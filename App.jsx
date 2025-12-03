@@ -4,7 +4,6 @@ import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
-import type { Exam, Student, Result } from './types';
 import { LogoIcon } from './components/Icons';
 import { 
     saveExamToFirebase, 
@@ -14,17 +13,15 @@ import {
     getAllResultsFromFirebase 
 } from './services/firebase';
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
-
-const App: React.FC = () => {
-  const [view, setView] = useState<View>('SELECTOR');
-  const [currentExam, setCurrentExam] = useState<Exam | null>(null);
-  const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
-  const [studentResult, setStudentResult] = useState<Result | null>(null);
+const App = () => {
+  const [view, setView] = useState('SELECTOR');
+  const [currentExam, setCurrentExam] = useState(null);
+  const [currentStudent, setCurrentStudent] = useState(null);
+  const [studentResult, setStudentResult] = useState(null);
   
   // State for Teacher Dashboard
-  const [exams, setExams] = useState<Record<string, Exam>>({});
-  const [results, setResults] = useState<Result[]>([]);
+  const [exams, setExams] = useState({});
+  const [results, setResults] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // --- TEACHER LOGIC ---
@@ -47,21 +44,21 @@ const App: React.FC = () => {
           });
   };
 
-  const addExam = useCallback(async (newExam: Exam) => {
+  const addExam = useCallback(async (newExam) => {
     // 1. Update Local State (Optimistic UI)
     setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
     // 2. Save to Firebase
     await saveExamToFirebase(newExam);
   }, []);
 
-  const updateExam = useCallback(async (updatedExam: Exam) => {
+  const updateExam = useCallback(async (updatedExam) => {
     setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
     await saveExamToFirebase(updatedExam);
   }, []);
   
   // --- STUDENT LOGIC ---
 
-  const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
+  const handleStudentLoginSuccess = async (examCode, student) => {
     // Fetch directly from Firebase to ensure student gets the latest exam version
     // even if they are on a different device than the teacher.
     const exam = await getExamFromFirebase(examCode);
@@ -81,12 +78,6 @@ const App: React.FC = () => {
           return;
       }
 
-      // Check for existing result (prevent double submission from same ID)
-      // Note: In a real backend app, this check should be done on server side.
-      // Here we rely on the specific doc ID generation in saveResultToFirebase overwriting or checking existence.
-      // But for UI feedback, we can try to fetch the result doc first? 
-      // For simplicity in this client-side logic, we proceed. Firebase rules can prevent overwrites if needed.
-
       setCurrentExam(exam);
       setCurrentStudent(student);
       setView('STUDENT_EXAM');
@@ -95,7 +86,7 @@ const App: React.FC = () => {
     }
   };
 
-  const calculateScore = useCallback((exam: Exam, answers: Record<string, string>): { score: number, correctCount: number } => {
+  const calculateScore = useCallback((exam, answers) => {
     let correctCount = 0;
     
     exam.questions.forEach(q => {
@@ -170,12 +161,12 @@ const App: React.FC = () => {
     return { score, correctCount };
   }, []);
 
-  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
+  const handleExamSubmit = useCallback(async (answers, timeLeft) => {
     if (!currentExam || !currentStudent) return;
     
     const { score, correctCount } = calculateScore(currentExam, answers);
 
-    const result: Result = {
+    const result = {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
@@ -198,12 +189,12 @@ const App: React.FC = () => {
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent, calculateScore]);
 
-  const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
+  const handleForceSubmit = useCallback(async (answers, timeLeft) => {
     if (!currentExam || !currentStudent) return;
 
     const { score, correctCount } = calculateScore(currentExam, answers);
 
-    const result: Result = {
+    const result = {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
@@ -224,9 +215,7 @@ const App: React.FC = () => {
     });
   }, [currentExam, currentStudent, calculateScore]);
 
-  const handleAllowContinuation = (studentId: string, examCode: string) => {
-      // In a real backend, this would update the status in Firestore.
-      // For now, we update local state which is fetched on load.
+  const handleAllowContinuation = (studentId, examCode) => {
       setResults(prev => prev.filter(r => !(r.student.studentId === studentId && r.examCode === examCode && r.status === 'force_submitted')));
       alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian ${examCode} (Instruksi: Minta siswa login ulang).`);
   };
