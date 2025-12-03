@@ -1,92 +1,93 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
+import type { Exam, Student, Result } from './types';
 import { LogoIcon } from './components/Icons';
 import { 
-    saveExamToFirebase, 
-    getExamFromFirebase, 
-    saveResultToFirebase, 
-    getAllExamsFromFirebase, 
-    getAllResultsFromFirebase 
+  getExamFromFirebase, 
+  saveResultToFirebase, 
+  saveExamToFirebase, 
+  updateExamInFirebase,
+  getAllExamsFromFirebase,
+  getAllResultsFromFirebase
 } from './services/firebase';
 
-const App = () => {
-  const [view, setView] = useState('SELECTOR');
-  const [currentExam, setCurrentExam] = useState(null);
-  const [currentStudent, setCurrentStudent] = useState(null);
-  const [studentResult, setStudentResult] = useState(null);
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
+
+const App: React.FC = () => {
+  const [view, setView] = useState<View>('SELECTOR');
+  const [currentExam, setCurrentExam] = useState<Exam | null>(null);
+  const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
+  const [studentResult, setStudentResult] = useState<Result | null>(null);
   
   // State for Teacher Dashboard
-  const [exams, setExams] = useState({});
-  const [results, setResults] = useState([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [exams, setExams] = useState<Record<string, Exam>>({});
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // --- TEACHER LOGIC ---
-
-  const handleTeacherLoginSuccess = () => {
-      // Start loading data from Firebase
-      setIsLoadingData(true);
-      Promise.all([getAllExamsFromFirebase(), getAllResultsFromFirebase()])
-          .then(([fetchedExams, fetchedResults]) => {
-              setExams(fetchedExams);
-              setResults(fetchedResults);
-              setIsLoadingData(false);
-              setView('TEACHER_DASHBOARD');
-          })
-          .catch(err => {
-              console.error("Failed to load initial data", err);
-              setIsLoadingData(false);
-              alert("Gagal memuat data dari database. Pastikan koneksi internet stabil.");
-              setView('TEACHER_DASHBOARD'); // Still let them in, maybe they want to create offline?
-          });
+  // Fetch data when teacher logs in
+  const handleTeacherLoginSuccess = async () => {
+    setLoading(true);
+    try {
+      // Parallel fetch for speed
+      const [fetchedExams, fetchedResults] = await Promise.all([
+        getAllExamsFromFirebase(),
+        getAllResultsFromFirebase()
+      ]);
+      setExams(fetchedExams);
+      setResults(fetchedResults);
+      setView('TEACHER_DASHBOARD');
+    } catch (e) {
+      alert("Gagal memuat data dari server. Silakan coba lagi.");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const addExam = useCallback(async (newExam) => {
-    // 1. Update Local State (Optimistic UI)
-    setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
-    // 2. Save to Firebase
-    await saveExamToFirebase(newExam);
-  }, []);
-
-  const updateExam = useCallback(async (updatedExam) => {
-    setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
-    await saveExamToFirebase(updatedExam);
-  }, []);
   
-  // --- STUDENT LOGIC ---
+  const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
+    setLoading(true);
+    try {
+      // Fetch specific exam from Firebase
+      const exam = await getExamFromFirebase(examCode);
+      
+      if (exam) {
+        const now = new Date();
+        const examStartDate = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
+        const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
-  const handleStudentLoginSuccess = async (examCode, student) => {
-    // Fetch directly from Firebase to ensure student gets the latest exam version
-    // even if they are on a different device than the teacher.
-    const exam = await getExamFromFirebase(examCode);
-    
-    if (exam) {
-      const now = new Date();
-      const examStartDate = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
-      const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
-
-      if (now < examStartDate) {
-        alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
-        return;
-      }
-
-      if (now > examEndDate) {
-          alert("Waktu untuk mengikuti ujian ini telah berakhir.");
+        // Validations
+        if (now < examStartDate) {
+          alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
           return;
-      }
+        }
 
-      setCurrentExam(exam);
-      setCurrentStudent(student);
-      setView('STUDENT_EXAM');
-    } else {
-      alert("Kode soal tidak ditemukan di sistem.");
+        if (now > examEndDate) {
+            alert("Waktu untuk mengikuti ujian ini telah berakhir.");
+            return;
+        }
+
+        // Check if student already took it (Optimistic check, ideal world should verify with DB)
+        // Since we don't load ALL results for students, we might skip this or do a quick specific query if needed.
+        // For now, we proceed to exam.
+
+        setCurrentExam(exam);
+        setCurrentStudent(student);
+        setView('STUDENT_EXAM');
+      } else {
+        alert("Kode soal tidak ditemukan atau koneksi bermasalah.");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan saat mencari ujian.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const calculateScore = useCallback((exam, answers) => {
+  const calculateScore = useCallback((exam: Exam, answers: Record<string, string>): { score: number, correctCount: number } => {
     let correctCount = 0;
     
     exam.questions.forEach(q => {
@@ -96,6 +97,7 @@ const App = () => {
             const correctAnswer = q.correctAnswer;
             if (!studentAnswer || !correctAnswer) return;
 
+            // Handle image-based (dataURL) or text-based answers
             if (correctAnswer.startsWith('data:image/')) {
                  if (studentAnswer === correctAnswer) {
                     correctCount++;
@@ -106,10 +108,11 @@ const App = () => {
                 }
             }
         } else if (q.questionType === 'TRUE_FALSE') {
+            // New logic for True/False Matrix
             if (q.trueFalseRows) {
                  if (!studentAnswer) return;
                  try {
-                     const studentArr = JSON.parse(studentAnswer);
+                     const studentArr = JSON.parse(studentAnswer); // Array of booleans
                      let allCorrect = true;
                      if (!Array.isArray(studentArr) || studentArr.length !== q.trueFalseRows.length) return;
                      
@@ -122,6 +125,7 @@ const App = () => {
                      if (allCorrect) correctCount++;
                  } catch(e) {}
             } else {
+                // Legacy fallback logic
                 const correctAnswer = q.correctAnswer;
                 if (!studentAnswer || !correctAnswer) return;
                 if (studentAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
@@ -132,6 +136,7 @@ const App = () => {
             const correctAnswer = q.correctAnswer;
             if (!studentAnswer || !correctAnswer) return;
             
+            // Check if arrays match (order doesn't matter for correctness check if we sort)
             const studentArr = studentAnswer.split(',').map(s => s.trim()).sort();
             const correctArr = correctAnswer.split(',').map(s => s.trim()).sort();
             
@@ -143,6 +148,7 @@ const App = () => {
             try {
                 const map = JSON.parse(studentAnswer);
                 let allCorrect = true;
+                // Strict scoring: All pairs must be correct to get the point
                 for (let i = 0; i < q.matchingPairs.length; i++) {
                     const expectedRight = q.matchingPairs[i].right;
                     const studentRight = map[i];
@@ -161,12 +167,13 @@ const App = () => {
     return { score, correctCount };
   }, []);
 
-  const handleExamSubmit = useCallback(async (answers, timeLeft) => {
+  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
-    
+    setLoading(true);
+
     const { score, correctCount } = calculateScore(currentExam, answers);
 
-    const result = {
+    const result: Result = {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
@@ -180,21 +187,24 @@ const App = () => {
         ],
         status: 'completed',
     };
-    
-    // Save to Firebase
+
+    // Save to Cloud
     await saveResultToFirebase(result);
 
+    // Update local state (optional, for immediate feedback if needed)
     setResults(prev => [...prev, result]);
     setStudentResult(result);
     setView('STUDENT_RESULT');
+    setLoading(false);
   }, [currentExam, currentStudent, calculateScore]);
 
-  const handleForceSubmit = useCallback(async (answers, timeLeft) => {
+  const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
-
+    
+    // Don't show full loading screen for force submit, just do it in bg
     const { score, correctCount } = calculateScore(currentExam, answers);
 
-    const result = {
+    const result: Result = {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
@@ -206,7 +216,6 @@ const App = () => {
         status: 'force_submitted',
     };
     
-    // Save to Firebase
     await saveResultToFirebase(result);
 
     setResults(prevResults => {
@@ -215,10 +224,33 @@ const App = () => {
     });
   }, [currentExam, currentStudent, calculateScore]);
 
-  const handleAllowContinuation = (studentId, examCode) => {
+  const handleAllowContinuation = async (studentId: string, examCode: string) => {
+      // In a real app, you would update the status in Firebase here.
+      // For this MVP, we just update local state to reflect the UI change, 
+      // but in a production environment, you should add a field to 'Result' (e.g. isLocked: false) 
+      // and update it via updateDoc.
+      
       setResults(prev => prev.filter(r => !(r.student.studentId === studentId && r.examCode === examCode && r.status === 'force_submitted')));
-      alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian ${examCode} (Instruksi: Minta siswa login ulang).`);
+      alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian ${examCode} (Instruksikan siswa untuk login kembali).`);
   };
+
+  const addExam = useCallback(async (newExam: Exam) => {
+    setLoading(true);
+    const success = await saveExamToFirebase(newExam);
+    if (success) {
+        setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
+    }
+    setLoading(false);
+  }, []);
+
+  const updateExam = useCallback(async (updatedExam: Exam) => {
+    setLoading(true);
+    const success = await updateExamInFirebase(updatedExam);
+    if (success) {
+         setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
+    }
+    setLoading(false);
+  }, []);
 
 
   const resetToHome = () => {
@@ -229,11 +261,11 @@ const App = () => {
   }
 
   const renderView = () => {
-    if (isLoadingData) {
+    if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-base-200">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-                <p className="text-gray-600 font-medium">Menghubungkan ke Database...</p>
+                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
+                <p className="text-lg font-semibold text-gray-600">Memuat data...</p>
             </div>
         )
     }
