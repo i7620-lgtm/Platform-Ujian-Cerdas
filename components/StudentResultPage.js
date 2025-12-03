@@ -1,7 +1,14 @@
-import React, { useEffect } from 'react';
-import { CheckCircleIcon } from './Icons';
 
-export const StudentResultPage = ({ result, onFinish }) => {
+import React, { useEffect } from 'react';
+import type { Result } from '../types';
+import { CheckCircleIcon, LogoIcon } from './Icons';
+
+interface StudentResultPageProps {
+  result: Result;
+  onFinish: () => void;
+}
+
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, onFinish }) => {
     
     useEffect(() => {
         // Prevent going back to the exam page
