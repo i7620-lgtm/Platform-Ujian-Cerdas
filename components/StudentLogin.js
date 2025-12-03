@@ -1,21 +1,28 @@
+
 import React, { useState } from 'react';
+import type { Student } from '../types';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 
-export const StudentLogin = ({ onLoginSuccess, onBack }) => {
+interface StudentLoginProps {
+  onLoginSuccess: (examCode: string, student: Student) => void;
+  onBack: () => void;
+}
+
+export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [examCode, setExamCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [studentClass, setStudentClass] = useState('');
   const [studentId, setStudentId] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!examCode || !fullName || !studentClass || !studentId) {
       setError('Semua field harus diisi.');
       return;
     }
     setError('');
-    const student = {
+    const student: Student = {
       fullName,
       class: studentClass,
       studentId,
