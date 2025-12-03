@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import type { Exam, Student, Question } from '../types';
 import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
 
-const formatTime = (seconds) => {
+interface StudentExamPageProps {
+  exam: Exam;
+  student: Student;
+  onSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+  onForceSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+}
+
+const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
 // Fisher-Yates shuffle algorithm
-const shuffleArray = (array) => {
+const shuffleArray = <T,>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -17,16 +25,22 @@ const shuffleArray = (array) => {
     return newArray;
 };
 
-const isDataUrl = (str) => str.startsWith('data:image/');
+const isDataUrl = (str: string) => str.startsWith('data:image/');
 
-const RenderContent = ({ content }) => {
+const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     if (isDataUrl(content)) {
         return <img src={content} alt="Konten Soal" className="max-w-full h-auto rounded-md border" />;
     }
     return <span className="break-words whitespace-pre-wrap">{content}</span>;
 };
 
-const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, onAnswerChange }) => {
+const QuestionDisplay: React.FC<{
+    question: Question;
+    index: number;
+    answer: string;
+    shuffleAnswers: boolean;
+    onAnswerChange: (questionId: string, answer: string) => void;
+}> = React.memo(({ question, index, answer, shuffleAnswers, onAnswerChange }) => {
 
     const shuffledOptions = useMemo(() => {
         if ((question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'COMPLEX_MULTIPLE_CHOICE') && question.options) {
@@ -53,7 +67,7 @@ const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, o
         return [];
     }, [question]);
 
-    const handleComplexChange = (option, isChecked) => {
+    const handleComplexChange = (option: string, isChecked: boolean) => {
         let current = answer ? answer.split(',') : [];
         if (isChecked) {
             if (!current.includes(option)) current.push(option);
@@ -63,8 +77,8 @@ const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, o
         onAnswerChange(question.id, current.join(','));
     };
 
-    const handleMatchingChange = (pairIndex, selectedRight) => {
-        let currentMap = {};
+    const handleMatchingChange = (pairIndex: number, selectedRight: string) => {
+        let currentMap: Record<string, string> = {};
         try {
             currentMap = answer ? JSON.parse(answer) : {};
         } catch (e) { currentMap = {}; }
@@ -74,8 +88,8 @@ const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, o
     };
 
     // Handle Matrix True/False logic
-    const handleTrueFalseMatrixChange = (rowIndex, val) => {
-        let currentArr = [];
+    const handleTrueFalseMatrixChange = (rowIndex: number, val: boolean) => {
+        let currentArr: boolean[] = [];
         try {
             // Initialize array if empty
             const saved = answer ? JSON.parse(answer) : [];
@@ -122,7 +136,7 @@ const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, o
             case 'TRUE_FALSE':
                 // Check if it's the new matrix format
                 if (question.trueFalseRows) {
-                     let currentAnswers = [];
+                     let currentAnswers: boolean[] = [];
                      try { currentAnswers = answer ? JSON.parse(answer) : []; } catch(e){}
 
                      return (
@@ -278,8 +292,8 @@ const QuestionDisplay = React.memo(({ question, index, answer, shuffleAnswers, o
 });
 
 
-export const StudentExamPage = ({ exam, student, onSubmit, onForceSubmit }) => {
-    const [answers, setAnswers] = useState(() => {
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, onSubmit, onForceSubmit }) => {
+    const [answers, setAnswers] = useState<Record<string, string>>(() => {
         try {
             const savedAnswers = localStorage.getItem(`exam_answers_${exam.code}_${student.studentId}`);
             return savedAnswers ? JSON.parse(savedAnswers) : {};
@@ -290,9 +304,9 @@ export const StudentExamPage = ({ exam, student, onSubmit, onForceSubmit }) => {
     
     const [timeLeft, setTimeLeft] = useState(exam.config.timeLimit * 60);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
-    const [saveStatus, setSaveStatus] = useState('idle');
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
-    const timerIdRef = useRef(null);
+    const timerIdRef = useRef<number | null>(null);
 
     const answersRef = useRef(answers);
     answersRef.current = answers;
@@ -384,7 +398,7 @@ export const StudentExamPage = ({ exam, student, onSubmit, onForceSubmit }) => {
     }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, student.studentId, exam.code, isForceSubmitted]);
 
 
-    const handleAnswerChange = useCallback((questionId, answer) => {
+    const handleAnswerChange = useCallback((questionId: string, answer: string) => {
         setAnswers(prev => ({
             ...prev,
             [questionId]: answer
