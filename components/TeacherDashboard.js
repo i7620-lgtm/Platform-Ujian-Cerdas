@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import type { Exam, Question, ExamConfig, Result, QuestionType } from '../types';
 import { 
     CloudArrowUpIcon, 
     ListBulletIcon, 
@@ -24,7 +25,7 @@ import {
 // --- COMPUTER VISION HELPERS (Client-Side Lightweight) ---
 
 // 1. Crop Image Base
-const cropImage = (sourceImage, x, y, w, h) => {
+const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, w: number, h: number): Promise<string> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
         canvas.width = w;
@@ -47,7 +48,7 @@ const cropImage = (sourceImage, x, y, w, h) => {
 };
 
 // 2. Add Padding
-const addWhitePadding = (dataUrl, padding = 10) => {
+const addWhitePadding = (dataUrl: string, padding: number = 10): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -68,7 +69,7 @@ const addWhitePadding = (dataUrl, padding = 10) => {
 };
 
 // 3. Refine Image Content (Safer Despeckle & Edge Cleaning)
-const refineImageContent = (dataUrl) => {
+const refineImageContent = (dataUrl: string): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -89,12 +90,12 @@ const refineImageContent = (dataUrl) => {
             const h = canvas.height;
 
             // Threshold strictness for "Ink"
-            const isInk = (idx) => data[idx] < 200 && data[idx + 1] < 200 && data[idx + 2] < 200;
+            const isInk = (idx: number) => data[idx] < 200 && data[idx + 1] < 200 && data[idx + 2] < 200;
 
             // B. Despeckle (Noise Removal) 
             // Only remove pixels that are ISOLATED (little to no neighbors). 
             const originalData = new Uint8ClampedArray(data);
-            const checkOriginalInk = (idx) => originalData[idx] < 200 && originalData[idx + 1] < 200 && originalData[idx + 2] < 200;
+            const checkOriginalInk = (idx: number) => originalData[idx] < 200 && originalData[idx + 1] < 200 && originalData[idx + 2] < 200;
 
             for (let y = 1; y < h - 1; y++) {
                 for (let x = 1; x < w - 1; x++) {
@@ -187,17 +188,17 @@ const refineImageContent = (dataUrl) => {
 
 // --- PDF PROCESSING ---
 
-const convertPdfToImages = (file, scale = 2.0) => {
+const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> => {
     return new Promise(async (resolve, reject) => {
-        const pdfjsLib = window.pdfjsLib;
+        const pdfjsLib = (window as any).pdfjsLib;
         if (!pdfjsLib) return reject(new Error("Pustaka PDF belum siap."));
 
         const reader = new FileReader();
         reader.onload = async (e) => {
             if (!e.target?.result) return reject(new Error("Gagal membaca file."));
             try {
-                const doc = await pdfjsLib.getDocument({ data: e.target.result }).promise;
-                const images = [];
+                const doc = await pdfjsLib.getDocument({ data: e.target.result as ArrayBuffer }).promise;
+                const images: string[] = [];
                 for (let i = 1; i <= doc.numPages; i++) {
                     const page = await doc.getPage(i);
                     const viewport = page.getViewport({ scale });
@@ -222,16 +223,43 @@ const convertPdfToImages = (file, scale = 2.0) => {
 
 // --- GEOMETRIC PDF PARSER ENGINE ---
 
-const parsePdfAndAutoCrop = async (file) => {
-    const pdfjsLib = window.pdfjsLib;
+interface VisualLine {
+    text: string;
+    pageIdx: number;
+    top: number;    
+    bottom: number;
+    left: number;   
+    width: number;
+    height: number;
+}
+
+interface Anchor {
+    type: 'QUESTION' | 'OPTION';
+    id: string; // "1", "A", etc.
+    pageIdx: number;
+    text: string;
+    x: number;
+    y: number; // Top Y
+    bottom: number; // Bottom Y of the anchor line
+    lineHeight: number;
+}
+
+interface PageData {
+    canvas: HTMLCanvasElement;
+    width: number;
+    height: number;
+}
+
+const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
+    const pdfjsLib = (window as any).pdfjsLib;
     if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
 
     const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     const numPages = doc.numPages;
     const SCALE = 2.0; 
 
-    const pagesData = [];
-    const allLines = [];
+    const pagesData: PageData[] = [];
+    const allLines: VisualLine[] = [];
 
     // --- STEP 1: RENDER PAGES & ASSEMBLE LINES ---
     for (let i = 1; i <= numPages; i++) {
@@ -253,7 +281,7 @@ const parsePdfAndAutoCrop = async (file) => {
         const textContent = await page.getTextContent();
         
         // Assemble Lines Logic (Reused)
-        const items = textContent.items.map((item) => {
+        const items = textContent.items.map((item: any) => {
             const h = (item.height || 10) * SCALE;
             const w = (item.width || 0) * SCALE;
             const pdfY = item.transform[5] * SCALE;
@@ -266,14 +294,14 @@ const parsePdfAndAutoCrop = async (file) => {
                 height: h,
                 width: w
             };
-        }).sort((a, b) => {
+        }).sort((a: any, b: any) => {
             const yDiff = a.top - b.top;
             if (Math.abs(yDiff) < 5) return a.x - b.x; 
             return yDiff; 
         });
 
-        let currentLine = null;
-        items.forEach((item) => {
+        let currentLine: VisualLine | null = null;
+        items.forEach((item: any) => {
             if (item.top > viewport.height * 0.94) return; // Footer
             if (item.top < viewport.height * 0.04) return; // Header
 
@@ -300,7 +328,7 @@ const parsePdfAndAutoCrop = async (file) => {
     }
 
     // --- STEP 2: DETECT ANCHORS (1., A., etc) ---
-    const anchors = [];
+    const anchors: Anchor[] = [];
     // Regex for Questions: "1.", "1)", "10."
     const qRegex = /^\s*(\d+)[\.\)]/;
     // Regex for Options: Matches A., a., A), a) ... E)
@@ -347,12 +375,12 @@ const parsePdfAndAutoCrop = async (file) => {
     });
 
     // --- STEP 3: BUILD GRID & CROP BOUNDS ---
-    const questions = [];
-    let currentQObj = {};
-    let currentOptions = [];
+    const questions: Question[] = [];
+    let currentQObj: Partial<Question> = {};
+    let currentOptions: {id: string, promise: Promise<string>}[] = [];
 
     // Helper to find Geometric Limits
-    const getCropRect = (anchor, index) => {
+    const getCropRect = (anchor: Anchor, index: number) => {
         const pageData = pagesData[anchor.pageIdx];
         const PADDING = 5;
         const MIN_Y = anchor.y - PADDING;
@@ -396,7 +424,7 @@ const parsePdfAndAutoCrop = async (file) => {
         return { x: MIN_X, y: MIN_Y, w: MAX_X - MIN_X, h: MAX_Y - MIN_Y, bottomAnchorFound: foundBottomAnchor };
     };
 
-    const processAnchorCrop = async (anchor, index) => {
+    const processAnchorCrop = async (anchor: Anchor, index: number): Promise<string> => {
         const rect = getCropRect(anchor, index);
         const pageData = pagesData[anchor.pageIdx];
         let finalImage = '';
@@ -491,7 +519,7 @@ const parsePdfAndAutoCrop = async (file) => {
 
 
 // Unified Plain Text Parser
-const parseQuestionsFromPlainText = (text) => {
+const parseQuestionsFromPlainText = (text: string): Question[] => {
     if (!text || !text.trim()) return [];
     
     const normalizedText = text
@@ -502,10 +530,10 @@ const parseQuestionsFromPlainText = (text) => {
         .replace(/\u2014/g, "--");
 
     const lines = normalizedText.split('\n');
-    const questions = [];
-    let currentQuestion = null;
-    let currentOptions = [];
-    let currentAnswerKey = undefined;
+    const questions: Question[] = [];
+    let currentQuestion: (Partial<Question> & { textParts: string[] }) | null = null;
+    let currentOptions: string[] = [];
+    let currentAnswerKey: string | undefined = undefined;
 
     const questionStartPattern = /^\s*(?:soal|no\.?|nomor)?\s*(\d+)[\.\)\-\s]\s*(.*)/i;
     // Matches (a), [a], a., a), A., A) - restricted to a-e for consistency
@@ -515,8 +543,8 @@ const parseQuestionsFromPlainText = (text) => {
     const finalizeCurrentQuestion = () => {
         if (currentQuestion && currentQuestion.textParts.length > 0) {
             const questionText = currentQuestion.textParts.join('\n').trim();
-            let finalCorrectAnswer = undefined;
-            let questionType = 'ESSAY';
+            let finalCorrectAnswer: string | undefined = undefined;
+            let questionType: QuestionType = 'ESSAY';
             
             const trimmedOptions = currentOptions.map(opt => opt.trim());
 
@@ -580,7 +608,20 @@ const generateExamCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
-const RemainingTime = ({ exam }) => {
+interface TeacherDashboardProps {
+    addExam: (newExam: Exam) => void;
+    updateExam: (updatedExam: Exam) => void;
+    exams: Record<string, Exam>;
+    results: Result[];
+    onLogout: () => void;
+    onAllowContinuation: (studentId: string, examCode: string) => void;
+}
+
+type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS';
+type InputMethod = 'paste' | 'upload';
+
+
+const RemainingTime: React.FC<{ exam: Exam }> = ({ exam }) => {
     const calculateTimeLeft = () => {
         const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
         const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
@@ -614,10 +655,10 @@ const RemainingTime = ({ exam }) => {
 };
 
 
-export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout, onAllowContinuation }) => {
-    const [view, setView] = useState('UPLOAD');
-    const [questions, setQuestions] = useState([]);
-    const [config, setConfig] = useState({
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, updateExam, exams, results, onLogout, onAllowContinuation }) => {
+    const [view, setView] = useState<TeacherView>('UPLOAD');
+    const [questions, setQuestions] = useState<Question[]>([]);
+    const [config, setConfig] = useState<ExamConfig>({
         timeLimit: 60,
         date: new Date().toISOString().split('T')[0],
         startTime: '08:00',
@@ -632,25 +673,25 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [inputText, setInputText] = useState(''); 
-    const [uploadedFile, setUploadedFile] = useState(null);
-    const [inputMethod, setInputMethod] = useState('paste');
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [inputMethod, setInputMethod] = useState<InputMethod>('paste');
     const [generatedCode, setGeneratedCode] = useState('');
     const [manualMode, setManualMode] = useState(false);
     
-    const [previewImages, setPreviewImages] = useState([]);
+    const [previewImages, setPreviewImages] = useState<string[]>([]);
     
-    const [selectedOngoingExam, setSelectedOngoingExam] = useState(null);
-    const [selectedFinishedExam, setSelectedFinishedExam] = useState(null);
+    const [selectedOngoingExam, setSelectedOngoingExam] = useState<Exam | null>(null);
+    const [selectedFinishedExam, setSelectedFinishedExam] = useState<Exam | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingExam, setEditingExam] = useState(null);
+    const [editingExam, setEditingExam] = useState<Exam | null>(null);
     
     // Type Selection Modal State
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
-    const [insertIndex, setInsertIndex] = useState(null); // null means add to end
+    const [insertIndex, setInsertIndex] = useState<number | null>(null); // null means add to end
     
-    const questionsSectionRef = useRef(null);
-    const generatedCodeSectionRef = useRef(null);
-    const headerRef = useRef(null);
+    const questionsSectionRef = useRef<HTMLDivElement>(null);
+    const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
+    const headerRef = useRef<HTMLElement>(null);
     const [analysisCompleted, setAnalysisCompleted] = useState(false);
     
     useEffect(() => {
@@ -695,8 +736,8 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         loadPreview();
     }, [uploadedFile]);
 
-    const extractTextFromPdf = async (file) => {
-        const pdfjsLib = window.pdfjsLib;
+    const extractTextFromPdf = async (file: File): Promise<string> => {
+        const pdfjsLib = (window as any).pdfjsLib;
         if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
         
         const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -704,7 +745,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         for (let i = 1; i <= doc.numPages; i++) {
             const page = await doc.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item) => item.str).join(' ');
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
             fullText += pageText + "\n\n";
         }
         return fullText;
@@ -731,7 +772,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
             return;
         }
         const blocks = inputText.split(/\n\s*\n/);
-        const newQuestions = blocks.filter(b => b.trim().length > 0).map((block, index) => ({
+        const newQuestions: Question[] = blocks.filter(b => b.trim().length > 0).map((block, index) => ({
             id: `manual-q-${Date.now()}-${index}`,
             questionText: block.trim(),
             questionType: 'ESSAY', 
@@ -776,7 +817,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }
     };
 
-    const isDataUrl = (str) => str.startsWith('data:image/');
+    const isDataUrl = (str: string) => str.startsWith('data:image/');
 
      const handleManualCreateClick = () => {
         setInputText('');
@@ -789,10 +830,10 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         setAnalysisCompleted(true);
     };
 
-    const handleConfigChange = (e) => {
+    const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
-            const { checked } = e.target;
+            const { checked } = e.target as HTMLInputElement;
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
                 if (name === 'detectBehavior' && !checked) {
@@ -805,12 +846,12 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }
     };
 
-    const handleCorrectAnswerChange = (questionId, answer) => {
+    const handleCorrectAnswerChange = (questionId: string, answer: string) => {
         setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
     };
 
     // New handler for Complex MC checkboxes
-    const handleComplexCorrectAnswerChange = (questionId, option, isChecked) => {
+    const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) {
                 let currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : [];
@@ -825,12 +866,12 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
     
-    const handleDeleteQuestion = (id) => {
+    const handleDeleteQuestion = (id: string) => {
         setQuestions(prev => prev.filter(q => q.id !== id));
     };
     
     // Updated Create Question Function for different types
-    const createNewQuestion = (type) => {
+    const createNewQuestion = (type: QuestionType): Question => {
         const base = {
             id: `q-${Date.now()}-${Math.random()}`,
             questionText: '',
@@ -875,12 +916,12 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     };
 
     // Open Modal for Add
-    const openTypeSelectionModal = (index = null) => {
+    const openTypeSelectionModal = (index: number | null = null) => {
         setInsertIndex(index);
         setIsTypeSelectionModalOpen(true);
     };
 
-    const handleSelectQuestionType = (type) => {
+    const handleSelectQuestionType = (type: QuestionType) => {
         const newQuestion = createNewQuestion(type);
         if (insertIndex === null) {
             // Add to end
@@ -898,7 +939,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         setInsertIndex(null);
     };
 
-    const handleAddOption = (questionId) => {
+    const handleAddOption = (questionId: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId && q.options) {
                 const nextChar = String.fromCharCode(65 + q.options.length); // A, B, C...
@@ -910,7 +951,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const handleDeleteOption = (questionId, indexToRemove) => {
+    const handleDeleteOption = (questionId: string, indexToRemove: number) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId && q.options && q.options.length > 1) { // Prevent removing last option
                 const optionToRemove = q.options[indexToRemove];
@@ -942,7 +983,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     };
 
     // Handle Matching Pair logic
-    const handleMatchingPairChange = (qId, idx, field, value) => {
+    const handleMatchingPairChange = (qId: string, idx: number, field: 'left' | 'right', value: string) => {
          setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.matchingPairs) {
                 const newPairs = [...q.matchingPairs];
@@ -953,7 +994,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const handleAddMatchingPair = (qId) => {
+    const handleAddMatchingPair = (qId: string) => {
         setQuestions(prev => prev.map(q => {
              if (q.id === qId && q.matchingPairs) {
                  return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] };
@@ -962,7 +1003,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
     
-    const handleDeleteMatchingPair = (qId, idx) => {
+    const handleDeleteMatchingPair = (qId: string, idx: number) => {
          setQuestions(prev => prev.map(q => {
              if (q.id === qId && q.matchingPairs && q.matchingPairs.length > 1) {
                  const newPairs = q.matchingPairs.filter((_, i) => i !== idx);
@@ -973,7 +1014,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     };
 
     // --- TRUE/FALSE MATRIX HANDLERS ---
-    const handleTrueFalseRowTextChange = (qId, idx, val) => {
+    const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.trueFalseRows) {
                 const newRows = [...q.trueFalseRows];
@@ -984,7 +1025,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const handleTrueFalseRowAnswerChange = (qId, idx, val) => {
+    const handleTrueFalseRowAnswerChange = (qId: string, idx: number, val: boolean) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.trueFalseRows) {
                 const newRows = [...q.trueFalseRows];
@@ -995,7 +1036,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const handleAddTrueFalseRow = (qId) => {
+    const handleAddTrueFalseRow = (qId: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.trueFalseRows) {
                 const nextNum = q.trueFalseRows.length + 1;
@@ -1005,7 +1046,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const handleDeleteTrueFalseRow = (qId, idx) => {
+    const handleDeleteTrueFalseRow = (qId: string, idx: number) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.trueFalseRows && q.trueFalseRows.length > 1) {
                 const newRows = q.trueFalseRows.filter((_, i) => i !== idx);
@@ -1022,7 +1063,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }
 
         const code = generateExamCode();
-        const newExam = {
+        const newExam: Exam = {
             code,
             questions,
             config
@@ -1040,7 +1081,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
             return;
         }
         
-        const updatedExam = {
+        const updatedExam: Exam = {
             code: editingExam.code,
             questions,
             config
@@ -1074,11 +1115,11 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         setView('UPLOAD');
     };
 
-    const handleQuestionTextChange = (id, text) => {
+    const handleQuestionTextChange = (id: string, text: string) => {
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     };
 
-    const handleOptionTextChange = (qId, optIndex, text) => {
+    const handleOptionTextChange = (qId: string, optIndex: number, text: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.options) {
                 const oldOption = q.options[optIndex];
@@ -1103,13 +1144,13 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     };
 
     // Handle Image Upload for Question/Option (Separate from text)
-    const handleImageUpload = (e, qId, optIndex) => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, qId: string, optIndex?: number) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = (ev) => {
-            const dataUrl = ev.target?.result;
+            const dataUrl = ev.target?.result as string;
             setQuestions(prev => prev.map(q => {
                 if (q.id === qId) {
                     if (optIndex !== undefined) {
@@ -1131,7 +1172,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         e.target.value = '';
     };
 
-    const handleDeleteImage = (qId, optIndex) => {
+    const handleDeleteImage = (qId: string, optIndex?: number) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId) {
                 if (optIndex !== undefined) {
@@ -1148,7 +1189,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
         }));
     };
 
-    const renderEditorView = (isEditing) => (
+    const renderEditorView = (isEditing: boolean) => (
          <div className="space-y-10">
              <div ref={questionsSectionRef} className="space-y-4">
                  <div className="p-4 bg-primary/5 rounded-lg">
@@ -1789,7 +1830,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
 
     const renderOngoingExamsView = () => {
         const now = new Date();
-        const allExams = Object.values(exams);
+        const allExams: Exam[] = Object.values(exams);
 
         const ongoingExams = allExams.filter((exam) => {
             const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
@@ -1839,7 +1880,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
 
     const renderUpcomingExamsView = () => {
         const now = new Date();
-        const allExams = Object.values(exams);
+        const allExams: Exam[] = Object.values(exams);
         
         const upcomingExams = allExams.filter((exam) => {
             const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
@@ -1893,7 +1934,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
 
     const renderFinishedExamsView = () => {
         const now = new Date();
-        const allExams = Object.values(exams);
+        const allExams: Exam[] = Object.values(exams);
         
         const finishedExams = allExams.filter((exam) => {
             const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
@@ -2099,7 +2140,7 @@ export const TeacherDashboard = ({ addExam, updateExam, exams, results, onLogout
     const renderTypeSelectionModal = () => {
         if (!isTypeSelectionModalOpen) return null;
         
-        const types = [
+        const types: {type: QuestionType, label: string, desc: string, icon: React.FC<any>}[] = [
             { type: 'INFO', label: 'Keterangan / Info', desc: 'Hanya teks atau gambar, tanpa pertanyaan.', icon: FileTextIcon },
             { type: 'MULTIPLE_CHOICE', label: 'Pilihan Ganda', desc: 'Satu jawaban benar dari beberapa opsi.', icon: ListBulletIcon },
             { type: 'COMPLEX_MULTIPLE_CHOICE', label: 'Pilihan Ganda Kompleks', desc: 'Lebih dari satu jawaban benar.', icon: CheckCircleIcon },
