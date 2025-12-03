@@ -1,12 +1,18 @@
+
 import React, { useState } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 
-export const TeacherLogin = ({ onLoginSuccess, onBack }) => {
+interface TeacherLoginProps {
+  onLoginSuccess: () => void;
+  onBack: () => void;
+}
+
+export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [teacherId, setTeacherId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     // Simple mock authentication
