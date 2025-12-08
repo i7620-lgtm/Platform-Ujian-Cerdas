@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
@@ -31,7 +32,6 @@ const sanitizeExam = (exam: any) => {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         // 1. Initial Table Setup
-        // We do NOT suppress errors here anymore so we can see if table creation fails.
         try {
             await db.query(`
                 CREATE TABLE IF NOT EXISTS exams (
@@ -44,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `);
         } catch (initError: any) {
             console.error("DB Init Error:", initError);
-            // If table creation fails, return 500 immediately so we know why.
             return res.status(500).json({ 
                 error: "Database Initialization Failed", 
                 details: initError.message,
@@ -79,7 +78,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             } catch (fetchError: any) {
                 console.error("GET Exams Error:", fetchError);
-                // Expose actual error
                 return res.status(500).json({ 
                     error: "Failed to fetch exams", 
                     details: fetchError.message,
@@ -112,11 +110,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(200).json({ success: true });
             } catch (postError: any) {
                 console.error("POST Exam Error:", postError);
-                // Expose actual error
                 return res.status(500).json({ 
                     error: "Failed to save exam", 
                     details: postError.message,
                     code: postError.code
+                });
+            }
+        }
+        
+        else if (req.method === 'PATCH') {
+            // New Method to handle Granular Image Updates (Split & Stitch)
+            try {
+                const { code, questionId, imageUrl, optionImages } = req.body;
+                
+                if (!code || !questionId) {
+                    return res.status(400).json({ error: "Missing code or questionId" });
+                }
+
+                // 1. Fetch current questions
+                const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
+                if (result.rows.length === 0) return res.status(404).json({ error: "Exam not found" });
+
+                let questions = JSON.parse(result.rows[0].questions);
+
+                // 2. Find and Update specific question
+                let updated = false;
+                questions = questions.map((q: any) => {
+                    if (q.id === questionId) {
+                        updated = true;
+                        // Merge new image data into existing question
+                        if (imageUrl !== undefined) q.imageUrl = imageUrl;
+                        if (optionImages !== undefined) q.optionImages = optionImages;
+                    }
+                    return q;
+                });
+
+                if (!updated) return res.status(404).json({ error: "Question ID not found" });
+
+                // 3. Save back
+                await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [
+                    JSON.stringify(questions), 
+                    code
+                ]);
+
+                return res.status(200).json({ success: true });
+
+            } catch (patchError: any) {
+                console.error("PATCH Exam Error:", patchError);
+                return res.status(500).json({ 
+                    error: "Failed to update exam image", 
+                    details: patchError.message 
                 });
             }
         }
