@@ -21,28 +21,17 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
         if (trueFalseRows) {
             sanitizedQ.trueFalseRows = trueFalseRows.map(row => ({
                 text: row.text,
-                answer: false // Dummy value or simply remove property type-wise if strict
-            })) as any; // Cast to avoid TS error, in real API this field is just omitted
+                answer: false // Dummy value
+            })) as any; 
         }
 
         // Remove answers from Matching
         if (matchingPairs) {
             sanitizedQ.matchingPairs = matchingPairs.map(pair => ({
                 left: pair.left,
-                right: '' // Empty right side or shuffled options handled by frontend display logic
-                // In a real secure backend, we might send 'optionsRight' as a separate shuffled array
+                right: '' 
             }));
         }
-
-        // Note: For standard matching, we usually send { left: 'A', right: 'X' } but 'right' is the CORRECT pair.
-        // For student, we should just send a list of Left items and a separate list of Right items to be shuffled.
-        // For this hybrid mock, we keep the structure but empty the 'right' association if we want strict security,
-        // BUT StudentExamPage relies on `matchingPairs[i].right` to display the dropdown options.
-        // SO: Ideally we assume `matchingPairs` contains the Correct Mapping.
-        // To secure it, we should NOT send the Correct Mapping.
-        // We will send the list of rights separately? 
-        // For Simplicity in this "Mock": We will keep matchingPairs logic in the component but in a REAL backend, 
-        // you would send `itemsLeft` and `itemsRight` arrays separately.
         
         return sanitizedQ;
     });
@@ -123,7 +112,7 @@ class StorageService {
   constructor() {
     window.addEventListener('online', () => {
       this.isOnline = true;
-      this.syncData();
+      // Removed auto sync on constructor to prevent errors on landing page
     });
     window.addEventListener('offline', () => {
       this.isOnline = false;
@@ -158,17 +147,13 @@ class StorageService {
   // For Student: Get Public Data (Sanitized)
   async getExamForStudent(code: string): Promise<Exam | null> {
       // 1. Try to get from local first (if student already downloaded it)
-      // Note: In a real app, we might check if the local version is 'teacher version' or 'student version'.
-      // Here we assume if it's in local, it might be the teacher's copy (full) or student cache.
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
 
       // 2. If not local, try online
       if (!exam && this.isOnline) {
           try {
-              // In real Vercel backend: GET /api/exams/:code/public
-              // This endpoint would return the sanitized JSON
-              const response = await fetch(`${API_URL}/exams/${code}/public`);
+              const response = await fetch(`${API_URL}/exams?code=${code}&public=true`);
               if (response.ok) {
                   exam = await response.json();
               }
@@ -180,8 +165,6 @@ class StorageService {
       if (!exam) return null;
 
       // 3. SECURITY STEP: Always sanitize before returning to component
-      // This ensures even if we loaded the Teacher's full version from LocalStorage,
-      // the Student View never receives the answers in props.
       return sanitizeExamForStudent(exam);
   }
 
@@ -215,13 +198,17 @@ class StorageService {
             const response = await fetch(`${API_URL}/results`);
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
+                // Merge logic: prefer cloud if exists
                 const combined = [...localResults];
                 cloudResults.forEach(cRes => {
-                    const exists = combined.some(lRes => 
+                    const idx = combined.findIndex(lRes => 
                         lRes.examCode === cRes.examCode && lRes.student.studentId === cRes.student.studentId
                     );
-                    if (!exists) {
+                    if (idx === -1) {
                         combined.push({ ...cRes, isSynced: true });
+                    } else {
+                        // Update local if cloud is newer or simply to sync status
+                        combined[idx] = { ...cRes, isSynced: true };
                     }
                 });
                 this.saveLocal(KEYS.RESULTS, combined);
@@ -232,14 +219,28 @@ class StorageService {
     return localResults;
   }
 
-  // Submit Result from Student
+  // Optimized fetch for single student check
+  async getStudentResult(examCode: string, studentId: string): Promise<Result | undefined> {
+    // Check local first
+    const localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
+    let result = localResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
+
+    if (!result && this.isOnline) {
+        try {
+            // In a real optimized backend, we would have GET /api/results?studentId=...
+            // For now, we fetch all results but this is triggered only on student login, not app load
+            const allCloudResults = await this.getResults(); 
+            result = allCloudResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
+        } catch (e) {}
+    }
+    return result;
+  }
+
   async submitExamResult(resultPayload: Omit<Result, 'score' | 'correctAnswers' | 'status'>): Promise<Result> {
     
     // 1. Try Online Grading first
     if (this.isOnline) {
         try {
-            // POST /api/submit-exam
-            // Backend will load the FULL exam, grade it, and return the scored result
             const response = await fetch(`${API_URL}/submit-exam`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -248,7 +249,7 @@ class StorageService {
             
             if (response.ok) {
                 const gradedResult: Result = await response.json();
-                this.saveResultLocal(gradedResult, true); // Save the Graded version
+                this.saveResultLocal(gradedResult, true); 
                 return gradedResult;
             }
         } catch (e) {
@@ -257,18 +258,13 @@ class StorageService {
     }
 
     // 2. Offline Mode
-    // We CANNOT grade strictly offline because we don't have the keys (they were sanitized).
-    // EXCEPT: If this device happens to be the Teacher's device (has full exam in localStorage), we could theoretically grade.
-    // But for consistency: Student Mode Offline = Pending Grading.
-    
-    // Check if we happen to have the full exam locally (Teacher Device testing Student Mode)
     const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const fullExam = allExams[resultPayload.examCode];
     
     let gradedResult: Result;
 
     if (fullExam && fullExam.questions[0].correctAnswer) {
-        // We have the keys locally! We can grade immediately (Teacher Mode / Insecure Mode)
+        // Teacher Device Mode
         const { score, correctCount } = gradeExam(fullExam, resultPayload.answers);
         gradedResult = {
             ...resultPayload,
@@ -279,12 +275,12 @@ class StorageService {
             timestamp: Date.now()
         };
     } else {
-        // We do NOT have keys. Secure Student Mode.
+        // Secure Student Mode
         gradedResult = {
             ...resultPayload,
-            score: 0, // Placeholder
-            correctAnswers: 0, // Placeholder
-            status: 'pending_grading', // MARKER
+            score: 0,
+            correctAnswers: 0,
+            status: 'pending_grading',
             isSynced: false,
             timestamp: Date.now()
         };
@@ -302,7 +298,6 @@ class StorageService {
   }
 
   async saveResult(result: Result): Promise<void> {
-      // Direct save mainly for Teacher manual override or forced updates
       this.saveResultLocal(result, false);
       this.syncData();
   }
@@ -311,7 +306,7 @@ class StorageService {
   async syncData() {
     if (!this.isOnline) return;
 
-    // 1. Sync Pending Exams (Teacher uploads)
+    // 1. Sync Pending Exams
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const pendingExams = Object.values(exams).filter(e => !e.isSynced);
     for (const exam of pendingExams) {
@@ -326,14 +321,13 @@ class StorageService {
     }
     this.saveLocal(KEYS.EXAMS, exams);
 
-    // 2. Sync Pending Results (Student submissions)
+    // 2. Sync Pending Results
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     const pendingResults = results.filter(r => !r.isSynced);
     let resultsUpdated = false;
 
     for (const res of pendingResults) {
          try {
-             // If it was pending grading, we submit for grading
              const endpoint = res.status === 'pending_grading' ? '/submit-exam' : '/results';
              
              const response = await fetch(`${API_URL}${endpoint}`, {
@@ -344,7 +338,6 @@ class StorageService {
             
             if (response.ok) {
                 if (res.status === 'pending_grading') {
-                    // Update the local result with the graded one from server
                     const graded: Result = await response.json();
                     const idx = results.findIndex(r => r.examCode === res.examCode && r.student.studentId === res.student.studentId);
                     if (idx !== -1) results[idx] = { ...graded, isSynced: true };
