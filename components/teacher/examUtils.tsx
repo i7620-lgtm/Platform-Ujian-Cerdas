@@ -1,4 +1,5 @@
 
+
 import type { Question, QuestionType } from '../../types';
 
 // --- INTERFACES ---
@@ -356,7 +357,7 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
     let currentQObj: Partial<Question> = {};
     let currentOptions: {id: string, promise: Promise<string>}[] = [];
 
-    const getCropRect = (anchor: Anchor, index: number) => {
+    const getCropRect = (anchor: Anchor) => {
         const pageData = pagesData[anchor.pageIdx];
         const PADDING = 5;
         const MIN_Y = anchor.y - PADDING;
@@ -393,7 +394,7 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
     };
 
     const processAnchorCrop = async (anchor: Anchor, index: number): Promise<string> => {
-        const rect = getCropRect(anchor, index);
+        const rect = getCropRect(anchor); // Removed index from here
         const pageData = pagesData[anchor.pageIdx];
         let finalImage = '';
 
@@ -403,7 +404,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
             const h1 = pageData.height - rect.y - (pageData.height * 0.05);
             const img1 = await cropImage(pageData.canvas, rect.x, rect.y, rect.w, h1);
 
-            const nextAnchor = anchors[index + 1];
+            const nextIndex = index + 1; // Explicitly use index here
+            const nextAnchor = anchors[nextIndex]; // This is the usage!
             if (nextAnchor && nextAnchor.pageIdx === anchor.pageIdx + 1) {
                 const page2 = pagesData[nextAnchor.pageIdx];
                 const h2 = nextAnchor.y - (page2.height * 0.05); 
