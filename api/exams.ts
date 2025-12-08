@@ -43,6 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 );
             `);
         } catch (initError) {
+            console.error("DB Init Error:", initError);
             // Ignore init error. If DB is missing, subsequent queries will fail and be caught below.
         }
 
@@ -72,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(200).json(parsedRows);
 
             } catch (fetchError) {
+                console.error("GET Exams Error:", fetchError);
                 // CRITICAL: Return 200 [] on ANY error to allow LocalStorage fallback without console noise
                 return res.status(200).json([]);
             }
@@ -100,6 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 return res.status(200).json({ success: true });
             } catch (postError) {
+                console.error("POST Exam Error:", postError);
                 // For POST, we can return error so frontend knows sync failed
                 return res.status(503).json({ error: "Cloud sync failed" });
             }
@@ -107,6 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         return res.status(405).json({ error: 'Method not allowed' });
     } catch (globalError: any) {
+        console.error("Global Handler Error:", globalError);
         // Global fallback for unexpected runtime crashes
         if (req.method === 'GET') return res.status(200).json([]);
         return res.status(500).json({ error: globalError.message });
