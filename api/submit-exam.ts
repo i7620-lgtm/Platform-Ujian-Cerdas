@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './db';
+import db from './db';
 
 // Logic Penilaian
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
@@ -54,39 +54,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS results (
-                exam_code TEXT,
-                student_id TEXT,
-                student_name TEXT,
-                student_class TEXT,
-                answers TEXT,
-                score INTEGER,
-                correct_answers INTEGER,
-                total_questions INTEGER,
-                status TEXT,
-                activity_log TEXT,
-                timestamp BIGINT,
-                PRIMARY KEY (exam_code, student_id)
-            );
-        `);
+        // Init table (Silent fail)
+        try {
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS results (
+                    exam_code TEXT,
+                    student_id TEXT,
+                    student_name TEXT,
+                    student_class TEXT,
+                    answers TEXT,
+                    score INTEGER,
+                    correct_answers INTEGER,
+                    total_questions INTEGER,
+                    status TEXT,
+                    activity_log TEXT,
+                    timestamp BIGINT,
+                    PRIMARY KEY (exam_code, student_id)
+                );
+            `);
+        } catch (e) {}
 
         const { examCode, student, answers, activityLog, completionTime } = req.body;
 
-        // 1. Ambil Kunci Jawaban Asli dari Database
-        const examResult = await pool.query('SELECT * FROM exams WHERE code = $1', [examCode]);
-        if (examResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Exam not found' });
+        // 1. Ambil Kunci Jawaban Asli
+        const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
+        if (!examResult || examResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Exam not found (Offline)' });
         }
         const fullExam = examResult.rows[0];
 
-        // 2. Lakukan Penilaian di Server
+        // 2. Lakukan Penilaian
         const grading = calculateGrade(fullExam, answers);
-
-        // 3. Tentukan Status
         const status = req.body.status || 'completed';
 
-        // 4. Simpan Hasil ke Database
+        // 3. Simpan Hasil
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
@@ -103,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 activity_log = EXCLUDED.activity_log;
         `;
 
-        await pool.query(query, [
+        await db.query(query, [
             examCode,
             student.studentId,
             student.fullName,
@@ -130,7 +131,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
     } catch (error: any) {
-        console.error("Submit Exam Error:", error);
-        return res.status(500).json({ error: error.message });
+        // If DB fails, return 503 so frontend knows to keep local copy as 'pending_grading'
+        // console.error("Submit Exam Error:", error);
+        return res.status(503).json({ error: "Database unavailable" });
     }
 }
