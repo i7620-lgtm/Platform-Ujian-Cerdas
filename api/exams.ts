@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './db.js';
+import pool from './db';
 
 // Helper to remove answers for students
 const sanitizeExam = (exam: any) => {
-    const questions = exam.questions.map((q: any) => {
+    const questions = JSON.parse(exam.questions || '[]').map((q: any) => {
         const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
         const sanitized = { ...rest };
         
@@ -26,6 +26,17 @@ const sanitizeExam = (exam: any) => {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
+        // AUTOMATIC TABLE MIGRATION
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS exams (
+                code TEXT PRIMARY KEY,
+                author_id TEXT,
+                questions TEXT,
+                config TEXT,
+                created_at BIGINT
+            );
+        `);
+
         if (req.method === 'GET') {
             const { code } = req.query;
 
@@ -40,16 +51,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(200).json(cleanExam);
             }
 
-            // Case 2: Teacher syncing all exams (Ideally should be protected by auth)
+            // Case 2: Teacher syncing all exams
             const result = await pool.query('SELECT * FROM exams ORDER BY created_at DESC');
-            return res.status(200).json(result.rows);
+            const parsedRows = result.rows.map(row => ({
+                ...row,
+                questions: JSON.parse(row.questions || '[]'),
+                config: JSON.parse(row.config || '{}'),
+                createdAt: parseInt(row.created_at)
+            }));
+            return res.status(200).json(parsedRows);
         } 
         
         else if (req.method === 'POST') {
             // Teacher uploading/syncing an exam
             const exam = req.body;
             
-            // Upsert (Insert or Update)
             const query = `
                 INSERT INTO exams (code, author_id, questions, config, created_at)
                 VALUES ($1, $2, $3, $4, $5)
