@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './db.js';
+import pool from './db';
 
 // Helper to remove answers for students
 const sanitizeExam = (exam: any) => {
