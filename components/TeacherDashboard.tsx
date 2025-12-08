@@ -99,6 +99,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
         setQuestions([]);
         setGeneratedCode('');
         setManualMode(false);
+        setEditingExam(null);
         setConfig({
             timeLimit: 60,
             date: new Date().toISOString().split('T')[0],
