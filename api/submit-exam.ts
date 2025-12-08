@@ -54,7 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        // AUTOMATIC TABLE MIGRATION
         await pool.query(`
             CREATE TABLE IF NOT EXISTS results (
                 exam_code TEXT,
@@ -131,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
     } catch (error: any) {
-        console.error(error);
+        console.error("Submit Exam Error:", error);
         return res.status(500).json({ error: error.message });
     }
 }
