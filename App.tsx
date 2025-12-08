@@ -1,6 +1,6 @@
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -24,25 +24,38 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Load Data on Mount
-  useEffect(() => {
-    const loadData = async () => {
-        setIsSyncing(true);
+  // Keep track of view for event listeners
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
+
+  // Centralized Data Loader
+  const loadData = useCallback(async () => {
+    setIsSyncing(true);
+    try {
         const loadedExams = await storageService.getExams();
         const loadedResults = await storageService.getResults();
         setExams(loadedExams);
         setResults(loadedResults);
+        return { loadedExams, loadedResults };
+    } catch (e) {
+        console.error("Failed to load data:", e);
+        return { loadedExams: {}, loadedResults: [] };
+    } finally {
         setIsSyncing(false);
-    };
-    loadData();
+    }
+  }, []);
 
+  // Connection Listeners
+  useEffect(() => {
     const handleOnline = () => {
         setIsOnline(true);
-        // Refresh results when back online to see if pending grades are finished
-        setTimeout(async () => {
-            const loadedResults = await storageService.getResults();
-            setResults(loadedResults);
-        }, 2000);
+        // Only auto-sync if logged in (in Dashboard or Exam modes)
+        // This prevents API calls on the landing page
+        if (['TEACHER_DASHBOARD', 'STUDENT_EXAM', 'STUDENT_RESULT'].includes(viewRef.current)) {
+            setTimeout(() => {
+                loadData();
+            }, 2000);
+        }
     };
     const handleOffline = () => setIsOnline(false);
     
@@ -52,11 +65,18 @@ const App: React.FC = () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [loadData]);
 
-  const handleTeacherLoginSuccess = () => setView('TEACHER_DASHBOARD');
+  const handleTeacherLoginSuccess = async () => {
+      // Fetch data only when teacher logs in
+      await loadData();
+      setView('TEACHER_DASHBOARD');
+  };
   
   const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
+    // Fetch data specifically when student attempts to login to ensure fresh results check
+    const { loadedResults } = await loadData();
+
     // SECURITY: Use getExamForStudent to ensure we get the public version (no answers)
     // even if the full exam is locally available (hybrid mode)
     const exam = await storageService.getExamForStudent(examCode);
@@ -76,7 +96,8 @@ const App: React.FC = () => {
           return;
       }
 
-      const existingResult = results.find(r => r.student.studentId === student.studentId && r.examCode === examCode);
+      // Use the freshly loaded results for validation
+      const existingResult = loadedResults.find(r => r.student.studentId === student.studentId && r.examCode === examCode);
       if (existingResult) {
           if (existingResult.status === 'completed' || existingResult.status === 'pending_grading') {
                if (!exam.config.allowRetakes) {
