@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -28,18 +27,26 @@ const App: React.FC = () => {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
-  // Centralized Data Loader
-  const loadData = useCallback(async () => {
+  // --- SEPARATED DATA FETCHERS (Only called on demand) ---
+  const refreshExams = useCallback(async () => {
     setIsSyncing(true);
     try {
         const loadedExams = await storageService.getExams();
-        const loadedResults = await storageService.getResults();
         setExams(loadedExams);
-        setResults(loadedResults);
-        return { loadedExams, loadedResults };
     } catch (e) {
-        console.error("Failed to load data:", e);
-        return { loadedExams: {}, loadedResults: [] };
+        console.error("Failed to load exams:", e);
+    } finally {
+        setIsSyncing(false);
+    }
+  }, []);
+
+  const refreshResults = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+        const loadedResults = await storageService.getResults();
+        setResults(loadedResults);
+    } catch (e) {
+        console.error("Failed to load results:", e);
     } finally {
         setIsSyncing(false);
     }
@@ -49,12 +56,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleOnline = () => {
         setIsOnline(true);
-        // Only auto-sync if logged in (in Dashboard or Exam modes)
-        // This prevents API calls on the landing page
-        if (['TEACHER_DASHBOARD', 'STUDENT_EXAM', 'STUDENT_RESULT'].includes(viewRef.current)) {
-            setTimeout(() => {
-                loadData();
-            }, 2000);
+        // Only sync if in dashboard
+        if (viewRef.current === 'TEACHER_DASHBOARD') {
+            storageService.syncData();
         }
     };
     const handleOffline = () => setIsOnline(false);
@@ -65,56 +69,66 @@ const App: React.FC = () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
     };
-  }, [loadData]);
+  }, []);
 
   const handleTeacherLoginSuccess = async () => {
-      // Fetch data only when teacher logs in
-      await loadData();
+      // Do NOT fetch everything on login. Dashboard will fetch what it needs.
       setView('TEACHER_DASHBOARD');
   };
   
   const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
-    // Fetch data specifically when student attempts to login to ensure fresh results check
-    const { loadedResults } = await loadData();
+    setIsSyncing(true);
+    try {
+      // 1. Fetch SPECIFIC Exam only
+      const exam = await storageService.getExamForStudent(examCode);
+      
+      if (!exam) {
+        alert("Kode soal tidak ditemukan atau gagal memuat soal.");
+        setIsSyncing(false);
+        return;
+      }
 
-    // SECURITY: Use getExamForStudent to ensure we get the public version (no answers)
-    // even if the full exam is locally available (hybrid mode)
-    const exam = await storageService.getExamForStudent(examCode);
-    
-    if (exam) {
+      // 2. Fetch SPECIFIC Result only to check status
+      const existingResult = await storageService.getStudentResult(examCode, student.studentId);
+      
       const now = new Date();
       const examStartDate = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
       const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
       if (now < examStartDate) {
         alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
+        setIsSyncing(false);
         return;
       }
 
       if (now > examEndDate) {
           alert("Waktu untuk mengikuti ujian ini telah berakhir.");
+          setIsSyncing(false);
           return;
       }
 
-      // Use the freshly loaded results for validation
-      const existingResult = loadedResults.find(r => r.student.studentId === student.studentId && r.examCode === examCode);
       if (existingResult) {
           if (existingResult.status === 'completed' || existingResult.status === 'pending_grading') {
                if (!exam.config.allowRetakes) {
                    alert("Anda sudah menyelesaikan ujian ini.");
+                   setIsSyncing(false);
                    return;
                }
           }
           if (existingResult.status === 'force_submitted') {
               alert("Ujian Anda ditangguhkan. Silakan hubungi guru untuk mendapatkan izin melanjutkan.");
+              setIsSyncing(false);
               return;
           }
       }
       setCurrentExam(exam);
       setCurrentStudent(student);
       setView('STUDENT_EXAM');
-    } else {
-      alert("Kode soal tidak ditemukan atau gagal memuat soal.");
+    } catch (e) {
+      console.error(e);
+      alert("Terjadi kesalahan saat memuat data ujian.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -122,7 +136,6 @@ const App: React.FC = () => {
   const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
     
-    // We send payload to Service. Service decides whether to grade (online) or save as pending (offline).
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -136,8 +149,6 @@ const App: React.FC = () => {
     };
     
     const finalResult = await storageService.submitExamResult(resultPayload);
-    
-    setResults(prev => [...prev.filter(r => !(r.examCode === finalResult.examCode && r.student.studentId === finalResult.student.studentId)), finalResult]);
     setStudentResult(finalResult);
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
@@ -145,7 +156,6 @@ const App: React.FC = () => {
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
 
-    // For force submit, we mark status explicitly
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -156,48 +166,39 @@ const App: React.FC = () => {
         status: 'force_submitted' as const,
     };
     
-    // We calculate tentative score inside service if possible, or 0 if pending
-    // But since this is FORCE submit, status overrides pending
-    // We reuse submitExamResult logic but patch the status
-    
-    // Actually, force_submit usually implies we want to grade it as is.
-    // If offline, we can't grade.
-    
-    // Simplified: Just save it.
     const result: Result = {
         ...resultPayload,
         score: 0, 
         correctAnswers: 0,
         status: 'force_submitted'
     };
-    // If online, we might want to grade it? Let's leave it as 0 for force submit until teacher reviews?
-    // Or we try to submit via service to get grade.
     
-    // Let's rely on service logic but force the status after
     const finalResult = await storageService.submitExamResult(result as any);
-    finalResult.status = 'force_submitted'; // Ensure status is force_submitted
+    finalResult.status = 'force_submitted'; 
     await storageService.saveResult(finalResult);
-
-    setResults(prevResults => {
-        const otherResults = prevResults.filter(r => !(r.student.studentId === currentStudent.studentId && r.examCode === currentExam.code));
-        return [...otherResults, finalResult];
-    });
+    // Student stays on exam page but blocked by UI
   }, [currentExam, currentStudent]);
 
-  const handleAllowContinuation = (studentId: string, examCode: string) => {
+  const handleAllowContinuation = async (studentId: string, examCode: string) => {
+      // Optimistic Update
       setResults(prev => prev.filter(r => !(r.student.studentId === studentId && r.examCode === examCode && r.status === 'force_submitted')));
       alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian ${examCode}.`);
+      // Re-fetch to confirm from server
+      await refreshResults();
   };
 
   const addExam = useCallback(async (newExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
     await storageService.saveExam(newExam);
-  }, []);
+    // Refresh to ensure sync status is correct
+    await refreshExams();
+  }, [refreshExams]);
 
   const updateExam = useCallback(async (updatedExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
     await storageService.saveExam(updatedExam);
-  }, []);
+    await refreshExams();
+  }, [refreshExams]);
 
   const resetToHome = () => {
     setCurrentExam(null);
@@ -206,7 +207,7 @@ const App: React.FC = () => {
     setView('SELECTOR');
   }
 
-  // --- UI Components for Connectivity ---
+  // --- UI Components ---
   const SyncStatus = () => (
       <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           {!isOnline && (
@@ -229,7 +230,16 @@ const App: React.FC = () => {
       case 'STUDENT_LOGIN':
         return <StudentLogin onLoginSuccess={handleStudentLoginSuccess} onBack={() => setView('SELECTOR')} />;
       case 'TEACHER_DASHBOARD':
-        return <TeacherDashboard addExam={addExam} updateExam={updateExam} exams={exams} results={results} onLogout={resetToHome} onAllowContinuation={handleAllowContinuation} />;
+        return <TeacherDashboard 
+                  addExam={addExam} 
+                  updateExam={updateExam} 
+                  exams={exams} 
+                  results={results} 
+                  onLogout={resetToHome} 
+                  onAllowContinuation={handleAllowContinuation}
+                  onRefreshExams={refreshExams}
+                  onRefreshResults={refreshResults}
+                />;
       case 'STUDENT_EXAM':
         if (currentExam && currentStudent) {
           return <StudentExamPage exam={currentExam} student={currentStudent} onSubmit={handleExamSubmit} onForceSubmit={handleForceSubmit} />;
