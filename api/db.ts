@@ -8,7 +8,7 @@ try {
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, // Diperlukan untuk Neon/Vercel Postgres
-            connectionTimeoutMillis: 5000, // Timeout cepat (5 detik) agar tidak hang
+            connectionTimeoutMillis: 15000, // Timeout ditingkatkan ke 15 detik untuk Cold Start Neon
             idleTimeoutMillis: 10000, 
         });
         
