@@ -2,6 +2,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
+// Global variable to cache schema check status within the same lambda instance
+let isSchemaChecked = false;
+
 // Helper to remove answers for students
 const sanitizeExam = (exam: any) => {
     try {
@@ -29,9 +32,12 @@ const sanitizeExam = (exam: any) => {
     }
 };
 
-// Safe Schema Migration Helper
+// Safe Schema Migration Helper - Optimized
 const ensureSchema = async () => {
+    if (isSchemaChecked) return; // Skip if already checked in this instance
+
     try {
+        console.log("Checking DB Schema...");
         await db.query(`
             CREATE TABLE IF NOT EXISTS exams (
                 code TEXT PRIMARY KEY, 
@@ -41,18 +47,18 @@ const ensureSchema = async () => {
                 created_at BIGINT DEFAULT 0
             );
         `);
-        // Attempt to add columns if table existed but columns didn't (Idempotent)
-        // We catch errors individually to ensure one failure doesn't block the request
+        // Split alters to avoid failure if one exists
         try { await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';`); } catch(e) {}
         try { await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;`); } catch(e) {}
+        
+        isSchemaChecked = true;
+        console.log("Schema check passed.");
     } catch (e) {
         console.error("Schema init warning:", e);
-        // Do not throw here, try to proceed with the request anyway
     }
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // 1. Set CORS headers explicitly to avoid issues
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -64,7 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // 2. Initialize Schema (Non-blocking if possible, but awaited for safety on first run)
         await ensureSchema();
 
         if (req.method === 'GET') {
@@ -99,6 +104,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(400).json({ error: "Invalid payload: 'code' is required." });
             }
 
+            // DATA INTEGRITY LOGGING
+            console.log(`[POST Save Exam] Code: ${exam.code}`);
+            console.log(`Payload Size: approx ${JSON.stringify(exam).length} characters`);
+            console.log(`Questions Count: ${exam.questions?.length || 0}`);
+
             // Ensure values are safe
             const authorId = exam.authorId || 'anonymous';
             const createdAt = exam.createdAt || Date.now();
@@ -122,6 +132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (req.method === 'PATCH') {
             const { code, questionId, imageUrl, optionImages } = req.body;
             
+            console.log(`[PATCH Image] Code: ${code}, QID: ${questionId}`);
+
             if (!code || !questionId) {
                 return res.status(400).json({ error: "Missing code or questionId" });
             }
@@ -155,7 +167,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
     } catch (globalError: any) {
         console.error("API Handler Fatal Error:", globalError);
-        // Important: Return JSON 500 so frontend can handle it, rather than crashing silently
         return res.status(500).json({ 
             error: "Internal Server Error", 
             message: globalError.message, 
