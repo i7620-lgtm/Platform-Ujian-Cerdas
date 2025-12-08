@@ -54,7 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        // Init table (Silent fail)
         try {
             await db.query(`
                 CREATE TABLE IF NOT EXISTS results (
@@ -72,7 +71,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     PRIMARY KEY (exam_code, student_id)
                 );
             `);
-        } catch (e) {}
+        } catch (e: any) {
+             console.error("DB Init Error (Results):", e);
+             return res.status(500).json({ error: "DB Init Failed", details: e.message });
+        }
 
         const { examCode, student, answers, activityLog, completionTime } = req.body;
 
@@ -131,8 +133,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
     } catch (error: any) {
-        // If DB fails, return 503 so frontend knows to keep local copy as 'pending_grading'
-        // console.error("Submit Exam Error:", error);
-        return res.status(503).json({ error: "Database unavailable" });
+        console.error("Submit Exam Error:", error);
+        return res.status(500).json({ 
+            error: "Submission Failed", 
+            details: error.message,
+            code: error.code
+        });
     }
 }
