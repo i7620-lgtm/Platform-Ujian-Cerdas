@@ -1,5 +1,9 @@
 import { Pool } from 'pg';
 
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is missing");
+}
+
 // Connection String will be provided via Vercel Environment Variables
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
