@@ -1,16 +1,36 @@
 import { Pool } from 'pg';
 
-if (!process.env.DATABASE_URL) {
-  console.warn("DATABASE_URL environment variable is missing. Database operations will fail gracefully.");
+let pool: Pool | undefined;
+
+// Hanya inisialisasi Pool jika DATABASE_URL tersedia
+try {
+    if (process.env.DATABASE_URL) {
+        pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }, // Diperlukan untuk Neon/Vercel Postgres
+            connectionTimeoutMillis: 5000, // Timeout cepat (5 detik) agar tidak hang
+            idleTimeoutMillis: 10000, 
+        });
+        
+        // Tangkap error tak terduga pada client yang idle agar tidak crash
+        pool.on('error', (err) => {
+            console.warn('Unexpected error on idle DB client', err);
+        });
+    } else {
+        // Ini normal saat dev lokal tanpa env vars, atau saat build
+        // console.warn("DATABASE_URL is not defined. API will work in offline mode.");
+    }
+} catch (err) {
+    console.error("Failed to initialize pool:", err);
 }
 
-// Connection String will be provided via Vercel Environment Variables
-// We provide a fallback to prevent immediate crash during initialization in dev/build environments
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://user:pass@localhost:5432/db_placeholder',
-  ssl: process.env.DATABASE_URL ? {
-    rejectUnauthorized: false, // Required for Neon
-  } : undefined,
-});
-
-export default pool;
+// Export wrapper function, bukan pool langsung
+export default {
+    query: async (text: string, params?: any[]) => {
+        if (!pool) {
+            // Lempar error spesifik yang akan ditangkap handler untuk fallback ke mode offline
+            throw new Error("DATABASE_URL_MISSING");
+        }
+        return pool.query(text, params);
+    }
+};
