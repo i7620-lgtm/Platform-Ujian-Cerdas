@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
@@ -55,8 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         try {
+            // Table Renamed to results_v1
             await db.query(`
-                CREATE TABLE IF NOT EXISTS results (
+                CREATE TABLE IF NOT EXISTS results_v1 (
                     exam_code TEXT,
                     student_id TEXT,
                     student_name TEXT,
@@ -79,7 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { examCode, student, answers, activityLog, completionTime } = req.body;
 
         // 1. Ambil Kunci Jawaban Asli
-        const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
+        // Referencing exams_v1
+        const examResult = await db.query('SELECT * FROM exams_v1 WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) {
             return res.status(404).json({ error: 'Exam not found (Offline)' });
         }
@@ -90,8 +93,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const status = req.body.status || 'completed';
 
         // 3. Simpan Hasil
+        // Using results_v1
         const query = `
-            INSERT INTO results (
+            INSERT INTO results_v1 (
                 exam_code, student_id, student_name, student_class, 
                 answers, score, correct_answers, total_questions, 
                 status, activity_log, timestamp
