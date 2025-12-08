@@ -72,7 +72,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleTeacherLoginSuccess = async () => {
-      // Do NOT fetch everything on login. Dashboard will fetch what it needs.
+      // Do NOT fetch everything on login. Dashboard will fetch what it needs via its own useEffect.
       setView('TEACHER_DASHBOARD');
   };
   
@@ -92,7 +92,8 @@ const App: React.FC = () => {
       const existingResult = await storageService.getStudentResult(examCode, student.studentId);
       
       const now = new Date();
-      const examStartDate = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
+      const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+      const examStartDate = new Date(`${dateStr}T${exam.config.startTime}`);
       const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
       if (now < examStartDate) {
@@ -156,6 +157,7 @@ const App: React.FC = () => {
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
 
+    // Construct the payload as expected by submitExamResult (without status)
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -163,20 +165,16 @@ const App: React.FC = () => {
         totalQuestions: currentExam.questions.length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: ["Ujian dihentikan paksa karena siswa terdeteksi membuka aplikasi/tab lain."],
-        status: 'force_submitted' as const,
     };
     
-    const result: Result = {
-        ...resultPayload,
-        score: 0, 
-        correctAnswers: 0,
-        status: 'force_submitted'
-    };
+    // Submit normally first to get the grade
+    const finalResult = await storageService.submitExamResult(resultPayload);
     
-    const finalResult = await storageService.submitExamResult(result as any);
+    // Then forcibly update status and save again
     finalResult.status = 'force_submitted'; 
     await storageService.saveResult(finalResult);
-    // Student stays on exam page but blocked by UI
+    
+    // Alert is handled by UI locking
   }, [currentExam, currentStudent]);
 
   const handleAllowContinuation = async (studentId: string, examCode: string) => {
