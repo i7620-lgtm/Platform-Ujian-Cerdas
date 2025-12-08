@@ -168,6 +168,7 @@ class StorageService {
       return sanitizeExamForStudent(exam);
   }
 
+  // UPDATED: "Split & Stitch" Logic for Heavy Exams
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const examToSave = { ...exam, isSynced: false, createdAt: exam.createdAt || Date.now() };
@@ -176,15 +177,70 @@ class StorageService {
 
     if (this.isOnline) {
         try {
-            await fetch(`${API_URL}/exams`, {
+            // STEP 1: Separate Skeleton and Images
+            const skeletonExam = JSON.parse(JSON.stringify(examToSave));
+            const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
+
+            // Traverse questions to find images
+            skeletonExam.questions.forEach((q: any) => {
+                let hasImage = false;
+                if (q.imageUrl && q.imageUrl.startsWith('data:image/')) {
+                    hasImage = true;
+                }
+                if (q.optionImages && q.optionImages.some((img: string) => img && img.startsWith('data:image/'))) {
+                    hasImage = true;
+                }
+
+                if (hasImage) {
+                    imageQueue.push({
+                        qId: q.id,
+                        imageUrl: q.imageUrl,
+                        optionImages: q.optionImages
+                    });
+                    // Strip heavy data from skeleton
+                    delete q.imageUrl;
+                    delete q.optionImages;
+                }
+            });
+
+            // STEP 2: Send Skeleton (Tiny Payload)
+            const skeletonPayload = JSON.stringify(skeletonExam);
+            console.log("Sending Skeleton...", (skeletonPayload.length / 1024).toFixed(2), "KB");
+            
+            const skelResponse = await fetch(`${API_URL}/exams`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(examToSave)
+                body: skeletonPayload
             });
+
+            if (!skelResponse.ok) throw new Error("Failed to save exam skeleton");
+
+            // STEP 3: Stitch Images via PATCH (Granular Upload)
+            if (imageQueue.length > 0) {
+                console.log(`Uploading ${imageQueue.length} image sets...`);
+                for (const item of imageQueue) {
+                    // Send one question's images at a time
+                    await fetch(`${API_URL}/exams`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: exam.code,
+                            questionId: item.qId,
+                            imageUrl: item.imageUrl,
+                            optionImages: item.optionImages
+                        })
+                    });
+                }
+            }
+
+            // Success
             exams[exam.code].isSynced = true;
             this.saveLocal(KEYS.EXAMS, exams);
+            console.log("Exam synced successfully with Split & Stitch.");
+
         } catch (e) {
-            console.warn("Cloud save failed, data queued.");
+            console.error("Cloud save failed:", e);
+            // Alerting is handled by UI implicitly via sync status
         }
     }
   }
@@ -311,12 +367,8 @@ class StorageService {
     const pendingExams = Object.values(exams).filter(e => !e.isSynced);
     for (const exam of pendingExams) {
         try {
-            await fetch(`${API_URL}/exams`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(exam)
-            });
-            exams[exam.code].isSynced = true;
+            // Use the new Split & Stitch Logic for sync as well
+            await this.saveExam(exam);
         } catch (e) {}
     }
     this.saveLocal(KEYS.EXAMS, exams);
