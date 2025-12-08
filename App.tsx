@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -6,7 +7,7 @@ import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import type { Exam, Student, Result } from './types';
-import { LogoIcon, CloudArrowUpIcon, WifiIcon, NoWifiIcon } from './components/Icons';
+import { LogoIcon, CloudArrowUpIcon, NoWifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
