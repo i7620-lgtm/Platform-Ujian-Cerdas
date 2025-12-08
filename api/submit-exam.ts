@@ -1,5 +1,8 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
+
+let isSchemaChecked = false;
 
 // Logic Penilaian
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
@@ -50,23 +53,18 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
     return { score, correctCount, totalQuestions: questions.length };
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
+const ensureSchema = async () => {
+    if (isSchemaChecked) return;
     try {
-        // Safe Migration for Results table (Split Queries)
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS results (
-                    exam_code TEXT,
-                    student_id TEXT,
-                    answers TEXT,
-                    score INTEGER,
-                    PRIMARY KEY (exam_code, student_id)
-                );
-            `);
-        } catch (e: any) { console.error("Results Table Create Error:", e.message); }
-        
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS results (
+                exam_code TEXT,
+                student_id TEXT,
+                answers TEXT,
+                score INTEGER,
+                PRIMARY KEY (exam_code, student_id)
+            );
+        `);
         const alterQueries = [
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;",
@@ -76,10 +74,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
         ];
-
         for (const q of alterQueries) {
             try { await db.query(q); } catch (e) { /* Ignore */ }
         }
+        isSchemaChecked = true;
+    } catch (e: any) { console.error("Results Table Init Error:", e.message); }
+};
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    try {
+        await ensureSchema();
 
         const { examCode, student, answers, activityLog } = req.body;
 
