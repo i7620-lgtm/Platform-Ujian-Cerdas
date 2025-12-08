@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -188,15 +187,15 @@ const App: React.FC = () => {
   const addExam = useCallback(async (newExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
     await storageService.saveExam(newExam);
-    // Refresh to ensure sync status is correct
-    await refreshExams();
-  }, [refreshExams]);
+    // Removed refreshExams() call. Local state is updated optimistically.
+    // Server sync happens in background via storageService.saveExam
+  }, []);
 
   const updateExam = useCallback(async (updatedExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
     await storageService.saveExam(updatedExam);
-    await refreshExams();
-  }, [refreshExams]);
+    // Removed refreshExams() call.
+  }, []);
 
   const resetToHome = () => {
     setCurrentExam(null);
