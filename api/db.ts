@@ -4,21 +4,25 @@ import { Pool } from 'pg';
 let pool: Pool | undefined;
 
 const getPool = () => {
-    // Re-initialize if undefined (e.g. after error or cold start context loss)
-    if (!pool && process.env.DATABASE_URL) {
-        console.log("Initializing DB Pool...");
+    // Re-initialize if undefined
+    if (!pool) {
+        if (!process.env.DATABASE_URL) {
+            console.error("DATABASE_URL is missing from environment variables.");
+            throw new Error("DATABASE_CONFIG_MISSING");
+        }
+
+        console.log("Initializing DB Pool (Serverless Optimized)...");
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
-            // Neon and Vercel Postgres require SSL. 
-            // rejectUnauthorized: false is often needed for self-signed certs in serverless envs.
-            ssl: { rejectUnauthorized: false }, 
-            connectionTimeoutMillis: 5000, // 5s connection timeout per attempt
-            idleTimeoutMillis: 20000,       
-            max: 5                          
+            ssl: { rejectUnauthorized: false }, // Required for Neon
+            max: 1, // CRITICAL: Limit to 1 connection per lambda to prevent exhaustion
+            connectionTimeoutMillis: 3000, // Fail fast (3s) instead of hanging
+            idleTimeoutMillis: 1000, // Close idle connections quickly
         });
         
         pool.on('error', (err) => {
             console.error('Unexpected error on idle DB client', err);
+            // Don't exit process in serverless, just log
         });
     }
     return pool;
@@ -26,41 +30,32 @@ const getPool = () => {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Export wrapper function with RETRY LOGIC
 export default {
     query: async (text: string, params?: any[]) => {
-        let currentPool = getPool();
-        if (!currentPool) {
-            console.error("DATABASE_URL missing.");
-            throw new Error("DATABASE_NOT_CONFIGURED");
-        }
-
-        let retries = 3;
-        while (retries > 0) {
+        let retries = 2; // Reduced retries to avoid Vercel 10s timeout limit
+        
+        while (retries >= 0) {
             try {
+                const currentPool = getPool();
                 return await currentPool.query(text, params);
             } catch (err: any) {
-                console.warn(`Query failed (Retries left: ${retries - 1}). Error: ${err.message}`);
-                
-                // Retry on connection issues or wake-up timeouts
-                // 57P03: cannot_connect_now (system starting up)
-                // 08006: connection_failure
-                // 08001: sqlclient_unable_to_establish_sqlconnection
                 const isConnectionError = 
-                    err.code === '57P03' || 
-                    err.code === '08006' || 
-                    err.code === '08001' ||
+                    err.code === '57P03' || // starting_up
+                    err.code === '08006' || // connection_failure
+                    err.code === '08001' || // sqlclient_unable_to_establish_sqlconnection
                     err.message.includes('timeout') || 
-                    err.message.includes('ECONNRESET') ||
                     err.message.includes('Connection terminated');
 
-                if (isConnectionError && retries > 1) {
+                if (isConnectionError && retries > 0) {
+                    console.warn(`DB Connection Warning: ${err.message}. Retrying in 1s...`);
                     retries--;
-                    await sleep(1500); // Wait 1.5s before retrying
+                    await sleep(1000); // Shorter sleep (1s)
                     continue; 
                 }
                 
-                throw err; // Throw if not retryable or out of retries
+                // If it's not a connection error, or we ran out of retries, throw immediately
+                console.error("DB Query Fatal Error:", err);
+                throw err; 
             }
         }
     }
