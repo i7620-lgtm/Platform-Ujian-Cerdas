@@ -4,32 +4,35 @@ import db from './db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
+        // Safe Migration for Results table
         try {
-            // Table Renamed to results_v1
             await db.query(`
-                CREATE TABLE IF NOT EXISTS results_v1 (
+                CREATE TABLE IF NOT EXISTS results (
                     exam_code TEXT,
                     student_id TEXT,
-                    student_name TEXT,
-                    student_class TEXT,
                     answers TEXT,
                     score INTEGER,
-                    correct_answers INTEGER,
-                    total_questions INTEGER,
-                    status TEXT,
-                    activity_log TEXT,
-                    timestamp BIGINT,
                     PRIMARY KEY (exam_code, student_id)
                 );
             `);
+            
+            // Add new columns safely
+            await db.query(`
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;
+            `);
         } catch (e: any) {
-            console.error("DB Init Error (Results):", e);
-            return res.status(500).json({ error: "DB Init Failed", details: e.message });
+            console.error("DB Init Error (Results):", e.message);
         }
 
         if (req.method === 'GET') {
             try {
-                // Using results_v1
+                // Using 'results' table
                 const result = await db.query(`
                     SELECT 
                         exam_code,
@@ -43,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         status,
                         activity_log,
                         timestamp
-                    FROM results_v1 
+                    FROM results 
                     ORDER BY timestamp DESC
                 `);
 
@@ -60,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     totalQuestions: row.total_questions,
                     status: row.status,
                     activityLog: JSON.parse(row.activity_log || '[]'),
-                    timestamp: parseInt(row.timestamp)
+                    timestamp: parseInt(row.timestamp || '0')
                 })) || [];
 
                 return res.status(200).json(formatted);
