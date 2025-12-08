@@ -1,6 +1,5 @@
 
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result } from '../types';
 import { 
     CheckCircleIcon, 
@@ -22,11 +21,15 @@ interface TeacherDashboardProps {
     results: Result[];
     onLogout: () => void;
     onAllowContinuation: (studentId: string, examCode: string) => void;
+    onRefreshExams: () => Promise<void>;
+    onRefreshResults: () => Promise<void>;
 }
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS';
 
-export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, updateExam, exams, results, onLogout, onAllowContinuation }) => {
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
+    addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
+}) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     
     // Editor State
@@ -46,8 +49,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
     
     const [generatedCode, setGeneratedCode] = useState('');
     const [manualMode, setManualMode] = useState(false);
-    
-    // Key to force reset child components
     const [resetKey, setResetKey] = useState(0);
 
     // Modal & Selection States
@@ -56,7 +57,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
 
-    // -- Handlers --
+    // --- LAZY FETCHING LOGIC ---
+    useEffect(() => {
+        // Only fetch what is needed for the current view
+        if (view === 'ONGOING') {
+            onRefreshExams();
+            onRefreshResults();
+        } else if (view === 'UPCOMING_EXAMS') {
+            onRefreshExams();
+        } else if (view === 'FINISHED_EXAMS') {
+            onRefreshExams();
+            onRefreshResults();
+        }
+        // 'UPLOAD' view does NOT trigger fetch to prevent errors on mount
+    }, [view, onRefreshExams, onRefreshResults]);
+
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => {
         setQuestions(newQuestions);
@@ -75,7 +90,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
             questions,
             config
         };
-        addExam(newExam);
+        addExam(newExam); // App.tsx handles the refresh after adding
         setGeneratedCode(code);
     };
 
@@ -116,7 +131,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
             continueWithPermission: false,
         });
         setView('UPLOAD');
-        // Increment key to force CreationView to remount and clear inputs
         setResetKey(prev => prev + 1);
     };
 
