@@ -3,7 +3,6 @@ import db from './db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
-        // Init Table (Silent fail)
         try {
             await db.query(`
                 CREATE TABLE IF NOT EXISTS results (
@@ -21,7 +20,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     PRIMARY KEY (exam_code, student_id)
                 );
             `);
-        } catch (e) {}
+        } catch (e: any) {
+            console.error("DB Init Error (Results):", e);
+            return res.status(500).json({ error: "DB Init Failed", details: e.message });
+        }
 
         if (req.method === 'GET') {
             try {
@@ -59,15 +61,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 })) || [];
 
                 return res.status(200).json(formatted);
-            } catch (fetchError) {
-                // CRITICAL: Return 200 [] on failure (e.g. DB missing) to suppress console errors
-                return res.status(200).json([]);
+            } catch (fetchError: any) {
+                console.error("GET Results Error:", fetchError);
+                return res.status(500).json({ 
+                    error: "Failed to fetch results", 
+                    details: fetchError.message,
+                    code: fetchError.code 
+                });
             }
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
     } catch (globalError: any) {
-         if (req.method === 'GET') return res.status(200).json([]);
          return res.status(500).json({ error: globalError.message });
     }
 }
