@@ -29,9 +29,9 @@ const sanitizeExam = (exam: any) => {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Wrap entire logic in try-catch to handle DB init errors gracefully
     try {
-        // 1. Initial Table Setup (Silent fail if DB missing)
+        // 1. Initial Table Setup
+        // We do NOT suppress errors here anymore so we can see if table creation fails.
         try {
             await db.query(`
                 CREATE TABLE IF NOT EXISTS exams (
@@ -42,9 +42,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     created_at BIGINT
                 );
             `);
-        } catch (initError) {
+        } catch (initError: any) {
             console.error("DB Init Error:", initError);
-            // Ignore init error. If DB is missing, subsequent queries will fail and be caught below.
+            // If table creation fails, return 500 immediately so we know why.
+            return res.status(500).json({ 
+                error: "Database Initialization Failed", 
+                details: initError.message,
+                code: initError.code 
+            });
         }
 
         if (req.method === 'GET') {
@@ -72,10 +77,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 return res.status(200).json(parsedRows);
 
-            } catch (fetchError) {
+            } catch (fetchError: any) {
                 console.error("GET Exams Error:", fetchError);
-                // CRITICAL: Return 200 [] on ANY error to allow LocalStorage fallback without console noise
-                return res.status(200).json([]);
+                // Expose actual error
+                return res.status(500).json({ 
+                    error: "Failed to fetch exams", 
+                    details: fetchError.message,
+                    code: fetchError.code
+                });
             }
         } 
         
@@ -101,18 +110,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ]);
 
                 return res.status(200).json({ success: true });
-            } catch (postError) {
+            } catch (postError: any) {
                 console.error("POST Exam Error:", postError);
-                // For POST, we can return error so frontend knows sync failed
-                return res.status(503).json({ error: "Cloud sync failed" });
+                // Expose actual error
+                return res.status(500).json({ 
+                    error: "Failed to save exam", 
+                    details: postError.message,
+                    code: postError.code
+                });
             }
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
     } catch (globalError: any) {
         console.error("Global Handler Error:", globalError);
-        // Global fallback for unexpected runtime crashes
-        if (req.method === 'GET') return res.status(200).json([]);
         return res.status(500).json({ error: globalError.message });
     }
 }
