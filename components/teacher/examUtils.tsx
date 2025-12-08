@@ -32,6 +32,36 @@ interface PageData {
 
 // --- COMPUTER VISION HELPERS ---
 
+// UPDATED: More aggressive compression defaults (0.6 quality, 800px width)
+export const compressImage = (dataUrl: string, quality = 0.6, maxWidth = 800): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(dataUrl);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            // Convert to JPEG which is much smaller than PNG
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+};
+
 export const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, w: number, h: number): Promise<string> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -45,7 +75,8 @@ export const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, 
         
         try {
             ctx.drawImage(sourceImage, x, y, w, h, 0, 0, w, h);
-            resolve(canvas.toDataURL());
+            // Use JPEG for smaller size
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
         } catch (e) {
             console.error("Crop error:", e);
             resolve('');
@@ -66,7 +97,7 @@ export const addWhitePadding = (dataUrl: string, padding: number = 10): Promise<
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, padding);
-            resolve(canvas.toDataURL());
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
         img.onerror = () => resolve(dataUrl);
         img.src = dataUrl;
@@ -174,7 +205,7 @@ export const refineImageContent = (dataUrl: string): Promise<string> => {
                 fCtx.fillStyle = '#FFFFFF';
                 fCtx.fillRect(0,0, cropW, cropH);
                 fCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-                resolve(finalCanvas.toDataURL());
+                resolve(finalCanvas.toDataURL('image/jpeg', 0.6));
             } else {
                 resolve(dataUrl);
             }
@@ -186,7 +217,7 @@ export const refineImageContent = (dataUrl: string): Promise<string> => {
 
 // --- PDF PROCESSING ---
 
-export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> => {
+export const convertPdfToImages = (file: File, scale = 1.5): Promise<string[]> => {
     return new Promise((resolve, reject) => {
         const pdfjsLib = (window as any).pdfjsLib;
         if (!pdfjsLib) return reject(new Error("Pustaka PDF belum siap."));
@@ -210,7 +241,7 @@ export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> =
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
                     await page.render({ canvasContext: ctx, viewport }).promise;
-                    images.push(canvas.toDataURL());
+                    images.push(canvas.toDataURL('image/jpeg', 0.6));
                 }
                 resolve(images);
             } catch (err) { reject(new Error('Gagal mengonversi PDF.')); }
@@ -242,7 +273,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
 
     const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     const numPages = doc.numPages;
-    const SCALE = 2.0; 
+    // Reduce scale to 1.5 to save DB space (was 2.0)
+    const SCALE = 1.5; 
 
     const pagesData: PageData[] = [];
     const allLines: VisualLine[] = [];
@@ -423,13 +455,14 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     ctx.fillRect(0,0, canvas.width, canvas.height);
                     ctx.drawImage(i1, 0, 0);
                     ctx.drawImage(i2, 0, i1.height);
-                    finalImage = canvas.toDataURL();
+                    finalImage = canvas.toDataURL('image/jpeg', 0.6);
                 }
             } else {
                 finalImage = img1;
             }
         }
 
+        // Refinement also handles compression
         const refined = await refineImageContent(finalImage);
         return await addWhitePadding(refined, 10);
     };
