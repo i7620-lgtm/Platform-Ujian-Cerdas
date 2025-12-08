@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import type { Exam, Question, ExamConfig, Result } from '../types';
 import { 
@@ -54,7 +55,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
 
     // -- Handlers --
 
-    const handleQuestionsGenerated = (newQuestions: Question[], mode: 'manual' | 'auto') => {
+    const handleQuestionsGenerated = (newQuestions: Question[]) => {
         setQuestions(newQuestions);
         setManualMode(true);
     };
