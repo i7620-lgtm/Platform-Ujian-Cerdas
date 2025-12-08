@@ -1,4 +1,3 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
@@ -31,26 +30,18 @@ const sanitizeExam = (exam: any) => {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
-        // 1. Initial Table Setup & Safe Migration
+        // 1. Initial Table Setup & Safe Migration (Split queries for reliability)
         try {
-            // Ensure table exists
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS exams (
-                    code TEXT PRIMARY KEY,
-                    questions TEXT,
-                    config TEXT
-                );
-            `);
-            
-            // Safely add new columns if they don't exist (preserving existing data)
-            await db.query(`
-                ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';
-                ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;
-            `);
-        } catch (initError: any) {
-            console.error("DB Init Warning:", initError.message);
-            // Continue execution, table might already be correct
-        }
+            await db.query(`CREATE TABLE IF NOT EXISTS exams (code TEXT PRIMARY KEY, questions TEXT, config TEXT);`);
+        } catch (e) { console.error("Create Table Error:", e); }
+
+        try {
+            await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';`);
+        } catch (e) { /* Ignore if exists or fails, prevents blocking */ }
+
+        try {
+            await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;`);
+        } catch (e) { /* Ignore if exists or fails */ }
 
         if (req.method === 'GET') {
             const { code } = req.query;
@@ -67,7 +58,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
 
                 // Case 2: Teacher syncing all exams
-                // Note: If created_at is 0 (default), sorting might be static for old items
                 const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC');
                 const parsedRows = result?.rows.map((row: any) => ({
                     ...row,
@@ -92,6 +82,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             try {
                 const exam = req.body;
                 
+                // Ensure values are safe
+                const authorId = exam.authorId || 'anonymous';
+                const createdAt = exam.createdAt || Date.now();
+                const questionsJson = JSON.stringify(exam.questions);
+                const configJson = JSON.stringify(exam.config);
+
                 const query = `
                     INSERT INTO exams (code, author_id, questions, config, created_at)
                     VALUES ($1, $2, $3, $4, $5)
@@ -101,13 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         config = EXCLUDED.config;
                 `;
                 
-                await db.query(query, [
-                    exam.code, 
-                    exam.authorId || 'anonymous', 
-                    JSON.stringify(exam.questions), 
-                    JSON.stringify(exam.config),
-                    exam.createdAt || Date.now()
-                ]);
+                await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt]);
 
                 return res.status(200).json({ success: true });
             } catch (postError: any) {
@@ -121,7 +111,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         else if (req.method === 'PATCH') {
-            // Granular Image Updates (Split & Stitch)
             try {
                 const { code, questionId, imageUrl, optionImages } = req.body;
                 
@@ -129,13 +118,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     return res.status(400).json({ error: "Missing code or questionId" });
                 }
 
-                // 1. Fetch current questions
                 const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
                 if (result.rows.length === 0) return res.status(404).json({ error: "Exam not found" });
 
                 let questions = JSON.parse(result.rows[0].questions);
 
-                // 2. Find and Update specific question
                 let updated = false;
                 questions = questions.map((q: any) => {
                     if (q.id === questionId) {
@@ -148,7 +135,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 if (!updated) return res.status(404).json({ error: "Question ID not found" });
 
-                // 3. Save back
                 await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [
                     JSON.stringify(questions), 
                     code
