@@ -1,11 +1,13 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         try {
+            // Table Renamed to results_v1
             await db.query(`
-                CREATE TABLE IF NOT EXISTS results (
+                CREATE TABLE IF NOT EXISTS results_v1 (
                     exam_code TEXT,
                     student_id TEXT,
                     student_name TEXT,
@@ -27,6 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (req.method === 'GET') {
             try {
+                // Using results_v1
                 const result = await db.query(`
                     SELECT 
                         exam_code,
@@ -40,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         status,
                         activity_log,
                         timestamp
-                    FROM results 
+                    FROM results_v1 
                     ORDER BY timestamp DESC
                 `);
 
