@@ -55,34 +55,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
+        // Safe Migration for Results table
         try {
-            // Table Renamed to results_v1
             await db.query(`
-                CREATE TABLE IF NOT EXISTS results_v1 (
+                CREATE TABLE IF NOT EXISTS results (
                     exam_code TEXT,
                     student_id TEXT,
-                    student_name TEXT,
-                    student_class TEXT,
                     answers TEXT,
                     score INTEGER,
-                    correct_answers INTEGER,
-                    total_questions INTEGER,
-                    status TEXT,
-                    activity_log TEXT,
-                    timestamp BIGINT,
                     PRIMARY KEY (exam_code, student_id)
                 );
             `);
+            
+            // Add new columns safely
+            await db.query(`
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;
+                ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;
+            `);
         } catch (e: any) {
-             console.error("DB Init Error (Results):", e);
-             return res.status(500).json({ error: "DB Init Failed", details: e.message });
+             console.error("DB Init Error (Results):", e.message);
         }
 
         const { examCode, student, answers, activityLog, completionTime } = req.body;
 
-        // 1. Ambil Kunci Jawaban Asli
-        // Referencing exams_v1
-        const examResult = await db.query('SELECT * FROM exams_v1 WHERE code = $1', [examCode]);
+        // 1. Ambil Kunci Jawaban Asli (from 'exams' table)
+        const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) {
             return res.status(404).json({ error: 'Exam not found (Offline)' });
         }
@@ -92,10 +94,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const grading = calculateGrade(fullExam, answers);
         const status = req.body.status || 'completed';
 
-        // 3. Simpan Hasil
-        // Using results_v1
+        // 3. Simpan Hasil (to 'results' table)
         const query = `
-            INSERT INTO results_v1 (
+            INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
                 answers, score, correct_answers, total_questions, 
                 status, activity_log, timestamp
