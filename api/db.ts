@@ -5,31 +5,34 @@ let pool: Pool | undefined;
 // Hanya inisialisasi Pool jika DATABASE_URL tersedia
 try {
     if (process.env.DATABASE_URL) {
+        console.log("Initializing DB Pool...");
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
-            ssl: { rejectUnauthorized: false }, // Diperlukan untuk Neon/Vercel Postgres
-            connectionTimeoutMillis: 15000, // Timeout ditingkatkan ke 15 detik untuk Cold Start Neon
-            idleTimeoutMillis: 10000, 
+            // Neon and Vercel Postgres require SSL. 
+            // rejectUnauthorized: false is often needed for self-signed certs in serverless envs.
+            ssl: { rejectUnauthorized: false }, 
+            connectionTimeoutMillis: 15000, // 15s timeout for Cold Starts
+            idleTimeoutMillis: 20000,       // Keep idle clients a bit longer
+            max: 5                          // Limit max connections for serverless
         });
         
         // Tangkap error tak terduga pada client yang idle agar tidak crash
         pool.on('error', (err) => {
-            console.warn('Unexpected error on idle DB client', err);
+            console.error('Unexpected error on idle DB client', err);
         });
     } else {
-        // Ini normal saat dev lokal tanpa env vars, atau saat build
-        // console.warn("DATABASE_URL is not defined. API will work in offline mode.");
+        console.warn("DATABASE_URL is not defined in environment variables.");
     }
 } catch (err) {
     console.error("Failed to initialize pool:", err);
 }
 
-// Export wrapper function, bukan pool langsung
+// Export wrapper function
 export default {
     query: async (text: string, params?: any[]) => {
         if (!pool) {
-            // Lempar error spesifik yang akan ditangkap handler untuk fallback ke mode offline
-            throw new Error("DATABASE_URL_MISSING");
+            console.error("Attempted DB query but pool is not initialized. Check DATABASE_URL.");
+            throw new Error("DATABASE_NOT_CONFIGURED: Pool not initialized");
         }
         return pool.query(text, params);
     }
