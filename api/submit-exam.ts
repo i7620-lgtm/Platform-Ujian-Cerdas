@@ -1,11 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './db.js';
+import pool from './db';
 
-// Logic Penilaian (Duplikasi dari Frontend tapi dijalankan di Server agar aman)
+// Logic Penilaian
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
     let correctCount = 0;
+    const questions = JSON.parse(exam.questions || '[]');
     
-    exam.questions.forEach((q: any) => {
+    questions.forEach((q: any) => {
         const studentAnswer = answers[q.id];
         if (!studentAnswer) return;
 
@@ -25,8 +26,8 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
              } catch(e) {}
         }
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sArr = studentAnswer.split(',').map(s => s.trim()).sort().join(',');
-            const cArr = (q.correctAnswer || '').split(',').map((s:string) => s.trim()).sort().join(',');
+            const sArr = studentAnswer.split(',').map((s: string) => s.trim()).sort().join(',');
+            const cArr = (q.correctAnswer || '').split(',').map((s: string) => s.trim()).sort().join(',');
             if (sArr === cArr) correctCount++;
         }
         else if (q.questionType === 'MATCHING' && q.matchingPairs) {
@@ -43,16 +44,34 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
         }
     });
 
-    const scorable = exam.questions.filter((q: any) => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
+    const scorable = questions.filter((q: any) => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
     const score = scorable > 0 ? Math.round((correctCount / scorable) * 100) : 0;
     
-    return { score, correctCount, totalQuestions: exam.questions.length }; // Use real length
+    return { score, correctCount, totalQuestions: questions.length };
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
+        // AUTOMATIC TABLE MIGRATION
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS results (
+                exam_code TEXT,
+                student_id TEXT,
+                student_name TEXT,
+                student_class TEXT,
+                answers TEXT,
+                score INTEGER,
+                correct_answers INTEGER,
+                total_questions INTEGER,
+                status TEXT,
+                activity_log TEXT,
+                timestamp BIGINT,
+                PRIMARY KEY (exam_code, student_id)
+            );
+        `);
+
         const { examCode, student, answers, activityLog, completionTime } = req.body;
 
         // 1. Ambil Kunci Jawaban Asli dari Database
@@ -66,7 +85,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const grading = calculateGrade(fullExam, answers);
 
         // 3. Tentukan Status
-        // Jika force_submitted dikirim dari frontend, gunakan itu. Jika tidak, completed.
         const status = req.body.status || 'completed';
 
         // 4. Simpan Hasil ke Database
@@ -100,7 +118,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             Date.now()
         ]);
 
-        // 5. Kembalikan Hasil ke Frontend (agar siswa bisa melihat nilai)
         return res.status(200).json({
             examCode,
             student,
