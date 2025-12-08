@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './db';
+import pool from './db.js';
 
 // Logic Penilaian
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
