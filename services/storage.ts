@@ -1,3 +1,4 @@
+
 import type { Exam, Result, Question } from '../types';
 
 // Constants for LocalStorage Keys
@@ -9,6 +10,16 @@ const KEYS = {
 // API Endpoints
 const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 
+// Fisher-Yates shuffle
+const shuffleArray = <T>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+};
+
 // --- HELPER UNTUK MENGHAPUS KUNCI JAWABAN (SECURITY) ---
 const sanitizeExamForStudent = (exam: Exam): Exam => {
     const sanitizedQuestions = exam.questions.map(q => {
@@ -18,14 +29,18 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
         if (trueFalseRows) {
             sanitizedQ.trueFalseRows = trueFalseRows.map(row => ({
                 text: row.text,
-                answer: false 
+                answer: false // Dummy value
             })) as any; 
         }
 
-        if (matchingPairs) {
-            sanitizedQ.matchingPairs = matchingPairs.map(pair => ({
+        if (matchingPairs && Array.isArray(matchingPairs)) {
+            // Keep the right options but break the association by shuffling
+            const rightValues = matchingPairs.map(p => p.right);
+            const shuffledRights = shuffleArray(rightValues);
+
+            sanitizedQ.matchingPairs = matchingPairs.map((pair, idx) => ({
                 left: pair.left,
-                right: '' 
+                right: shuffledRights[idx] 
             }));
         }
         return sanitizedQ;
@@ -114,6 +129,7 @@ class StorageService {
           const cloudExams: Exam[] = await response.json();
           const merged = { ...localExams };
           cloudExams.forEach(exam => {
+             // Map cloud exam to local format, ensure authorId is preserved
              merged[exam.code] = { ...exam, isSynced: true };
           });
           this.saveLocal(KEYS.EXAMS, merged);
@@ -142,6 +158,7 @@ class StorageService {
       }
 
       if (!exam) return null;
+      // We explicitly call sanitize again just in case the source wasn't sanitized or we want to re-shuffle
       return sanitizeExamForStudent(exam);
   }
 
@@ -154,24 +171,27 @@ class StorageService {
     if (this.isOnline) {
         try {
             // STEP 1: Separate Skeleton and Images
+            // Deep clone to avoid modifying local state
             const skeletonExam = JSON.parse(JSON.stringify(examToSave));
             const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
 
-            skeletonExam.questions.forEach((q: any) => {
-                let hasImage = false;
-                if (q.imageUrl && q.imageUrl.startsWith('data:image/')) hasImage = true;
-                if (q.optionImages && q.optionImages.some((img: string) => img && img.startsWith('data:image/'))) hasImage = true;
+            // Robust check for questions array
+            if (Array.isArray(skeletonExam.questions)) {
+                skeletonExam.questions.forEach((q: any) => {
+                    let hasImage = false;
+                    if (q.imageUrl && q.imageUrl.startsWith('data:image/')) hasImage = true;
+                    if (q.optionImages && q.optionImages.some((img: string) => img && img.startsWith('data:image/'))) hasImage = true;
 
-                if (hasImage) {
-                    imageQueue.push({ qId: q.id, imageUrl: q.imageUrl, optionImages: q.optionImages });
-                    delete q.imageUrl;
-                    delete q.optionImages;
-                }
-            });
+                    if (hasImage) {
+                        imageQueue.push({ qId: q.id, imageUrl: q.imageUrl, optionImages: q.optionImages });
+                        delete q.imageUrl;
+                        delete q.optionImages;
+                    }
+                });
+            }
 
             // STEP 2: Send Skeleton
             const skeletonPayload = JSON.stringify(skeletonExam);
-            console.log("Sending Skeleton...", (skeletonPayload.length / 1024).toFixed(2), "KB");
             
             const skelResponse = await fetch(`${API_URL}/exams`, {
                 method: 'POST',
@@ -201,6 +221,7 @@ class StorageService {
                 }
             }
 
+            // Update sync status on successful save
             exams[exam.code].isSynced = true;
             this.saveLocal(KEYS.EXAMS, exams);
             console.log("Exam synced successfully.");
@@ -276,7 +297,7 @@ class StorageService {
     const fullExam = allExams[resultPayload.examCode];
     
     let gradedResult: Result;
-    if (fullExam && fullExam.questions[0].correctAnswer) {
+    if (fullExam && fullExam.questions.length > 0) {
         const { score, correctCount } = gradeExam(fullExam, resultPayload.answers);
         gradedResult = {
             ...resultPayload,
@@ -287,6 +308,7 @@ class StorageService {
             timestamp: Date.now()
         };
     } else {
+        // Fallback if exam not found locally (shouldn't happen in normal flow)
         gradedResult = {
             ...resultPayload,
             score: 0,
@@ -321,6 +343,7 @@ class StorageService {
     for (const exam of pendingExams) {
         try { await this.saveExam(exam); } catch (e) {}
     }
+    // Reload from local to get updated isSynced status from saveExam calls
     this.saveLocal(KEYS.EXAMS, exams);
 
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
