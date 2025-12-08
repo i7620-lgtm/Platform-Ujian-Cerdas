@@ -1,0 +1,5 @@
+{
+  "name": "Platform Ujian Siswa Cerdas 3",
+  "description": "Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dari PDF dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk.",
+  "requestFramePermissions": []
+}
