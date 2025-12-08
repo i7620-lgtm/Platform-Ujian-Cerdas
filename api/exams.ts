@@ -5,30 +5,57 @@ import db from './db';
 // Global variable to cache schema check status within the same lambda instance
 let isSchemaChecked = false;
 
+const shuffleArray = <T>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+};
+
 // Helper to remove answers for students
-const sanitizeExam = (exam: any) => {
+const sanitizeExam = (examRow: any) => {
     try {
-        const questions = JSON.parse(exam.questions || '[]').map((q: any) => {
+        const originalQuestions = JSON.parse(examRow.questions || '[]');
+        const questions = originalQuestions.map((q: any) => {
             const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
-            const sanitized = { ...rest };
+            const sanitized: any = { ...rest };
             
             if (trueFalseRows) {
                 sanitized.trueFalseRows = trueFalseRows.map((row: any) => ({
                     text: row.text,
-                    answer: null 
+                    answer: false // Send dummy boolean instead of null to satisfy types
                 }));
             }
-            if (matchingPairs) {
-                sanitized.matchingPairs = matchingPairs.map((pair: any) => ({
+            if (matchingPairs && Array.isArray(matchingPairs)) {
+                // Shuffle the right-side values to break the association but keep the options visible
+                const rightValues = matchingPairs.map((p: any) => p.right);
+                const shuffledRights = shuffleArray(rightValues);
+                
+                sanitized.matchingPairs = matchingPairs.map((pair: any, index: number) => ({
                     left: pair.left,
-                    right: '' 
+                    right: shuffledRights[index] // Assign shuffled right value
                 }));
             }
             return sanitized;
         });
-        return { ...exam, questions };
+
+        return { 
+            code: examRow.code,
+            authorId: examRow.author_id,
+            questions,
+            config: JSON.parse(examRow.config || '{}'),
+            createdAt: parseInt(examRow.created_at || '0')
+        };
     } catch (e) {
-        return exam;
+        console.error("Sanitize error:", e);
+        return {
+            code: examRow.code,
+            questions: [],
+            config: {},
+            createdAt: 0
+        };
     }
 };
 
@@ -88,7 +115,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Case 2: Teacher syncing all exams
             const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC');
             const parsedRows = result?.rows.map((row: any) => ({
-                ...row,
+                code: row.code,
+                authorId: row.author_id,
                 questions: JSON.parse(row.questions || '[]'),
                 config: JSON.parse(row.config || '{}'),
                 createdAt: parseInt(row.created_at || '0')
@@ -106,8 +134,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // DATA INTEGRITY LOGGING
             console.log(`[POST Save Exam] Code: ${exam.code}`);
-            console.log(`Payload Size: approx ${JSON.stringify(exam).length} characters`);
-            console.log(`Questions Count: ${exam.questions?.length || 0}`);
 
             // Ensure values are safe
             const authorId = exam.authorId || 'anonymous';
@@ -121,7 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ON CONFLICT (code) 
                 DO UPDATE SET 
                     questions = EXCLUDED.questions,
-                    config = EXCLUDED.config;
+                    config = EXCLUDED.config,
+                    author_id = EXCLUDED.author_id;
             `;
             
             await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt]);
@@ -132,8 +159,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (req.method === 'PATCH') {
             const { code, questionId, imageUrl, optionImages } = req.body;
             
-            console.log(`[PATCH Image] Code: ${code}, QID: ${questionId}`);
-
             if (!code || !questionId) {
                 return res.status(400).json({ error: "Missing code or questionId" });
             }
