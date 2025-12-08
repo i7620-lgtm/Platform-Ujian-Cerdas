@@ -31,25 +31,25 @@ const sanitizeExam = (exam: any) => {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
-        // 1. Initial Table Setup
+        // 1. Initial Table Setup & Safe Migration
         try {
-            // Table Renamed to exams_v1 to fix schema conflict
+            // Ensure table exists
             await db.query(`
-                CREATE TABLE IF NOT EXISTS exams_v1 (
+                CREATE TABLE IF NOT EXISTS exams (
                     code TEXT PRIMARY KEY,
-                    author_id TEXT,
                     questions TEXT,
-                    config TEXT,
-                    created_at BIGINT
+                    config TEXT
                 );
             `);
+            
+            // Safely add new columns if they don't exist (preserving existing data)
+            await db.query(`
+                ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';
+                ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;
+            `);
         } catch (initError: any) {
-            console.error("DB Init Error:", initError);
-            return res.status(500).json({ 
-                error: "Database Initialization Failed", 
-                details: initError.message,
-                code: initError.code 
-            });
+            console.error("DB Init Warning:", initError.message);
+            // Continue execution, table might already be correct
         }
 
         if (req.method === 'GET') {
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             try {
                 // Case 1: Student fetching specific public exam
                 if (code && req.url?.includes('public')) {
-                    const result = await db.query('SELECT * FROM exams_v1 WHERE code = $1', [code]);
+                    const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
                     if (!result || result.rows.length === 0) {
                         return res.status(404).json({ error: 'Exam not found' });
                     }
@@ -67,12 +67,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
 
                 // Case 2: Teacher syncing all exams
-                const result = await db.query('SELECT * FROM exams_v1 ORDER BY created_at DESC');
+                // Note: If created_at is 0 (default), sorting might be static for old items
+                const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC');
                 const parsedRows = result?.rows.map((row: any) => ({
                     ...row,
                     questions: JSON.parse(row.questions || '[]'),
                     config: JSON.parse(row.config || '{}'),
-                    createdAt: parseInt(row.created_at)
+                    createdAt: parseInt(row.created_at || '0')
                 })) || [];
                 
                 return res.status(200).json(parsedRows);
@@ -92,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const exam = req.body;
                 
                 const query = `
-                    INSERT INTO exams_v1 (code, author_id, questions, config, created_at)
+                    INSERT INTO exams (code, author_id, questions, config, created_at)
                     VALUES ($1, $2, $3, $4, $5)
                     ON CONFLICT (code) 
                     DO UPDATE SET 
@@ -120,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         else if (req.method === 'PATCH') {
-            // New Method to handle Granular Image Updates (Split & Stitch)
+            // Granular Image Updates (Split & Stitch)
             try {
                 const { code, questionId, imageUrl, optionImages } = req.body;
                 
@@ -129,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
 
                 // 1. Fetch current questions
-                const result = await db.query('SELECT questions FROM exams_v1 WHERE code = $1', [code]);
+                const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
                 if (result.rows.length === 0) return res.status(404).json({ error: "Exam not found" });
 
                 let questions = JSON.parse(result.rows[0].questions);
@@ -139,7 +140,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 questions = questions.map((q: any) => {
                     if (q.id === questionId) {
                         updated = true;
-                        // Merge new image data into existing question
                         if (imageUrl !== undefined) q.imageUrl = imageUrl;
                         if (optionImages !== undefined) q.optionImages = optionImages;
                     }
@@ -149,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!updated) return res.status(404).json({ error: "Question ID not found" });
 
                 // 3. Save back
-                await db.query('UPDATE exams_v1 SET questions = $1 WHERE code = $2', [
+                await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [
                     JSON.stringify(questions), 
                     code
                 ]);
