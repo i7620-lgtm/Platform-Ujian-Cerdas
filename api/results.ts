@@ -1,21 +1,21 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+let isSchemaChecked = false;
+
+const ensureSchema = async () => {
+    if (isSchemaChecked) return;
     try {
-        // Safe Migration for Results table (Split Queries)
-        try {
-            await db.query(`
-                CREATE TABLE IF NOT EXISTS results (
-                    exam_code TEXT,
-                    student_id TEXT,
-                    answers TEXT,
-                    score INTEGER,
-                    PRIMARY KEY (exam_code, student_id)
-                );
-            `);
-        } catch(e) {}
-        
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS results (
+                exam_code TEXT,
+                student_id TEXT,
+                answers TEXT,
+                score INTEGER,
+                PRIMARY KEY (exam_code, student_id)
+            );
+        `);
         const alterQueries = [
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;",
@@ -25,10 +25,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
         ];
-
         for (const q of alterQueries) {
             try { await db.query(q); } catch (e) { /* Ignore */ }
         }
+        isSchemaChecked = true;
+    } catch(e) {}
+};
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    try {
+        await ensureSchema();
 
         if (req.method === 'GET') {
             try {
