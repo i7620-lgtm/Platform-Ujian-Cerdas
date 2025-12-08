@@ -21,13 +21,6 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true
   },
-  "include": [
-    "index.tsx",
-    "App.tsx",
-    "components/**/*.tsx",
-    "components/**/*.ts",
-    "services/**/*.ts",
-    "types.ts"
-  ],
+  "include": ["."],
   "exclude": ["node_modules", "dist", "api"]
 }
