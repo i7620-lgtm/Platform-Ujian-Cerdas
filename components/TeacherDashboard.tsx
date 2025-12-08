@@ -47,6 +47,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
     const [generatedCode, setGeneratedCode] = useState('');
     const [manualMode, setManualMode] = useState(false);
     
+    // Key to force reset child components
+    const [resetKey, setResetKey] = useState(0);
+
     // Modal & Selection States
     const [selectedOngoingExam, setSelectedOngoingExam] = useState<Exam | null>(null);
     const [selectedFinishedExam, setSelectedFinishedExam] = useState<Exam | null>(null);
@@ -113,6 +116,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
             continueWithPermission: false,
         });
         setView('UPLOAD');
+        // Increment key to force CreationView to remount and clear inputs
+        setResetKey(prev => prev + 1);
     };
 
     const openEditModal = (exam: Exam) => {
@@ -183,7 +188,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ addExam, upd
             <main className="max-w-[95%] mx-auto p-4 md:p-8">
                 {view === 'UPLOAD' && (
                     <>
-                        <CreationView onQuestionsGenerated={handleQuestionsGenerated} />
+                        <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
                         {(questions.length > 0 || manualMode) && (
                             <ExamEditor 
                                 questions={questions}
