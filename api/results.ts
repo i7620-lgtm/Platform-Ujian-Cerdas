@@ -1,10 +1,9 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
-        // Safe Migration for Results table
+        // Safe Migration for Results table (Split Queries)
         try {
             await db.query(`
                 CREATE TABLE IF NOT EXISTS results (
@@ -15,19 +14,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     PRIMARY KEY (exam_code, student_id)
                 );
             `);
-            
-            // Add new columns safely
-            await db.query(`
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;
-                ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;
-            `);
-        } catch (e: any) {
-            console.error("DB Init Error (Results):", e.message);
+        } catch(e) {}
+        
+        const alterQueries = [
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
+        ];
+
+        for (const q of alterQueries) {
+            try { await db.query(q); } catch (e) { /* Ignore */ }
         }
 
         if (req.method === 'GET') {
