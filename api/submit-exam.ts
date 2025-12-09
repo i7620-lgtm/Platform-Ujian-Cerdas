@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
@@ -74,7 +75,8 @@ const ensureSchema = async () => {
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS status_code INTEGER;", 
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
-            "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS location TEXT;"
         ];
         for (const q of alterQueries) {
             try { await db.query(q); } catch (e) { /* Ignore */ }
@@ -89,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         await ensureSchema();
 
-        const { examCode, student, answers, activityLog } = req.body;
+        const { examCode, student, answers, activityLog, location } = req.body;
 
         // 1. Ambil Kunci Jawaban Asli (from 'exams' table)
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
@@ -117,9 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
                 answers, score, correct_answers, total_questions, 
-                status, status_code, activity_log, timestamp
+                status, status_code, activity_log, timestamp, location
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (exam_code, student_id)
             DO UPDATE SET
                 answers = EXCLUDED.answers,
@@ -128,7 +130,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 status = EXCLUDED.status,
                 status_code = EXCLUDED.status_code,
                 activity_log = EXCLUDED.activity_log,
-                timestamp = EXCLUDED.timestamp;
+                timestamp = EXCLUDED.timestamp,
+                location = COALESCE(EXCLUDED.location, results.location);
         `;
 
         await db.query(query, [
@@ -143,7 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             status,
             statusCode,
             JSON.stringify(activityLog || []),
-            Date.now()
+            Date.now(),
+            location || null
         ]);
 
         return res.status(200).json({
@@ -156,7 +160,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             status: status,
             statusCode: statusCode,
             isSynced: true,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            location: location
         });
 
     } catch (error: any) {
