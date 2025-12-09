@@ -1,4 +1,5 @@
 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -32,6 +33,11 @@ export interface ExamConfig {
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
   continueWithPermission: boolean;
+  // New features
+  showResultToStudent: boolean;
+  showCorrectAnswer: boolean;
+  enablePublicStream: boolean;
+  trackLocation: boolean;
 }
 
 export interface Exam {
@@ -64,4 +70,5 @@ export interface Result {
     status?: ResultStatus;
     isSynced?: boolean; 
     timestamp?: number;
+    location?: string; // GPS Coordinates
 }
