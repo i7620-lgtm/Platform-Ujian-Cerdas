@@ -5,7 +5,7 @@ import {
     CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
-    ClockIcon,
+    ClockIcon, 
     CalendarDaysIcon,
     XMarkIcon
 } from './Icons';
@@ -23,12 +23,13 @@ interface TeacherDashboardProps {
     onAllowContinuation: (studentId: string, examCode: string) => void;
     onRefreshExams: () => Promise<void>;
     onRefreshResults: () => Promise<void>;
+    currentTeacherId: string;
 }
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
+    addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, currentTeacherId
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     
@@ -88,7 +89,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const newExam: Exam = {
             code,
             questions,
-            config
+            config,
+            authorId: currentTeacherId,
+            // Perubahan: Simpan sebagai ISO String agar mudah dibaca di DB
+            createdAt: new Date().toISOString()
         };
         addExam(newExam); // App.tsx handles the refresh after adding
         setGeneratedCode(code);
@@ -105,7 +109,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const updatedExam: Exam = {
             code: editingExam.code,
             questions,
-            config
+            config,
+            authorId: editingExam.authorId,
+            createdAt: editingExam.createdAt
         };
         updateExam(updatedExam);
         alert('Ujian berhasil diperbarui!');
@@ -177,6 +183,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     <div className="py-4 flex justify-between items-center">
                         <h1 className="text-2xl font-bold text-neutral">Dashboard Guru</h1>
                         <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium px-3 py-1 bg-gray-100 rounded-full text-gray-600">
+                                ID: {currentTeacherId}
+                            </span>
                             <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary font-semibold">
                                 <LogoutIcon className="w-5 h-5"/>
                                 Logout
