@@ -1,31 +1,47 @@
 
-import pg from 'pg';
-const { Pool } = pg;
+import * as pg from 'pg';
 
-// Use a global variable to persist the pool across hot reloads in development
-// and across invocations in serverless (if container is reused).
+// Robust import strategy for Vercel/ESM environments
+// 'import * as pg' ensures we capture the entire module namespace,
+// preventing "does not provide an export named default" errors.
+const Pool = (pg as any).Pool || (pg as any).default?.Pool;
+
+// Global pool variable to persist connection across hot-reloads
 let pool: any;
 
 const getPool = () => {
     if (!pool) {
         if (!process.env.DATABASE_URL) {
-            console.error("CRITICAL ERROR: DATABASE_URL is missing from environment variables.");
-            throw new Error("DATABASE_URL environment variable is not set");
+            const msg = "CRITICAL ERROR: DATABASE_URL is missing in Vercel Environment Variables.";
+            console.error(msg);
+            throw new Error(msg);
+        }
+
+        if (!Pool) {
+             const msg = "CRITICAL ERROR: 'pg' library failed to load. Pool is undefined.";
+             console.error(msg, { pgExport: pg });
+             throw new Error(msg);
         }
 
         console.log("Initializing DB Pool...");
 
-        pool = new Pool({
-            connectionString: process.env.DATABASE_URL,
-            ssl: { rejectUnauthorized: false }, 
-            max: 1, // Keep max connections low for serverless
-            connectionTimeoutMillis: 10000, 
-            idleTimeoutMillis: 10000, 
-        });
-        
-        pool.on('error', (err: Error) => {
-            console.error('Unexpected DB Pool Error:', err);
-        });
+        try {
+            pool = new Pool({
+                connectionString: process.env.DATABASE_URL,
+                ssl: { rejectUnauthorized: false }, // Required for Neon/AWS RDS
+                max: 1, // Strict limit for serverless to prevent connection exhaustion
+                connectionTimeoutMillis: 15000, // 15s timeout
+                idleTimeoutMillis: 15000, 
+            });
+            
+            pool.on('error', (err: Error) => {
+                console.error('Unexpected DB Pool Error:', err);
+                // Do not exit process in serverless, just log
+            });
+        } catch (e) {
+            console.error("Failed to create DB Pool constructor:", e);
+            throw e;
+        }
     }
     return pool;
 };
