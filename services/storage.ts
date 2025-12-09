@@ -1,5 +1,4 @@
 
-
 import type { Exam, Result, Question } from '../types';
 
 // Constants for LocalStorage Keys
@@ -177,7 +176,8 @@ class StorageService {
 
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    const examToSave = { ...exam, isSynced: false, createdAt: exam.createdAt || Date.now() };
+    // Simpan createdAt sebagai string (ISO)
+    const examToSave = { ...exam, isSynced: false, createdAt: exam.createdAt || new Date().toISOString() };
     exams[exam.code] = examToSave;
     this.saveLocal(KEYS.EXAMS, exams);
 
