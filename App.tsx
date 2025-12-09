@@ -118,7 +118,7 @@ const App: React.FC = () => {
                }
           }
           if (existingResult.status === 'force_submitted') {
-              alert("Ujian Anda ditangguhkan. Silakan hubungi guru untuk mendapatkan izin melanjutkan.");
+              alert("Ujian Anda ditangguhkan karena terdeteksi membuka aplikasi lain. Silakan hubungi guru untuk mendapatkan izin melanjutkan.");
               setIsSyncing(false);
               return;
           }
@@ -179,11 +179,26 @@ const App: React.FC = () => {
   }, [currentExam, currentStudent]);
 
   const handleAllowContinuation = async (studentId: string, examCode: string) => {
-      // Optimistic Update
-      setResults(prev => prev.filter(r => !(r.student.studentId === studentId && r.examCode === examCode && r.status === 'force_submitted')));
-      alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian ${examCode}.`);
-      // Re-fetch to confirm from server
-      await refreshResults();
+      try {
+          setIsSyncing(true);
+          // 1. Update in Storage/Backend
+          await storageService.unlockStudentExam(examCode, studentId);
+          
+          // 2. Optimistic UI Update
+          setResults(prev => prev.map(r => {
+              if (r.student.studentId === studentId && r.examCode === examCode) {
+                  return { ...r, status: 'in_progress' };
+              }
+              return r;
+          }));
+          
+          alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian.`);
+      } catch(e) {
+          console.error(e);
+          alert("Gagal membuka blokir siswa.");
+      } finally {
+          setIsSyncing(false);
+      }
   };
 
   const addExam = useCallback(async (newExam: Exam) => {
