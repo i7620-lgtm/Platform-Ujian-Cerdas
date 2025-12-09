@@ -6,14 +6,15 @@ import db from './db.js';
 // Cache untuk status tabel agar tidak menjalankan CREATE TABLE setiap kali request
 let isTableInitialized = false;
 
-// Definisi Skema Tabel yang Benar dengan PRIMARY KEY
+// Definisi Skema Tabel yang Benar
+// created_at menggunakan TEXT agar bisa menyimpan format tanggal/waktu yang mudah dibaca (misal "2024-05-20 10:00")
 const CREATE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS exams (
         code TEXT PRIMARY KEY, 
         author_id TEXT DEFAULT 'anonymous',
         questions TEXT, 
         config TEXT,
-        created_at BIGINT DEFAULT 0
+        created_at TEXT DEFAULT '' 
     );
 `;
 
@@ -23,6 +24,26 @@ const ensureSchema = async () => {
     try {
         console.log("Checking/Creating 'exams' table...");
         await db.query(CREATE_TABLE_SQL);
+        
+        // MIGRATION CHECK:
+        // Jika tabel sudah ada dengan created_at tipe BIGINT, kita harus mengubahnya menjadi TEXT
+        // agar sesuai dengan request user untuk menyimpan "tanggal dan waktu" yang dapat dibaca.
+        try {
+             // Cek tipe data kolom (Postgres specific)
+             const checkType = await db.query(`
+                SELECT data_type FROM information_schema.columns 
+                WHERE table_name = 'exams' AND column_name = 'created_at';
+             `);
+             
+             if (checkType.rows.length > 0 && checkType.rows[0].data_type !== 'text') {
+                 console.log("Migrating created_at column to TEXT...");
+                 // Alter column type. Konversi angka ke string jika perlu.
+                 await db.query(`ALTER TABLE exams ALTER COLUMN created_at TYPE TEXT USING created_at::text;`);
+             }
+        } catch (migError) {
+            console.warn("Migration warning (created_at):", migError);
+        }
+
         isTableInitialized = true;
         console.log("'exams' table verified.");
     } catch (error) {
@@ -38,10 +59,10 @@ const sanitizeExam = (examRow: any) => {
             authorId: examRow.author_id,
             questions,
             config: JSON.parse(examRow.config || '{}'),
-            createdAt: parseInt(examRow.created_at || '0')
+            createdAt: examRow.created_at || '' // Sekarang string
         };
     } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: 0 };
+        return { code: examRow.code, questions: [], config: {}, createdAt: '' };
     }
 };
 
@@ -91,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(200).json(sanitizeForPublic(exam));
             } else {
                 // Teacher view gets full data (with answers)
+                // Order by created_at DESC (String sort is okay for ISO, acceptable for others)
                 const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
                 const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
                 return res.status(200).json(data);
@@ -102,8 +124,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const exam = req.body;
             if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
-            const authorId = exam.authorId || 'anonymous';
-            const createdAt = exam.createdAt || Date.now();
+            // Pastikan authorId diambil dari body, fallback ke anonymous
+            const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
+            
+            // createdAt sekarang berupa String tanggal & waktu
+            const createdAt = exam.createdAt || new Date().toLocaleString(); 
+
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
