@@ -5,7 +5,7 @@ import {
     CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
-    ClockIcon, 
+    ClockIcon,
     CalendarDaysIcon,
     XMarkIcon
 } from './Icons';
@@ -15,6 +15,7 @@ import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView } 
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 
 interface TeacherDashboardProps {
+    teacherId: string;
     addExam: (newExam: Exam) => void;
     updateExam: (updatedExam: Exam) => void;
     exams: Record<string, Exam>;
@@ -23,13 +24,12 @@ interface TeacherDashboardProps {
     onAllowContinuation: (studentId: string, examCode: string) => void;
     onRefreshExams: () => Promise<void>;
     onRefreshResults: () => Promise<void>;
-    currentTeacherId: string;
 }
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, currentTeacherId
+    teacherId, addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     
@@ -88,11 +88,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const code = generateExamCode();
         const newExam: Exam = {
             code,
-            questions,
+            authorId: teacherId, // Set actual teacher ID
+            questions, // Contains answers/correctAnswer from Editor
             config,
-            authorId: currentTeacherId,
-            // Perubahan: Simpan sebagai ISO String agar mudah dibaca di DB
-            createdAt: new Date().toISOString()
+            createdAt: Date.now() // Explicitly set creation time
         };
         addExam(newExam); // App.tsx handles the refresh after adding
         setGeneratedCode(code);
@@ -108,10 +107,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         
         const updatedExam: Exam = {
             code: editingExam.code,
+            authorId: editingExam.authorId || teacherId, // Preserve original author or update
             questions,
             config,
-            authorId: editingExam.authorId,
-            createdAt: editingExam.createdAt
+            createdAt: editingExam.createdAt || Date.now()
         };
         updateExam(updatedExam);
         alert('Ujian berhasil diperbarui!');
@@ -181,11 +180,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <header className="bg-base-100 shadow-sm sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="py-4 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-neutral">Dashboard Guru</h1>
+                        <h1 className="text-2xl font-bold text-neutral">Dashboard Guru <span className="text-sm font-normal text-gray-500 ml-2">({teacherId})</span></h1>
                         <div className="flex items-center gap-4">
-                            <span className="text-sm font-medium px-3 py-1 bg-gray-100 rounded-full text-gray-600">
-                                ID: {currentTeacherId}
-                            </span>
                             <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary font-semibold">
                                 <LogoutIcon className="w-5 h-5"/>
                                 Logout
