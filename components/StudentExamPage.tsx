@@ -1,11 +1,14 @@
+
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question } from '../types';
 import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
-  onSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
   onForceSubmit: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
@@ -34,6 +37,7 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     return <span className="break-words whitespace-pre-wrap">{content}</span>;
 };
 
+// ... (QuestionDisplay component remains the same, assuming it doesn't need changes)
 const QuestionDisplay: React.FC<{
     question: Question;
     index: number;
@@ -51,6 +55,7 @@ const QuestionDisplay: React.FC<{
             }));
             
             if (shuffleAnswers) {
+                // Ensure answer options shuffle is also stable if needed, but per-question useMemo usually suffices
                 return shuffleArray(combined);
             }
             return combined;
@@ -311,19 +316,84 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const answersRef = useRef(answers);
     answersRef.current = answers;
 
+    // Persisted Shuffle Logic
     const displayedQuestions = useMemo(() => {
-        // Only shuffle questions that are not INFO type to allow instructions to stay at top if needed? 
-        // For simplicity, shuffle everything if config enabled, but generally INFO blocks should probably stay with their context.
-        // Current logic: simple shuffle.
-        return exam.config.shuffleQuestions ? shuffleArray(exam.questions) : exam.questions;
-    }, [exam.questions, exam.config.shuffleQuestions]);
+        if (!exam.config.shuffleQuestions) return exam.questions;
 
-    const submitExam = useCallback(() => {
+        const orderKey = `exam_order_${exam.code}_${student.studentId}`;
+        try {
+            const savedOrder = localStorage.getItem(orderKey);
+            if (savedOrder) {
+                const orderIds: string[] = JSON.parse(savedOrder);
+                // Reconstruct array based on saved order ID
+                const ordered = orderIds
+                    .map(id => exam.questions.find(q => q.id === id))
+                    .filter((q): q is Question => !!q);
+                
+                // If question length matches, return saved order
+                if (ordered.length === exam.questions.length) {
+                    return ordered;
+                }
+            }
+        } catch (e) { console.error("Error loading saved order", e); }
+
+        // If no valid saved order, shuffle and save
+        const shuffled = shuffleArray(exam.questions);
+        try {
+            localStorage.setItem(orderKey, JSON.stringify(shuffled.map(q => q.id)));
+        } catch (e) {}
+        
+        return shuffled;
+    }, [exam.questions, exam.config.shuffleQuestions, exam.code, student.studentId]);
+
+    const submitExam = useCallback(async () => {
         if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian?")) {
-            onSubmit(answers, timeLeft);
+            let locationString = "";
+            
+            // Geolocation Logic
+            if (exam.config.trackLocation) {
+                 if ("geolocation" in navigator) {
+                    try {
+                        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                timeout: 5000,
+                                maximumAge: 0,
+                                enableHighAccuracy: true
+                            });
+                        });
+                        locationString = `${position.coords.latitude}, ${position.coords.longitude}`;
+                    } catch (error) {
+                        console.warn("Geolocation failed or denied", error);
+                        // Optionally alert the student or just proceed
+                    }
+                 }
+            }
+
+            onSubmit(answers, timeLeft, locationString);
             localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
         }
-    }, [answers, timeLeft, exam.code, student.studentId, onSubmit]);
+    }, [answers, timeLeft, exam.code, student.studentId, onSubmit, exam.config.trackLocation]);
+
+    // Initial Start Ping (To show up in dashboard immediately)
+    useEffect(() => {
+        const startExam = async () => {
+            if (navigator.onLine) {
+                // Send an "in_progress" status
+                try {
+                    await storageService.submitExamResult({
+                        student,
+                        examCode: exam.code,
+                        answers: answersRef.current,
+                        totalQuestions: exam.questions.length,
+                        completionTime: 0,
+                        activityLog: ["Memulai Ujian"],
+                        status: 'in_progress'
+                    });
+                } catch (e) { console.error("Failed to send start ping", e); }
+            }
+        };
+        startExam();
+    }, [exam.code, student]);
 
     // Timer effect
     useEffect(() => {
@@ -332,7 +402,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 if (prev <= 1) {
                     if(timerIdRef.current) clearInterval(timerIdRef.current);
                     alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
-                    onSubmit(answersRef.current, 0);
+                    onSubmit(answersRef.current, 0, "");
                     localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
                     return 0;
                 }
@@ -356,23 +426,44 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         };
     }, []);
 
-    // Auto-save effect
+    // Auto-save effect (Local + Cloud Sync for Live Monitoring)
     useEffect(() => {
-        const saveInterval = setInterval(() => {
-            if (isForceSubmitted) return; // Don't save if exam is locked
+        const saveInterval = setInterval(async () => {
+            if (isForceSubmitted) return; 
             setSaveStatus('saving');
+            
+            // 1. Local Save
             try {
                 localStorage.setItem(`exam_answers_${exam.code}_${student.studentId}`, JSON.stringify(answersRef.current));
-                setTimeout(() => setSaveStatus('saved'), 500);
-                setTimeout(() => setSaveStatus('idle'), 2000);
             } catch (error) {
                 console.error("Failed to save answers to localStorage", error);
-                setSaveStatus('idle'); // Or an error state
             }
+
+            // 2. Cloud Sync (Live Monitoring) - Every 30 seconds roughly if online
+            // We use the same interval for simplicity, or we could use a separate one.
+            // Using a slightly longer throttle for cloud to save bandwidth
+            if (navigator.onLine) {
+                 try {
+                    // We submit as 'in_progress' to update the teacher dashboard
+                    await storageService.submitExamResult({
+                        student,
+                        examCode: exam.code,
+                        answers: answersRef.current,
+                        totalQuestions: exam.questions.length,
+                        completionTime: 0, // Not relevant for in-progress
+                        activityLog: ["Sedang mengerjakan..."],
+                        status: 'in_progress'
+                    });
+                } catch (e) { /* Ignore background sync errors */ }
+            }
+
+            setTimeout(() => setSaveStatus('saved'), 500);
+            setTimeout(() => setSaveStatus('idle'), 2000);
+
         }, exam.config.autoSaveInterval * 1000);
 
         return () => clearInterval(saveInterval);
-    }, [exam.code, student.studentId, exam.config.autoSaveInterval, isForceSubmitted]);
+    }, [exam.code, student, exam.config.autoSaveInterval, isForceSubmitted, exam.questions.length]);
 
     // Behavior detection effect
     const timeLeftRef = useRef(timeLeft);
@@ -461,6 +552,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     <button onClick={submitExam} className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
                         Selesaikan Ujian
                     </button>
+                    {exam.config.trackLocation && (
+                        <p className="text-xs text-gray-500 mt-2">* Lokasi Anda akan dicatat saat tombol ditekan.</p>
+                    )}
                 </div>
             </main>
         </div>
