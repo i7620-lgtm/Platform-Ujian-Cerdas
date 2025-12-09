@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question } from '../types';
 import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
@@ -37,7 +36,6 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     return <span className="break-words whitespace-pre-wrap">{content}</span>;
 };
 
-// ... (QuestionDisplay component remains the same, assuming it doesn't need changes)
 const QuestionDisplay: React.FC<{
     question: Question;
     index: number;
@@ -55,7 +53,6 @@ const QuestionDisplay: React.FC<{
             }));
             
             if (shuffleAnswers) {
-                // Ensure answer options shuffle is also stable if needed, but per-question useMemo usually suffices
                 return shuffleArray(combined);
             }
             return combined;
@@ -312,65 +309,61 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
     const timerIdRef = useRef<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const answersRef = useRef(answers);
     answersRef.current = answers;
 
-    // Persisted Shuffle Logic
+    // Use Memo to persist the order of shuffled questions for this session
     const displayedQuestions = useMemo(() => {
-        if (!exam.config.shuffleQuestions) return exam.questions;
-
-        const orderKey = `exam_order_${exam.code}_${student.studentId}`;
+        // Try to load persisted order
+        const storageKey = `exam_order_${exam.code}_${student.studentId}`;
         try {
-            const savedOrder = localStorage.getItem(orderKey);
-            if (savedOrder) {
+            const savedOrder = localStorage.getItem(storageKey);
+            if (savedOrder && exam.config.shuffleQuestions) {
                 const orderIds: string[] = JSON.parse(savedOrder);
-                // Reconstruct array based on saved order ID
-                const ordered = orderIds
-                    .map(id => exam.questions.find(q => q.id === id))
-                    .filter((q): q is Question => !!q);
-                
-                // If question length matches, return saved order
-                if (ordered.length === exam.questions.length) {
-                    return ordered;
-                }
+                // Map the questions based on saved IDs to maintain order
+                const ordered = orderIds.map(id => exam.questions.find(q => q.id === id)).filter(q => q !== undefined) as Question[];
+                // Add any new questions that might not be in the saved order at the end
+                const remaining = exam.questions.filter(q => !orderIds.includes(q.id));
+                return [...ordered, ...remaining];
             }
-        } catch (e) { console.error("Error loading saved order", e); }
+        } catch(e) {}
 
-        // If no valid saved order, shuffle and save
-        const shuffled = shuffleArray(exam.questions);
-        try {
-            localStorage.setItem(orderKey, JSON.stringify(shuffled.map(q => q.id)));
-        } catch (e) {}
+        const finalQuestions = exam.config.shuffleQuestions ? shuffleArray([...exam.questions]) : exam.questions;
         
-        return shuffled;
+        // Save order
+        if (exam.config.shuffleQuestions) {
+             localStorage.setItem(storageKey, JSON.stringify(finalQuestions.map(q => q.id)));
+        }
+        return finalQuestions;
     }, [exam.questions, exam.config.shuffleQuestions, exam.code, student.studentId]);
 
     const submitExam = useCallback(async () => {
         if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian?")) {
-            let locationString = "";
-            
-            // Geolocation Logic
+            setIsSubmitting(true);
+            let location = "";
             if (exam.config.trackLocation) {
-                 if ("geolocation" in navigator) {
-                    try {
-                        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                                timeout: 5000,
-                                maximumAge: 0,
-                                enableHighAccuracy: true
-                            });
-                        });
-                        locationString = `${position.coords.latitude}, ${position.coords.longitude}`;
-                    } catch (error) {
-                        console.warn("Geolocation failed or denied", error);
-                        // Optionally alert the student or just proceed
-                    }
+                 // Try getting location
+                 try {
+                     const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                         if (!navigator.geolocation) reject(new Error("Geolocation not supported"));
+                         navigator.geolocation.getCurrentPosition(resolve, reject, {
+                             timeout: 10000,
+                             enableHighAccuracy: true
+                         });
+                     });
+                     location = `${position.coords.latitude},${position.coords.longitude}`;
+                 } catch (e) {
+                     console.error("Gagal mendapatkan lokasi:", e);
+                     // Proceed without location if fails
                  }
             }
 
-            onSubmit(answers, timeLeft, locationString);
+            onSubmit(answers, timeLeft, location);
             localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
+            localStorage.removeItem(`exam_order_${exam.code}_${student.studentId}`);
+            setIsSubmitting(false);
         }
     }, [answers, timeLeft, exam.code, student.studentId, onSubmit, exam.config.trackLocation]);
 
@@ -402,7 +395,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 if (prev <= 1) {
                     if(timerIdRef.current) clearInterval(timerIdRef.current);
                     alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
-                    onSubmit(answersRef.current, 0, "");
+                    onSubmit(answersRef.current, 0); // Auto submit without location check for speed
                     localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
                     return 0;
                 }
@@ -549,11 +542,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     ))}
                 </div>
                 <div className="mt-8 text-center">
-                    <button onClick={submitExam} className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-                        Selesaikan Ujian
+                    <button 
+                        onClick={submitExam} 
+                        disabled={isSubmitting}
+                        className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSubmitting ? "Mengirim Jawaban..." : "Selesaikan Ujian"}
                     </button>
                     {exam.config.trackLocation && (
-                        <p className="text-xs text-gray-500 mt-2">* Lokasi Anda akan dicatat saat tombol ditekan.</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                            * Lokasi Anda akan dicatat saat tombol ditekan.
+                        </p>
                     )}
                 </div>
             </main>
