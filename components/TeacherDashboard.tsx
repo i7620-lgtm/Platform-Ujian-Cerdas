@@ -86,14 +86,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
 
         const code = generateExamCode();
+        // Format Tanggal dan Waktu yang mudah dibaca (YYYY-MM-DD HH:mm:ss)
+        const now = new Date();
+        const readableDate = now.toLocaleString('id-ID', { 
+            year: 'numeric', month: '2-digit', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).replace(/\//g, '-');
+
         const newExam: Exam = {
             code,
-            authorId: teacherId, // Set actual teacher ID from login
-            questions, // Contains answers/correctAnswer from Editor
+            authorId: teacherId || 'ANONYMOUS_TEACHER', // Use actual logged-in teacher ID
+            questions, 
             config,
-            createdAt: Date.now() // Explicitly set creation time as number
+            createdAt: readableDate // Save as readable string
         };
-        addExam(newExam); // App.tsx handles the refresh after adding
+        addExam(newExam); 
         setGeneratedCode(code);
     };
 
@@ -107,10 +114,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         
         const updatedExam: Exam = {
             code: editingExam.code,
-            authorId: editingExam.authorId || teacherId, // Preserve original author or update
+            authorId: editingExam.authorId || teacherId,
             questions,
             config,
-            createdAt: editingExam.createdAt || Date.now() // Preserve or update timestamp
+            createdAt: editingExam.createdAt // Preserve creation date
         };
         updateExam(updatedExam);
         alert('Ujian berhasil diperbarui!');
