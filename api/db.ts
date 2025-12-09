@@ -1,4 +1,3 @@
-
 import { Pool, PoolClient } from 'pg';
 
 let pool: Pool | undefined;
@@ -6,23 +5,25 @@ let pool: Pool | undefined;
 const getPool = () => {
     if (!pool) {
         if (!process.env.DATABASE_URL) {
-            console.error("DATABASE_URL is missing from environment variables.");
-            throw new Error("DATABASE_CONFIG_MISSING");
+            console.error("CRITICAL ERROR: DATABASE_URL is missing from environment variables.");
+            // We don't throw here to allow other logic to run, but query will fail.
         }
 
+        console.log("Initializing DB Pool...");
+
         // Optimization for Serverless (Vercel + Neon)
+        // We use a single connection max to avoid overwhelming the database during cold starts
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, 
-            // PENTING: Set max 1 agar tidak membanjiri koneksi saat Vercel melakukan scaling/retries
             max: 1, 
-            // Fail fast: Jika tidak bisa connect dalam 5 detik, lempar error (jangan hang)
-            connectionTimeoutMillis: 5000, 
-            idleTimeoutMillis: 1000, 
+            connectionTimeoutMillis: 8000, // Increased timeout for slower cold starts
+            idleTimeoutMillis: 5000, 
         });
         
         pool.on('error', (err) => {
-            console.warn('DB Pool Error:', err.message);
+            console.error('Unexpected DB Pool Error:', err);
+            // Don't exit process, just log. Serverless will restart if needed.
         });
     }
     return pool;
@@ -30,17 +31,23 @@ const getPool = () => {
 
 export default {
     query: async (text: string, params?: any[]) => {
-        const client = await getPool().connect();
+        const p = getPool();
+        if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
+
+        const client = await p.connect();
         try {
             const result = await client.query(text, params);
             return result;
+        } catch (error) {
+            console.error("Query Error:", error);
+            throw error;
         } finally {
-            // Penting: Segera lepaskan client kembali ke pool
             client.release();
         }
     },
     getClient: async (): Promise<PoolClient> => {
-        const currentPool = getPool();
-        return await currentPool.connect();
+        const p = getPool();
+        if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
+        return await p.connect();
     }
 };
