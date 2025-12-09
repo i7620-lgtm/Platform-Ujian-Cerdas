@@ -110,6 +110,20 @@ const gradeExam = (exam: Exam, answers: Record<string, string>): { score: number
     return { score, correctCount };
 };
 
+// --- UTILITIES FOR RESILIENCE ---
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    try {
+        return await operation();
+    } catch (error) {
+        if (retries <= 0) throw error;
+        console.warn(`Operation failed, retrying in ${delay}ms... (${retries} retries left)`, error);
+        await wait(delay);
+        return retryOperation(operation, retries - 1, delay * 1.5); // Exponential backoff
+    }
+}
+
 class StorageService {
   private isOnline: boolean = navigator.onLine;
 
@@ -129,7 +143,6 @@ class StorageService {
           const cloudExams: Exam[] = await response.json();
           const merged = { ...localExams };
           cloudExams.forEach(exam => {
-             // Map cloud exam to local format, ensure authorId is preserved
              merged[exam.code] = { ...exam, isSynced: true };
           });
           this.saveLocal(KEYS.EXAMS, merged);
@@ -158,7 +171,6 @@ class StorageService {
       }
 
       if (!exam) return null;
-      // We explicitly call sanitize again just in case the source wasn't sanitized or we want to re-shuffle
       return sanitizeExamForStudent(exam);
   }
 
@@ -171,11 +183,9 @@ class StorageService {
     if (this.isOnline) {
         try {
             // STEP 1: Separate Skeleton and Images
-            // Deep clone to avoid modifying local state
             const skeletonExam = JSON.parse(JSON.stringify(examToSave));
             const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
 
-            // Robust check for questions array
             if (Array.isArray(skeletonExam.questions)) {
                 skeletonExam.questions.forEach((q: any) => {
                     let hasImage = false;
@@ -190,34 +200,44 @@ class StorageService {
                 });
             }
 
-            // STEP 2: Send Skeleton
-            const skeletonPayload = JSON.stringify(skeletonExam);
-            
-            const skelResponse = await fetch(`${API_URL}/exams`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: skeletonPayload
-            });
+            // STEP 2: Send Skeleton with Retry Logic
+            // This is crucial for waking up sleeping databases
+            await retryOperation(async () => {
+                const skelResponse = await fetch(`${API_URL}/exams`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(skeletonExam)
+                });
 
-            if (!skelResponse.ok) {
-                const errText = await skelResponse.text();
-                throw new Error(`Failed to save exam skeleton: ${skelResponse.status} ${errText}`);
-            }
+                if (!skelResponse.ok) {
+                    const errText = await skelResponse.text();
+                    throw new Error(`Failed to save exam skeleton: ${skelResponse.status} ${errText}`);
+                }
+            }, 3, 2000); // Retry 3 times, start with 2s delay
 
-            // STEP 3: Stitch Images
+            // STEP 3: Stitch Images in Batches (Chunking)
+            // Sending too many parallel requests kills serverless connections.
+            // We limit concurrency to 2 parallel requests.
             if (imageQueue.length > 0) {
-                console.log(`Uploading ${imageQueue.length} image sets...`);
-                for (const item of imageQueue) {
-                    await fetch(`${API_URL}/exams`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            code: exam.code,
-                            questionId: item.qId,
-                            imageUrl: item.imageUrl,
-                            optionImages: item.optionImages
-                        })
-                    });
+                console.log(`Uploading ${imageQueue.length} image sets in batches...`);
+                
+                const BATCH_SIZE = 2;
+                for (let i = 0; i < imageQueue.length; i += BATCH_SIZE) {
+                    const batch = imageQueue.slice(i, i + BATCH_SIZE);
+                    await Promise.all(batch.map(item => 
+                        retryOperation(async () => {
+                             await fetch(`${API_URL}/exams`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    code: exam.code,
+                                    questionId: item.qId,
+                                    imageUrl: item.imageUrl,
+                                    optionImages: item.optionImages
+                                })
+                            });
+                        }, 2, 1000)
+                    ));
                 }
             }
 
@@ -228,6 +248,7 @@ class StorageService {
 
         } catch (e) {
             console.error("Cloud save failed:", e);
+            // Don't throw, just log. The user has local data anyway.
         }
     }
   }
@@ -308,7 +329,6 @@ class StorageService {
             timestamp: Date.now()
         };
     } else {
-        // Fallback if exam not found locally (shouldn't happen in normal flow)
         gradedResult = {
             ...resultPayload,
             score: 0,
@@ -340,6 +360,8 @@ class StorageService {
 
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const pendingExams = Object.values(exams).filter(e => !e.isSynced);
+    
+    // Process exams sequentially for sync
     for (const exam of pendingExams) {
         try { await this.saveExam(exam); } catch (e) {}
     }
