@@ -1,4 +1,5 @@
 
+
 import type { Exam, Result, Question } from '../types';
 
 // Constants for LocalStorage Keys
@@ -192,7 +193,10 @@ class StorageService {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(examToSave)
                     });
-                    if (!response.ok) throw new Error("Payload too large or server error");
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`Server Error (${response.status}): ${errText}`);
+                    }
                 }, 1, 500); // 1 retry only for optimistic
                 
                 // Success!
@@ -200,8 +204,10 @@ class StorageService {
                 this.saveLocal(KEYS.EXAMS, exams);
                 console.log("One-Shot Upload Successful.");
                 return;
-            } catch (e) {
-                console.warn("One-Shot failed, switching to Chunked Upload.", e);
+            } catch (e: any) {
+                console.warn("One-Shot failed, switching to Chunked Upload. Reason:", e.message);
+                // If it's a server logic error (500) and NOT payload size (413), throwing here might be better 
+                // but we try chunking just in case it was a timeout or transient issue.
             }
 
             // STRATEGY 2: Skeleton + Serial Patches (Robust)
@@ -232,7 +238,10 @@ class StorageService {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(skeletonExam)
                 });
-                if (!skelResponse.ok) throw new Error(`Failed to save skeleton`);
+                if (!skelResponse.ok) {
+                    const errText = await skelResponse.text();
+                    throw new Error(`Failed to save skeleton: ${skelResponse.status} ${errText}`);
+                }
             }, 3, 2000);
 
             // C. Send Images ONE BY ONE (Serial)
@@ -252,7 +261,10 @@ class StorageService {
                                 optionImages: item.optionImages
                             })
                         });
-                        if (!res.ok) throw new Error("Patch failed");
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            throw new Error(`Patch failed: ${res.status} ${errText}`);
+                        }
                     }, 3, 1000); // Retry individual images if needed
                 }
             }
@@ -262,8 +274,10 @@ class StorageService {
             this.saveLocal(KEYS.EXAMS, exams);
             console.log("Exam synced successfully (Chunked).");
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Cloud save failed completely:", e);
+            // Re-throw so UI shows the error
+            throw new Error(`Cloud save failed: ${e.message}`);
         }
     }
   }
