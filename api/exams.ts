@@ -2,6 +2,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
+let isSchemaChecked = false;
+
 const shuffleArray = <T>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -58,13 +60,12 @@ const sanitizeExam = (examRow: any) => {
 
 // Safe Schema Migration Helper - Optimized
 const ensureSchema = async () => {
-    // Catatan: Variabel global isSchemaChecked dihapus agar pemeriksaan skema 
-    // selalu dijalankan untuk mencegah error "column does not exist" pada cold start.
+    if (isSchemaChecked) return;
     
     try {
         console.log("Checking DB Schema...");
         
-        // 1. Pastikan Tabel Utama Ada (Urutan disesuaikan dengan database Anda)
+        // 1. Pastikan Tabel Utama Ada
         await db.query(`
             CREATE TABLE IF NOT EXISTS exams (
                 code TEXT PRIMARY KEY, 
@@ -76,16 +77,19 @@ const ensureSchema = async () => {
         `);
 
         // 2. Pastikan Kolom Tambahan Ada (Migrasi)
-        // Kita tidak menggunakan try-catch kosong disini. Jika ini gagal, biarkan error muncul
-        // agar kita tahu ada masalah pada database, daripada gagal diam-diam saat INSERT nanti.
         await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';`);
         await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;`);
         
+        // 3. (CRITICAL) Pastikan Unique Index Ada untuk 'ON CONFLICT (code)'
+        // Jika tabel dibuat di versi lama tanpa Primary Key, perintah INSERT akan gagal.
+        // Kita paksa buat index unik di sini.
+        await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS exams_code_idx ON exams (code);`);
+
         console.log("Schema check passed.");
+        isSchemaChecked = true;
     } catch (e: any) {
         console.error("Schema init error:", e.message);
-        // Jangan throw error di sini agar API tidak crash total jika hanya warning,
-        // tapi log harus jelas.
+        // Lanjutkan eksekusi, mungkin schema sudah benar tapi query migrasi gagal karena permission dsb.
     }
 };
 
@@ -145,8 +149,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
-            // UPDATE: Urutan query diselaraskan dengan struktur database Anda:
-            // code, author_id, questions, config, created_at
             const query = `
                 INSERT INTO exams (code, author_id, questions, config, created_at)
                 VALUES ($1, $2, $3, $4, $5)
@@ -198,10 +200,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
     } catch (globalError: any) {
         console.error("API Handler Fatal Error:", globalError);
+        // Return JSON error response so frontend can display it instead of generic 500 HTML
         return res.status(500).json({ 
             error: "Internal Server Error", 
-            message: globalError.message, 
+            message: globalError.message || "Unknown DB Error", 
             code: globalError.code 
         });
     }
 }
+    
