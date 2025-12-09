@@ -182,7 +182,32 @@ class StorageService {
 
     if (this.isOnline) {
         try {
-            // STEP 1: Separate Skeleton and Images
+            // STRATEGY 1: Optimistic Full Upload (Fastest)
+            // Try to send everything in one go. If < 4.5MB payload, this works perfectly.
+            console.log("Attempting One-Shot Upload...");
+            try {
+                await retryOperation(async () => {
+                    const response = await fetch(`${API_URL}/exams`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(examToSave)
+                    });
+                    if (!response.ok) throw new Error("Payload too large or server error");
+                }, 1, 500); // 1 retry only for optimistic
+                
+                // Success!
+                exams[exam.code].isSynced = true;
+                this.saveLocal(KEYS.EXAMS, exams);
+                console.log("One-Shot Upload Successful.");
+                return;
+            } catch (e) {
+                console.warn("One-Shot failed, switching to Chunked Upload.", e);
+            }
+
+            // STRATEGY 2: Skeleton + Serial Patches (Robust)
+            // If One-Shot failed (likely payload size), we split it.
+            
+            // A. Separate Skeleton and Images
             const skeletonExam = JSON.parse(JSON.stringify(examToSave));
             const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
 
@@ -200,55 +225,45 @@ class StorageService {
                 });
             }
 
-            // STEP 2: Send Skeleton with Retry Logic
-            // This is crucial for waking up sleeping databases
+            // B. Send Skeleton
             await retryOperation(async () => {
                 const skelResponse = await fetch(`${API_URL}/exams`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(skeletonExam)
                 });
+                if (!skelResponse.ok) throw new Error(`Failed to save skeleton`);
+            }, 3, 2000);
 
-                if (!skelResponse.ok) {
-                    const errText = await skelResponse.text();
-                    throw new Error(`Failed to save exam skeleton: ${skelResponse.status} ${errText}`);
-                }
-            }, 3, 2000); // Retry 3 times, start with 2s delay
-
-            // STEP 3: Stitch Images in Batches (Chunking)
-            // Sending too many parallel requests kills serverless connections.
-            // We limit concurrency to 2 parallel requests.
+            // C. Send Images ONE BY ONE (Serial)
+            // We use serial execution to prevent connection overload and ensure database locking works cleanly.
             if (imageQueue.length > 0) {
-                console.log(`Uploading ${imageQueue.length} image sets in batches...`);
+                console.log(`Uploading ${imageQueue.length} image sets serially...`);
                 
-                const BATCH_SIZE = 2;
-                for (let i = 0; i < imageQueue.length; i += BATCH_SIZE) {
-                    const batch = imageQueue.slice(i, i + BATCH_SIZE);
-                    await Promise.all(batch.map(item => 
-                        retryOperation(async () => {
-                             await fetch(`${API_URL}/exams`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    code: exam.code,
-                                    questionId: item.qId,
-                                    imageUrl: item.imageUrl,
-                                    optionImages: item.optionImages
-                                })
-                            });
-                        }, 2, 1000)
-                    ));
+                for (const item of imageQueue) {
+                    await retryOperation(async () => {
+                        const res = await fetch(`${API_URL}/exams`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                code: exam.code,
+                                questionId: item.qId,
+                                imageUrl: item.imageUrl,
+                                optionImages: item.optionImages
+                            })
+                        });
+                        if (!res.ok) throw new Error("Patch failed");
+                    }, 3, 1000); // Retry individual images if needed
                 }
             }
 
-            // Update sync status on successful save
+            // Update sync status
             exams[exam.code].isSynced = true;
             this.saveLocal(KEYS.EXAMS, exams);
-            console.log("Exam synced successfully.");
+            console.log("Exam synced successfully (Chunked).");
 
         } catch (e) {
-            console.error("Cloud save failed:", e);
-            // Don't throw, just log. The user has local data anyway.
+            console.error("Cloud save failed completely:", e);
         }
     }
   }
@@ -361,11 +376,9 @@ class StorageService {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const pendingExams = Object.values(exams).filter(e => !e.isSynced);
     
-    // Process exams sequentially for sync
     for (const exam of pendingExams) {
         try { await this.saveExam(exam); } catch (e) {}
     }
-    // Reload from local to get updated isSynced status from saveExam calls
     this.saveLocal(KEYS.EXAMS, exams);
 
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
