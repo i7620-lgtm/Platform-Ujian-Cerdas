@@ -88,10 +88,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const code = generateExamCode();
         const newExam: Exam = {
             code,
-            authorId: teacherId, // Set actual teacher ID
+            authorId: teacherId, // Set actual teacher ID from login
             questions, // Contains answers/correctAnswer from Editor
             config,
-            createdAt: Date.now() // Explicitly set creation time
+            createdAt: Date.now() // Explicitly set creation time as number
         };
         addExam(newExam); // App.tsx handles the refresh after adding
         setGeneratedCode(code);
@@ -110,7 +110,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             authorId: editingExam.authorId || teacherId, // Preserve original author or update
             questions,
             config,
-            createdAt: editingExam.createdAt || Date.now()
+            createdAt: editingExam.createdAt || Date.now() // Preserve or update timestamp
         };
         updateExam(updatedExam);
         alert('Ujian berhasil diperbarui!');
