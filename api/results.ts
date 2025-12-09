@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
@@ -24,7 +25,8 @@ const ensureSchema = async () => {
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
-            "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS location TEXT;"
         ];
         for (const q of alterQueries) {
             try { await db.query(q); } catch (e) { /* Ignore */ }
@@ -52,7 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         total_questions,
                         status,
                         activity_log,
-                        timestamp
+                        timestamp,
+                        location
                     FROM results 
                     ORDER BY timestamp DESC
                 `);
@@ -70,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     totalQuestions: row.total_questions,
                     status: row.status,
                     activityLog: JSON.parse(row.activity_log || '[]'),
-                    timestamp: parseInt(row.timestamp || '0')
+                    timestamp: parseInt(row.timestamp || '0'),
+                    location: row.location
                 })) || [];
 
                 return res.status(200).json(formatted);
