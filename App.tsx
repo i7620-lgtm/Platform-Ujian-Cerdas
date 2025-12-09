@@ -5,7 +5,7 @@ import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
-import type { Exam, Student, Result } from './types';
+import type { Exam, Student, Result, ResultStatus } from './types';
 import { LogoIcon, CloudArrowUpIcon, NoWifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
@@ -184,10 +184,10 @@ const App: React.FC = () => {
           // 1. Update in Storage/Backend
           await storageService.unlockStudentExam(examCode, studentId);
           
-          // 2. Optimistic UI Update
+          // 2. Optimistic UI Update with Explicit Type Casting
           setResults(prev => prev.map(r => {
               if (r.student.studentId === studentId && r.examCode === examCode) {
-                  return { ...r, status: 'in_progress' };
+                  return { ...r, status: 'in_progress' as ResultStatus };
               }
               return r;
           }));
