@@ -177,10 +177,9 @@ class StorageService {
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     
-    // Validate createdAt to ensure it is a number (timestamp)
-    const safeCreatedAt = (typeof exam.createdAt === 'number' && !isNaN(exam.createdAt)) 
-        ? exam.createdAt 
-        : Date.now();
+    // CreatedAt should be a string (date and time) now.
+    // Use existing value or fallback to formatted locale string.
+    const safeCreatedAt = exam.createdAt || new Date().toLocaleString('id-ID');
 
     const examToSave: Exam = { 
         ...exam, 
@@ -194,8 +193,7 @@ class StorageService {
     if (this.isOnline) {
         try {
             // STRATEGY 1: Optimistic Full Upload (Fastest)
-            // Try to send everything in one go. If < 4.5MB payload, this works perfectly.
-            console.log("Attempting One-Shot Upload...");
+            console.log("Attempting One-Shot Upload with Date:", safeCreatedAt);
             try {
                 await retryOperation(async () => {
                     const response = await fetch(`${API_URL}/exams`, {
@@ -207,7 +205,7 @@ class StorageService {
                         const errText = await response.text();
                         throw new Error(`Server Error (${response.status}): ${errText}`);
                     }
-                }, 1, 500); // 1 retry only for optimistic
+                }, 1, 500); 
                 
                 // Success!
                 exams[exam.code].isSynced = true;
@@ -216,14 +214,9 @@ class StorageService {
                 return;
             } catch (e: any) {
                 console.warn("One-Shot failed, switching to Chunked Upload. Reason:", e.message);
-                // If it's a server logic error (500) and NOT payload size (413), throwing here might be better 
-                // but we try chunking just in case it was a timeout or transient issue.
             }
 
-            // STRATEGY 2: Skeleton + Serial Patches (Robust)
-            // If One-Shot failed (likely payload size), we split it.
-            
-            // A. Separate Skeleton and Images
+            // STRATEGY 2: Skeleton + Serial Patches
             const skeletonExam = JSON.parse(JSON.stringify(examToSave));
             const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
 
@@ -241,7 +234,7 @@ class StorageService {
                 });
             }
 
-            // B. Send Skeleton
+            // Send Skeleton
             await retryOperation(async () => {
                 const skelResponse = await fetch(`${API_URL}/exams`, {
                     method: 'POST',
@@ -254,11 +247,8 @@ class StorageService {
                 }
             }, 3, 2000);
 
-            // C. Send Images ONE BY ONE (Serial)
-            // We use serial execution to prevent connection overload and ensure database locking works cleanly.
+            // Send Images Serially
             if (imageQueue.length > 0) {
-                console.log(`Uploading ${imageQueue.length} image sets serially...`);
-                
                 for (const item of imageQueue) {
                     await retryOperation(async () => {
                         const res = await fetch(`${API_URL}/exams`, {
@@ -275,7 +265,7 @@ class StorageService {
                             const errText = await res.text();
                             throw new Error(`Patch failed: ${res.status} ${errText}`);
                         }
-                    }, 3, 1000); // Retry individual images if needed
+                    }, 3, 1000);
                 }
             }
 
@@ -286,7 +276,6 @@ class StorageService {
 
         } catch (e: any) {
             console.error("Cloud save failed completely:", e);
-            // Re-throw so UI shows the error
             throw new Error(`Cloud save failed: ${e.message}`);
         }
     }
