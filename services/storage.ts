@@ -321,7 +321,7 @@ class StorageService {
     return result;
   }
 
-  async submitExamResult(resultPayload: Omit<Result, 'score' | 'correctAnswers' | 'status'>): Promise<Result> {
+  async submitExamResult(resultPayload: Omit<Result, 'score' | 'correctAnswers'>): Promise<Result> {
     if (this.isOnline) {
         try {
             const response = await fetch(`${API_URL}/submit-exam`, {
@@ -345,6 +345,11 @@ class StorageService {
     const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const fullExam = allExams[resultPayload.examCode];
     
+    // Determine status logic:
+    // If status is provided (e.g., 'in_progress'), preserve it. 
+    // Otherwise default to 'completed' (standard submission).
+    const status = resultPayload.status;
+
     let gradedResult: Result;
     if (fullExam && fullExam.questions.length > 0) {
         const { score, correctCount } = gradeExam(fullExam, resultPayload.answers);
@@ -352,7 +357,7 @@ class StorageService {
             ...resultPayload,
             score,
             correctAnswers: correctCount,
-            status: 'completed',
+            status: status || 'completed',
             isSynced: false,
             timestamp: Date.now()
         };
@@ -361,7 +366,7 @@ class StorageService {
             ...resultPayload,
             score: 0,
             correctAnswers: 0,
-            status: 'pending_grading',
+            status: status || 'pending_grading',
             isSynced: false,
             timestamp: Date.now()
         };
@@ -381,6 +386,30 @@ class StorageService {
   async saveResult(result: Result): Promise<void> {
       this.saveResultLocal(result, false);
       this.syncData();
+  }
+
+  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
+      const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
+      const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
+      
+      if (index !== -1) {
+          // Update Local
+          results[index].status = 'in_progress';
+          if (!results[index].activityLog) results[index].activityLog = [];
+          results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian pada ${new Date().toLocaleTimeString()}`);
+          
+          this.saveLocal(KEYS.RESULTS, results);
+
+          // Update Cloud
+          if (this.isOnline) {
+             try {
+                // Just resave the result with the new status
+                await this.saveResult(results[index]);
+             } catch (e) {
+                 console.error("Failed to unlock student on server:", e);
+             }
+          }
+      }
   }
 
   async syncData() {
