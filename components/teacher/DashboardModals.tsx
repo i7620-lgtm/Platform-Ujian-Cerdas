@@ -84,10 +84,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-base-100 rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+            <div className="bg-base-100 rounded-xl shadow-2xl w-full max-w-[95vw] h-[90vh] flex flex-col">
                 
                 {/* HEADER */}
-                <div className="p-5 border-b bg-base-100 sticky top-0 z-10 rounded-t-xl flex flex-col gap-4 shadow-sm">
+                <div className="p-5 border-b bg-base-100 sticky top-0 z-10 rounded-t-xl flex flex-col gap-4 shadow-sm shrink-0">
                     <div className="flex justify-between items-start">
                         <div>
                              <div className="flex items-center gap-2">
@@ -142,19 +142,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                 </div>
 
                 {/* TABLE CONTENT */}
-                <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
+                <div className="overflow-auto flex-1 bg-gray-50">
                     {filteredResults.length > 0 ? (
-                        <div className="overflow-x-auto">
+                        <div className="inline-block min-w-full align-middle">
                             <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-white sticky top-0 shadow-sm z-0">
+                                <thead className="bg-white sticky top-0 shadow-sm z-10">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">No. Absen</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Nama Siswa</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Kelas</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Nilai Sementara</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Aktivitas Terkini</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-20">No. Absen</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Nama Siswa</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Kelas</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Status</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Nilai Sementara</th>
+                                        {/* Activity column wider and flexible */}
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[350px]">Aktivitas Terkini</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -171,7 +172,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                         else statusBadge = <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-bold">Menunggu</span>;
 
                                         return (
-                                            <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-yellow-50/50' : ''}`}>
+                                            <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-red-50' : ''}`}>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-600">
                                                     #{result.student.studentId.padStart(2, '0')}
                                                 </td>
@@ -197,19 +198,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                                                    <span title={lastActivity} className="flex items-center gap-1">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                                                        {lastActivity}
+                                                {/* Text wrap enabled for activity log */}
+                                                <td className="px-6 py-4 text-sm text-gray-500 whitespace-normal">
+                                                    <span title={lastActivity} className="flex items-start gap-2">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 shrink-0"></div>
+                                                        <span className="leading-relaxed break-words">{lastActivity}</span>
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     {result.status === 'force_submitted' && (
                                                         <button 
                                                             onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
-                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center gap-1 mx-auto"
+                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
                                                         >
-                                                            <span>Buka Blokir</span>
+                                                            <span>Izinkan Lanjut</span>
                                                         </button>
                                                     )}
                                                 </td>
