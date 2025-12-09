@@ -40,7 +40,7 @@ export interface Exam {
   questions: Question[];
   config: ExamConfig;
   isSynced?: boolean; 
-  createdAt?: string; // Changed to string for readable database storage
+  createdAt?: number; // Explicitly number (Epoch timestamp)
 }
 
 export interface Student {
