@@ -46,6 +46,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         shuffleQuestions: false,
         shuffleAnswers: false,
         continueWithPermission: false,
+        showResultToStudent: true,
+        showCorrectAnswer: false,
+        enablePublicStream: false,
+        trackLocation: false
     });
     
     const [generatedCode, setGeneratedCode] = useState('');
@@ -142,6 +146,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             shuffleQuestions: false,
             shuffleAnswers: false,
             continueWithPermission: false,
+            showResultToStudent: true,
+            showCorrectAnswer: false,
+            enablePublicStream: false,
+            trackLocation: false
         });
         setView('UPLOAD');
         setResetKey(prev => prev + 1);
