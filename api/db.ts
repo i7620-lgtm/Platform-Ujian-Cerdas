@@ -10,40 +10,37 @@ const getPool = () => {
             throw new Error("DATABASE_CONFIG_MISSING");
         }
 
-        console.log("Initializing DB Pool...");
+        // Optimization for Serverless (Vercel + Neon)
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, 
-            max: 5, // Sedikit diperbesar untuk mendukung transaksi
-            connectionTimeoutMillis: 10000, 
+            // PENTING: Set max 1 agar tidak membanjiri koneksi saat Vercel melakukan scaling/retries
+            max: 1, 
+            // Fail fast: Jika tidak bisa connect dalam 5 detik, lempar error (jangan hang)
+            connectionTimeoutMillis: 5000, 
             idleTimeoutMillis: 1000, 
         });
         
         pool.on('error', (err) => {
-            console.error('Unexpected error on idle DB client', err);
+            console.warn('DB Pool Error:', err.message);
         });
     }
     return pool;
 };
 
 export default {
-    // Query biasa (auto-connect & release)
     query: async (text: string, params?: any[]) => {
-        const start = Date.now();
-        const currentPool = getPool();
+        const client = await getPool().connect();
         try {
-            const result = await currentPool.query(text, params);
+            const result = await client.query(text, params);
             return result;
-        } catch (err: any) {
-            const duration = Date.now() - start;
-            console.error(`DB Query Failed after ${duration}ms:`, err.message);
-            throw err; 
+        } finally {
+            // Penting: Segera lepaskan client kembali ke pool
+            client.release();
         }
     },
-    // Mendapatkan client khusus untuk transaksi (BEGIN/COMMIT)
     getClient: async (): Promise<PoolClient> => {
         const currentPool = getPool();
-        const client = await currentPool.connect();
-        return client;
+        return await currentPool.connect();
     }
 };
