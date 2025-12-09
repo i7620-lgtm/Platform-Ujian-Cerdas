@@ -1,5 +1,5 @@
 
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 
 let pool: Pool | undefined;
 
@@ -14,8 +14,8 @@ const getPool = () => {
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, 
-            max: 2, // Allow slightly more concurrency for image batches
-            connectionTimeoutMillis: 8000, // Fail fast before Vercel 10s limit
+            max: 5, // Sedikit diperbesar untuk mendukung transaksi
+            connectionTimeoutMillis: 10000, 
             idleTimeoutMillis: 1000, 
         });
         
@@ -27,10 +27,11 @@ const getPool = () => {
 };
 
 export default {
+    // Query biasa (auto-connect & release)
     query: async (text: string, params?: any[]) => {
         const start = Date.now();
+        const currentPool = getPool();
         try {
-            const currentPool = getPool();
             const result = await currentPool.query(text, params);
             return result;
         } catch (err: any) {
@@ -38,5 +39,11 @@ export default {
             console.error(`DB Query Failed after ${duration}ms:`, err.message);
             throw err; 
         }
+    },
+    // Mendapatkan client khusus untuk transaksi (BEGIN/COMMIT)
+    getClient: async (): Promise<PoolClient> => {
+        const currentPool = getPool();
+        const client = await currentPool.connect();
+        return client;
     }
 };
