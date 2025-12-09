@@ -1,5 +1,4 @@
 
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
@@ -131,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 status_code = EXCLUDED.status_code,
                 activity_log = EXCLUDED.activity_log,
                 timestamp = EXCLUDED.timestamp,
-                location = COALESCE(EXCLUDED.location, results.location);
+                location = EXCLUDED.location;
         `;
 
         await db.query(query, [
@@ -147,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             statusCode,
             JSON.stringify(activityLog || []),
             Date.now(),
-            location || null
+            location || ''
         ]);
 
         return res.status(200).json({
