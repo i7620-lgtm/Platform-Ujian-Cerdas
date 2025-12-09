@@ -51,12 +51,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         return () => clearInterval(intervalId);
     }, [exam]);
 
-
-    if (!exam) return null;
-
-    const scorableQuestionsCount = exam.questions.filter(q => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
-
-    // Derived Data
+    // Derived Data (HOOKS MUST BE CALLED BEFORE EARLY RETURN)
     const uniqueClasses = useMemo(() => {
         const classes = new Set(localResults.map(r => r.student.class));
         return Array.from(classes).sort();
@@ -74,6 +69,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
             return parseInt(a.student.studentId) - parseInt(b.student.studentId);
         });
     }, [localResults, filterClass]);
+
+    // --- EARLY RETURN CHECK ---
+    if (!exam) return null;
+
+    const scorableQuestionsCount = exam.questions.filter(q => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
 
     // Statistics
     const totalStudents = localResults.length;
