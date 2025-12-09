@@ -8,17 +8,24 @@ let isTableInitialized = false;
 const initializeTable = async () => {
     if (isTableInitialized) return;
     try {
+        // Pastikan tabel ada
         await db.query(`
             CREATE TABLE IF NOT EXISTS exams (
-                code TEXT PRIMARY KEY, 
+                code TEXT, 
                 author_id TEXT DEFAULT 'anonymous',
                 questions TEXT, 
                 config TEXT,
                 created_at BIGINT DEFAULT 0
             );
         `);
-        // Simple check or robust index creation once
-        await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS exams_code_idx ON exams (code);`);
+        
+        // Coba tambahkan Unique Index untuk performa, tapi jangan crash jika gagal
+        try {
+            await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS exams_code_idx ON exams (code);`);
+        } catch (e) {
+            console.warn("Index creation warning (non-fatal):", e);
+        }
+        
         isTableInitialized = true;
     } catch (e) {
         console.error("Failed to init table:", e);
@@ -115,18 +122,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
-            const query = `
-                INSERT INTO exams (code, author_id, questions, config, created_at)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (code) 
-                DO UPDATE SET 
-                    author_id = EXCLUDED.author_id,
-                    questions = EXCLUDED.questions,
-                    config = EXCLUDED.config;
-            `;
-            const params = [exam.code, authorId, questionsJson, configJson, createdAt];
+            // STRATEGY: MANUAL UPSERT (Update OR Insert)
+            // Ini lebih aman daripada ON CONFLICT jika skema database tidak memiliki Constraint UNIQUE yang sempurna.
+            
+            // 1. Coba UPDATE dulu
+            const updateResult = await db.query(`
+                UPDATE exams 
+                SET author_id = $2, questions = $3, config = $4, created_at = $5
+                WHERE code = $1
+            `, [exam.code, authorId, questionsJson, configJson, createdAt]);
 
-            await db.query(query, params);
+            // 2. Jika tidak ada baris yang di-update (artinya data baru), lakukan INSERT
+            if (updateResult.rowCount === 0) {
+                 await db.query(`
+                    INSERT INTO exams (code, author_id, questions, config, created_at)
+                    VALUES ($1, $2, $3, $4, $5)
+                `, [exam.code, authorId, questionsJson, configJson, createdAt]);
+            }
+
             return res.status(200).json({ success: true });
         }
         
