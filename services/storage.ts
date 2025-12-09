@@ -176,8 +176,18 @@ class StorageService {
 
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    // Simpan createdAt sebagai string (ISO)
-    const examToSave = { ...exam, isSynced: false, createdAt: exam.createdAt || new Date().toISOString() };
+    
+    // Validate createdAt to ensure it is a number (timestamp)
+    const safeCreatedAt = (typeof exam.createdAt === 'number' && !isNaN(exam.createdAt)) 
+        ? exam.createdAt 
+        : Date.now();
+
+    const examToSave: Exam = { 
+        ...exam, 
+        isSynced: false, 
+        createdAt: safeCreatedAt 
+    };
+    
     exams[exam.code] = examToSave;
     this.saveLocal(KEYS.EXAMS, exams);
 
