@@ -77,6 +77,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     // Statistics
     const totalStudents = localResults.length;
+    // Safe Comparison: Explicitly checking against string literals
     const activeStudents = localResults.filter(r => r.status === 'in_progress').length;
     const finishedStudents = localResults.filter(r => r.status === 'completed').length;
     const suspendedStudents = localResults.filter(r => r.status === 'force_submitted').length;
