@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -63,8 +62,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }
     };
 
-    // ... (rest of the component logic remains the same until configuration section)
-
     const handleQuestionTextChange = (id: string, text: string) => {
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     };
@@ -100,6 +97,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const rawDataUrl = ev.target?.result as string;
+            // Compress Image before setting state to avoid payload too large
             const dataUrl = await compressImage(rawDataUrl, 0.7);
 
             setQuestions(prev => prev.map(q => {
@@ -308,7 +306,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     };
 
     // --- RENDER HELPERS ---
-    // (renderTypeSelectionModal remains same)
+
     const renderTypeSelectionModal = () => {
         if (!isTypeSelectionModalOpen) return null;
         
@@ -355,7 +353,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
             {/* --- SECTION 1: QUESTIONS --- */}
             <div ref={questionsSectionRef} className="space-y-4">
-                 {/* Question editing UI same as before */}
                  <div className="p-4 bg-primary/5 rounded-lg">
                     <h2 className="text-xl font-bold text-neutral">
                         {isEditing ? '1. Tinjau dan Edit Soal' : '3. Tinjau dan Edit Soal'}
@@ -366,7 +363,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     {questions.map((q, index) => (
                         <React.Fragment key={q.id}>
                             <div id={q.id} className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm group hover:shadow-md transition-shadow relative">
-                                {/* Question Item Content */}
                                     <div>
                                         {/* TYPE BADGE */}
                                         <div className="flex justify-center mb-4">
@@ -425,8 +421,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* Editor parts for MC, matching, etc. */}
-                                        {/* ... (reusing existing logic for question details) ... */}
+                                        {/* EDITOR: MULTIPLE CHOICE */}
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                             <div className="mt-3 ml-8">
                                                 <div className="space-y-3">
@@ -485,64 +480,233 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <button onClick={() => handleAddOption(q.id)} className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
+                                                <button 
+                                                    onClick={() => handleAddOption(q.id)}
+                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                >
+                                                    <PlusCircleIcon className="w-4 h-4" />
+                                                    Tambah Opsi
+                                                </button>
                                             </div>
                                         )}
-                                        {/* ... (other types omitted for brevity, logic exists) ... */}
-                                        {/* COMPLEX, TRUE_FALSE, MATCHING, ESSAY/FILL */}
-                                         {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
+                                        
+                                        {/* EDITOR: COMPLEX MULTIPLE CHOICE */}
+                                        {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                             <div className="mt-3 ml-8">
+                                                <p className="text-xs text-gray-500 mb-2 italic">Centang kotak untuk menandai semua jawaban yang benar.</p>
                                                 <div className="space-y-3">
                                                     {q.options.map((option, i) => {
                                                         const isChecked = q.correctAnswer ? q.correctAnswer.split(',').includes(option) : false;
                                                         return (
                                                         <div key={i} className={`relative flex items-start gap-3 p-3 pr-10 rounded-md border group/opt ${isChecked ? 'bg-green-50 border-green-300 ring-1 ring-green-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <button onClick={() => handleDeleteOption(q.id, i)} className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"><TrashIcon className="w-4 h-4" /></button>
-                                                            <input type="checkbox" checked={isChecked} onChange={(e) => handleComplexCorrectAnswerChange(q.id, option, e.target.checked)} className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer rounded" />
+                                                            <button 
+                                                                onClick={() => handleDeleteOption(q.id, i)}
+                                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"
+                                                            >
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
+
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={(e) => handleComplexCorrectAnswerChange(q.id, option, e.target.checked)}
+                                                                className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer rounded"
+                                                            />
                                                             <div className="flex-1 space-y-2">
-                                                                <input type="text" value={option} onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)} className={`block w-full px-2 py-1.5 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`} />
-                                                                {/* Image handling for complex options */}
-                                                                {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={option}
+                                                                        onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
+                                                                        className={`block w-full px-2 py-1.5 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
+                                                                        placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
+                                                                    />
+                                                                </div>
+                                                                 {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
                                                                     <div className="relative inline-block group/optImg">
-                                                                        <img src={(q.optionImages && q.optionImages[i]) || option} className="max-w-full h-auto border rounded-md max-h-[150px]" />
-                                                                        <button onClick={() => { if(q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i); else handleOptionTextChange(q.id, i, ''); }} className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"><XMarkIcon className="w-3 h-3" /></button>
+                                                                        <img 
+                                                                            src={(q.optionImages && q.optionImages[i]) || option} 
+                                                                            alt={`Opsi ${i+1}`} 
+                                                                            className="max-w-full h-auto border rounded-md max-h-[150px]" 
+                                                                        />
+                                                                         <button 
+                                                                            onClick={() => {
+                                                                                if (q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i);
+                                                                                else handleOptionTextChange(q.id, i, ''); 
+                                                                            }}
+                                                                            className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"
+                                                                        >
+                                                                            <XMarkIcon className="w-3 h-3" />
+                                                                        </button>
                                                                     </div>
                                                                 )}
-                                                                <div className="flex justify-end"><label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors"><PhotoIcon className="w-4 h-4" /><input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} /></label></div>
+                                                                <div className="flex justify-end">
+                                                                    <label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
+                                                                        <PhotoIcon className="w-4 h-4" />
+                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} />
+                                                                    </label>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )})}
                                                 </div>
-                                                <button onClick={() => handleAddOption(q.id)} className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
+                                                 <button 
+                                                    onClick={() => handleAddOption(q.id)}
+                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                >
+                                                    <PlusCircleIcon className="w-4 h-4" />
+                                                    Tambah Opsi
+                                                </button>
                                             </div>
                                         )}
+                                        
+                                        {/* EDITOR: TRUE/FALSE */}
                                         {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                             <div className="mt-3 ml-8">
+                                                <p className="text-xs text-gray-500 mb-2 italic">Tentukan pernyataan dan kunci jawabannya (Benar/Salah).</p>
                                                 <div className="overflow-x-auto border rounded-md">
                                                     <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b"><tr><th className="px-4 py-2 w-full">Pernyataan</th><th className="px-4 py-2 text-center w-24">Benar</th><th className="px-4 py-2 text-center w-24">Salah</th><th className="px-2 py-2 w-10"></th></tr></thead>
-                                                        <tbody className="divide-y divide-gray-100">{q.trueFalseRows.map((row, i) => (<tr key={i} className="bg-white hover:bg-gray-50"><td className="px-4 py-2"><input type="text" value={row.text} onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)} className="w-full border-gray-300 rounded focus:ring-primary focus:border-primary text-sm p-1.5" /></td><td className="px-4 py-2 text-center"><input type="radio" name={`tf-row-${q.id}-${i}`} checked={row.answer === true} onChange={() => handleTrueFalseRowAnswerChange(q.id, i, true)} className="w-4 h-4 text-green-600 focus:ring-green-500 cursor-pointer" /></td><td className="px-4 py-2 text-center"><input type="radio" name={`tf-row-${q.id}-${i}`} checked={row.answer === false} onChange={() => handleTrueFalseRowAnswerChange(q.id, i, false)} className="w-4 h-4 text-red-600 focus:ring-red-500 cursor-pointer" /></td><td className="px-2 py-2 text-center"><button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-400 hover:text-red-500 p-1"><TrashIcon className="w-4 h-4"/></button></td></tr>))}</tbody>
+                                                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                                                            <tr>
+                                                                <th className="px-4 py-2 w-full">Pernyataan</th>
+                                                                <th className="px-4 py-2 text-center w-24">Benar</th>
+                                                                <th className="px-4 py-2 text-center w-24">Salah</th>
+                                                                <th className="px-2 py-2 w-10"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100">
+                                                            {q.trueFalseRows.map((row, i) => (
+                                                                <tr key={i} className="bg-white hover:bg-gray-50">
+                                                                    <td className="px-4 py-2">
+                                                                        <input 
+                                                                            type="text"
+                                                                            value={row.text}
+                                                                            onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)}
+                                                                            className="w-full border-gray-300 rounded focus:ring-primary focus:border-primary text-sm p-1.5"
+                                                                            placeholder="Tulis pernyataan..."
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-center">
+                                                                        <input 
+                                                                            type="radio"
+                                                                            name={`tf-row-${q.id}-${i}`}
+                                                                            checked={row.answer === true}
+                                                                            onChange={() => handleTrueFalseRowAnswerChange(q.id, i, true)}
+                                                                            className="w-4 h-4 text-green-600 focus:ring-green-500 cursor-pointer"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-center">
+                                                                        <input 
+                                                                            type="radio"
+                                                                            name={`tf-row-${q.id}-${i}`}
+                                                                            checked={row.answer === false}
+                                                                            onChange={() => handleTrueFalseRowAnswerChange(q.id, i, false)}
+                                                                            className="w-4 h-4 text-red-600 focus:ring-red-500 cursor-pointer"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-2 py-2 text-center">
+                                                                         <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-400 hover:text-red-500 p-1">
+                                                                             <TrashIcon className="w-4 h-4"/>
+                                                                         </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
                                                     </table>
                                                 </div>
-                                                <button onClick={() => handleAddTrueFalseRow(q.id)} className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"><PlusCircleIcon className="w-4 h-4" /> Tambah Pernyataan</button>
+                                                <button 
+                                                    onClick={() => handleAddTrueFalseRow(q.id)}
+                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                >
+                                                    <PlusCircleIcon className="w-4 h-4" />
+                                                    Tambah Pernyataan
+                                                </button>
                                             </div>
                                         )}
+
+                                        {/* EDITOR: MATCHING */}
                                         {q.questionType === 'MATCHING' && q.matchingPairs && (
                                              <div className="mt-3 ml-8">
-                                                <div className="space-y-2">{q.matchingPairs.map((pair, i) => (<div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded border"><div className="flex-1"><input type="text" placeholder="Item Kiri" value={pair.left} onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)} className="w-full text-sm p-1 border rounded" /></div><div className="text-gray-400">→</div><div className="flex-1"><input type="text" placeholder="Pasangan Kanan (Benar)" value={pair.right} onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)} className="w-full text-sm p-1 border rounded bg-green-50 border-green-200" /></div><button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-gray-400 hover:text-red-500 p-1"><TrashIcon className="w-4 h-4"/></button></div>))}</div>
-                                                <button onClick={() => handleAddMatchingPair(q.id)} className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"><PlusCircleIcon className="w-4 h-4" /> Tambah Pasangan</button>
+                                                <p className="text-xs text-gray-500 mb-2 italic">Pasangkan item di kolom kiri dengan jawaban yang benar di kolom kanan.</p>
+                                                <div className="space-y-2">
+                                                    {q.matchingPairs.map((pair, i) => (
+                                                        <div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded border">
+                                                             <div className="flex-1">
+                                                                 <input 
+                                                                    type="text" 
+                                                                    placeholder="Item Kiri"
+                                                                    value={pair.left}
+                                                                    onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)}
+                                                                    className="w-full text-sm p-1 border rounded"
+                                                                 />
+                                                             </div>
+                                                             <div className="text-gray-400">→</div>
+                                                             <div className="flex-1">
+                                                                 <input 
+                                                                    type="text" 
+                                                                    placeholder="Pasangan Kanan (Benar)"
+                                                                    value={pair.right}
+                                                                    onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)}
+                                                                    className="w-full text-sm p-1 border rounded bg-green-50 border-green-200"
+                                                                 />
+                                                             </div>
+                                                             <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-gray-400 hover:text-red-500 p-1">
+                                                                 <TrashIcon className="w-4 h-4"/>
+                                                             </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleAddMatchingPair(q.id)}
+                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                >
+                                                    <PlusCircleIcon className="w-4 h-4" />
+                                                    Tambah Pasangan
+                                                </button>
                                              </div>
                                         )}
+
                                         {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
                                              <div className="mt-3 ml-8">
-                                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{q.questionType === 'ESSAY' ? 'Jawaban Referensi / Poin Penting' : 'Kunci Jawaban'}</label>
-                                                {q.questionType === 'ESSAY' ? (<textarea value={q.correctAnswer || ''} onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words min-h-[60px]" placeholder="Tuliskan poin-poin jawaban yang diharapkan (opsional, untuk referensi guru)" />) : (<input type="text" value={q.correctAnswer || ''} onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words" placeholder="Masukkan jawaban yang benar" />)}
+                                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                    {q.questionType === 'ESSAY' ? 'Jawaban Referensi / Poin Penting' : 'Kunci Jawaban'}
+                                                </label>
+                                                {q.questionType === 'ESSAY' ? (
+                                                     <textarea 
+                                                        value={q.correctAnswer || ''}
+                                                        onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
+                                                        className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words min-h-[60px]"
+                                                        placeholder="Tuliskan poin-poin jawaban yang diharapkan (opsional, untuk referensi guru)"
+                                                    />
+                                                ) : (
+                                                    <input 
+                                                        type="text"
+                                                        value={q.correctAnswer || ''}
+                                                        onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
+                                                        className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words"
+                                                        placeholder="Masukkan jawaban yang benar"
+                                                    />
+                                                )}
                                              </div>
                                         )}
                                     </div>
                             </div>
-                            {/* Insert Divider */}
-                            <div className="relative py-2 group/insert"><div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div></div><div className="relative flex justify-center"><button onClick={() => openTypeSelectionModal(index)} className="bg-gray-50 text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Soal / Keterangan Di Sini</button></div></div>
+                            
+                            {/* INSERT QUESTION DIVIDER */}
+                            <div className="relative py-2 group/insert">
+                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                    <div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div>
+                                </div>
+                                <div className="relative flex justify-center">
+                                    <button
+                                        onClick={() => openTypeSelectionModal(index)}
+                                        className="bg-gray-50 text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
+                                    >
+                                        <PlusCircleIcon className="w-4 h-4" />
+                                        Tambah Soal / Keterangan Di Sini
+                                    </button>
+                                </div>
+                            </div>
                         </React.Fragment>
                     ))}
                 </div>
@@ -563,7 +727,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                      <p className="text-sm text-base-content mt-1">Atur jadwal, durasi, dan aturan pengerjaan ujian.</p>
                 </div>
                 <div className="mt-4 bg-white p-6 border rounded-lg grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 shadow-sm">
-                    {/* Basic Config */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Tanggal Ujian</label>
                         <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
@@ -580,85 +743,36 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <label className="block text-sm font-medium text-gray-700">Simpan Otomatis (detik)</label>
                         <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
                     </div>
-
-                    {/* Checkbox Options */}
-                    <div className="md:col-span-2 space-y-3 pt-4 border-t mt-2">
-                        <h4 className="font-semibold text-gray-700 mb-2">Pengaturan Lanjutan</h4>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Acak Urutan Soal</span>
-                                   <span className="block text-xs text-gray-500">Setiap siswa mendapat urutan soal yang berbeda.</span>
-                               </div>
+                    <div className="md:col-span-2 space-y-3 pt-2">
+                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Acak Urutan Soal</span></label>
+                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Acak Urutan Jawaban (Pilihan Ganda)</span></label>
+                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Izinkan Siswa Mengerjakan Ulang</span></label>
+                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Deteksi Pindah Tab/Aplikasi</span></label>
+                       {config.detectBehavior && (
+                        <label className="flex items-center ml-6 cursor-pointer"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Hentikan Ujian & Perlu Izin Guru untuk Melanjutkan</span></label>
+                       )}
+                       
+                       {/* NEW CONFIGURATIONS */}
+                       <div className="pt-2 mt-2 border-t border-gray-100 space-y-3">
+                           <h4 className="text-sm font-bold text-gray-800">Pengaturan Lanjutan</h4>
+                           <label className="flex items-center cursor-pointer">
+                               <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                               <span className="ml-2 text-sm text-gray-700">Tampilkan Nilai ke Siswa Setelah Selesai</span>
                            </label>
-                           
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Acak Urutan Jawaban</span>
-                                   <span className="block text-xs text-gray-500">Opsi pilihan ganda akan diacak.</span>
-                               </div>
+                           {/* Feature prepared but hidden or disabled logic can be added later */}
+                           <label className="flex items-center cursor-pointer">
+                               <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                               <span className="ml-2 text-sm text-gray-700">Tampilkan Kunci Jawaban Setelah Selesai (Review)</span>
                            </label>
-                           
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <span className="ml-2 text-sm font-medium text-gray-700">Izinkan Mengerjakan Ulang</span>
+                           <label className="flex items-center cursor-pointer">
+                               <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                               <span className="ml-2 text-sm text-gray-700">Aktifkan Link Livestream Publik (Tanpa Login)</span>
                            </label>
-                           
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Deteksi Kecurangan</span>
-                                   <span className="block text-xs text-gray-500">Pantau jika siswa pindah tab/aplikasi.</span>
-                               </div>
+                           <label className="flex items-center cursor-pointer">
+                               <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                               <span className="ml-2 text-sm text-gray-700">Lacak Lokasi Siswa saat Submit (GPS)</span>
                            </label>
-
-                           {config.detectBehavior && (
-                                <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded md:col-span-2 bg-yellow-50 border border-yellow-100">
-                                    <input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <div className="ml-2">
-                                        <span className="block text-sm font-bold text-gray-800">Hentikan Ujian & Perlu Izin Guru</span>
-                                        <span className="block text-xs text-gray-600">Jika curang, ujian terkunci otomatis dan harus dibuka oleh guru.</span>
-                                    </div>
-                                </label>
-                           )}
-
-                           {/* NEW FEATURES */}
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent ?? true} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Tampilkan Nilai Akhir</span>
-                                   <span className="block text-xs text-gray-500">Siswa dapat melihat skor setelah selesai.</span>
-                               </div>
-                           </label>
-
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer ?? false} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Tampilkan Kunci Jawaban</span>
-                                   <span className="block text-xs text-gray-500">Perlihatkan jawaban benar setelah selesai.</span>
-                               </div>
-                           </label>
-
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="trackLocation" checked={config.trackLocation ?? false} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Lacak Lokasi GPS</span>
-                                   <span className="block text-xs text-gray-500">Simpan lokasi siswa saat submit (perlu izin browser).</span>
-                               </div>
-                           </label>
-
-                           <label className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded">
-                               <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream ?? false} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <div className="ml-2">
-                                   <span className="block text-sm font-medium text-gray-700">Aktifkan Livestream Publik</span>
-                                   <span className="block text-xs text-gray-500">Buat link khusus untuk orang tua/publik memantau.</span>
-                               </div>
-                           </label>
-
-                        </div>
+                       </div>
                     </div>
                 </div>
             </div>
