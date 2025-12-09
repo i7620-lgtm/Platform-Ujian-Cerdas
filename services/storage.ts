@@ -297,6 +297,7 @@ class StorageService {
                     if (idx === -1) {
                         combined.push({ ...cRes, isSynced: true });
                     } else {
+                        // Merge strategies could go here, for now cloud wins if exists
                         combined[idx] = { ...cRes, isSynced: true };
                     }
                 });
@@ -346,7 +347,7 @@ class StorageService {
     const fullExam = allExams[resultPayload.examCode];
     
     // Determine status logic:
-    // If status is provided (e.g., 'in_progress'), preserve it. 
+    // If status is provided (e.g., 'in_progress' or 'force_submitted'), preserve it. 
     // Otherwise default to 'completed' (standard submission).
     const status = resultPayload.status;
 
@@ -357,7 +358,7 @@ class StorageService {
             ...resultPayload,
             score,
             correctAnswers: correctCount,
-            status: status || 'completed',
+            status: status ? (status as ResultStatus) : 'completed',
             isSynced: false,
             timestamp: Date.now()
         };
@@ -366,7 +367,7 @@ class StorageService {
             ...resultPayload,
             score: 0,
             correctAnswers: 0,
-            status: status || 'pending_grading',
+            status: status ? (status as ResultStatus) : 'pending_grading',
             isSynced: false,
             timestamp: Date.now()
         };
@@ -394,7 +395,6 @@ class StorageService {
       
       if (index !== -1) {
           // Update Local
-          // Explicit casting to satisfy TypeScript if ResultStatus definition is lingering
           results[index].status = 'in_progress' as ResultStatus;
           if (!results[index].activityLog) results[index].activityLog = [];
           results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian pada ${new Date().toLocaleTimeString()}`);
@@ -430,7 +430,8 @@ class StorageService {
 
     for (const res of pendingResults) {
          try {
-             const endpoint = res.status === 'pending_grading' ? '/submit-exam' : '/results';
+             // Always use /submit-exam to ensure insert/update happens
+             const endpoint = '/submit-exam';
              const response = await fetch(`${API_URL}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -438,6 +439,7 @@ class StorageService {
             });
             
             if (response.ok) {
+                // If it was pending grading, we might get a graded result back
                 if (res.status === 'pending_grading') {
                     const graded: Result = await response.json();
                     const idx = results.findIndex(r => r.examCode === res.examCode && r.student.studentId === res.student.studentId);
