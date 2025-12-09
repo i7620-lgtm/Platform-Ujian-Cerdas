@@ -2,9 +2,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
-// Global variable to cache schema check status within the same lambda instance
-let isSchemaChecked = false;
-
 const shuffleArray = <T>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -61,27 +58,34 @@ const sanitizeExam = (examRow: any) => {
 
 // Safe Schema Migration Helper - Optimized
 const ensureSchema = async () => {
-    if (isSchemaChecked) return; // Skip if already checked in this instance
-
+    // Catatan: Variabel global isSchemaChecked dihapus agar pemeriksaan skema 
+    // selalu dijalankan untuk mencegah error "column does not exist" pada cold start.
+    
     try {
         console.log("Checking DB Schema...");
+        
+        // 1. Pastikan Tabel Utama Ada (Urutan disesuaikan dengan database Anda)
         await db.query(`
             CREATE TABLE IF NOT EXISTS exams (
                 code TEXT PRIMARY KEY, 
+                author_id TEXT DEFAULT 'anonymous',
                 questions TEXT, 
                 config TEXT,
-                author_id TEXT DEFAULT 'anonymous',
                 created_at BIGINT DEFAULT 0
             );
         `);
-        // Split alters to avoid failure if one exists
-        try { await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';`); } catch(e) {}
-        try { await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;`); } catch(e) {}
+
+        // 2. Pastikan Kolom Tambahan Ada (Migrasi)
+        // Kita tidak menggunakan try-catch kosong disini. Jika ini gagal, biarkan error muncul
+        // agar kita tahu ada masalah pada database, daripada gagal diam-diam saat INSERT nanti.
+        await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';`);
+        await db.query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;`);
         
-        isSchemaChecked = true;
         console.log("Schema check passed.");
-    } catch (e) {
-        console.error("Schema init warning:", e);
+    } catch (e: any) {
+        console.error("Schema init error:", e.message);
+        // Jangan throw error di sini agar API tidak crash total jika hanya warning,
+        // tapi log harus jelas.
     }
 };
 
@@ -141,14 +145,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
+            // UPDATE: Urutan query diselaraskan dengan struktur database Anda:
+            // code, author_id, questions, config, created_at
             const query = `
                 INSERT INTO exams (code, author_id, questions, config, created_at)
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (code) 
                 DO UPDATE SET 
+                    author_id = EXCLUDED.author_id,
                     questions = EXCLUDED.questions,
-                    config = EXCLUDED.config,
-                    author_id = EXCLUDED.author_id;
+                    config = EXCLUDED.config;
             `;
             
             await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt]);
