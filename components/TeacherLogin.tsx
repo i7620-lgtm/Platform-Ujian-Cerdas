@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 
 interface TeacherLoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (teacherId: string) => void;
   onBack: () => void;
 }
 
@@ -17,7 +17,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     setError('');
     // Simple mock authentication
     if (teacherId.trim() !== '' && password === 'guru123') {
-      onLoginSuccess();
+      onLoginSuccess(teacherId);
     } else {
       setError('ID Guru atau Password salah.');
     }
