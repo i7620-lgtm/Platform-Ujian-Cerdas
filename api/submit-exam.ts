@@ -72,6 +72,7 @@ const ensureSchema = async () => {
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS status_code INTEGER;", 
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS activity_log TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS timestamp BIGINT;"
         ];
@@ -101,21 +102,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const grading = calculateGrade(fullExam, answers);
         const status = req.body.status || 'completed';
 
+        // MAPPING STATUS CODE
+        // 0: Belum Mengerjakan (Default)
+        // 1: Sedang Mengerjakan (in_progress)
+        // 2: Ditangguhkan (force_submitted)
+        // 3: Selesai (completed)
+        let statusCode = 0;
+        if (status === 'in_progress') statusCode = 1;
+        else if (status === 'force_submitted') statusCode = 2;
+        else if (status === 'completed') statusCode = 3;
+
         // 3. Simpan Hasil (to 'results' table)
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
                 answers, score, correct_answers, total_questions, 
-                status, activity_log, timestamp
+                status, status_code, activity_log, timestamp
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (exam_code, student_id)
             DO UPDATE SET
                 answers = EXCLUDED.answers,
                 score = EXCLUDED.score,
                 correct_answers = EXCLUDED.correct_answers,
                 status = EXCLUDED.status,
-                activity_log = EXCLUDED.activity_log;
+                status_code = EXCLUDED.status_code,
+                activity_log = EXCLUDED.activity_log,
+                timestamp = EXCLUDED.timestamp;
         `;
 
         await db.query(query, [
@@ -128,6 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             grading.correctCount,
             grading.totalQuestions,
             status,
+            statusCode,
             JSON.stringify(activityLog || []),
             Date.now()
         ]);
@@ -140,6 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             correctAnswers: grading.correctCount,
             totalQuestions: grading.totalQuestions,
             status: status,
+            statusCode: statusCode,
             isSynced: true,
             timestamp: Date.now()
         });
