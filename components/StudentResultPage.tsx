@@ -1,14 +1,16 @@
 
+
 import React, { useEffect } from 'react';
-import type { Result } from '../types';
+import type { Result, ExamConfig } from '../types';
 import { CheckCircleIcon, WifiIcon, ClockIcon } from './Icons';
 
 interface StudentResultPageProps {
   result: Result;
+  config?: ExamConfig;
   onFinish: () => void;
 }
 
-export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, onFinish }) => {
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish }) => {
     
     useEffect(() => {
         window.history.pushState(null, "", window.location.href);
@@ -52,6 +54,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, on
         );
     }
 
+    // Logic: If showResultToStudent is FALSE (and not undefined), hide result.
+    const showResult = config ? (config.showResultToStudent ?? true) : true;
     const scoreColorClass = result.score >= 75 ? 'text-green-500' : result.score >= 50 ? 'text-yellow-500' : 'text-red-500';
 
     return (
@@ -62,22 +66,29 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, on
                         <CheckCircleIcon className="w-20 h-20 text-secondary" />
                     </div>
                     <h1 className="text-3xl font-bold text-neutral mb-2">Ujian Selesai!</h1>
-                    <p className="text-base-content mb-6">Berikut adalah hasil ujian Anda, {result.student.fullName}.</p>
+                    <p className="text-base-content mb-6">Terima kasih telah mengerjakan ujian ini, {result.student.fullName}.</p>
                     
-                    <div className="bg-gray-50 rounded-xl p-6 my-8 border">
-                        <p className="text-lg text-gray-600">Nilai Akhir Anda</p>
-                        <p className={`text-6xl sm:text-7xl font-extrabold my-2 ${scoreColorClass}`}>{result.score}</p>
-                        <div className="flex justify-center divide-x mt-4 text-gray-600">
-                            <div className="px-4 text-center">
-                                <p className="font-bold text-lg">{result.correctAnswers}</p>
-                                <p className="text-sm">Jawaban Benar</p>
-                            </div>
-                            <div className="px-4 text-center">
-                                <p className="font-bold text-lg">{result.totalQuestions}</p>
-                                <p className="text-sm">Total Soal</p>
+                    {showResult ? (
+                        <div className="bg-gray-50 rounded-xl p-6 my-8 border">
+                            <p className="text-lg text-gray-600">Nilai Akhir Anda</p>
+                            <p className={`text-6xl sm:text-7xl font-extrabold my-2 ${scoreColorClass}`}>{result.score}</p>
+                            <div className="flex justify-center divide-x mt-4 text-gray-600">
+                                <div className="px-4 text-center">
+                                    <p className="font-bold text-lg">{result.correctAnswers}</p>
+                                    <p className="text-sm">Jawaban Benar</p>
+                                </div>
+                                <div className="px-4 text-center">
+                                    <p className="font-bold text-lg">{result.totalQuestions}</p>
+                                    <p className="text-sm">Total Soal</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="bg-gray-50 rounded-xl p-6 my-8 border border-gray-200">
+                            <p className="text-gray-600">Hasil ujian Anda telah disimpan ke database guru.</p>
+                            <p className="text-sm text-gray-500 mt-2">Nilai akan diumumkan oleh guru setelah pemeriksaan selesai.</p>
+                        </div>
+                    )}
 
                     <p className="text-xs text-gray-400 mb-6">
                         Catatan: Halaman ini hanya dapat dilihat satu kali. Setelah Anda keluar, Anda tidak dapat melihat hasil ini lagi.
