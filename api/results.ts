@@ -1,6 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db';
+// WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
+import db from './db.js';
 
 let isSchemaChecked = false;
 
