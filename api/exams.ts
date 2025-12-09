@@ -7,13 +7,14 @@ import db from './db.js';
 let isTableInitialized = false;
 
 // Definisi Skema Tabel yang Benar dengan PRIMARY KEY
+// created_at diubah menjadi TEXT agar menyimpan format tanggal yang mudah dibaca (ISO String)
 const CREATE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS exams (
         code TEXT PRIMARY KEY, 
         author_id TEXT DEFAULT 'anonymous',
         questions TEXT, 
         config TEXT,
-        created_at BIGINT DEFAULT 0
+        created_at TEXT DEFAULT '' 
     );
 `;
 
@@ -39,10 +40,11 @@ const sanitizeExam = (examRow: any) => {
             authorId: examRow.author_id,
             questions,
             config: JSON.parse(examRow.config || '{}'),
-            createdAt: parseInt(examRow.created_at || '0')
+            // Tidak perlu parseInt, karena sekarang bertipe string
+            createdAt: examRow.created_at || new Date().toISOString()
         };
     } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: 0 };
+        return { code: examRow.code, questions: [], config: {}, createdAt: new Date().toISOString() };
     }
 };
 
@@ -80,7 +82,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
             const authorId = exam.authorId || 'anonymous';
-            const createdAt = exam.createdAt || Date.now();
+            // Simpan sebagai ISO String (Teks)
+            const createdAt = exam.createdAt || new Date().toISOString();
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
