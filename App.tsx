@@ -1,15 +1,17 @@
 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
+import { OngoingExamModal } from './components/teacher/DashboardModals'; // Import explicitly for public view
 import type { Exam, Student, Result, ResultStatus } from './types';
 import { LogoIcon, CloudArrowUpIcon, NoWifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'PUBLIC_STREAM';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -23,6 +25,38 @@ const App: React.FC = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Check for Public Stream URL Param on Mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const streamCode = params.get('stream');
+    if (streamCode) {
+        handlePublicStreamInit(streamCode);
+    }
+  }, []);
+
+  const handlePublicStreamInit = async (code: string) => {
+      setIsSyncing(true);
+      try {
+          const exam = await storageService.getExamForStudent(code);
+          if (exam) {
+              // Load results specifically for this exam
+              // Since we are public, we might not have all local results, fetch fresh from server
+              const allResults = await storageService.getResults(); 
+              setResults(allResults);
+              setCurrentExam(exam);
+              setView('PUBLIC_STREAM');
+          } else {
+              alert("Ujian tidak ditemukan untuk livestream.");
+              // Remove param to reset
+              window.history.replaceState({}, document.title, "/");
+          }
+      } catch (e) {
+          console.error("Stream init failed", e);
+      } finally {
+          setIsSyncing(false);
+      }
+  };
 
   // Keep track of view for event listeners
   const viewRef = useRef(view);
@@ -134,8 +168,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Submit Handler
-  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
+  // Submit Handler - UPDATED to accept location
+  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string) => {
     if (!currentExam || !currentStudent) return;
     
     const resultPayload = {
@@ -148,6 +182,7 @@ const App: React.FC = () => {
             "Siswa fokus penuh selama ujian.",
             "Tidak terdeteksi membuka aplikasi lain."
         ],
+        location // Capture location from StudentExamPage
     };
     
     const finalResult = await storageService.submitExamResult(resultPayload);
@@ -214,6 +249,7 @@ const App: React.FC = () => {
     setStudentResult(null);
     setView('SELECTOR');
     setTeacherId('ANONYMOUS');
+    window.history.replaceState({}, document.title, "/"); // Clear query params
   }
 
   // --- UI Components ---
@@ -234,6 +270,19 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (view) {
+      case 'PUBLIC_STREAM':
+        return (
+             <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                 {currentExam && (
+                    <OngoingExamModal 
+                        exam={currentExam} 
+                        results={results} 
+                        onClose={resetToHome} 
+                        onAllowContinuation={() => alert("Akses Publik: Anda tidak memiliki izin untuk melakukan ini.")}
+                    />
+                 )}
+             </div>
+        );
       case 'TEACHER_LOGIN':
         return <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />;
       case 'STUDENT_LOGIN':
@@ -257,7 +306,8 @@ const App: React.FC = () => {
         return null;
       case 'STUDENT_RESULT':
         if (studentResult) {
-          return <StudentResultPage result={studentResult} onFinish={resetToHome} />;
+            // Pass the exam config to determine visibility of result
+          return <StudentResultPage result={studentResult} config={currentExam?.config} onFinish={resetToHome} />;
         }
         return null;
       case 'SELECTOR':
