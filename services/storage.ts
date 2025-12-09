@@ -177,9 +177,9 @@ class StorageService {
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     
-    // CreatedAt should be a string (date and time) now.
-    // Use existing value or fallback to formatted locale string.
-    const safeCreatedAt = exam.createdAt || new Date().toLocaleString('id-ID');
+    // Explicitly convert to string to prevent Type 'number' is not assignable to 'string' errors
+    // from legacy data or type confusion.
+    const safeCreatedAt = exam.createdAt ? String(exam.createdAt) : new Date().toLocaleString('id-ID');
 
     const examToSave: Exam = { 
         ...exam, 
