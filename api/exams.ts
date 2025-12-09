@@ -1,4 +1,3 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
@@ -20,7 +19,7 @@ const executeWithLazyMigration = async (operation: () => Promise<any>) => {
     } catch (error: any) {
         // Error code 42P01 berarti "undefined_table" (Tabel tidak ditemukan)
         if (error.code === '42P01') {
-            console.log("Table missing, creating table...");
+            console.log("Table 'exams' missing, creating table...");
             await db.query(CREATE_TABLE_SQL);
             return await operation(); // Coba lagi setelah buat tabel
         }
@@ -70,10 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         } 
         
-        // --- POST: SIMPAN DATA BARU (SKELETON) ---
+        // --- POST: SIMPAN DATA BARU (UPSERT) ---
         else if (req.method === 'POST') {
             const exam = req.body;
-            if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload" });
+            if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
             const authorId = exam.authorId || 'anonymous';
             const createdAt = exam.createdAt || Date.now();
@@ -81,8 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const configJson = JSON.stringify(exam.config || {});
 
             return await executeWithLazyMigration(async () => {
-                // Strategi: UPDATE dulu, jika tidak ada row, baru INSERT.
-                // Ini menghindari error Primary Key jika tabel dibuat manual sebelumnya.
+                // Gunakan Manual UPSERT agar lebih kompatibel dengan berbagai state database
                 const updateRes = await db.query(`
                     UPDATE exams 
                     SET author_id = $2, questions = $3, config = $4, created_at = $5
@@ -95,20 +93,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         VALUES ($1, $2, $3, $4, $5)
                     `, [exam.code, authorId, questionsJson, configJson, createdAt]);
                 }
-                return res.status(200).json({ success: true });
+                return res.status(200).json({ success: true, message: "Exam saved successfully" });
             });
         }
         
-        // --- PATCH: UPDATE GAMBAR (ATOMIC TRANSACTION) ---
+        // --- PATCH: UPDATE GAMBAR (TRANSAKSI) ---
         else if (req.method === 'PATCH') {
             const { code, questionId, imageUrl, optionImages } = req.body;
             if (!code || !questionId) return res.status(400).json({ error: "Missing parameters" });
 
-            // Helper khusus untuk transaksi karena butuh client yang sama
             const runTransaction = async () => {
                 const client = await db.getClient();
                 try {
                     await client.query('BEGIN');
+                    // Lock row untuk mencegah race condition
                     const result = await client.query('SELECT questions FROM exams WHERE code = $1 FOR UPDATE', [code]);
                     
                     if (result.rows.length === 0) {
@@ -118,6 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     let questions = JSON.parse(result.rows[0].questions);
                     let found = false;
+                    
+                    // Update specific question image
                     questions = questions.map((q: any) => {
                         if (q.id === questionId) {
                             found = true;
@@ -143,7 +143,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             };
 
-            // Wrap transaction dalam Lazy Migration handler
             try {
                 const result = await runTransaction();
                 if (result.error) return res.status(result.status).json(result);
@@ -151,7 +150,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } catch (err: any) {
                 if (err.code === '42P01') { // Table missing
                     await db.query(CREATE_TABLE_SQL);
-                    // Retry transaction once
                     const retryResult = await runTransaction();
                     if (retryResult.error) return res.status(retryResult.status).json(retryResult);
                     return res.status(200).json({ success: true });
@@ -163,10 +161,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
         
     } catch (error: any) {
-        console.error("API Fatal Error:", error);
+        console.error("API Fatal Error in exams.ts:", error);
+        // Pastikan selalu return JSON, jangan biarkan crash tanpa response
         return res.status(500).json({ 
             error: "Internal Server Error", 
-            message: error.message || "Unknown error"
+            message: error.message || "Unknown error occurred",
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 }
