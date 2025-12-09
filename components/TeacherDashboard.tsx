@@ -98,7 +98,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             authorId: teacherId || 'ANONYMOUS_TEACHER', // Use actual logged-in teacher ID
             questions, 
             config,
-            createdAt: readableDate // Save as readable string
+            createdAt: String(readableDate) // Ensure it is explicitly a string
         };
         addExam(newExam); 
         setGeneratedCode(code);
@@ -117,7 +117,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             authorId: editingExam.authorId || teacherId,
             questions,
             config,
-            createdAt: editingExam.createdAt // Preserve creation date
+            // Force conversion to string to handle any legacy number data
+            createdAt: editingExam.createdAt ? String(editingExam.createdAt) : new Date().toLocaleString('id-ID')
         };
         updateExam(updatedExam);
         alert('Ujian berhasil diperbarui!');
