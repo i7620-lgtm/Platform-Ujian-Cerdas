@@ -7,14 +7,13 @@ import db from './db.js';
 let isTableInitialized = false;
 
 // Definisi Skema Tabel yang Benar dengan PRIMARY KEY
-// created_at diubah menjadi TEXT agar menyimpan format tanggal yang mudah dibaca (ISO String)
 const CREATE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS exams (
         code TEXT PRIMARY KEY, 
         author_id TEXT DEFAULT 'anonymous',
         questions TEXT, 
         config TEXT,
-        created_at TEXT DEFAULT '' 
+        created_at BIGINT DEFAULT 0
     );
 `;
 
@@ -28,7 +27,6 @@ const ensureSchema = async () => {
         console.log("'exams' table verified.");
     } catch (error) {
         console.error("Failed to create table:", error);
-        // Jangan throw error di sini, biarkan query utama mencoba berjalan
     }
 };
 
@@ -40,12 +38,32 @@ const sanitizeExam = (examRow: any) => {
             authorId: examRow.author_id,
             questions,
             config: JSON.parse(examRow.config || '{}'),
-            // Tidak perlu parseInt, karena sekarang bertipe string
-            createdAt: examRow.created_at || new Date().toISOString()
+            createdAt: parseInt(examRow.created_at || '0')
         };
     } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: new Date().toISOString() };
+        return { code: examRow.code, questions: [], config: {}, createdAt: 0 };
     }
+};
+
+// Security: Strip answers for student view
+const sanitizeForPublic = (exam: any) => {
+    if (exam.questions && Array.isArray(exam.questions)) {
+        exam.questions = exam.questions.map((q: any) => {
+            // Destructure to remove sensitive fields
+            const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
+            const safeQ = { ...rest };
+            
+            // Handle complex types
+            if (trueFalseRows) {
+                safeQ.trueFalseRows = trueFalseRows.map((r: any) => ({ text: r.text, answer: false })); // Dummy answer
+            }
+            if (matchingPairs) {
+                 safeQ.matchingPairs = matchingPairs.map((p: any) => ({ left: p.left, right: '?' })); // Strip pair
+            }
+            return safeQ;
+        });
+    }
+    return exam;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -58,7 +76,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        // Pastikan tabel ada sebelum melakukan operasi apapun
         await ensureSchema();
 
         // --- GET: AMBIL DATA ---
@@ -68,8 +85,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (code && req.url?.includes('public')) {
                 const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
                 if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
-                return res.status(200).json(sanitizeExam(result.rows[0]));
+                
+                const exam = sanitizeExam(result.rows[0]);
+                // Secure the public endpoint by stripping answers
+                return res.status(200).json(sanitizeForPublic(exam));
             } else {
+                // Teacher view gets full data (with answers)
                 const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
                 const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
                 return res.status(200).json(data);
@@ -82,13 +103,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
             const authorId = exam.authorId || 'anonymous';
-            // Simpan sebagai ISO String (Teks)
-            const createdAt = exam.createdAt || new Date().toISOString();
+            const createdAt = exam.createdAt || Date.now();
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
-            // Karena kita sudah memastikan tabel dibuat dengan PRIMARY KEY (code),
-            // kita bisa menggunakan ON CONFLICT yang jauh lebih efisien.
             const query = `
                 INSERT INTO exams (code, author_id, questions, config, created_at)
                 VALUES ($1, $2, $3, $4, $5)
