@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
+  const [teacherId, setTeacherId] = useState<string>('ANONYMOUS');
   
   // Data State
   const [exams, setExams] = useState<Record<string, Exam>>({});
@@ -70,8 +72,8 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleTeacherLoginSuccess = async () => {
-      // Do NOT fetch everything on login. Dashboard will fetch what it needs via its own useEffect.
+  const handleTeacherLoginSuccess = async (id: string) => {
+      setTeacherId(id);
       setView('TEACHER_DASHBOARD');
   };
   
@@ -202,6 +204,7 @@ const App: React.FC = () => {
     setCurrentStudent(null);
     setStudentResult(null);
     setView('SELECTOR');
+    setTeacherId('ANONYMOUS');
   }
 
   // --- UI Components ---
@@ -228,6 +231,7 @@ const App: React.FC = () => {
         return <StudentLogin onLoginSuccess={handleStudentLoginSuccess} onBack={() => setView('SELECTOR')} />;
       case 'TEACHER_DASHBOARD':
         return <TeacherDashboard 
+                  teacherId={teacherId}
                   addExam={addExam} 
                   updateExam={updateExam} 
                   exams={exams} 
