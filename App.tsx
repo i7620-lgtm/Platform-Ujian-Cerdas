@@ -158,7 +158,7 @@ const App: React.FC = () => {
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
 
-    // Construct the payload as expected by submitExamResult (without status)
+    // Construct the payload with status 'force_submitted' immediately
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -166,14 +166,11 @@ const App: React.FC = () => {
         totalQuestions: currentExam.questions.length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: ["Ujian dihentikan paksa karena siswa terdeteksi membuka aplikasi/tab lain."],
+        status: 'force_submitted' as ResultStatus
     };
     
-    // Submit normally first to get the grade
-    const finalResult = await storageService.submitExamResult(resultPayload);
-    
-    // Then forcibly update status and save again
-    finalResult.status = 'force_submitted'; 
-    await storageService.saveResult(finalResult);
+    // Submit with correct status directly
+    await storageService.submitExamResult(resultPayload);
     
     // Alert is handled by UI locking
   }, [currentExam, currentStudent]);
@@ -204,14 +201,11 @@ const App: React.FC = () => {
   const addExam = useCallback(async (newExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
     await storageService.saveExam(newExam);
-    // Removed refreshExams() call. Local state is updated optimistically.
-    // Server sync happens in background via storageService.saveExam
   }, []);
 
   const updateExam = useCallback(async (updatedExam: Exam) => {
     setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
     await storageService.saveExam(updatedExam);
-    // Removed refreshExams() call.
   }, []);
 
   const resetToHome = () => {
