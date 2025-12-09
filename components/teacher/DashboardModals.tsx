@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon } from '../Icons';
+import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
     exam: Exam | null;
@@ -10,53 +11,205 @@ interface OngoingExamModalProps {
     onAllowContinuation: (studentId: string, examCode: string) => void;
 }
 
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results, onClose, onAllowContinuation }) => {
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation }) => {
+    const [filterClass, setFilterClass] = useState<string>('ALL');
+    const [localResults, setLocalResults] = useState<Result[]>(initialResults);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+    // Sync local state when props change
+    useEffect(() => {
+        if(exam) {
+            setLocalResults(initialResults.filter(r => r.examCode === exam.code));
+        }
+    }, [initialResults, exam]);
+
+    // Live Stream Effect (Auto Refresh)
+    useEffect(() => {
+        if (!exam) return;
+        
+        const fetchLatest = async () => {
+            setIsRefreshing(true);
+            try {
+                const latest = await storageService.getResults(); // This should trigger a fetch if implemented in storage
+                // Filter only for this exam
+                const updatedForThisExam = latest.filter(r => r.examCode === exam.code);
+                setLocalResults(updatedForThisExam);
+                setLastUpdated(new Date());
+            } catch (e) {
+                console.error("Auto-refresh failed", e);
+            } finally {
+                setIsRefreshing(false);
+            }
+        };
+
+        // Initial fetch
+        fetchLatest();
+
+        // Polling interval (5 seconds for "Livestream" feel)
+        const intervalId = setInterval(fetchLatest, 5000);
+        return () => clearInterval(intervalId);
+    }, [exam]);
+
+
     if (!exam) return null;
 
-    const examResults = results.filter(r => r.examCode === exam.code);
     const scorableQuestionsCount = exam.questions.filter(q => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
+
+    // Derived Data
+    const uniqueClasses = useMemo(() => {
+        const classes = new Set(localResults.map(r => r.student.class));
+        return Array.from(classes).sort();
+    }, [localResults]);
+
+    const filteredResults = useMemo(() => {
+        let res = localResults;
+        if (filterClass !== 'ALL') {
+            res = res.filter(r => r.student.class === filterClass);
+        }
+        // Sort by Class then Student ID (Absen)
+        return res.sort((a, b) => {
+            if (a.student.class !== b.student.class) return a.student.class.localeCompare(b.student.class);
+            // Assuming studentId is numeric string for Absen
+            return parseInt(a.student.studentId) - parseInt(b.student.studentId);
+        });
+    }, [localResults, filterClass]);
+
+    // Statistics
+    const totalStudents = localResults.length;
+    const activeStudents = localResults.filter(r => r.status === 'in_progress').length;
+    const finishedStudents = localResults.filter(r => r.status === 'completed').length;
+    const suspendedStudents = localResults.filter(r => r.status === 'force_submitted').length;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-base-100 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-lg font-bold text-neutral">Pantau Ujian: {exam.code}</h2>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
-                        <XMarkIcon className="w-6 h-6" />
-                    </button>
+            <div className="bg-base-100 rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+                
+                {/* HEADER */}
+                <div className="p-5 border-b bg-base-100 sticky top-0 z-10 rounded-t-xl flex flex-col gap-4 shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <div>
+                             <div className="flex items-center gap-2">
+                                <span className="relative flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                <h2 className="text-xl font-bold text-neutral">Live Monitoring: {exam.code}</h2>
+                             </div>
+                             <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                                <ClockIcon className="w-4 h-4"/> Terakhir diperbarui: {lastUpdated.toLocaleTimeString()}
+                                {isRefreshing && <span className="text-primary text-xs animate-pulse font-semibold">(Menyegarkan...)</span>}
+                             </p>
+                        </div>
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                            <XMarkIcon className="w-6 h-6 text-gray-600" />
+                        </button>
+                    </div>
+
+                    {/* DASHBOARD STATS */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                            <p className="text-xs text-blue-600 font-semibold uppercase">Total Peserta</p>
+                            <p className="text-2xl font-bold text-blue-800">{totalStudents}</p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                            <p className="text-xs text-green-600 font-semibold uppercase">Sedang Mengerjakan</p>
+                            <p className="text-2xl font-bold text-green-800">{activeStudents}</p>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                            <p className="text-xs text-purple-600 font-semibold uppercase">Selesai</p>
+                            <p className="text-2xl font-bold text-purple-800">{finishedStudents}</p>
+                        </div>
+                         <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                            <p className="text-xs text-yellow-600 font-semibold uppercase">Ditangguhkan</p>
+                            <p className="text-2xl font-bold text-yellow-800">{suspendedStudents}</p>
+                        </div>
+                    </div>
+
+                    {/* FILTERS */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-600">Filter Kelas:</span>
+                        <select 
+                            value={filterClass} 
+                            onChange={(e) => setFilterClass(e.target.value)}
+                            className="p-2 border rounded-md text-sm bg-white focus:ring-primary focus:border-primary"
+                        >
+                            <option value="ALL">Semua Kelas</option>
+                            {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
                 </div>
-                <div className="p-6 overflow-y-auto">
-                    {examResults.length > 0 ? (
-                            <div className="overflow-x-auto">
+
+                {/* TABLE CONTENT */}
+                <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
+                    {filteredResults.length > 0 ? (
+                        <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                                <thead className="bg-white sticky top-0 shadow-sm z-0">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Siswa</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Benar</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salah</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hasil</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">No. Absen</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Nama Siswa</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Kelas</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Nilai Sementara</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Aktivitas Terkini</th>
+                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {examResults.map(result => {
+                                    {filteredResults.map(result => {
                                         const incorrectCount = scorableQuestionsCount - result.correctAnswers;
+                                        const lastActivity = result.activityLog && result.activityLog.length > 0 
+                                            ? result.activityLog[result.activityLog.length - 1] 
+                                            : "Memulai sesi...";
+                                        
+                                        let statusBadge;
+                                        if (result.status === 'in_progress') statusBadge = <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold animate-pulse">● Mengerjakan</span>;
+                                        else if (result.status === 'completed') statusBadge = <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">✓ Selesai</span>;
+                                        else if (result.status === 'force_submitted') statusBadge = <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold">! Ditangguhkan</span>;
+                                        else statusBadge = <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-bold">Menunggu</span>;
+
                                         return (
-                                            <tr key={result.student.studentId} className={`transition-colors hover:bg-gray-50 ${result.status === 'force_submitted' ? 'bg-yellow-50' : ''}`}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{result.student.fullName}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">{result.correctAnswers}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">{incorrectCount < 0 ? 0 : incorrectCount}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">{result.score}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">
-                                                    {result.status === 'force_submitted' ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full text-xs font-semibold">Ditangguhkan</span>
-                                                            <button onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} className="bg-green-500 text-white px-3 py-1 text-xs rounded-md hover:bg-green-600 font-semibold">
-                                                                Izinkan
-                                                            </button>
-                                                        </div>
+                                            <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-yellow-50/50' : ''}`}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-600">
+                                                    #{result.student.studentId.padStart(2, '0')}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                                    {result.student.fullName}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {result.student.class}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    {statusBadge}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    {result.status === 'completed' || result.status === 'force_submitted' ? (
+                                                         <div className="flex flex-col items-center">
+                                                            <span className="text-lg font-bold text-neutral">{result.score}</span>
+                                                            <span className="text-xs text-gray-500">B: {result.correctAnswers} | S: {incorrectCount}</span>
+                                                         </div>
                                                     ) : (
-                                                        <span className="text-green-800 bg-green-100 px-2 py-1 rounded-full text-xs font-semibold">Mengerjakan</span>
+                                                        <div className="flex flex-col items-center opacity-50">
+                                                             <span className="text-sm font-bold text-gray-400">Live: {result.score}</span>
+                                                             <span className="text-[10px] text-gray-400">Prog: {Object.keys(result.answers).length}/{exam.questions.length}</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                                    <span title={lastActivity} className="flex items-center gap-1">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                                                        {lastActivity}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {result.status === 'force_submitted' && (
+                                                        <button 
+                                                            onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
+                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center gap-1 mx-auto"
+                                                        >
+                                                            <span>Buka Blokir</span>
+                                                        </button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -65,7 +218,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                 </tbody>
                             </table>
                         </div>
-                    ) : <p className="text-center text-gray-500 py-8">Belum ada siswa yang memulai ujian ini.</p>}
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full py-20 text-gray-500">
+                            <WifiIcon className="w-16 h-16 text-gray-300 mb-4" />
+                            <p className="text-lg font-medium">Menunggu data peserta...</p>
+                            <p className="text-sm">Data akan muncul secara otomatis saat siswa mulai mengerjakan.</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
