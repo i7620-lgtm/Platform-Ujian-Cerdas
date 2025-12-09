@@ -1,5 +1,5 @@
 
-import type { Exam, Result, Question } from '../types';
+import type { Exam, Result, Question, ResultStatus } from '../types';
 
 // Constants for LocalStorage Keys
 const KEYS = {
@@ -394,7 +394,8 @@ class StorageService {
       
       if (index !== -1) {
           // Update Local
-          results[index].status = 'in_progress';
+          // Explicit casting to satisfy TypeScript if ResultStatus definition is lingering
+          results[index].status = 'in_progress' as ResultStatus;
           if (!results[index].activityLog) results[index].activityLog = [];
           results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian pada ${new Date().toLocaleTimeString()}`);
           
