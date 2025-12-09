@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
@@ -162,11 +163,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
     } catch (error: any) {
         console.error("API Fatal Error in exams.ts:", error);
-        // Pastikan selalu return JSON, jangan biarkan crash tanpa response
         return res.status(500).json({ 
             error: "Internal Server Error", 
-            message: error.message || "Unknown error occurred",
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message || "Unknown error occurred"
         });
     }
 }
