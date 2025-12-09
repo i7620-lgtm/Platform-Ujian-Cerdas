@@ -84,7 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // Run init blindly, but don't block heavily if it fails
         await initializeTable();
 
         if (req.method === 'GET') {
@@ -95,7 +94,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
                 return res.status(200).json(sanitizeExam(result.rows[0]));
             } else {
-                // Fetch latest 50 to avoid payload size issues on listing
                 const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
                 const data = result?.rows.map((row: any) => ({
                     code: row.code,
@@ -128,36 +126,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `;
             const params = [exam.code, authorId, questionsJson, configJson, createdAt];
 
-            // Direct execution, no complex retry logic in handler to save time
             await db.query(query, params);
             return res.status(200).json({ success: true });
         }
         
         else if (req.method === 'PATCH') {
+            // CRITICAL FIX: Use Transaction + Locking for atomic updates
             const { code, questionId, imageUrl, optionImages } = req.body;
             if (!code || !questionId) return res.status(400).json({ error: "Missing code or questionId" });
 
-            // Fetch current questions
-            const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
-            if (result.rows.length === 0) return res.status(404).json({ error: "Exam not found" });
+            const client = await db.getClient();
+            
+            try {
+                await client.query('BEGIN'); // Start Transaction
 
-            let questions = JSON.parse(result.rows[0].questions);
-            let updated = false;
-
-            questions = questions.map((q: any) => {
-                if (q.id === questionId) {
-                    updated = true;
-                    if (imageUrl !== undefined) q.imageUrl = imageUrl;
-                    if (optionImages !== undefined) q.optionImages = optionImages;
+                // 'FOR UPDATE' locks this row. No other request can modify it until we COMMIT.
+                const result = await client.query('SELECT questions FROM exams WHERE code = $1 FOR UPDATE', [code]);
+                
+                if (result.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(404).json({ error: "Exam not found" });
                 }
-                return q;
-            });
 
-            if (!updated) return res.status(404).json({ error: "Question ID not found" });
+                let questions = JSON.parse(result.rows[0].questions);
+                let updated = false;
 
-            // Update DB
-            await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
-            return res.status(200).json({ success: true });
+                questions = questions.map((q: any) => {
+                    if (q.id === questionId) {
+                        updated = true;
+                        if (imageUrl !== undefined) q.imageUrl = imageUrl;
+                        if (optionImages !== undefined) q.optionImages = optionImages;
+                    }
+                    return q;
+                });
+
+                if (!updated) {
+                    await client.query('ROLLBACK');
+                    return res.status(404).json({ error: "Question ID not found" });
+                }
+
+                await client.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
+                await client.query('COMMIT'); // Release Lock
+                
+                return res.status(200).json({ success: true });
+
+            } catch (e) {
+                await client.query('ROLLBACK');
+                throw e;
+            } finally {
+                client.release();
+            }
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
