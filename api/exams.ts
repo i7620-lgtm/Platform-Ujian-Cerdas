@@ -1,6 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db';
+// WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
+import db from './db.js';
 
 // Cache untuk status tabel agar tidak menjalankan CREATE TABLE setiap kali request
 let isTableInitialized = false;
@@ -27,7 +28,6 @@ const ensureSchema = async () => {
     } catch (error) {
         console.error("Failed to create table:", error);
         // Jangan throw error di sini, biarkan query utama mencoba berjalan
-        // Siapa tahu tabel sebenarnya sudah ada tapi permission error, dll.
     }
 };
 
