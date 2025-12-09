@@ -40,7 +40,7 @@ export interface Exam {
   questions: Question[];
   config: ExamConfig;
   isSynced?: boolean; 
-  createdAt?: number;
+  createdAt?: string; // Changed to string for readable database storage
 }
 
 export interface Student {
