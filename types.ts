@@ -49,7 +49,8 @@ export interface Student {
   studentId: string;
 }
 
-export type ResultStatus = 'completed' | 'force_submitted' | 'pending_grading';
+// Added 'in_progress' explicitly to support live monitoring
+export type ResultStatus = 'in_progress' | 'completed' | 'force_submitted' | 'pending_grading';
 
 export interface Result {
     student: Student;
