@@ -16,10 +16,9 @@ const getPool = () => {
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, // Required for Neon
             max: 1, // Keep connections low for serverless
-            // Vercel Free Tier has a 10s limit. 
-            // We set timeout to 8s to allow Neon cold start (usually 3-5s) 
-            // but fail before Vercel kills the process hard.
-            connectionTimeoutMillis: 8000, 
+            // Vercel Free Tier limit is 10s. We set 9s to allow max time for cold start
+            // but fail gracefully before Vercel hard kills the process.
+            connectionTimeoutMillis: 9000, 
             idleTimeoutMillis: 1000, 
         });
         
@@ -40,11 +39,6 @@ export default {
         } catch (err: any) {
             const duration = Date.now() - start;
             console.error(`DB Query Failed after ${duration}ms:`, err.message);
-            
-            // Provide clearer error message for timeouts
-            if (err.message.includes('timeout') || duration > 7000) {
-                console.error("Tip: Database might be in Cold Start. Please try again in a few seconds.");
-            }
             throw err; 
         }
     }
