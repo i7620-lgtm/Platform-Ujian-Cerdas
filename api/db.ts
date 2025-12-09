@@ -1,29 +1,30 @@
-import { Pool, PoolClient } from 'pg';
 
-let pool: Pool | undefined;
+import pg from 'pg';
+const { Pool } = pg;
+
+// Use a global variable to persist the pool across hot reloads in development
+// and across invocations in serverless (if container is reused).
+let pool: any;
 
 const getPool = () => {
     if (!pool) {
         if (!process.env.DATABASE_URL) {
             console.error("CRITICAL ERROR: DATABASE_URL is missing from environment variables.");
-            // We don't throw here to allow other logic to run, but query will fail.
+            throw new Error("DATABASE_URL environment variable is not set");
         }
 
         console.log("Initializing DB Pool...");
 
-        // Optimization for Serverless (Vercel + Neon)
-        // We use a single connection max to avoid overwhelming the database during cold starts
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }, 
-            max: 1, 
-            connectionTimeoutMillis: 8000, // Increased timeout for slower cold starts
-            idleTimeoutMillis: 5000, 
+            max: 1, // Keep max connections low for serverless
+            connectionTimeoutMillis: 10000, 
+            idleTimeoutMillis: 10000, 
         });
         
-        pool.on('error', (err) => {
+        pool.on('error', (err: Error) => {
             console.error('Unexpected DB Pool Error:', err);
-            // Don't exit process, just log. Serverless will restart if needed.
         });
     }
     return pool;
@@ -31,23 +32,18 @@ const getPool = () => {
 
 export default {
     query: async (text: string, params?: any[]) => {
-        const p = getPool();
-        if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
-
-        const client = await p.connect();
         try {
-            const result = await client.query(text, params);
+            const p = getPool();
+            const result = await p.query(text, params);
             return result;
         } catch (error) {
-            console.error("Query Error:", error);
+            console.error("Query Execution Error:", error);
             throw error;
-        } finally {
-            client.release();
         }
     },
-    getClient: async (): Promise<PoolClient> => {
+    getClient: async () => {
         const p = getPool();
-        if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
-        return await p.connect();
+        const client = await p.connect();
+        return client;
     }
 };
