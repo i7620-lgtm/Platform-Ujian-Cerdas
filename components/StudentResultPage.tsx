@@ -1,5 +1,4 @@
 
-
 import React, { useEffect } from 'react';
 import type { Result, ExamConfig } from '../types';
 import { CheckCircleIcon, WifiIcon, ClockIcon } from './Icons';
@@ -54,8 +53,36 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         );
     }
 
-    // Logic: If showResultToStudent is FALSE (and not undefined), hide result.
-    const showResult = config ? (config.showResultToStudent ?? true) : true;
+    // Hide result logic if configured
+    const showResult = config ? config.showResultToStudent : true;
+
+    if (!showResult) {
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4 animate-fade-in">
+                <div className="w-full max-w-lg text-center">
+                    <div className="bg-base-100 p-8 rounded-2xl shadow-lg transform transition-all duration-500 animate-slide-in-up">
+                         <div className="flex justify-center mb-4">
+                            <CheckCircleIcon className="w-20 h-20 text-secondary" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-neutral mb-2">Ujian Selesai!</h1>
+                        <p className="text-base-content mb-6">Terima kasih, {result.student.fullName}. Jawaban Anda telah berhasil dikirim.</p>
+                        
+                        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                            <p className="text-sm text-gray-500">Hasil ujian akan diumumkan oleh guru Anda.</p>
+                        </div>
+
+                        <button 
+                            onClick={onFinish} 
+                            className="w-full bg-primary text-primary-content font-bold py-3 px-4 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-md hover:shadow-lg"
+                        >
+                            Selesai & Kembali ke Halaman Utama
+                        </button>
+                    </div>
+                </div>
+             </div>
+        )
+    }
+
     const scoreColorClass = result.score >= 75 ? 'text-green-500' : result.score >= 50 ? 'text-yellow-500' : 'text-red-500';
 
     return (
@@ -66,29 +93,22 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                         <CheckCircleIcon className="w-20 h-20 text-secondary" />
                     </div>
                     <h1 className="text-3xl font-bold text-neutral mb-2">Ujian Selesai!</h1>
-                    <p className="text-base-content mb-6">Terima kasih telah mengerjakan ujian ini, {result.student.fullName}.</p>
+                    <p className="text-base-content mb-6">Berikut adalah hasil ujian Anda, {result.student.fullName}.</p>
                     
-                    {showResult ? (
-                        <div className="bg-gray-50 rounded-xl p-6 my-8 border">
-                            <p className="text-lg text-gray-600">Nilai Akhir Anda</p>
-                            <p className={`text-6xl sm:text-7xl font-extrabold my-2 ${scoreColorClass}`}>{result.score}</p>
-                            <div className="flex justify-center divide-x mt-4 text-gray-600">
-                                <div className="px-4 text-center">
-                                    <p className="font-bold text-lg">{result.correctAnswers}</p>
-                                    <p className="text-sm">Jawaban Benar</p>
-                                </div>
-                                <div className="px-4 text-center">
-                                    <p className="font-bold text-lg">{result.totalQuestions}</p>
-                                    <p className="text-sm">Total Soal</p>
-                                </div>
+                    <div className="bg-gray-50 rounded-xl p-6 my-8 border">
+                        <p className="text-lg text-gray-600">Nilai Akhir Anda</p>
+                        <p className={`text-6xl sm:text-7xl font-extrabold my-2 ${scoreColorClass}`}>{result.score}</p>
+                        <div className="flex justify-center divide-x mt-4 text-gray-600">
+                            <div className="px-4 text-center">
+                                <p className="font-bold text-lg">{result.correctAnswers}</p>
+                                <p className="text-sm">Jawaban Benar</p>
+                            </div>
+                            <div className="px-4 text-center">
+                                <p className="font-bold text-lg">{result.totalQuestions}</p>
+                                <p className="text-sm">Total Soal</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="bg-gray-50 rounded-xl p-6 my-8 border border-gray-200">
-                            <p className="text-gray-600">Hasil ujian Anda telah disimpan ke database guru.</p>
-                            <p className="text-sm text-gray-500 mt-2">Nilai akan diumumkan oleh guru setelah pemeriksaan selesai.</p>
-                        </div>
-                    )}
+                    </div>
 
                     <p className="text-xs text-gray-400 mb-6">
                         Catatan: Halaman ini hanya dapat dilihat satu kali. Setelah Anda keluar, Anda tidak dapat melihat hasil ini lagi.
