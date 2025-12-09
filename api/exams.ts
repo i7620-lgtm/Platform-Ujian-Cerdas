@@ -2,25 +2,27 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db';
 
-// Single Round-Trip Migration Query
-// Menggabungkan semua perintah DDL menjadi satu string untuk menghemat waktu koneksi.
-const MIGRATION_QUERY = `
-    CREATE TABLE IF NOT EXISTS exams (
-        code TEXT PRIMARY KEY, 
-        author_id TEXT DEFAULT 'anonymous',
-        questions TEXT, 
-        config TEXT,
-        created_at BIGINT DEFAULT 0
-    );
-    ALTER TABLE exams ADD COLUMN IF NOT EXISTS author_id TEXT DEFAULT 'anonymous';
-    ALTER TABLE exams ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0;
-    CREATE UNIQUE INDEX IF NOT EXISTS exams_code_idx ON exams (code);
-`;
+// Lightweight Initializer
+let isTableInitialized = false;
 
-const runMigration = async () => {
-    console.log("Running DB Migration (Lazy)...");
-    await db.query(MIGRATION_QUERY);
-    console.log("Migration complete.");
+const initializeTable = async () => {
+    if (isTableInitialized) return;
+    try {
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS exams (
+                code TEXT PRIMARY KEY, 
+                author_id TEXT DEFAULT 'anonymous',
+                questions TEXT, 
+                config TEXT,
+                created_at BIGINT DEFAULT 0
+            );
+        `);
+        // Simple check or robust index creation once
+        await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS exams_code_idx ON exams (code);`);
+        isTableInitialized = true;
+    } catch (e) {
+        console.error("Failed to init table:", e);
+    }
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -82,40 +84,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+        // Run init blindly, but don't block heavily if it fails
+        await initializeTable();
+
         if (req.method === 'GET') {
             const { code } = req.query;
 
-            // Fungsi Helper untuk melakukan query dengan retry migrasi
-            const executeGet = async () => {
-                if (code && req.url?.includes('public')) {
-                    const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
-                    if (!result || result.rows.length === 0) return null;
-                    return sanitizeExam(result.rows[0]);
-                } else {
-                    const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC');
-                    return result?.rows.map((row: any) => ({
-                        code: row.code,
-                        authorId: row.author_id,
-                        questions: JSON.parse(row.questions || '[]'),
-                        config: JSON.parse(row.config || '{}'),
-                        createdAt: parseInt(row.created_at || '0')
-                    })) || [];
-                }
-            };
-
-            try {
-                const data = await executeGet();
-                if (data === null && code) return res.status(404).json({ error: 'Exam not found' });
+            if (code && req.url?.includes('public')) {
+                const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
+                if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
+                return res.status(200).json(sanitizeExam(result.rows[0]));
+            } else {
+                // Fetch latest 50 to avoid payload size issues on listing
+                const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
+                const data = result?.rows.map((row: any) => ({
+                    code: row.code,
+                    authorId: row.author_id,
+                    questions: JSON.parse(row.questions || '[]'),
+                    config: JSON.parse(row.config || '{}'),
+                    createdAt: parseInt(row.created_at || '0')
+                })) || [];
                 return res.status(200).json(data);
-            } catch (err: any) {
-                // Jika error karena tabel tidak ada, jalankan migrasi lalu coba lagi
-                if (err.message.includes('relation "exams" does not exist') || err.message.includes('column')) {
-                    await runMigration();
-                    const data = await executeGet();
-                    if (data === null && code) return res.status(404).json({ error: 'Exam not found' });
-                    return res.status(200).json(data);
-                }
-                throw err;
             }
         } 
         
@@ -139,24 +128,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `;
             const params = [exam.code, authorId, questionsJson, configJson, createdAt];
 
-            try {
-                await db.query(query, params);
-            } catch (err: any) {
-                // Cek error spesifik skema: Table Missing, Column Missing, atau ON CONFLICT Missing Constraint
-                const isSchemaError = err.message.includes('relation "exams" does not exist') 
-                                   || err.message.includes('column')
-                                   || err.message.includes('constraint matching the ON CONFLICT');
-
-                if (isSchemaError) {
-                    console.log("Schema error detected, attempting Lazy Migration...");
-                    await runMigration();
-                    console.log("Retrying INSERT operation...");
-                    await db.query(query, params);
-                } else {
-                    throw err;
-                }
-            }
-
+            // Direct execution, no complex retry logic in handler to save time
+            await db.query(query, params);
             return res.status(200).json({ success: true });
         }
         
@@ -164,48 +137,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { code, questionId, imageUrl, optionImages } = req.body;
             if (!code || !questionId) return res.status(400).json({ error: "Missing code or questionId" });
 
-            // Logic Patch juga perlu retry mechanism sederhana
-            const executePatch = async () => {
-                const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
-                if (result.rows.length === 0) return { error: "Exam not found" };
+            // Fetch current questions
+            const result = await db.query('SELECT questions FROM exams WHERE code = $1', [code]);
+            if (result.rows.length === 0) return res.status(404).json({ error: "Exam not found" });
 
-                let questions = JSON.parse(result.rows[0].questions);
-                let updated = false;
-                questions = questions.map((q: any) => {
-                    if (q.id === questionId) {
-                        updated = true;
-                        if (imageUrl !== undefined) q.imageUrl = imageUrl;
-                        if (optionImages !== undefined) q.optionImages = optionImages;
-                    }
-                    return q;
-                });
+            let questions = JSON.parse(result.rows[0].questions);
+            let updated = false;
 
-                if (!updated) return { error: "Question ID not found" };
-                await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
-                return { success: true };
-            };
-
-            try {
-                const result = await executePatch();
-                if (result.error) return res.status(404).json(result);
-                return res.status(200).json(result);
-            } catch (err: any) {
-                 if (err.message.includes('relation "exams" does not exist')) {
-                    await runMigration();
-                    // Retry tidak mungkin berhasil jika exam belum ada, tapi code flow aman
-                    return res.status(404).json({ error: "Exam not found (after migration)" });
+            questions = questions.map((q: any) => {
+                if (q.id === questionId) {
+                    updated = true;
+                    if (imageUrl !== undefined) q.imageUrl = imageUrl;
+                    if (optionImages !== undefined) q.optionImages = optionImages;
                 }
-                throw err;
-            }
+                return q;
+            });
+
+            if (!updated) return res.status(404).json({ error: "Question ID not found" });
+
+            // Update DB
+            await db.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
+            return res.status(200).json({ success: true });
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
         
-    } catch (globalError: any) {
-        console.error("API Handler Fatal Error:", globalError);
+    } catch (error: any) {
+        console.error("API Error:", error);
         return res.status(500).json({ 
             error: "Internal Server Error", 
-            message: globalError.message || "Unknown DB Error"
+            message: error.message 
         });
     }
 }
