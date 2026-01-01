@@ -397,8 +397,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
     const timerIdRef = useRef<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [scrollProgress, setScrollProgress] = useState(0);
-
+    
     const answersRef = useRef(answers);
     answersRef.current = answers;
 
@@ -448,18 +447,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             setIsSubmitting(false);
         }
     }, [answers, timeLeft, exam.code, student.studentId, onSubmit, exam.config.trackLocation]);
-
-    // Scroll Progress Handler
-    useEffect(() => {
-        const handleScroll = () => {
-            const totalScroll = document.documentElement.scrollTop;
-            const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-            const scroll = `${totalScroll / windowHeight}`;
-            setScrollProgress(Number(scroll));
-        }
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
 
     // Initial Start Ping
     useEffect(() => {
