@@ -29,13 +29,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Fix: Removed 'questions.length > 0' check. 
-        // When creating manually, questions is empty initially, but we still want to scroll to the editor.
-        if (!isEditing && !generatedCode && questionsSectionRef.current) {
-            // Scroll to editor on mount if creating new
-            setTimeout(() => {
-                questionsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 500);
+        // Scroll to editor on mount if creating new (Manual or Upload)
+        // Check conditions but do NOT check questionsSectionRef.current in the condition to avoid race conditions
+        if (!isEditing && !generatedCode) {
+            const timer = setTimeout(() => {
+                if (questionsSectionRef.current) {
+                    questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100); // Small delay to ensure layout is ready
+            return () => clearTimeout(timer);
         }
     }, []); // Run once on mount
 
