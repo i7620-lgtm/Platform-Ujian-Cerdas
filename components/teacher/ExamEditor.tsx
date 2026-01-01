@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -28,13 +29,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!isEditing && questions.length > 0 && !generatedCode && questionsSectionRef.current) {
+        // Fix: Removed 'questions.length > 0' check. 
+        // When creating manually, questions is empty initially, but we still want to scroll to the editor.
+        if (!isEditing && !generatedCode && questionsSectionRef.current) {
             // Scroll to editor on mount if creating new
             setTimeout(() => {
                 questionsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 500);
         }
-    }, []);
+    }, []); // Run once on mount
 
     useEffect(() => {
         if (generatedCode && generatedCodeSectionRef.current) {
