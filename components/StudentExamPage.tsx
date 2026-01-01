@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question } from '../types';
 import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
@@ -29,11 +30,87 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 const isDataUrl = (str: string) => str.startsWith('data:image/');
 
+// --- ADVANCED IMAGE ENHANCER COMPONENT ---
+// Menggunakan teknik SVG Filter untuk menajamkan gambar yang terkompresi
+const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+    // Mode "HD" menggunakan kombinasi filter kontras tinggi dan unsharp masking (SVG)
+    // untuk mensimulasikan restorasi resolusi.
+    const [isHD, setIsHD] = useState(true); 
+    const [scale, setScale] = useState(1);
+
+    return (
+        <div className="space-y-3 mt-3">
+             {/* Hidden SVG Filter Definition for Sharpening */}
+             <svg width="0" height="0" style={{ position: 'absolute' }}>
+                <defs>
+                    <filter id="sharpen">
+                        {/* Convolve Matrix untuk deteksi tepi dan penajaman */}
+                        <feConvolveMatrix 
+                            order="3" 
+                            preserveAlpha="true" 
+                            kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"
+                        />
+                    </filter>
+                </defs>
+            </svg>
+
+            <div className={`relative overflow-hidden rounded-xl border border-gray-100 bg-white transition-all ${isHD ? 'shadow-sm' : ''}`}>
+                <div className="overflow-auto flex justify-center bg-gray-50/30 p-2" style={{ maxHeight: '600px' }}>
+                    <img 
+                        src={src} 
+                        alt={alt} 
+                        style={{ 
+                            // Magic Filter: 
+                            // 1. Grayscale: menghilangkan noise warna (chroma subsampling artifacts)
+                            // 2. Contrast & Brightness: membuat teks hitam lebih pekat, background putih lebih bersih
+                            // 3. url(#sharpen): Memakai SVG filter untuk menajamkan tepi huruf
+                            filter: isHD ? 'grayscale(100%) contrast(120%) brightness(105%) url(#sharpen)' : 'none',
+                            transform: `scale(${scale})`,
+                            transformOrigin: 'top center',
+                            transition: 'filter 0.4s ease, transform 0.2s ease',
+                            maxWidth: '100%',
+                            mixBlendMode: isHD ? 'multiply' : 'normal' // Membuat background putih gambar menyatu
+                        }}
+                        className="object-contain" 
+                    />
+                </div>
+                
+                {/* Minimalist Floating Controls */}
+                <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-white/90 backdrop-blur shadow-sm p-1.5 rounded-full border border-gray-200 opacity-0 hover:opacity-100 transition-opacity z-10">
+                     <button onClick={() => setScale(s => Math.max(0.8, s - 0.2))} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-50 rounded-full font-bold text-lg" title="Zoom Out">-</button>
+                     <span className="text-[10px] font-mono w-8 text-center text-gray-500">{Math.round(scale * 100)}%</span>
+                     <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-50 rounded-full font-bold text-lg" title="Zoom In">+</button>
+                </div>
+            </div>
+
+            <div className="flex justify-start">
+                 <button 
+                    onClick={() => setIsHD(!isHD)}
+                    className={`text-xs px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${isHD ? 'bg-neutral text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                 >
+                    {isHD ? (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                            <span>Mode Teks Tajam (HD)</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                            <span>Mode Asli</span>
+                        </>
+                    )}
+                 </button>
+            </div>
+        </div>
+    )
+};
+
+
 const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     if (isDataUrl(content)) {
-        return <img src={content} alt="Konten Soal" className="max-w-full h-auto rounded-md border" />;
+        return <SmartImageViewer src={content} alt="Konten Soal" />;
     }
-    return <span className="break-words whitespace-pre-wrap">{content}</span>;
+    return <div className="prose prose-lg max-w-none text-gray-800 leading-relaxed break-words whitespace-pre-wrap font-sans">{content}</div>;
 };
 
 const QuestionDisplay: React.FC<{
@@ -89,15 +166,12 @@ const QuestionDisplay: React.FC<{
         onAnswerChange(question.id, JSON.stringify(currentMap));
     };
 
-    // Handle Matrix True/False logic
     const handleTrueFalseMatrixChange = (rowIndex: number, val: boolean) => {
         let currentArr: boolean[] = [];
         try {
-            // Initialize array if empty
             const saved = answer ? JSON.parse(answer) : [];
-            // Ensure array has correct length based on question rows
             const rowCount = question.trueFalseRows ? question.trueFalseRows.length : 0;
-            currentArr = new Array(rowCount).fill(null); // Use null for unanswered, though JSON might not like undefined
+            currentArr = new Array(rowCount).fill(null); 
             if (Array.isArray(saved)) {
                  saved.forEach((v, i) => { if(i < rowCount) currentArr[i] = v; });
             }
@@ -109,72 +183,72 @@ const QuestionDisplay: React.FC<{
     };
 
     const renderQuestionInput = () => {
-        const baseInputClasses = "mt-2 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary";
+        const baseInputClasses = "mt-4 block w-full px-5 py-4 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-lg";
         
         switch (question.questionType) {
             case 'INFO':
                 return null;
             case 'MULTIPLE_CHOICE':
                 return (
-                    <div className="space-y-3 mt-4">
+                    <div className="grid gap-4 mt-8">
                         {shuffledOptions?.map((item, idx) => (
-                            <label key={idx} className={`flex items-start p-4 border rounded-lg hover:bg-secondary/10 cursor-pointer transition-colors ${answer === item.text ? 'bg-secondary/10 border-secondary ring-2 ring-secondary' : 'bg-white'}`}>
-                                <input
-                                    type="radio"
-                                    name={question.id}
-                                    value={item.text}
-                                    checked={answer === item.text}
-                                    onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                                    className="h-4 w-4 mt-1 text-secondary focus:ring-secondary border-gray-300 flex-shrink-0"
-                                />
-                                <div className="ml-3 text-gray-700 w-full">
-                                    {item.text && <div className="mb-1 font-medium"><RenderContent content={item.text} /></div>}
-                                    {item.image && <img src={item.image} alt="Gambar Opsi" className="max-w-full h-auto rounded-md border max-h-[200px]" />}
+                            <label key={idx} className={`relative flex items-start p-5 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${answer === item.text ? 'bg-primary/5 border-primary shadow-md transform scale-[1.01]' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50 shadow-sm'}`}>
+                                <div className="flex items-center h-6 mt-1">
+                                    <input
+                                        type="radio"
+                                        name={question.id}
+                                        value={item.text}
+                                        checked={answer === item.text}
+                                        onChange={(e) => onAnswerChange(question.id, e.target.value)}
+                                        className="h-5 w-5 text-primary border-gray-300 focus:ring-primary cursor-pointer accent-primary"
+                                    />
+                                </div>
+                                <div className="ml-5 text-gray-700 w-full select-none">
+                                    <div className="flex items-start gap-4">
+                                        <span className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold mt-0.5 transition-colors ${answer === item.text ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                            {String.fromCharCode(65 + idx)}
+                                        </span>
+                                        <div className="w-full pt-1">
+                                             {item.text && <RenderContent content={item.text} />}
+                                        </div>
+                                    </div>
+                                    {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" />}
                                 </div>
                             </label>
                         ))}
                     </div>
                 );
             case 'TRUE_FALSE':
-                // Check if it's the new matrix format
                 if (question.trueFalseRows) {
                      let currentAnswers: boolean[] = [];
                      try { currentAnswers = answer ? JSON.parse(answer) : []; } catch(e){}
 
                      return (
-                        <div className="mt-4 overflow-x-auto border rounded-lg shadow-sm">
-                            <table className="min-w-full divide-y divide-gray-200">
+                        <div className="mt-8 overflow-hidden border border-gray-100 rounded-2xl shadow-sm bg-white">
+                            <table className="min-w-full divide-y divide-gray-100">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pernyataan</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-24 border-l">Benar</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-24 border-l">Salah</th>
+                                        <th className="px-6 py-5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pernyataan</th>
+                                        <th className="px-4 py-5 text-center text-xs font-bold text-green-600 uppercase tracking-wider w-28 bg-green-50/50">Benar</th>
+                                        <th className="px-4 py-5 text-center text-xs font-bold text-red-600 uppercase tracking-wider w-28 bg-red-50/50">Salah</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="bg-white divide-y divide-gray-100">
                                     {question.trueFalseRows.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{row.text}</td>
-                                            <td className="px-6 py-4 text-center border-l bg-gray-50/50">
+                                        <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-5 text-base text-gray-800 font-medium leading-relaxed">{row.text}</td>
+                                            <td className="px-4 py-5 text-center cursor-pointer hover:bg-green-50/30" onClick={() => handleTrueFalseMatrixChange(idx, true)}>
                                                 <div className="flex justify-center">
-                                                    <input 
-                                                        type="radio" 
-                                                        name={`${question.id}_row_${idx}`}
-                                                        checked={currentAnswers[idx] === true}
-                                                        onChange={() => handleTrueFalseMatrixChange(idx, true)}
-                                                        className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 cursor-pointer"
-                                                    />
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${currentAnswers[idx] === true ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
+                                                        {currentAnswers[idx] === true && <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
+                                                    </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center border-l bg-gray-50/50">
+                                            <td className="px-4 py-5 text-center cursor-pointer hover:bg-red-50/30" onClick={() => handleTrueFalseMatrixChange(idx, false)}>
                                                  <div className="flex justify-center">
-                                                    <input 
-                                                        type="radio" 
-                                                        name={`${question.id}_row_${idx}`}
-                                                        checked={currentAnswers[idx] === false}
-                                                        onChange={() => handleTrueFalseMatrixChange(idx, false)}
-                                                        className="h-5 w-5 text-red-600 focus:ring-red-500 border-gray-300 cursor-pointer"
-                                                    />
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${currentAnswers[idx] === false ? 'border-red-500 bg-red-500' : 'border-gray-300'}`}>
+                                                        {currentAnswers[idx] === false && <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -184,41 +258,31 @@ const QuestionDisplay: React.FC<{
                         </div>
                      );
                 }
-                // Fallback for legacy (shouldn't happen with new creates)
-                 return (
-                    <div className="space-y-3 mt-4">
-                        {question.options?.map((opt, idx) => (
-                            <label key={idx} className={`flex items-start p-4 border rounded-lg hover:bg-secondary/10 cursor-pointer transition-colors ${answer === opt ? 'bg-secondary/10 border-secondary ring-2 ring-secondary' : 'bg-white'}`}>
-                                <input
-                                    type="radio"
-                                    name={question.id}
-                                    value={opt}
-                                    checked={answer === opt}
-                                    onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                                    className="h-4 w-4 mt-1 text-secondary focus:ring-secondary border-gray-300 flex-shrink-0"
-                                />
-                                <div className="ml-3 text-gray-700 w-full font-medium">{opt}</div>
-                            </label>
-                        ))}
-                    </div>
-                );
+                 return null;
             case 'COMPLEX_MULTIPLE_CHOICE':
                  return (
-                    <div className="space-y-3 mt-4">
-                        <p className="text-sm text-gray-500 italic mb-2">Pilih semua jawaban yang benar.</p>
+                    <div className="grid gap-4 mt-8">
+                        <div className="flex items-center gap-3 mb-2 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                             <div className="bg-blue-100 p-1.5 rounded-md"><CheckCircleIcon className="w-5 h-5 text-blue-600"/></div>
+                             <span className="text-sm text-blue-800 font-medium">Pilih satu atau lebih jawaban yang menurut Anda benar.</span>
+                        </div>
                         {shuffledOptions?.map((item, idx) => {
                              const isChecked = answer ? answer.split(',').includes(item.text) : false;
                              return (
-                                <label key={idx} className={`flex items-start p-4 border rounded-lg hover:bg-secondary/10 cursor-pointer transition-colors ${isChecked ? 'bg-secondary/10 border-secondary ring-2 ring-secondary' : 'bg-white'}`}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={(e) => handleComplexChange(item.text, e.target.checked)}
-                                        className="h-4 w-4 mt-1 text-secondary focus:ring-secondary border-gray-300 flex-shrink-0 rounded"
-                                    />
-                                    <div className="ml-3 text-gray-700 w-full">
-                                        {item.text && <div className="mb-1 font-medium"><RenderContent content={item.text} /></div>}
-                                        {item.image && <img src={item.image} alt="Gambar Opsi" className="max-w-full h-auto rounded-md border max-h-[200px]" />}
+                                <label key={idx} className={`relative flex items-start p-5 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${isChecked ? 'bg-secondary/5 border-secondary shadow-md transform scale-[1.01]' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50 shadow-sm'}`}>
+                                    <div className="flex items-center h-6 mt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => handleComplexChange(item.text, e.target.checked)}
+                                            className="h-5 w-5 text-secondary border-gray-300 focus:ring-secondary rounded accent-secondary cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="ml-5 text-gray-700 w-full select-none">
+                                        <div className="pt-1">
+                                            {item.text && <RenderContent content={item.text} />}
+                                            {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" />}
+                                        </div>
                                     </div>
                                 </label>
                             );
@@ -228,26 +292,40 @@ const QuestionDisplay: React.FC<{
             case 'MATCHING':
                  const currentMatchingAnswers = answer ? JSON.parse(answer) : {};
                  return (
-                    <div className="space-y-4 mt-4">
-                        <p className="text-sm text-gray-500 italic mb-2">Pasangkan pernyataan kiri dengan jawaban kanan yang sesuai.</p>
-                        <div className="grid gap-4">
+                    <div className="mt-8 bg-gray-50/80 p-6 md:p-8 rounded-2xl border border-gray-200/60 backdrop-blur-sm">
+                         <div className="flex items-center gap-2 mb-6">
+                             <span className="text-sm font-bold bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg">Soal Menjodohkan</span>
+                        </div>
+                        <div className="space-y-6">
                             {question.matchingPairs?.map((pair, idx) => (
-                                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 border rounded bg-white">
-                                    <div className="flex-1 font-medium text-gray-700">
-                                        {pair.left}
-                                    </div>
-                                    <div className="hidden sm:block text-gray-400">→</div>
-                                    <div className="flex-1">
-                                        <select 
-                                            value={currentMatchingAnswers[idx] || ''} 
-                                            onChange={(e) => handleMatchingChange(idx, e.target.value)}
-                                            className="w-full p-2 border border-gray-300 rounded focus:ring-secondary focus:border-secondary bg-gray-50 text-sm"
-                                        >
-                                            <option value="" disabled>Pilih Pasangan...</option>
-                                            {matchingRightOptions.map((opt, optIdx) => (
-                                                <option key={optIdx} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
+                                <div key={idx} className="relative">
+                                    <div className="flex flex-col md:flex-row md:items-stretch gap-0 rounded-xl overflow-hidden shadow-sm border border-gray-200">
+                                        {/* Left Side */}
+                                        <div className="flex-1 bg-white p-5 flex items-center">
+                                             <div className="flex items-start gap-4 w-full">
+                                                <span className="flex-shrink-0 w-6 h-6 bg-gray-100 text-gray-500 rounded flex items-center justify-center text-xs font-bold mt-0.5">{idx + 1}</span>
+                                                <div className="text-gray-800 font-medium">{pair.left}</div>
+                                             </div>
+                                        </div>
+                                        
+                                        {/* Connector (Desktop) */}
+                                        <div className="hidden md:flex items-center justify-center w-12 bg-gray-50 border-x border-gray-100">
+                                            <div className="w-full h-px bg-gray-300"></div>
+                                        </div>
+
+                                        {/* Right Side (Select) */}
+                                        <div className="flex-1 bg-gray-50 p-4 flex items-center">
+                                            <select 
+                                                value={currentMatchingAnswers[idx] || ''} 
+                                                onChange={(e) => handleMatchingChange(idx, e.target.value)}
+                                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-base font-medium transition-shadow cursor-pointer hover:border-purple-300"
+                                            >
+                                                <option value="" disabled className="text-gray-400">-- Pilih Pasangan --</option>
+                                                {matchingRightOptions.map((opt, optIdx) => (
+                                                    <option key={optIdx} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -258,9 +336,9 @@ const QuestionDisplay: React.FC<{
                 return <textarea
                     value={answer || ''}
                     onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                    rows={5}
+                    rows={8}
                     className={baseInputClasses}
-                    placeholder="Ketik jawaban esai Anda di sini..."
+                    placeholder="Ketik jawaban uraian Anda di sini..."
                 />;
             case 'FILL_IN_THE_BLANK':
                 return <input
@@ -268,7 +346,8 @@ const QuestionDisplay: React.FC<{
                     value={answer || ''}
                     onChange={(e) => onAnswerChange(question.id, e.target.value)}
                     className={baseInputClasses}
-                    placeholder="Isi bagian yang kosong..."
+                    placeholder="Ketik jawaban singkat..."
+                    autoComplete="off"
                 />;
             default:
                 return null;
@@ -276,19 +355,27 @@ const QuestionDisplay: React.FC<{
     };
 
     return (
-        <div className="bg-base-100 p-6 rounded-2xl shadow-sm">
-             <div className="font-semibold text-neutral leading-relaxed text-lg flex items-start gap-2">
-                <span className="text-secondary font-bold">{question.questionType === 'INFO' ? 'Info' : `${index + 1}.`}</span>
-                <div className="flex-1 w-full">
-                    {question.questionText && <div className="mb-3"><RenderContent content={question.questionText} /></div>}
-                    {question.imageUrl && (
-                        <div className="mb-4">
-                            <img src={question.imageUrl} alt="Gambar Soal" className="max-w-full h-auto rounded-md border" />
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 mb-10 transition-transform hover:translate-y-[-2px] duration-500 ease-out">
+             <div className="flex items-start gap-5">
+                <div className="flex-shrink-0 mt-1">
+                    <span className={`flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-2xl text-lg md:text-xl font-bold shadow-sm ${question.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : 'bg-primary text-white shadow-primary/30 shadow-lg'}`}>
+                        {question.questionType === 'INFO' ? 'i' : index + 1}
+                    </span>
+                </div>
+                <div className="flex-1 w-full min-w-0 pt-2">
+                    {question.questionText && (
+                        <div className="mb-6">
+                            <RenderContent content={question.questionText} />
                         </div>
                     )}
+                    {question.imageUrl && (
+                        <div className="mb-8">
+                            <SmartImageViewer src={question.imageUrl} alt="Gambar Soal" />
+                        </div>
+                    )}
+                     {renderQuestionInput()}
                 </div>
             </div>
-            {renderQuestionInput()}
         </div>
     );
 });
@@ -310,21 +397,19 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
     const timerIdRef = useRef<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [scrollProgress, setScrollProgress] = useState(0);
 
     const answersRef = useRef(answers);
     answersRef.current = answers;
 
     // Use Memo to persist the order of shuffled questions for this session
     const displayedQuestions = useMemo(() => {
-        // Try to load persisted order
         const storageKey = `exam_order_${exam.code}_${student.studentId}`;
         try {
             const savedOrder = localStorage.getItem(storageKey);
             if (savedOrder && exam.config.shuffleQuestions) {
                 const orderIds: string[] = JSON.parse(savedOrder);
-                // Map the questions based on saved IDs to maintain order
                 const ordered = orderIds.map(id => exam.questions.find(q => q.id === id)).filter(q => q !== undefined) as Question[];
-                // Add any new questions that might not be in the saved order at the end
                 const remaining = exam.questions.filter(q => !orderIds.includes(q.id));
                 return [...ordered, ...remaining];
             }
@@ -332,7 +417,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
         const finalQuestions = exam.config.shuffleQuestions ? shuffleArray([...exam.questions]) : exam.questions;
         
-        // Save order
         if (exam.config.shuffleQuestions) {
              localStorage.setItem(storageKey, JSON.stringify(finalQuestions.map(q => q.id)));
         }
@@ -340,23 +424,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [exam.questions, exam.config.shuffleQuestions, exam.code, student.studentId]);
 
     const submitExam = useCallback(async () => {
-        if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian?")) {
+        if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian? Pastikan semua jawaban sudah terisi.")) {
             setIsSubmitting(true);
             let location = "";
             if (exam.config.trackLocation) {
-                 // Try getting location
                  try {
                      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
                          if (!navigator.geolocation) reject(new Error("Geolocation not supported"));
                          navigator.geolocation.getCurrentPosition(resolve, reject, {
-                             timeout: 10000,
-                             enableHighAccuracy: true
+                             timeout: 5000,
+                             enableHighAccuracy: false
                          });
                      });
                      location = `${position.coords.latitude},${position.coords.longitude}`;
                  } catch (e) {
                      console.error("Gagal mendapatkan lokasi:", e);
-                     // Proceed without location if fails
                  }
             }
 
@@ -367,11 +449,22 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, [answers, timeLeft, exam.code, student.studentId, onSubmit, exam.config.trackLocation]);
 
-    // Initial Start Ping (To show up in dashboard immediately)
+    // Scroll Progress Handler
+    useEffect(() => {
+        const handleScroll = () => {
+            const totalScroll = document.documentElement.scrollTop;
+            const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scroll = `${totalScroll / windowHeight}`;
+            setScrollProgress(Number(scroll));
+        }
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Initial Start Ping
     useEffect(() => {
         const startExam = async () => {
             if (navigator.onLine) {
-                // Send an "in_progress" status
                 try {
                     await storageService.submitExamResult({
                         student,
@@ -395,7 +488,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 if (prev <= 1) {
                     if(timerIdRef.current) clearInterval(timerIdRef.current);
                     alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
-                    onSubmit(answersRef.current, 0); // Auto submit without location check for speed
+                    onSubmit(answersRef.current, 0); 
                     localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
                     return 0;
                 }
@@ -419,35 +512,30 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         };
     }, []);
 
-    // Auto-save effect (Local + Cloud Sync for Live Monitoring)
+    // Auto-save effect
     useEffect(() => {
         const saveInterval = setInterval(async () => {
             if (isForceSubmitted) return; 
             setSaveStatus('saving');
             
-            // 1. Local Save
             try {
                 localStorage.setItem(`exam_answers_${exam.code}_${student.studentId}`, JSON.stringify(answersRef.current));
             } catch (error) {
                 console.error("Failed to save answers to localStorage", error);
             }
 
-            // 2. Cloud Sync (Live Monitoring) - Every 30 seconds roughly if online
-            // We use the same interval for simplicity, or we could use a separate one.
-            // Using a slightly longer throttle for cloud to save bandwidth
             if (navigator.onLine) {
                  try {
-                    // We submit as 'in_progress' to update the teacher dashboard
                     await storageService.submitExamResult({
                         student,
                         examCode: exam.code,
                         answers: answersRef.current,
                         totalQuestions: exam.questions.length,
-                        completionTime: 0, // Not relevant for in-progress
+                        completionTime: 0,
                         activityLog: ["Sedang mengerjakan..."],
                         status: 'in_progress'
                     });
-                } catch (e) { /* Ignore background sync errors */ }
+                } catch (e) { }
             }
 
             setTimeout(() => setSaveStatus('saved'), 500);
@@ -491,45 +579,91 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     
     if (isForceSubmitted) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-red-50 p-4">
-                <div className="w-full max-w-lg text-center bg-white p-8 rounded-2xl shadow-lg">
-                    <h1 className="text-2xl font-bold text-red-600 mb-4">Ujian Ditangguhkan</h1>
-                    <p className="text-gray-600">
-                        Sistem mendeteksi Anda meninggalkan halaman ujian. Jawaban terakhir Anda telah disimpan.
-                        Silakan hubungi guru untuk meminta izin melanjutkan ujian.
+            <div className="flex items-center justify-center min-h-screen bg-red-50 p-6">
+                <div className="w-full max-w-lg text-center bg-white p-12 rounded-[2rem] shadow-2xl animate-fade-in border border-red-100">
+                     <div className="bg-red-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-8 shadow-inner">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-red-500">
+                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                         </svg>
+                     </div>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-4 tracking-tight">Ujian Ditangguhkan</h1>
+                    <p className="text-gray-500 text-lg leading-relaxed mb-8 font-light">
+                        Sistem mendeteksi aktivitas mencurigakan (keluar dari aplikasi). Demi integritas, ujian dikunci sementara.
                     </p>
+                    <div className="bg-orange-50 border border-orange-100 rounded-xl p-5 text-orange-800 text-sm font-medium">
+                        Silakan hubungi pengawas atau guru Anda untuk membuka kunci ujian ini.
+                    </div>
                 </div>
             </div>
         );
     }
 
+    const answeredCount = Object.keys(answers).length;
+    const progressPercent = (answeredCount / displayedQuestions.length) * 100;
+    const isCriticalTime = timeLeft < 300; // less than 5 mins
 
     return (
-        <div className="min-h-screen bg-base-200">
-            <header className="bg-base-100 shadow-md sticky top-0 z-10 p-4">
-                <div className="max-w-4xl mx-auto flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-xl font-bold text-neutral">Ujian {exam.code}</h1>
-                        <p className="text-sm text-gray-500">{student.fullName} - {student.class}</p>
+        <div className="min-h-screen bg-[#F8FAFC] font-sans text-gray-900 pb-20 selection:bg-primary/20">
+            {/* PROGRESS BAR (Top) */}
+            <div className="fixed top-0 left-0 w-full h-1.5 bg-gray-100 z-50">
+                 <div 
+                    className="h-full bg-gradient-to-r from-primary to-indigo-400 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.3)]" 
+                    style={{ width: `${progressPercent}%` }}
+                 />
+            </div>
+            
+            {/* GLASS HEADER */}
+            <header className="fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-xl shadow-sm z-40 border-b border-white/50 transition-all">
+                <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                         <div className="flex flex-col">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">KODE SOAL</span>
+                            <h1 className="text-xl font-black text-gray-800 tracking-tight">{exam.code}</h1>
+                        </div>
+                        <div className="hidden md:block w-px h-8 bg-gray-200"></div>
+                        <div className="hidden md:flex flex-col">
+                             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">SISWA</span>
+                             <p className="text-sm font-semibold text-gray-600">{student.fullName}</p>
+                        </div>
                     </div>
-                    <div className="w-full flex justify-between items-center gap-2 sm:w-auto sm:justify-start sm:gap-4 text-sm font-semibold">
-                        <div title="Sisa Waktu" className="flex items-center gap-2 px-3 py-2 bg-red-100 rounded-lg">
-                            <ClockIcon className="w-5 h-5 text-red-600" />
-                            <span className="text-red-600 font-mono text-base">{formatTime(timeLeft)}</span>
+
+                    <div className="flex items-center gap-3 md:gap-5">
+                        {/* TIMER */}
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${isCriticalTime ? 'bg-red-50 border border-red-100 animate-pulse' : 'bg-gray-50 border border-gray-100'}`}>
+                            <ClockIcon className={`w-5 h-5 ${isCriticalTime ? 'text-red-500' : 'text-gray-400'}`} />
+                            <span className={`font-mono text-lg font-bold tracking-tight ${isCriticalTime ? 'text-red-600' : 'text-gray-700'}`}>{formatTime(timeLeft)}</span>
                         </div>
-                         <div title={isOnline ? "Terhubung" : "Mode Offline Aktif"} className={`flex items-center gap-2 px-3 py-2 rounded-lg ${isOnline ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {isOnline ? <WifiIcon className="w-5 h-5"/> : <NoWifiIcon className="w-5 h-5"/>}
-                            <span>{isOnline ? "Online" : "Offline"}</span>
-                        </div>
-                        <div title="Status Penyimpanan" className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-gray-600">
-                           {saveStatus === 'saved' ? <CheckCircleIcon className="w-5 h-5 text-secondary"/> : <div className={`w-3 h-3 rounded-full ${saveStatus === 'saving' ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></div> }
-                           <span className="capitalize text-xs">{saveStatus === 'idle' ? 'Disimpan' : (saveStatus === 'saving' ? 'Menyimpan...' : 'Tersimpan')}</span>
+
+                        {/* STATUS ICONS */}
+                        <div className="flex items-center gap-2">
+                             <div title={isOnline ? "Tersambung" : "Offline Mode"} className={`w-10 h-10 flex items-center justify-center rounded-full transition-all shadow-sm ${isOnline ? 'bg-white text-green-500 border border-green-100' : 'bg-yellow-50 text-yellow-600 border border-yellow-200'}`}>
+                                {isOnline ? <WifiIcon className="w-5 h-5"/> : <NoWifiIcon className="w-5 h-5"/>}
+                             </div>
+                             <div title={saveStatus === 'saved' ? 'Tersimpan' : 'Menyimpan...'} className={`hidden sm:flex w-10 h-10 items-center justify-center rounded-full transition-all shadow-sm ${saveStatus === 'saved' ? 'bg-white text-blue-500 border border-blue-100' : 'bg-gray-100 text-gray-400'}`}>
+                                <CheckCircleIcon className="w-5 h-5"/>
+                             </div>
                         </div>
                     </div>
                 </div>
             </header>
-            <main className="max-w-4xl mx-auto p-4 md:p-8 animate-fade-in">
-                <div className="space-y-6">
+
+            {/* MAIN CONTENT */}
+            <main className="max-w-5xl mx-auto px-4 md:px-6 pt-28 pb-10">
+                
+                {/* WELCOME / INFO CARD */}
+                <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">Lembar Jawaban</h2>
+                        <p className="text-gray-500 font-medium">
+                            Jawablah dengan teliti. Gunakan tombol <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-neutral text-white mx-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span>HD</span> pada gambar jika buram.
+                        </p>
+                    </div>
+                    <div className="text-right hidden md:block">
+                        <p className="text-4xl font-black text-gray-200">{answeredCount}<span className="text-2xl text-gray-300">/{displayedQuestions.length}</span></p>
+                    </div>
+                </div>
+
+                <div className="space-y-8">
                     {displayedQuestions.map((q, index) => (
                         <QuestionDisplay
                             key={q.id}
@@ -541,17 +675,27 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         />
                     ))}
                 </div>
-                <div className="mt-8 text-center">
+
+                {/* FOOTER ACTION */}
+                <div className="mt-16 mb-12 flex flex-col items-center justify-center gap-6">
+                     <p className="text-sm font-medium text-gray-400 uppercase tracking-widest">
+                        {answeredCount} dari {displayedQuestions.length} soal terjawab
+                     </p>
+
                     <button 
                         onClick={submitExam} 
                         disabled={isSubmitting}
-                        className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative w-full max-w-lg bg-neutral text-white font-bold py-5 px-8 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.4)] transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden"
                     >
-                        {isSubmitting ? "Mengirim Jawaban..." : "Selesaikan Ujian"}
+                        <span className="relative z-10 text-lg tracking-widest flex items-center justify-center gap-3">
+                            {isSubmitting ? "MENGIRIM..." : "KIRIM JAWABAN SAYA"}
+                            {!isSubmitting && <span className="text-gray-400">→</span>}
+                        </span>
+                        <div className="absolute inset-0 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
                     </button>
                     {exam.config.trackLocation && (
-                        <p className="text-xs text-gray-500 mt-2">
-                            * Lokasi Anda akan dicatat saat tombol ditekan.
+                        <p className="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full">
+                           <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></span> Lokasi GPS aktif
                         </p>
                     )}
                 </div>
