@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -28,18 +27,23 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
 
+    // Scroll Effect - Handled Robustly
     useEffect(() => {
-        // Scroll to editor on mount if creating new (Manual or Upload)
-        // Check conditions but do NOT check questionsSectionRef.current in the condition to avoid race conditions
+        // Hanya jalankan jika dalam mode pembuatan baru (bukan edit) dan belum ada kode yang digenerate (belum selesai)
         if (!isEditing && !generatedCode) {
+            // Gunakan timeout yang sedikit lebih lama untuk memastikan DOM sudah ter-paint sepenuhnya
+            // dan layout shift dari komponen lain sudah selesai.
             const timer = setTimeout(() => {
                 if (questionsSectionRef.current) {
-                    questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    questionsSectionRef.current.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' // scroll-mt-32 CSS class will handle the offset for sticky header
+                    });
                 }
-            }, 100); // Small delay to ensure layout is ready
+            }, 300);
             return () => clearTimeout(timer);
         }
-    }, []); // Run once on mount
+    }, [isEditing, generatedCode]); // Dependensi yang lebih eksplisit
 
     useEffect(() => {
         if (generatedCode && generatedCodeSectionRef.current) {
@@ -357,7 +361,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     return (
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
             {/* --- SECTION 1: QUESTIONS --- */}
-            <div ref={questionsSectionRef} className="space-y-4">
+            {/* 
+                IMPORTANT: scroll-mt-32 added here. 
+                This ensures that when scrollIntoView is called, 
+                the element is positioned with enough top margin to not be hidden behind the sticky header.
+            */}
+            <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-primary/5 rounded-lg">
                     <h2 className="text-xl font-bold text-neutral">
                         {isEditing ? '1. Tinjau dan Edit Soal' : '3. Tinjau dan Edit Soal'}
