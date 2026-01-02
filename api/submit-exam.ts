@@ -5,57 +5,84 @@ import db from './db.js';
 
 let isSchemaChecked = false;
 
-// Logic Penilaian
+// Helper Normalisasi: Lowercase, Trim, Remove Extra Spaces
+const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Logic Penilaian yang Ditingkatkan
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
     let correctCount = 0;
     const questions = JSON.parse(exam.questions || '[]');
     
     questions.forEach((q: any) => {
         const studentAnswer = answers[q.id];
-        if (!studentAnswer) return;
+        
+        // Skip jika tidak dijawab (undefined / null / string kosong)
+        if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') return;
 
+        // 1. Pilihan Ganda & Isian Singkat
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && studentAnswer.toLowerCase() === q.correctAnswer.toLowerCase()) correctCount++;
+             if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) {
+                 correctCount++;
+             }
         } 
+        // 2. Benar / Salah
         else if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) {
              try {
                  const studentArr = JSON.parse(studentAnswer);
                  let allCorrect = true;
-                 for(let i=0; i < q.trueFalseRows.length; i++) {
-                     if (studentArr[i] !== q.trueFalseRows[i].answer) {
-                         allCorrect = false; break;
+                 // Validasi panjang array
+                 if (!Array.isArray(studentArr) || studentArr.length !== q.trueFalseRows.length) {
+                     allCorrect = false;
+                 } else {
+                     for(let i=0; i < q.trueFalseRows.length; i++) {
+                         // Bandingkan boolean strict (true === true)
+                         if (studentArr[i] !== q.trueFalseRows[i].answer) {
+                             allCorrect = false; break;
+                         }
                      }
                  }
                  if (allCorrect) correctCount++;
-             } catch(e) {}
+             } catch(e) { /* Invalid JSON = Salah */ }
         }
+        // 3. Pilihan Ganda Kompleks
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
             let sArr: string[] = [];
             try {
-                // Try Parse JSON (New Format)
                 sArr = JSON.parse(studentAnswer);
                 if (!Array.isArray(sArr)) throw new Error();
             } catch {
-                // Fallback to Comma Split
-                sArr = studentAnswer.split(',');
+                sArr = String(studentAnswer).split(',');
             }
-            // Teacher Answer is stored as Comma Separated in DB
-            const cArr = (q.correctAnswer || '').split(',').map((s: string) => s.trim()).sort().join('|');
-            const sSorted = sArr.map((s: string) => s.trim()).sort().join('|');
             
-            if (sSorted === cArr) correctCount++;
+            const tArrRaw = String(q.correctAnswer || '').split(',');
+            
+            // Gunakan Set untuk mengabaikan urutan dan duplikat
+            const tSet = new Set(tArrRaw.map((s: string) => normalize(s)).filter((s: string) => s !== ''));
+            const sSet = new Set(sArr.map((s: string) => normalize(s)).filter((s: string) => s !== ''));
+
+            // Harus sama persis isinya (Size sama DAN setiap item kunci ada di jawaban siswa)
+            if (tSet.size === sSet.size && [...tSet].every((val: string) => sSet.has(val))) {
+                correctCount++;
+            }
         }
+        // 4. Menjodohkan (Matching)
         else if (q.questionType === 'MATCHING' && q.matchingPairs) {
             try {
-                const map = JSON.parse(studentAnswer);
+                const map = JSON.parse(studentAnswer); // Format: { "0": "JawabA", "1": "JawabB" }
                 let allCorrect = true;
+                
+                // Iterasi setiap pasangan soal
                 for (let i = 0; i < q.matchingPairs.length; i++) {
-                    if (map[i] !== q.matchingPairs[i].right) {
+                    const expectedRight = q.matchingPairs[i].right;
+                    const studentRight = map[i]; // Akses via index string ("0", "1")
+                    
+                    // Bandingkan string yang dinormalisasi
+                    if (normalize(studentRight) !== normalize(expectedRight)) {
                         allCorrect = false; break;
                     }
                 }
                 if (allCorrect) correctCount++;
-            } catch (e) {}
+            } catch (e) { /* Salah jika JSON rusak */ }
         }
     });
 
@@ -103,30 +130,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { examCode, student, answers, activityLog, location } = req.body;
 
-        // 1. Ambil Kunci Jawaban Asli (from 'exams' table)
+        // 1. Ambil Data Ujian (untuk Kunci Jawaban)
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) {
             return res.status(404).json({ error: 'Exam not found (Offline)' });
         }
         const fullExam = examResult.rows[0];
 
-        // 2. Lakukan Penilaian (Kalkulasi tetap dilakukan untuk DB recovery, tapi disembunyikan di respon)
+        // 2. Hitung Nilai (Server-Side Grading)
         const grading = calculateGrade(fullExam, answers);
         const status = req.body.status || 'completed';
 
-        // MAPPING STATUS CODE
-        // 0: Belum Mengerjakan (Default)
-        // 1: Sedang Mengerjakan (in_progress)
-        // 2: Ditangguhkan (force_submitted)
-        // 3: Selesai (completed)
         let statusCode = 0;
         if (status === 'in_progress') statusCode = 1;
         else if (status === 'force_submitted') statusCode = 2;
         else if (status === 'completed') statusCode = 3;
 
-        // 3. Simpan Hasil (to 'results' table)
-        // Kita simpan skor aslinya ke Database agar jika siswa crash, progress nilai tetap ada.
-        // Namun kita sembunyikan di respon JSON.
+        // 3. Simpan ke Database
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
@@ -162,9 +182,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             location || ''
         ]);
 
-        // 4. Bangun Respon Aman
-        // SECURITY: Jika status masih in_progress (auto-save), 
-        // JANGAN kembalikan nilai skor ke client agar tidak bisa diintip via Network Tab.
+        // 4. Respon Aman (Sembunyikan nilai jika masih pengerjaan)
         const safeScore = status === 'in_progress' ? null : grading.score;
         const safeCorrectAnswers = status === 'in_progress' ? null : grading.correctCount;
 
@@ -186,8 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error("Submit Exam Error:", error);
         return res.status(500).json({ 
             error: "Submission Failed", 
-            details: error.message,
-            code: error.code
+            details: error.message
         });
     }
 }
