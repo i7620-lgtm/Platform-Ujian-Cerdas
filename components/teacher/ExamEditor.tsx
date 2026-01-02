@@ -75,6 +75,33 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     };
 
+    const handleTypeChange = (qId: string, newType: QuestionType) => {
+        setQuestions(prev => prev.map(q => {
+            if (q.id === qId) {
+                const updated = { ...q, questionType: newType };
+
+                // Smart Initialization: Create structures if switching to a complex type
+                if (['MULTIPLE_CHOICE', 'COMPLEX_MULTIPLE_CHOICE'].includes(newType) && (!updated.options || updated.options.length === 0)) {
+                    updated.options = ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'];
+                    updated.correctAnswer = newType === 'MULTIPLE_CHOICE' ? 'Opsi A' : '';
+                }
+                if (newType === 'TRUE_FALSE' && (!updated.trueFalseRows || updated.trueFalseRows.length === 0)) {
+                    updated.trueFalseRows = [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }];
+                }
+                if (newType === 'MATCHING' && (!updated.matchingPairs || updated.matchingPairs.length === 0)) {
+                    updated.matchingPairs = [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }];
+                }
+                // Reset answer for simple types to avoid type mismatch
+                if (newType === 'ESSAY' || newType === 'FILL_IN_THE_BLANK') {
+                    // Keep text but maybe reset complex answer structures if necessary, usually safe to keep string
+                }
+                
+                return updated;
+            }
+            return q;
+        }));
+    };
+
     const handleOptionTextChange = (qId: string, optIndex: number, text: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.options) {
@@ -374,27 +401,44 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Anda dapat mengedit, menghapus, atau menambahkan soal baru.</p>
                 </div>
                 <div className="space-y-4">
-                    {questions.map((q, index) => (
+                    {questions.map((q, index) => {
+                        // Calculate display number dynamically: Count all previous items that are NOT 'INFO'
+                        const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                        
+                        return (
                         <React.Fragment key={q.id}>
                             <div id={q.id} className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm group hover:shadow-md transition-shadow relative">
                                     <div>
-                                        {/* TYPE BADGE */}
+                                        {/* TYPE BADGE / SELECTOR */}
                                         <div className="flex justify-center mb-4">
-                                            <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200 shadow-sm">
-                                                {q.questionType === 'MULTIPLE_CHOICE' && 'Pilihan Ganda'}
-                                                {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && 'Pilihan Ganda Kompleks'}
-                                                {q.questionType === 'TRUE_FALSE' && 'Benar / Salah'}
-                                                {q.questionType === 'MATCHING' && 'Menjodohkan'}
-                                                {q.questionType === 'ESSAY' && 'Esai'}
-                                                {q.questionType === 'FILL_IN_THE_BLANK' && 'Isian Singkat'}
-                                                {q.questionType === 'INFO' && 'Keterangan / Info'}
-                                            </span>
+                                            <div className="relative inline-block">
+                                                <select
+                                                    value={q.questionType}
+                                                    onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)}
+                                                    className="appearance-none bg-gray-100 border border-gray-200 text-gray-700 py-1.5 pl-4 pr-8 rounded-full text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-gray-200 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm"
+                                                >
+                                                    <option value="MULTIPLE_CHOICE">Pilihan Ganda</option>
+                                                    <option value="COMPLEX_MULTIPLE_CHOICE">Pilihan Ganda Kompleks</option>
+                                                    <option value="TRUE_FALSE">Benar / Salah</option>
+                                                    <option value="MATCHING">Menjodohkan</option>
+                                                    <option value="ESSAY">Esai / Uraian</option>
+                                                    <option value="FILL_IN_THE_BLANK">Isian Singkat</option>
+                                                    <option value="INFO">Keterangan / Info</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="flex justify-between items-start gap-4">
                                             <div className="flex-1">
                                                 <div className="flex items-start gap-2 mb-2">
-                                                    <span className="text-primary font-bold mt-2">{index + 1}.</span>
+                                                    {q.questionType === 'INFO' ? (
+                                                        <span className="flex-shrink-0 mt-2 bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-md">INFO</span>
+                                                    ) : (
+                                                        <span className="text-primary font-bold mt-2">{questionNumber}.</span>
+                                                    )}
                                                     <div className="flex-1 space-y-2">
                                                         <textarea
                                                             value={q.questionText}
@@ -722,7 +766,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 </div>
                             </div>
                         </React.Fragment>
-                    ))}
+                        );
+                    })}
                 </div>
                  <div className="mt-6 text-center">
                     <button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-semibold hover:text-primary-focus mx-auto transition-colors bg-primary/5 px-4 py-2 rounded-full hover:bg-primary/10">
