@@ -86,10 +86,13 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
         }
     });
 
-    const scorable = questions.filter((q: any) => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
+    // FIX: Filter out INFO types for denominator (total questions)
+    const scorableQuestions = questions.filter((q: any) => q.questionType !== 'INFO');
+    const scorable = scorableQuestions.filter((q: any) => q.questionType !== 'ESSAY').length;
+    
     const score = scorable > 0 ? Math.round((correctCount / scorable) * 100) : 0;
     
-    return { score, correctCount, totalQuestions: questions.length };
+    return { score, correctCount, totalQuestions: scorableQuestions.length };
 };
 
 const ensureSchema = async () => {
@@ -137,7 +140,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const fullExam = examResult.rows[0];
 
-        // 2. Hitung Nilai (Server-Side Grading)
+        // 2. FETCH EXISTING RESULT (for merging activity log)
+        let finalActivityLog = activityLog || [];
+        try {
+            const existingRes = await db.query(
+                'SELECT activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
+                [examCode, student.studentId]
+            );
+            if (existingRes.rows.length > 0) {
+                const prevLog = JSON.parse(existingRes.rows[0].activity_log || '[]');
+                // Jika log baru tidak kosong, append. Jika kosong, pertahankan yang lama.
+                if (activityLog && activityLog.length > 0) {
+                     // Filter duplicates if needed, or just append
+                     finalActivityLog = [...prevLog, ...activityLog];
+                } else {
+                     finalActivityLog = prevLog;
+                }
+            }
+        } catch(e) { /* Ignore read errors */ }
+
+        // 3. Hitung Nilai (Server-Side Grading)
         const grading = calculateGrade(fullExam, answers);
         const status = req.body.status || 'completed';
 
@@ -146,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (status === 'force_submitted') statusCode = 2;
         else if (status === 'completed') statusCode = 3;
 
-        // 3. Simpan ke Database
+        // 4. Simpan ke Database
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
@@ -161,7 +183,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 correct_answers = EXCLUDED.correct_answers,
                 status = EXCLUDED.status,
                 status_code = EXCLUDED.status_code,
-                activity_log = EXCLUDED.activity_log,
+                activity_log = EXCLUDED.activity_log, -- Now contains the merged logs
                 timestamp = EXCLUDED.timestamp,
                 location = EXCLUDED.location;
         `;
@@ -177,12 +199,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             grading.totalQuestions,
             status,
             statusCode,
-            JSON.stringify(activityLog || []),
+            JSON.stringify(finalActivityLog), // Use merged logs
             Date.now(),
             location || ''
         ]);
 
-        // 4. Respon Aman (Sembunyikan nilai jika masih pengerjaan)
+        // 5. Respon Aman (Sembunyikan nilai jika masih pengerjaan)
         const safeScore = status === 'in_progress' ? null : grading.score;
         const safeCorrectAnswers = status === 'in_progress' ? null : grading.correctCount;
 
