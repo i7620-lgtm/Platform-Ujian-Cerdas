@@ -233,7 +233,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                                             // PROGRESS LOGIC
                                             const questionsAnswered = Object.keys(result.answers).length;
-                                            const totalQuestions = exam.questions.length;
+                                            // FIX: Filter out INFO types for denominator
+                                            const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
 
                                             return (
                                                 <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-red-50' : ''}`}>
