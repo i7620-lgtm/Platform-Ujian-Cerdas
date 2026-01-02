@@ -606,4 +606,3 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 export const generateExamCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
- 
