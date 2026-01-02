@@ -192,6 +192,13 @@ const App: React.FC = () => {
           if (existingResult.status === 'in_progress') {
                // Load previous state
                setResumedResult(existingResult);
+               
+               // NEW: Send resume update (async, non-blocking)
+               storageService.submitExamResult({
+                  ...existingResult,
+                  activityLog: ["Melanjutkan ujian."],
+                  status: 'in_progress'
+               });
           }
       } else {
           // No result exists, checks end date for new entries
@@ -200,6 +207,18 @@ const App: React.FC = () => {
               setIsSyncing(false);
               return;
           }
+
+          // NEW: Create initial record immediately so student appears in monitor
+          const initialPayload = {
+              student: student,
+              examCode: exam.code,
+              answers: {},
+              totalQuestions: exam.questions.filter(q => q.questionType !== 'INFO').length,
+              completionTime: 0,
+              activityLog: ["Memulai ujian."],
+              status: 'in_progress' as ResultStatus
+          };
+          storageService.submitExamResult(initialPayload);
       }
 
       setCurrentExam(exam);
@@ -222,7 +241,8 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        totalQuestions: currentExam.questions.length,
+        // FIX: Exclude INFO types from total count
+        totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: [
             "Siswa menyelesaikan ujian secara normal."
@@ -252,7 +272,8 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        totalQuestions: currentExam.questions.length,
+        // FIX: Exclude INFO types from total count
+        totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: ["Ujian dihentikan paksa karena siswa terdeteksi membuka aplikasi/tab lain."],
         status: 'force_submitted' as ResultStatus
@@ -264,6 +285,25 @@ const App: React.FC = () => {
     
     // Alert is handled by UI locking
   }, [currentExam, currentStudent]);
+
+  // NEW: Update Handler for Auto-Save
+  const handleExamUpdate = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string) => {
+      if (!currentExam || !currentStudent) return;
+      
+      const resultPayload = {
+          student: currentStudent,
+          examCode: currentExam.code,
+          answers, // This updates the progress
+          totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
+          completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
+          activityLog: [], // Empty here, handled by backend merging
+          location,
+          status: 'in_progress' as ResultStatus
+      };
+      
+      await storageService.submitExamResult(resultPayload);
+  }, [currentExam, currentStudent]);
+
 
   const handleAllowContinuation = async (studentId: string, examCode: string) => {
       try {
@@ -351,6 +391,7 @@ const App: React.FC = () => {
                 initialData={resumedResult} // Pass resumed data here
                 onSubmit={handleExamSubmit} 
                 onForceSubmit={handleForceSubmit} 
+                onUpdate={handleExamUpdate} // Pass update handler
             />
           );
         }
