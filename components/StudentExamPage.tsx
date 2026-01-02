@@ -163,9 +163,10 @@ const QuestionDisplay: React.FC<{
                 return null;
             case 'MULTIPLE_CHOICE':
                 return (
-                    <div className="grid gap-3 mt-6">
+                    // Responsive Grid: 1 column on mobile, 2 columns on tablet/desktop
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-6">
                         {shuffledOptions?.map((item, idx) => (
-                            <label key={idx} className={`relative flex items-start p-4 md:p-5 rounded-xl cursor-pointer transition-all duration-200 border group select-none ${answer === item.text ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-200' : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
+                            <label key={idx} className={`relative flex items-start p-4 md:p-5 rounded-xl cursor-pointer transition-all duration-200 border group select-none h-full ${answer === item.text ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-200' : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                                 <div className="flex items-center h-6 mt-0.5">
                                     <input
                                         type="radio"
@@ -193,8 +194,8 @@ const QuestionDisplay: React.FC<{
                 );
             case 'COMPLEX_MULTIPLE_CHOICE':
                  return (
-                    <div className="grid gap-3 mt-6">
-                         <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg border border-blue-100 w-fit">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-6">
+                         <div className="md:col-span-2 flex items-center gap-2 mb-2 px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg border border-blue-100 w-fit">
                              <CheckCircleIcon className="w-4 h-4"/>
                              Pilih lebih dari satu jawaban
                         </div>
@@ -208,7 +209,7 @@ const QuestionDisplay: React.FC<{
                              }
 
                              return (
-                                <label key={idx} className={`relative flex items-start p-4 md:p-5 rounded-xl cursor-pointer transition-all duration-200 border group select-none ${isChecked ? 'bg-teal-50 border-teal-200 shadow-sm ring-1 ring-teal-200' : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
+                                <label key={idx} className={`relative flex items-start p-4 md:p-5 rounded-xl cursor-pointer transition-all duration-200 border group select-none h-full ${isChecked ? 'bg-teal-50 border-teal-200 shadow-sm ring-1 ring-teal-200' : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-300'}`}>
                                     <div className="flex items-center h-6 mt-0.5">
                                         <input
                                             type="checkbox"
@@ -234,39 +235,31 @@ const QuestionDisplay: React.FC<{
                      try { currentAnswers = answer ? JSON.parse(answer) : []; } catch(e){}
 
                      return (
-                        <div className="mt-8 overflow-hidden border border-gray-200 rounded-xl shadow-sm bg-white">
-                            <table className="min-w-full divide-y divide-gray-100">
-                                <thead className="bg-gray-50/50">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pernyataan</th>
-                                        <th className="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Benar</th>
-                                        <th className="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Salah</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-100">
-                                    {question.trueFalseRows.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4 text-base text-gray-800 leading-relaxed">{row.text}</td>
-                                            <td className="px-4 py-4 text-center">
-                                                <button 
-                                                    onClick={() => handleTrueFalseMatrixChange(idx, true)}
-                                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${currentAnswers[idx] === true ? 'bg-green-500 text-white shadow-md scale-110' : 'bg-gray-100 text-gray-300 hover:bg-green-100'}`}
-                                                >
-                                                    <span className="font-bold text-sm">B</span>
-                                                </button>
-                                            </td>
-                                            <td className="px-4 py-4 text-center">
-                                                 <button 
-                                                    onClick={() => handleTrueFalseMatrixChange(idx, false)}
-                                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${currentAnswers[idx] === false ? 'bg-red-500 text-white shadow-md scale-110' : 'bg-gray-100 text-gray-300 hover:bg-red-100'}`}
-                                                >
-                                                    <span className="font-bold text-sm">S</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="mt-6 space-y-4">
+                            {/* Responsive List Layout instead of Table */}
+                            {question.trueFalseRows.map((row, idx) => (
+                                <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="text-base text-gray-800 leading-relaxed font-medium flex-1">
+                                        {row.text}
+                                    </div>
+                                    <div className="flex items-center justify-end gap-3 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                                        <button 
+                                            onClick={() => handleTrueFalseMatrixChange(idx, true)}
+                                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all font-bold text-sm border ${currentAnswers[idx] === true ? 'bg-green-500 text-white border-green-600 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-green-50 hover:text-green-600'}`}
+                                        >
+                                            <span className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-[10px]">B</span>
+                                            Benar
+                                        </button>
+                                        <button 
+                                            onClick={() => handleTrueFalseMatrixChange(idx, false)}
+                                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all font-bold text-sm border ${currentAnswers[idx] === false ? 'bg-red-500 text-white border-red-600 shadow-md transform scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-red-50 hover:text-red-600'}`}
+                                        >
+                                            <span className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-[10px]">S</span>
+                                            Salah
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                      );
                 }
@@ -274,23 +267,27 @@ const QuestionDisplay: React.FC<{
             case 'MATCHING':
                  const currentMatchingAnswers = answer ? JSON.parse(answer) : {};
                  return (
-                    <div className="mt-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                    <div className="mt-8 bg-gray-50 p-4 md:p-6 rounded-2xl border border-gray-200">
                          <div className="mb-4">
                              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Jodohkan Pasangan Berikut</span>
                         </div>
                         <div className="space-y-4">
                             {question.matchingPairs?.map((pair, idx) => (
-                                <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center gap-4">
+                                <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center gap-4 hover:border-primary/30 transition-colors">
                                     <div className="flex-1 font-medium text-gray-800 flex items-start gap-3">
-                                        <span className="bg-gray-100 text-gray-500 w-6 h-6 rounded flex items-center justify-center text-xs font-bold mt-0.5">{idx+1}</span>
-                                        {pair.left}
+                                        <span className="bg-gray-100 text-gray-500 w-6 h-6 rounded flex items-center justify-center text-xs font-bold mt-0.5 shrink-0">{idx+1}</span>
+                                        <span className="break-words">{pair.left}</span>
                                     </div>
-                                    <div className="hidden md:block text-gray-300">➜</div>
+                                    {/* Responsive Arrow: Down on mobile, Right on desktop */}
+                                    <div className="flex justify-center text-gray-300">
+                                        <span className="md:hidden">⬇</span>
+                                        <span className="hidden md:inline">➜</span>
+                                    </div>
                                     <div className="flex-1">
                                         <select 
                                             value={currentMatchingAnswers[idx] || ''} 
                                             onChange={(e) => handleMatchingChange(idx, e.target.value)}
-                                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary focus:border-primary text-sm font-medium transition-all"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary focus:border-primary text-sm font-medium transition-all cursor-pointer hover:bg-gray-100"
                                         >
                                             <option value="" disabled>Pilih Pasangan...</option>
                                             {matchingRightOptions.map((opt, optIdx) => (
