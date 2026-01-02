@@ -30,9 +30,20 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
              } catch(e) {}
         }
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sArr = studentAnswer.split(',').map((s: string) => s.trim()).sort().join(',');
-            const cArr = (q.correctAnswer || '').split(',').map((s: string) => s.trim()).sort().join(',');
-            if (sArr === cArr) correctCount++;
+            let sArr: string[] = [];
+            try {
+                // Try Parse JSON (New Format)
+                sArr = JSON.parse(studentAnswer);
+                if (!Array.isArray(sArr)) throw new Error();
+            } catch {
+                // Fallback to Comma Split
+                sArr = studentAnswer.split(',');
+            }
+            // Teacher Answer is stored as Comma Separated in DB
+            const cArr = (q.correctAnswer || '').split(',').map((s: string) => s.trim()).sort().join('|');
+            const sSorted = sArr.map((s: string) => s.trim()).sort().join('|');
+            
+            if (sSorted === cArr) correctCount++;
         }
         else if (q.questionType === 'MATCHING' && q.matchingPairs) {
             try {
@@ -99,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const fullExam = examResult.rows[0];
 
-        // 2. Lakukan Penilaian
+        // 2. Lakukan Penilaian (Kalkulasi tetap dilakukan untuk DB recovery, tapi disembunyikan di respon)
         const grading = calculateGrade(fullExam, answers);
         const status = req.body.status || 'completed';
 
@@ -114,6 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (status === 'completed') statusCode = 3;
 
         // 3. Simpan Hasil (to 'results' table)
+        // Kita simpan skor aslinya ke Database agar jika siswa crash, progress nilai tetap ada.
+        // Namun kita sembunyikan di respon JSON.
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
@@ -149,12 +162,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             location || ''
         ]);
 
+        // 4. Bangun Respon Aman
+        // SECURITY: Jika status masih in_progress (auto-save), 
+        // JANGAN kembalikan nilai skor ke client agar tidak bisa diintip via Network Tab.
+        const safeScore = status === 'in_progress' ? null : grading.score;
+        const safeCorrectAnswers = status === 'in_progress' ? null : grading.correctCount;
+
         return res.status(200).json({
             examCode,
             student,
             answers,
-            score: grading.score,
-            correctAnswers: grading.correctCount,
+            score: safeScore, 
+            correctAnswers: safeCorrectAnswers,
             totalQuestions: grading.totalQuestions,
             status: status,
             statusCode: statusCode,
