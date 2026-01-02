@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -18,6 +17,10 @@ const App: React.FC = () => {
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
+  
+  // State baru untuk menampung data ujian yang dilanjutkan (resume)
+  const [resumedResult, setResumedResult] = useState<Result | null>(null);
+
   const [teacherId, setTeacherId] = useState<string>('ANONYMOUS');
   
   // Data State
@@ -111,6 +114,9 @@ const App: React.FC = () => {
   
   const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
     setIsSyncing(true);
+    // Reset resumed result
+    setResumedResult(null);
+
     try {
       // 1. Fetch SPECIFIC Exam only
       const exam = await storageService.getExamForStudent(examCode);
@@ -129,35 +135,77 @@ const App: React.FC = () => {
       const examStartDate = new Date(`${dateStr}T${exam.config.startTime}`);
       const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
+      // Bypass time check if status is 'in_progress' (allowing resume even if strictly late, optional policy)
+      // But generally enforce start time.
       if (now < examStartDate) {
         alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
         setIsSyncing(false);
         return;
       }
 
-      if (now > examEndDate) {
-          alert("Waktu untuk mengikuti ujian ini telah berakhir.");
-          setIsSyncing(false);
-          return;
-      }
-
+      // Check Exisiting Result Status
       if (existingResult) {
+          // --- STRICT SECURITY CHECK ---
+          // Memastikan Nama dan Kelas cocok persis dengan data sesi yang tersimpan.
+          // Ini mencegah siswa membajak sesi teman hanya dengan tahu Nomor Absen.
+          const normalize = (str: string) => str.trim().toLowerCase();
+          
+          const inputName = normalize(student.fullName);
+          const storedName = normalize(existingResult.student.fullName);
+          const inputClass = normalize(student.class);
+          const storedClass = normalize(existingResult.student.class);
+
+          if (inputName !== storedName || inputClass !== storedClass) {
+              alert(
+                  `Akses Ditolak: Data Identitas Tidak Cocok.\n\n` +
+                  `Sistem menemukan sesi ujian aktif untuk Absen No: ${student.studentId}, tetapi data berikut berbeda:\n` +
+                  `------------------------------------------------\n` +
+                  `DATA TERSIMPAN:\nNama: ${existingResult.student.fullName}\nKelas: ${existingResult.student.class}\n\n` +
+                  `DATA INPUT ANDA:\nNama: ${student.fullName}\nKelas: ${student.class}\n` +
+                  `------------------------------------------------\n` +
+                  `Untuk melanjutkan ujian, Anda WAJIB memasukkan Nama Lengkap dan Kelas yang SAMA PERSIS dengan sesi sebelumnya.`
+              );
+              setIsSyncing(false);
+              return;
+          }
+          // --- END STRICT CHECK ---
+
+          if (existingResult.status === 'force_submitted') {
+              alert("Ujian Anda ditangguhkan karena pelanggaran. Silakan hubungi guru untuk membuka akses kembali.");
+              setIsSyncing(false);
+              return;
+          }
+
           if (existingResult.status === 'completed' || existingResult.status === 'pending_grading') {
                if (!exam.config.allowRetakes) {
                    alert("Anda sudah menyelesaikan ujian ini.");
                    setIsSyncing(false);
                    return;
                }
+               // If retake allowed, we proceed as new (ignoring existingResult for resumption)
           }
-          if (existingResult.status === 'force_submitted') {
-              alert("Ujian Anda ditangguhkan karena terdeteksi membuka aplikasi lain. Silakan hubungi guru untuk mendapatkan izin melanjutkan.");
+
+          // --- LOGIC PERBAIKAN DI SINI ---
+          // Jika status 'in_progress', artinya guru sudah membuka blokir (unlock) 
+          // ATAU siswa refresh halaman/pindah device saat ujian belum selesai.
+          // Kita izinkan masuk dan memuat state sebelumnya.
+          if (existingResult.status === 'in_progress') {
+               // Load previous state
+               setResumedResult(existingResult);
+          }
+      } else {
+          // No result exists, checks end date for new entries
+          if (now > examEndDate) {
+              alert("Waktu untuk mengikuti ujian ini telah berakhir.");
               setIsSyncing(false);
               return;
           }
       }
+
       setCurrentExam(exam);
       setCurrentStudent(student);
       setView('STUDENT_EXAM');
+
     } catch (e) {
       console.error(e);
       alert("Terjadi kesalahan saat memuat data ujian.");
@@ -177,19 +225,27 @@ const App: React.FC = () => {
         totalQuestions: currentExam.questions.length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: [
-            "Siswa fokus penuh selama ujian.",
-            "Tidak terdeteksi membuka aplikasi lain."
+            "Siswa menyelesaikan ujian secara normal."
         ],
         location // Add location
     };
     
-    const finalResult = await storageService.submitExamResult(resultPayload);
+    // Pass 'completed' explicitly to override any previous status
+    const finalResult = await storageService.submitExamResult({
+        ...resultPayload,
+        status: 'completed' 
+    });
     setStudentResult(finalResult);
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
 
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
+
+    // --- LOOP SECURITY LOGIC ---
+    // Segera hapus 'resumedResult'. Ini memastikan bahwa jika siswa mencoba refresh
+    // setelah pelanggaran berulang, aplikasi tidak memiliki memori tentang izin sebelumnya.
+    setResumedResult(null);
 
     // Construct the payload with status 'force_submitted' immediately
     const resultPayload = {
@@ -202,7 +258,8 @@ const App: React.FC = () => {
         status: 'force_submitted' as ResultStatus
     };
     
-    // Submit with correct status directly
+    // Submit with correct status directly. 
+    // Data ini akan menimpa status 'in_progress' di database, sehingga tiket dari guru hangus.
     await storageService.submitExamResult(resultPayload);
     
     // Alert is handled by UI locking
@@ -222,7 +279,7 @@ const App: React.FC = () => {
               return r;
           }));
           
-          alert(`Siswa dengan ID ${studentId} sekarang diizinkan untuk melanjutkan ujian.`);
+          alert(`Siswa dengan ID ${studentId} diizinkan melanjutkan. Instruksikan siswa untuk Login kembali dengan data yang sama.`);
       } catch(e) {
           console.error(e);
           alert("Gagal membuka blokir siswa.");
@@ -245,6 +302,7 @@ const App: React.FC = () => {
     setCurrentExam(null);
     setCurrentStudent(null);
     setStudentResult(null);
+    setResumedResult(null);
     setView('SELECTOR');
     setTeacherId('ANONYMOUS');
     window.history.replaceState(null, '', '/'); // Clear URL params if any
@@ -286,7 +344,15 @@ const App: React.FC = () => {
                 />;
       case 'STUDENT_EXAM':
         if (currentExam && currentStudent) {
-          return <StudentExamPage exam={currentExam} student={currentStudent} onSubmit={handleExamSubmit} onForceSubmit={handleForceSubmit} />;
+          return (
+            <StudentExamPage 
+                exam={currentExam} 
+                student={currentStudent} 
+                initialData={resumedResult} // Pass resumed data here
+                onSubmit={handleExamSubmit} 
+                onForceSubmit={handleForceSubmit} 
+            />
+          );
         }
         return null;
       case 'STUDENT_RESULT':
