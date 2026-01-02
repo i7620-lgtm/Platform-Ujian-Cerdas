@@ -20,6 +20,9 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArray;
 };
 
+// Helper Normalisasi Konsisten
+const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 // --- HELPER UNTUK MENGHAPUS KUNCI JAWABAN (SECURITY) ---
 const sanitizeExamForStudent = (exam: Exam): Exam => {
     const sanitizedQuestions = exam.questions.map(q => {
@@ -49,54 +52,71 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
     return { ...exam, questions: sanitizedQuestions };
 };
 
-// --- GRADING LOGIC ---
+// --- GRADING LOGIC (MIRROR SERVER SIDE) ---
 const gradeExam = (exam: Exam, answers: Record<string, string>): { score: number, correctCount: number } => {
     let correctCount = 0;
     
     exam.questions.forEach(q => {
         const studentAnswer = answers[q.id];
         
+        if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') return;
+
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
             const correctAnswer = q.correctAnswer;
-            if (!studentAnswer || !correctAnswer) return;
+            if (!correctAnswer) return;
 
+            // Handle Image Answers (Exact Match) vs Text (Normalized)
             if (correctAnswer.startsWith('data:image/')) {
                  if (studentAnswer === correctAnswer) correctCount++;
             } else {
-                 if (studentAnswer.toLowerCase() === correctAnswer.toLowerCase()) correctCount++;
+                 if (normalize(studentAnswer) === normalize(correctAnswer)) correctCount++;
             }
-        } else if (q.questionType === 'TRUE_FALSE') {
+        } 
+        else if (q.questionType === 'TRUE_FALSE') {
             if (q.trueFalseRows) {
-                 if (!studentAnswer) return;
                  try {
                      const studentArr = JSON.parse(studentAnswer);
                      let allCorrect = true;
-                     if (!Array.isArray(studentArr) || studentArr.length !== q.trueFalseRows.length) return;
-                     for(let i=0; i < q.trueFalseRows.length; i++) {
-                         if (studentArr[i] !== q.trueFalseRows[i].answer) {
-                             allCorrect = false; break;
+                     if (!Array.isArray(studentArr) || studentArr.length !== q.trueFalseRows.length) {
+                         allCorrect = false;
+                     } else {
+                         for(let i=0; i < q.trueFalseRows.length; i++) {
+                             if (studentArr[i] !== q.trueFalseRows[i].answer) {
+                                 allCorrect = false; break;
+                             }
                          }
                      }
                      if (allCorrect) correctCount++;
                  } catch(e) {}
-            } else {
-                if (studentAnswer.toLowerCase() === q.correctAnswer?.toLowerCase()) correctCount++;
             }
-        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
             const correctAnswer = q.correctAnswer;
-            if (!studentAnswer || !correctAnswer) return;
-            const studentArr = studentAnswer.split(',').map(s => s.trim()).sort();
-            const correctArr = correctAnswer.split(',').map(s => s.trim()).sort();
-            if (JSON.stringify(studentArr) === JSON.stringify(correctArr)) correctCount++;
-        } else if (q.questionType === 'MATCHING' && q.matchingPairs) {
-            if (!studentAnswer) return;
+            if (!correctAnswer) return;
+            
+            let studentArr: string[] = [];
+            try {
+                studentArr = JSON.parse(studentAnswer);
+                if (!Array.isArray(studentArr)) throw new Error("Not Array");
+            } catch {
+                studentArr = studentAnswer.split(',');
+            }
+
+            const tSet = new Set((correctAnswer || '').split(',').map(s => normalize(s)).filter(s => s !== ''));
+            const sSet = new Set(studentArr.map(s => normalize(s)).filter(s => s !== ''));
+            
+            if (tSet.size === sSet.size && [...tSet].every(val => sSet.has(val))) {
+                correctCount++;
+            }
+        } 
+        else if (q.questionType === 'MATCHING' && q.matchingPairs) {
             try {
                 const map = JSON.parse(studentAnswer);
                 let allCorrect = true;
                 for (let i = 0; i < q.matchingPairs.length; i++) {
                     const expectedRight = q.matchingPairs[i].right;
-                    const studentRight = map[i];
-                    if (studentRight !== expectedRight) {
+                    const studentRight = map[i]; // access by index key
+                    if (normalize(studentRight) !== normalize(expectedRight)) {
                         allCorrect = false; break;
                     }
                 }
@@ -177,8 +197,6 @@ class StorageService {
   async saveExam(exam: Exam): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     
-    // Explicitly convert to string to prevent Type 'number' is not assignable to 'string' errors
-    // from legacy data or type confusion.
     const safeCreatedAt = exam.createdAt ? String(exam.createdAt) : new Date().toLocaleString('id-ID');
 
     const examToSave: Exam = { 
@@ -192,91 +210,19 @@ class StorageService {
 
     if (this.isOnline) {
         try {
-            // STRATEGY 1: Optimistic Full Upload (Fastest)
-            console.log("Attempting One-Shot Upload with Date:", safeCreatedAt);
-            try {
-                await retryOperation(async () => {
-                    const response = await fetch(`${API_URL}/exams`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(examToSave)
-                    });
-                    if (!response.ok) {
-                        const errText = await response.text();
-                        throw new Error(`Server Error (${response.status}): ${errText}`);
-                    }
-                }, 1, 500); 
-                
-                // Success!
-                exams[exam.code].isSynced = true;
-                this.saveLocal(KEYS.EXAMS, exams);
-                console.log("One-Shot Upload Successful.");
-                return;
-            } catch (e: any) {
-                console.warn("One-Shot failed, switching to Chunked Upload. Reason:", e.message);
-            }
-
-            // STRATEGY 2: Skeleton + Serial Patches
-            const skeletonExam = JSON.parse(JSON.stringify(examToSave));
-            const imageQueue: Array<{qId: string, imageUrl?: string, optionImages?: (string|null)[]}> = [];
-
-            if (Array.isArray(skeletonExam.questions)) {
-                skeletonExam.questions.forEach((q: any) => {
-                    let hasImage = false;
-                    if (q.imageUrl && q.imageUrl.startsWith('data:image/')) hasImage = true;
-                    if (q.optionImages && q.optionImages.some((img: string) => img && img.startsWith('data:image/'))) hasImage = true;
-
-                    if (hasImage) {
-                        imageQueue.push({ qId: q.id, imageUrl: q.imageUrl, optionImages: q.optionImages });
-                        delete q.imageUrl;
-                        delete q.optionImages;
-                    }
-                });
-            }
-
-            // Send Skeleton
             await retryOperation(async () => {
-                const skelResponse = await fetch(`${API_URL}/exams`, {
+                const response = await fetch(`${API_URL}/exams`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(skeletonExam)
+                    body: JSON.stringify(examToSave)
                 });
-                if (!skelResponse.ok) {
-                    const errText = await skelResponse.text();
-                    throw new Error(`Failed to save skeleton: ${skelResponse.status} ${errText}`);
-                }
-            }, 3, 2000);
-
-            // Send Images Serially
-            if (imageQueue.length > 0) {
-                for (const item of imageQueue) {
-                    await retryOperation(async () => {
-                        const res = await fetch(`${API_URL}/exams`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                code: exam.code,
-                                questionId: item.qId,
-                                imageUrl: item.imageUrl,
-                                optionImages: item.optionImages
-                            })
-                        });
-                        if (!res.ok) {
-                            const errText = await res.text();
-                            throw new Error(`Patch failed: ${res.status} ${errText}`);
-                        }
-                    }, 3, 1000);
-                }
-            }
-
-            // Update sync status
+                if (!response.ok) throw new Error("Server Error");
+            }, 1, 500); 
+            
             exams[exam.code].isSynced = true;
             this.saveLocal(KEYS.EXAMS, exams);
-            console.log("Exam synced successfully (Chunked).");
-
-        } catch (e: any) {
-            console.error("Cloud save failed completely:", e);
-            throw new Error(`Cloud save failed: ${e.message}`);
+        } catch (e) {
+            console.warn("Save failed, stored locally.");
         }
     }
   }
@@ -297,7 +243,6 @@ class StorageService {
                     if (idx === -1) {
                         combined.push({ ...cRes, isSynced: true });
                     } else {
-                        // Merge strategies could go here, for now cloud wins if exists
                         combined[idx] = { ...cRes, isSynced: true };
                     }
                 });
@@ -335,8 +280,6 @@ class StorageService {
                 const gradedResult: Result = await response.json();
                 this.saveResultLocal(gradedResult, true); 
                 return gradedResult;
-            } else {
-                console.error("Submit failed:", await response.text());
             }
         } catch (e) {
             console.warn("Online submission failed, falling back to offline.");
@@ -346,9 +289,6 @@ class StorageService {
     const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const fullExam = allExams[resultPayload.examCode];
     
-    // Determine status logic:
-    // If status is provided (e.g., 'in_progress' or 'force_submitted'), preserve it. 
-    // Otherwise default to 'completed' (standard submission).
     const status = resultPayload.status;
 
     let gradedResult: Result;
@@ -394,21 +334,12 @@ class StorageService {
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
       if (index !== -1) {
-          // Update Local
           results[index].status = 'in_progress' as ResultStatus;
-          if (!results[index].activityLog) results[index].activityLog = [];
-          results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian pada ${new Date().toLocaleTimeString()}`);
-          
+          results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian.`);
           this.saveLocal(KEYS.RESULTS, results);
 
-          // Update Cloud
           if (this.isOnline) {
-             try {
-                // Just resave the result with the new status
-                await this.saveResult(results[index]);
-             } catch (e) {
-                 console.error("Failed to unlock student on server:", e);
-             }
+             try { await this.saveResult(results[index]); } catch (e) {}
           }
       }
   }
@@ -422,7 +353,6 @@ class StorageService {
     for (const exam of pendingExams) {
         try { await this.saveExam(exam); } catch (e) {}
     }
-    this.saveLocal(KEYS.EXAMS, exams);
 
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     const pendingResults = results.filter(r => !r.isSynced);
@@ -430,16 +360,13 @@ class StorageService {
 
     for (const res of pendingResults) {
          try {
-             // Always use /submit-exam to ensure insert/update happens
-             const endpoint = '/submit-exam';
-             const response = await fetch(`${API_URL}${endpoint}`, {
+             const response = await fetch(`${API_URL}/submit-exam`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(res)
             });
             
             if (response.ok) {
-                // If it was pending grading, we might get a graded result back
                 if (res.status === 'pending_grading') {
                     const graded: Result = await response.json();
                     const idx = results.findIndex(r => r.examCode === res.examCode && r.student.studentId === res.student.studentId);
