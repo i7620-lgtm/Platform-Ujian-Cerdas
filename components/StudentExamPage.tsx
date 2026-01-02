@@ -1,13 +1,13 @@
 
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { Exam, Student, Question } from '../types';
+import type { Exam, Student, Question, Result } from '../types';
 import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
 import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
+  initialData?: Result | null; // Data untuk resume ujian
   onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
   onForceSubmit: (answers: Record<string, string>, timeLeft: number) => void;
 }
@@ -381,8 +381,11 @@ const QuestionDisplay: React.FC<{
 });
 
 
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, onSubmit, onForceSubmit }) => {
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit }) => {
+    // 1. Initialize Answers
+    // Priority: initialData (Resume from Cloud) -> localStorage (Resume from local cache) -> Empty
     const [answers, setAnswers] = useState<Record<string, string>>(() => {
+        if (initialData && initialData.answers) return initialData.answers;
         try {
             const savedAnswers = localStorage.getItem(`exam_answers_${exam.code}_${student.studentId}`);
             return savedAnswers ? JSON.parse(savedAnswers) : {};
@@ -391,7 +394,32 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     });
     
-    const [timeLeft, setTimeLeft] = useState(exam.config.timeLimit * 60);
+    // 2. Initialize Activity Log
+    const [activityLog, setActivityLog] = useState<string[]>(() => {
+        if (initialData && initialData.activityLog && initialData.activityLog.length > 0) {
+            // Append resumption log
+            return [...initialData.activityLog, `[${new Date().toLocaleTimeString()}] Ujian dilanjutkan kembali (Resume).`];
+        }
+        try {
+            const savedLog = localStorage.getItem(`exam_log_${exam.code}_${student.studentId}`);
+            return savedLog ? JSON.parse(savedLog) : [`[${new Date().toLocaleTimeString()}] Memulai ujian.`];
+        } catch {
+            return [`[${new Date().toLocaleTimeString()}] Memulai ujian.`];
+        }
+    });
+
+    // 3. Initialize Time Left
+    // If resuming, calculate based on completionTime stored (which is time spent)
+    const [timeLeft, setTimeLeft] = useState(() => {
+        if (initialData && typeof initialData.completionTime === 'number') {
+            const timeSpent = initialData.completionTime;
+            const totalTime = exam.config.timeLimit * 60;
+            const remaining = Math.max(0, totalTime - timeSpent);
+            return remaining;
+        }
+        return exam.config.timeLimit * 60;
+    });
+
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
@@ -400,6 +428,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     
     const answersRef = useRef(answers);
     answersRef.current = answers;
+    
+    const activityLogRef = useRef(activityLog);
+    activityLogRef.current = activityLog;
 
     // Use Memo to persist the order of shuffled questions for this session
     const displayedQuestions = useMemo(() => {
@@ -422,6 +453,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return finalQuestions;
     }, [exam.questions, exam.config.shuffleQuestions, exam.code, student.studentId]);
 
+    // Helper to add log
+    const addLog = useCallback((message: string) => {
+        const newLog = [...activityLogRef.current, message];
+        setActivityLog(newLog);
+        activityLogRef.current = newLog;
+        try {
+            localStorage.setItem(`exam_log_${exam.code}_${student.studentId}`, JSON.stringify(newLog));
+        } catch (e) {}
+    }, [exam.code, student.studentId]);
+
     const submitExam = useCallback(async () => {
         if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian? Pastikan semua jawaban sudah terisi.")) {
             setIsSubmitting(true);
@@ -438,18 +479,51 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                      location = `${position.coords.latitude},${position.coords.longitude}`;
                  } catch (e) {
                      console.error("Gagal mendapatkan lokasi:", e);
+                     addLog(`[${new Date().toLocaleTimeString()}] Gagal mendapatkan lokasi GPS.`);
                  }
             }
 
+            // Add final log
+            const finalLogs = [...activityLogRef.current, `[${new Date().toLocaleTimeString()}] Ujian diselesaikan oleh siswa.`];
+            
+            // We pass finalLogs directly here by overriding the onSubmit call if possible, 
+            // but since onSubmit signature doesn't take logs, we rely on the internal logic of the App or modify how state is passed.
+            // However, in App.tsx, handleExamSubmit constructs payload. 
+            // NOTE: Ideally handleExamSubmit should take logs, but to keep it simple we can augment the payload in `submitExamResult` directly via storageService if we could,
+            // or we update App.tsx. 
+            // FOR NOW: We assume `storageService.submitExamResult` inside `App.tsx` creates the log array.
+            // To fix the gap, we will perform a 'sync' right before submit.
+            
+            // ACTUALLY: Let's rely on the fact that we've been syncing logs via auto-save. 
+            // But to be sure, let's inject it into the `answers` object if we can't change the prop signature easily, 
+            // OR better: Update the App.tsx logic? No, the user asked to change logic "here".
+            
+            // WORKAROUND: We will do one final "auto-save" style push with completed status manually to ensure logs are there.
+            try {
+                await storageService.submitExamResult({
+                    student,
+                    examCode: exam.code,
+                    answers: answersRef.current,
+                    totalQuestions: exam.questions.length,
+                    completionTime: (exam.config.timeLimit * 60) - timeLeft,
+                    activityLog: finalLogs,
+                    status: 'completed',
+                    location
+                });
+            } catch(e) {}
+            
             onSubmit(answers, timeLeft, location);
+            
             localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
             localStorage.removeItem(`exam_order_${exam.code}_${student.studentId}`);
+            localStorage.removeItem(`exam_log_${exam.code}_${student.studentId}`);
             setIsSubmitting(false);
         }
-    }, [answers, timeLeft, exam.code, student.studentId, onSubmit, exam.config.trackLocation]);
+    }, [answers, timeLeft, exam.code, student, onSubmit, exam.config.trackLocation, addLog, exam.config.timeLimit, exam.questions.length]);
 
-    // Initial Start Ping
+    // Initial Start Ping (Only if not resuming)
     useEffect(() => {
+        // Only ping if we are not resuming heavily, or just ping to update 'in_progress' timestamp
         const startExam = async () => {
             if (navigator.onLine) {
                 try {
@@ -458,15 +532,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         examCode: exam.code,
                         answers: answersRef.current,
                         totalQuestions: exam.questions.length,
-                        completionTime: 0,
-                        activityLog: ["Memulai Ujian"],
+                        completionTime: (exam.config.timeLimit * 60) - timeLeft,
+                        activityLog: activityLogRef.current,
                         status: 'in_progress'
                     });
-                } catch (e) { console.error("Failed to send start ping", e); }
+                } catch (e) { console.error("Failed to send start/resume ping", e); }
             }
         };
         startExam();
-    }, [exam.code, student]);
+    }, [exam.code, student, exam.questions.length]); // Dependencies adjusted
 
     // Timer effect
     useEffect(() => {
@@ -489,15 +563,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Online/Offline status effect
     useEffect(() => {
-        const handleOnline = () => setIsOnline(true);
-        const handleOffline = () => setIsOnline(false);
+        const handleOnline = () => {
+            setIsOnline(true);
+            addLog(`[${new Date().toLocaleTimeString()}] Koneksi internet terhubung kembali.`);
+        };
+        const handleOffline = () => {
+            setIsOnline(false);
+            addLog(`[${new Date().toLocaleTimeString()}] Koneksi internet terputus.`);
+        };
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, []);
+    }, [addLog]);
 
     // Auto-save effect
     useEffect(() => {
@@ -519,7 +599,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         answers: answersRef.current,
                         totalQuestions: exam.questions.length,
                         completionTime: 0,
-                        activityLog: ["Sedang mengerjakan..."],
+                        // Sync FULL logs periodically
+                        activityLog: activityLogRef.current,
                         status: 'in_progress'
                     });
                 } catch (e) { }
@@ -538,23 +619,95 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     timeLeftRef.current = timeLeft;
 
     useEffect(() => {
+        // Hanya aktif jika fitur deteksi dinyalakan
+        if (!exam.config.detectBehavior) return;
+
+        const forceLockExam = (reason: string) => {
+             if (timerIdRef.current) clearInterval(timerIdRef.current);
+             setIsForceSubmitted(true);
+             
+             // Tambah log final sebelum force submit
+             const lockMsg = `[${new Date().toLocaleTimeString('id-ID')}] ⛔ Ujian dikunci otomatis. Alasan: ${reason}`;
+             const updatedLog = [...activityLogRef.current, lockMsg];
+             setActivityLog(updatedLog);
+
+             storageService.submitExamResult({
+                 student,
+                 examCode: exam.code,
+                 answers: answersRef.current,
+                 totalQuestions: exam.questions.length,
+                 completionTime: (exam.config.timeLimit * 60) - timeLeftRef.current,
+                 activityLog: updatedLog,
+                 status: 'force_submitted'
+             });
+
+             onForceSubmit(answersRef.current, timeLeftRef.current);
+             localStorage.setItem(`exam_answers_${exam.code}_${student.studentId}`, JSON.stringify(answersRef.current));
+        };
+
         const handleVisibilityChange = () => {
-            if (document.hidden && exam.config.detectBehavior && exam.config.continueWithPermission) {
+            const timestamp = new Date().toLocaleTimeString('id-ID');
+            
+            if (document.hidden) {
+                // Log ketika siswa meninggalkan tab (minimize atau ganti tab)
+                const msg = `[${timestamp}] ⚠️ Terdeteksi beralih ke Tab Lain/Aplikasi Lain (Browser diminimalkan).`;
+                addLog(msg);
+
+                // Jika mode "Hentikan Ujian" aktif
+                if (exam.config.continueWithPermission && !isForceSubmitted) {
+                    forceLockExam("Pindah Tab/Aplikasi");
+                }
+            } else {
+                // Log ketika siswa kembali
                 if (!isForceSubmitted) {
-                    if (timerIdRef.current) clearInterval(timerIdRef.current);
-                    setIsForceSubmitted(true);
-                    onForceSubmit(answersRef.current, timeLeftRef.current);
-                    localStorage.setItem(`exam_answers_${exam.code}_${student.studentId}`, JSON.stringify(answersRef.current));
+                    const msg = `[${timestamp}] 🔙 Kembali ke tampilan ujian.`;
+                    addLog(msg);
                 }
             }
         };
 
+        const handleResize = () => {
+             if (isForceSubmitted) return;
+             
+             // 1. Validasi Mobile Keyboard: Jangan trigger jika user sedang mengetik
+             const activeEl = document.activeElement;
+             const isInputFocused = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA';
+             if (isInputFocused) return;
+
+             // 2. Kalkulasi Rasio Layar
+             const widthRatio = window.innerWidth / window.screen.availWidth;
+             const heightRatio = window.innerHeight / window.screen.availHeight;
+
+             // 3. Thresholds (Toleransi)
+             // Lebar < 90% (Split screen kiri/kanan)
+             // Tinggi < 75% (Split screen atas/bawah atau floating)
+             const isSuspiciousWidth = widthRatio < 0.90; 
+             const isSuspiciousHeight = heightRatio < 0.75;
+
+             if (isSuspiciousWidth || isSuspiciousHeight) {
+                 const timestamp = new Date().toLocaleTimeString('id-ID');
+                 const msg = `[${timestamp}] ⚠️ Terdeteksi Mode Layar Terpisah/Floating Window (W:${Math.round(widthRatio*100)}% H:${Math.round(heightRatio*100)}%).`;
+                 addLog(msg);
+
+                 if (exam.config.continueWithPermission) {
+                     forceLockExam("Split Screen / Resize Window");
+                 }
+             }
+        };
+
+        // Instant Check on Mount (Strict Resume Logic)
+        if (document.hidden && exam.config.detectBehavior && exam.config.continueWithPermission) {
+            handleVisibilityChange();
+        }
+
         document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("resize", handleResize);
 
         return () => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("resize", handleResize);
         };
-    }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, student.studentId, exam.code, isForceSubmitted]);
+    }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, student, exam.code, isForceSubmitted, addLog, exam.questions.length, exam.config.timeLimit]);
 
 
     const handleAnswerChange = useCallback((questionId: string, answer: string) => {
@@ -575,7 +728,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                      </div>
                     <h1 className="text-3xl font-bold text-gray-800 mb-4 tracking-tight">Ujian Ditangguhkan</h1>
                     <p className="text-gray-500 text-lg leading-relaxed mb-8 font-light">
-                        Sistem mendeteksi aktivitas mencurigakan (keluar dari aplikasi). Demi integritas, ujian dikunci sementara.
+                        Sistem mendeteksi aktivitas mencurigakan (Pindah Aplikasi / Split Screen). Demi integritas, ujian dikunci sementara.
                     </p>
                     <div className="bg-orange-50 border border-orange-100 rounded-xl p-5 text-orange-800 text-sm font-medium">
                         Silakan hubungi pengawas atau guru Anda untuk membuka kunci ujian ini.
