@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
-import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, ListBulletIcon, ArrowLeftIcon, ArrowPathIcon, LockClosedIcon } from './Icons';
-import { storageService } from '../services/storage';
+import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, ListBulletIcon, ArrowLeftIcon, ArrowPathIcon } from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -344,6 +343,30 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // Time Management
     const endTimeRef = useRef<number>(0);
     const [timeLeft, setTimeLeft] = useState(0);
+
+    // Refs untuk akses state terbaru di dalam useEffect anti-cheat
+    const answersRef = useRef(answers);
+    const timeLeftRef = useRef(timeLeft);
+
+    useEffect(() => { answersRef.current = answers; }, [answers]);
+    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+    // Anti-Cheat: Detect Visibility Change
+    useEffect(() => {
+        if (!exam.config.detectBehavior) return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // Gunakan state terbaru dari Ref
+                onForceSubmit(answersRef.current, timeLeftRef.current);
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [exam.config.detectBehavior, onForceSubmit]);
 
     // Initial Setup Effect
     useEffect(() => {
