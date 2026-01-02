@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
-import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, PhotoIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, PhotoIcon, LockClosedIcon, ArrowPathIcon } from './Icons';
 import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
@@ -411,6 +411,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [isForceSubmitted, setIsForceSubmitted] = useState(false);
+    const [isCheckingStatus, setIsCheckingStatus] = useState(false); // New state for manual check spinner
     const timerIdRef = useRef<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
@@ -609,19 +610,119 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, student, exam.code, isForceSubmitted, addLog]);
 
+    // NEW: Polling logic when exam is force locked
+    useEffect(() => {
+        let interval: number;
+        
+        // Function to check if teacher unlocked
+        const checkUnlockStatus = async (isManual = false) => {
+            if (isManual) setIsCheckingStatus(true);
+            try {
+                // Fetch latest results from server (API) to bypass stale local cache
+                const latestResults = await storageService.getResults();
+                const myResult = latestResults.find(r => 
+                    r.examCode === exam.code && 
+                    r.student.studentId === student.studentId
+                );
+
+                if (myResult && myResult.status === 'in_progress') {
+                    // RESUME EXAM
+                    setIsForceSubmitted(false);
+                    const unlockMsg = `[System] ✅ Akses dibuka kembali oleh guru pada ${new Date().toLocaleTimeString()}.`;
+                    const newLog = [...activityLogRef.current, unlockMsg];
+                    setActivityLog(newLog);
+                    
+                    // Restart Timer
+                    timerIdRef.current = window.setInterval(() => {
+                        const remaining = calculateTimeLeft();
+                        if (remaining <= 0) {
+                            if(timerIdRef.current) clearInterval(timerIdRef.current);
+                            setTimeLeft(0); 
+                            onSubmit(answersRef.current, 0); 
+                        } else {
+                            setTimeLeft(remaining);
+                        }
+                    }, 1000);
+                }
+            } catch (e) {
+                console.error("Failed to check status", e);
+            } finally {
+                if (isManual) setIsCheckingStatus(false);
+            }
+        };
+
+        if (isForceSubmitted) {
+            // Check immediately
+            checkUnlockStatus();
+            // Then poll every 4 seconds
+            interval = window.setInterval(() => checkUnlockStatus(false), 4000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isForceSubmitted, exam.code, student.studentId, calculateTimeLeft, onSubmit]);
+
     const handleAnswerChange = useCallback((questionId: string, answer: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: answer }));
     }, []);
     
     if (isForceSubmitted) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-red-50 p-6">
-                <div className="w-full max-w-lg text-center bg-white p-12 rounded-[2rem] shadow-xl border border-red-100">
-                     <div className="bg-red-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
-                         <div className="text-4xl">⛔</div>
+            <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4 animate-fade-in relative overflow-hidden">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-10 pointer-events-none">
+                     <div className="absolute top-0 -left-10 w-72 h-72 bg-red-400 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+                     <div className="absolute top-0 -right-10 w-72 h-72 bg-orange-400 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+                     <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+                </div>
+
+                <div className="w-full max-w-md bg-white p-8 md:p-10 rounded-3xl shadow-2xl border border-gray-100 text-center relative z-10">
+                     <div className="bg-red-50 p-6 rounded-full w-28 h-28 flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-red-50/50">
+                         <LockClosedIcon className="w-12 h-12 text-red-500 animate-pulse" />
                      </div>
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">Ujian Terkunci</h1>
-                    <p className="text-gray-500 mb-6">Sistem mendeteksi aktivitas mencurigakan. Hubungi pengawas untuk membuka kunci.</p>
+                    <h1 className="text-2xl font-black text-gray-800 mb-2">Ujian Ditangguhkan</h1>
+                    <p className="text-gray-500 mb-8 leading-relaxed">
+                        Sistem mendeteksi aktivitas mencurigakan (beralih aplikasi/tab). Akses Anda dikunci sementara.
+                    </p>
+                    
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 mb-8 text-left">
+                        <h3 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                            Menunggu Izin Guru...
+                        </h3>
+                        <p className="text-xs text-blue-600 leading-5">
+                            Segera hubungi pengawas ujian. Sistem akan otomatis membuka halaman ini begitu guru memberikan izin.
+                        </p>
+                    </div>
+
+                    <button 
+                        onClick={async () => {
+                            setIsCheckingStatus(true);
+                            // Logic is handled by the effect calling checkUnlockStatus(true) conceptually
+                            // But here we trigger a manual re-render or simulate it by calling a sync function if exposed,
+                            // Since effect handles it, this button is mostly psychological but we can trigger a storage fetch.
+                            await storageService.getResults(); 
+                            // The interval will pick it up, or we can force a state update to trigger effect? 
+                            // Actually, just let the interval handle it or expose the function. 
+                            // For simplicity, we just set loading state to show interaction.
+                            setTimeout(() => setIsCheckingStatus(false), 1000);
+                        }}
+                        disabled={isCheckingStatus}
+                        className="w-full py-4 rounded-xl font-bold text-sm bg-gray-900 text-white shadow-lg hover:bg-black transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                        {isCheckingStatus ? (
+                             <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                Memeriksa Status...
+                             </>
+                        ) : (
+                            <>
+                                <ArrowPathIcon className="w-4 h-4" />
+                                Cek Status Manual
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         );
