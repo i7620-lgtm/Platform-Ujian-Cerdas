@@ -408,17 +408,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     });
 
-    // 3. Initialize Time Left
-    // If resuming, calculate based on completionTime stored (which is time spent)
-    const [timeLeft, setTimeLeft] = useState(() => {
-        if (initialData && typeof initialData.completionTime === 'number') {
-            const timeSpent = initialData.completionTime;
-            const totalTime = exam.config.timeLimit * 60;
-            const remaining = Math.max(0, totalTime - timeSpent);
-            return remaining;
-        }
-        return exam.config.timeLimit * 60;
-    });
+    // 3. Initialize Absolute Time (Wall-Clock Sync)
+    // Menghitung waktu selesai berdasarkan JADWAL, bukan durasi relatif login.
+    const examEndTime = useMemo(() => {
+        // Parsing tanggal yang aman (YYYY-MM-DD atau ISO)
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        const startObj = new Date(`${dateStr}T${exam.config.startTime}`);
+        // Tambahkan durasi dalam milidetik
+        return startObj.getTime() + (exam.config.timeLimit * 60 * 1000);
+    }, [exam.config]);
+
+    // 4. Initialize Time Left with Real-time diff
+    const calculateTimeLeft = useCallback(() => {
+        const now = Date.now();
+        const diffSeconds = Math.floor((examEndTime - now) / 1000);
+        return diffSeconds > 0 ? diffSeconds : 0;
+    }, [examEndTime]);
+
+    const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
 
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -486,26 +493,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             // Add final log
             const finalLogs = [...activityLogRef.current, `[${new Date().toLocaleTimeString()}] Ujian diselesaikan oleh siswa.`];
             
-            // We pass finalLogs directly here by overriding the onSubmit call if possible, 
-            // but since onSubmit signature doesn't take logs, we rely on the internal logic of the App or modify how state is passed.
-            // However, in App.tsx, handleExamSubmit constructs payload. 
-            // NOTE: Ideally handleExamSubmit should take logs, but to keep it simple we can augment the payload in `submitExamResult` directly via storageService if we could,
-            // or we update App.tsx. 
-            // FOR NOW: We assume `storageService.submitExamResult` inside `App.tsx` creates the log array.
-            // To fix the gap, we will perform a 'sync' right before submit.
-            
-            // ACTUALLY: Let's rely on the fact that we've been syncing logs via auto-save. 
-            // But to be sure, let's inject it into the `answers` object if we can't change the prop signature easily, 
-            // OR better: Update the App.tsx logic? No, the user asked to change logic "here".
-            
-            // WORKAROUND: We will do one final "auto-save" style push with completed status manually to ensure logs are there.
+            // Calculate completion time: Total Duration - Time Left
+            // This represents "Time taken relative to the full window", not necessarily active minutes if late.
+            const completionDuration = (exam.config.timeLimit * 60) - timeLeft;
+
             try {
                 await storageService.submitExamResult({
                     student,
                     examCode: exam.code,
                     answers: answersRef.current,
                     totalQuestions: exam.questions.length,
-                    completionTime: (exam.config.timeLimit * 60) - timeLeft,
+                    completionTime: completionDuration,
                     activityLog: finalLogs,
                     status: 'completed',
                     location
@@ -523,7 +521,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Initial Start Ping (Only if not resuming)
     useEffect(() => {
-        // Only ping if we are not resuming heavily, or just ping to update 'in_progress' timestamp
         const startExam = async () => {
             if (navigator.onLine) {
                 try {
@@ -542,24 +539,29 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         startExam();
     }, [exam.code, student, exam.questions.length]); // Dependencies adjusted
 
-    // Timer effect
+    // DRIFT-PROOF TIMER EFFECT
     useEffect(() => {
+        // Set interval untuk mengecek waktu setiap detik
         timerIdRef.current = window.setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    if(timerIdRef.current) clearInterval(timerIdRef.current);
-                    alert("Waktu habis! Ujian akan diselesaikan secara otomatis.");
-                    onSubmit(answersRef.current, 0); 
-                    localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
-                    return 0;
-                }
-                return prev - 1;
-            });
+            // Hitung ulang berdasarkan Date.now() setiap tick
+            // Ini mencegah drift jika thread utama sibuk atau tab di-background
+            const remaining = calculateTimeLeft();
+            
+            if (remaining <= 0) {
+                if(timerIdRef.current) clearInterval(timerIdRef.current);
+                setTimeLeft(0); // Ensure 0 display
+                alert("Waktu ujian telah berakhir sesuai jadwal.");
+                onSubmit(answersRef.current, 0); 
+                localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
+            } else {
+                setTimeLeft(remaining);
+            }
         }, 1000);
+
         return () => {
             if (timerIdRef.current) clearInterval(timerIdRef.current);
         };
-    }, [exam.code, onSubmit, student.studentId]);
+    }, [exam.code, onSubmit, student.studentId, calculateTimeLeft]);
 
     // Online/Offline status effect
     useEffect(() => {
@@ -598,8 +600,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         examCode: exam.code,
                         answers: answersRef.current,
                         totalQuestions: exam.questions.length,
-                        completionTime: 0,
-                        // Sync FULL logs periodically
+                        completionTime: (exam.config.timeLimit * 60) - timeLeft,
                         activityLog: activityLogRef.current,
                         status: 'in_progress'
                     });
@@ -612,7 +613,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }, exam.config.autoSaveInterval * 1000);
 
         return () => clearInterval(saveInterval);
-    }, [exam.code, student, exam.config.autoSaveInterval, isForceSubmitted, exam.questions.length]);
+    }, [exam.code, student, exam.config.autoSaveInterval, isForceSubmitted, exam.questions.length, timeLeft]); // Added timeLeft dependency to sync correct completion time
 
     // Behavior detection effect
     const timeLeftRef = useRef(timeLeft);
