@@ -9,6 +9,7 @@ interface StudentExamPageProps {
   initialData?: Result | null;
   onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
   onForceSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+  onUpdate?: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
 }
 
 // Helper: Format Waktu (MM:SS atau HH:MM:SS)
@@ -325,7 +326,7 @@ const QuestionCard: React.FC<{
 });
 
 // --- HALAMAN UTAMA ---
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit }) => {
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit, onUpdate }) => {
     // 1. Initial State & Setup
     const [answers, setAnswers] = useState<Record<string, string>>(() => {
         // Load from LocalStorage or Resume Data
@@ -350,6 +351,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+    // NEW: Auto-save Logic
+    useEffect(() => {
+        if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
+
+        const intervalId = setInterval(() => {
+            if (!isSubmitting) {
+                // Call update with current state (from refs)
+                onUpdate(answersRef.current, timeLeftRef.current);
+            }
+        }, exam.config.autoSaveInterval * 1000);
+
+        return () => clearInterval(intervalId);
+    }, [exam.config.autoSaveInterval, isSubmitting, onUpdate]);
+
 
     // Anti-Cheat: Detect Visibility Change
     useEffect(() => {
