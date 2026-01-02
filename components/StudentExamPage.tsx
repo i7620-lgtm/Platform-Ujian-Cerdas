@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
-import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, PhotoIcon } from './Icons';
 import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
@@ -13,9 +13,10 @@ interface StudentExamPageProps {
 }
 
 const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, '0')} : ${minutes.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
 };
 
 // Fisher-Yates shuffle algorithm
@@ -32,28 +33,12 @@ const isDataUrl = (str: string) => str.startsWith('data:image/');
 
 // --- ADVANCED IMAGE ENHANCER COMPONENT ---
 // Menggunakan teknik SVG Filter untuk menajamkan gambar yang terkompresi
-const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
-    // Mode "HD" menggunakan kombinasi filter kontras tinggi dan unsharp masking (SVG)
-    // untuk mensimulasikan restorasi resolusi.
-    const [isHD, setIsHD] = useState(true); 
+// isHD sekarang diterima sebagai props dari parent
+const SmartImageViewer: React.FC<{ src: string; alt: string; isHD: boolean }> = ({ src, alt, isHD }) => {
     const [scale, setScale] = useState(1);
 
     return (
         <div className="space-y-3 mt-3">
-             {/* Hidden SVG Filter Definition for Sharpening */}
-             <svg width="0" height="0" style={{ position: 'absolute' }}>
-                <defs>
-                    <filter id="sharpen">
-                        {/* Convolve Matrix untuk deteksi tepi dan penajaman */}
-                        <feConvolveMatrix 
-                            order="3" 
-                            preserveAlpha="true" 
-                            kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"
-                        />
-                    </filter>
-                </defs>
-            </svg>
-
             <div className={`relative overflow-hidden rounded-xl border border-gray-100 bg-white transition-all ${isHD ? 'shadow-sm' : ''}`}>
                 <div className="overflow-auto flex justify-center bg-gray-50/30 p-2" style={{ maxHeight: '600px' }}>
                     <img 
@@ -63,7 +48,7 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
                             // Magic Filter: 
                             // 1. Grayscale: menghilangkan noise warna (chroma subsampling artifacts)
                             // 2. Contrast & Brightness: membuat teks hitam lebih pekat, background putih lebih bersih
-                            // 3. url(#sharpen): Memakai SVG filter untuk menajamkan tepi huruf
+                            // 3. url(#sharpen): Memakai SVG filter global untuk menajamkan tepi huruf
                             filter: isHD ? 'grayscale(100%) contrast(120%) brightness(105%) url(#sharpen)' : 'none',
                             transform: `scale(${scale})`,
                             transformOrigin: 'top center',
@@ -75,40 +60,20 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
                     />
                 </div>
                 
-                {/* Minimalist Floating Controls */}
+                {/* Minimalist Floating Controls for Zoom Only */}
                 <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-white/90 backdrop-blur shadow-sm p-1.5 rounded-full border border-gray-200 opacity-0 hover:opacity-100 transition-opacity z-10">
                      <button onClick={() => setScale(s => Math.max(0.8, s - 0.2))} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-50 rounded-full font-bold text-lg" title="Zoom Out">-</button>
                      <span className="text-[10px] font-mono w-8 text-center text-gray-500">{Math.round(scale * 100)}%</span>
                      <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-primary hover:bg-gray-50 rounded-full font-bold text-lg" title="Zoom In">+</button>
                 </div>
             </div>
-
-            <div className="flex justify-start">
-                 <button 
-                    onClick={() => setIsHD(!isHD)}
-                    className={`text-xs px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${isHD ? 'bg-neutral text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                 >
-                    {isHD ? (
-                        <>
-                            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                            <span>Mode Teks Tajam (HD)</span>
-                        </>
-                    ) : (
-                        <>
-                            <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                            <span>Mode Asli</span>
-                        </>
-                    )}
-                 </button>
-            </div>
         </div>
     )
 };
 
-
-const RenderContent: React.FC<{ content: string }> = ({ content }) => {
+const RenderContent: React.FC<{ content: string; isHD: boolean }> = ({ content, isHD }) => {
     if (isDataUrl(content)) {
-        return <SmartImageViewer src={content} alt="Konten Soal" />;
+        return <SmartImageViewer src={content} alt="Konten Soal" isHD={isHD} />;
     }
     return <div className="prose prose-lg max-w-none text-gray-800 leading-relaxed break-words whitespace-pre-wrap font-sans">{content}</div>;
 };
@@ -118,8 +83,10 @@ const QuestionDisplay: React.FC<{
     index: number;
     answer: string;
     shuffleAnswers: boolean;
+    isHD: boolean; // Receive Global HD State
+    isHighlighted: boolean; // Receive Highlight State
     onAnswerChange: (questionId: string, answer: string) => void;
-}> = React.memo(({ question, index, answer, shuffleAnswers, onAnswerChange }) => {
+}> = React.memo(({ question, index, answer, shuffleAnswers, isHD, isHighlighted, onAnswerChange }) => {
 
     const shuffledOptions = useMemo(() => {
         if ((question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'COMPLEX_MULTIPLE_CHOICE') && question.options) {
@@ -209,10 +176,10 @@ const QuestionDisplay: React.FC<{
                                             {String.fromCharCode(65 + idx)}
                                         </span>
                                         <div className="w-full pt-1">
-                                             {item.text && <RenderContent content={item.text} />}
+                                             {item.text && <RenderContent content={item.text} isHD={isHD} />}
                                         </div>
                                     </div>
-                                    {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" />}
+                                    {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" isHD={isHD} />}
                                 </div>
                             </label>
                         ))}
@@ -280,8 +247,8 @@ const QuestionDisplay: React.FC<{
                                     </div>
                                     <div className="ml-5 text-gray-700 w-full select-none">
                                         <div className="pt-1">
-                                            {item.text && <RenderContent content={item.text} />}
-                                            {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" />}
+                                            {item.text && <RenderContent content={item.text} isHD={isHD} />}
+                                            {item.image && <SmartImageViewer src={item.image} alt="Gambar Opsi" isHD={isHD} />}
                                         </div>
                                     </div>
                                 </label>
@@ -355,22 +322,25 @@ const QuestionDisplay: React.FC<{
     };
 
     return (
-        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 mb-10 transition-transform hover:translate-y-[-2px] duration-500 ease-out">
+        <div 
+            id={question.id}
+            className={`bg-white p-6 md:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 mb-10 transition-all duration-500 ease-out ${isHighlighted ? 'ring-2 ring-red-400 bg-red-50/50 shadow-xl scale-[1.01]' : 'hover:translate-y-[-2px]'}`}
+        >
              <div className="flex items-start gap-5">
                 <div className="flex-shrink-0 mt-1">
-                    <span className={`flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-2xl text-lg md:text-xl font-bold shadow-sm ${question.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : 'bg-primary text-white shadow-primary/30 shadow-lg'}`}>
+                    <span className={`flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-2xl text-lg md:text-xl font-bold shadow-sm ${question.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : (isHighlighted ? 'bg-red-500 text-white animate-pulse' : 'bg-primary text-white shadow-primary/30 shadow-lg')}`}>
                         {question.questionType === 'INFO' ? 'i' : index + 1}
                     </span>
                 </div>
                 <div className="flex-1 w-full min-w-0 pt-2">
                     {question.questionText && (
                         <div className="mb-6">
-                            <RenderContent content={question.questionText} />
+                            <RenderContent content={question.questionText} isHD={isHD} />
                         </div>
                     )}
                     {question.imageUrl && (
                         <div className="mb-8">
-                            <SmartImageViewer src={question.imageUrl} alt="Gambar Soal" />
+                            <SmartImageViewer src={question.imageUrl} alt="Gambar Soal" isHD={isHD} />
                         </div>
                     )}
                      {renderQuestionInput()}
@@ -382,6 +352,10 @@ const QuestionDisplay: React.FC<{
 
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit }) => {
+    // 0. Global UI State
+    const [isHD, setIsHD] = useState(true);
+    const [highlightedQuestionId, setHighlightedQuestionId] = useState<string | null>(null);
+
     // 1. Initialize Answers
     // Priority: initialData (Resume from Cloud) -> localStorage (Resume from local cache) -> Empty
     const [answers, setAnswers] = useState<Record<string, string>>(() => {
@@ -471,6 +445,35 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [exam.code, student.studentId]);
 
     const submitExam = useCallback(async () => {
+        // --- LOGIC VALIDASI JAWABAN KOSONG ---
+        // Cari pertanyaan pertama (bukan tipe INFO) yang belum memiliki jawaban
+        const firstUnansweredQuestion = displayedQuestions.find(q => {
+             if (q.questionType === 'INFO') return false;
+             const userAns = answersRef.current[q.id];
+             return !userAns || userAns.trim() === '';
+        });
+
+        if (firstUnansweredQuestion) {
+             alert("Terdapat soal yang belum dijawab. Anda akan diarahkan otomatis ke soal tersebut.");
+             
+             // Set Visual Highlight
+             setHighlightedQuestionId(firstUnansweredQuestion.id);
+
+             // Auto Scroll Logic
+             const element = document.getElementById(firstUnansweredQuestion.id);
+             if (element) {
+                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             }
+
+             // Remove highlight after 3 seconds
+             setTimeout(() => {
+                 setHighlightedQuestionId(null);
+             }, 3000);
+             
+             return; // Batalkan proses submit
+        }
+        // --- END VALIDASI ---
+
         if (window.confirm("Apakah Anda yakin ingin menyelesaikan ujian? Pastikan semua jawaban sudah terisi.")) {
             setIsSubmitting(true);
             let location = "";
@@ -517,7 +520,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             localStorage.removeItem(`exam_log_${exam.code}_${student.studentId}`);
             setIsSubmitting(false);
         }
-    }, [answers, timeLeft, exam.code, student, onSubmit, exam.config.trackLocation, addLog, exam.config.timeLimit, exam.questions.length]);
+    }, [answers, timeLeft, exam.code, student, onSubmit, exam.config.trackLocation, addLog, exam.config.timeLimit, exam.questions.length, displayedQuestions]);
 
     // Initial Start Ping (Only if not resuming)
     useEffect(() => {
@@ -745,6 +748,19 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans text-gray-900 pb-20 selection:bg-primary/20">
+            {/* Global SVG Filter Definition for Sharpening */}
+            <svg width="0" height="0" style={{ position: 'absolute' }}>
+                <defs>
+                    <filter id="sharpen">
+                        <feConvolveMatrix 
+                            order="3" 
+                            preserveAlpha="true" 
+                            kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"
+                        />
+                    </filter>
+                </defs>
+            </svg>
+
             {/* PROGRESS BAR (Top) */}
             <div className="fixed top-0 left-0 w-full h-1.5 bg-gray-100 z-50">
                  <div 
@@ -769,6 +785,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     </div>
 
                     <div className="flex items-center gap-3 md:gap-5">
+                         {/* GLOBAL HD TOGGLE */}
+                         <button 
+                            onClick={() => setIsHD(!isHD)}
+                            className={`flex items-center gap-1 px-3 py-2 rounded-xl transition-all border shadow-sm ${isHD ? 'bg-neutral text-white border-neutral' : 'bg-white text-gray-500 border-gray-200'}`}
+                            title={isHD ? "Matikan Mode HD" : "Hidupkan Mode HD (Teks Tajam)"}
+                         >
+                            <PhotoIcon className="w-4 h-4" />
+                            <span className="text-xs font-bold hidden sm:inline">{isHD ? 'HD ON' : 'HD OFF'}</span>
+                            {isHD && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-1"></span>}
+                        </button>
+
                         {/* TIMER */}
                         <div className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${isCriticalTime ? 'bg-red-50 border border-red-100 animate-pulse' : 'bg-gray-50 border border-gray-100'}`}>
                             <ClockIcon className={`w-5 h-5 ${isCriticalTime ? 'text-red-500' : 'text-gray-400'}`} />
@@ -796,7 +823,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     <div>
                         <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">Lembar Jawaban</h2>
                         <p className="text-gray-500 font-medium">
-                            Jawablah dengan teliti. Gunakan tombol <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-neutral text-white mx-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span>HD</span> pada gambar jika buram.
+                            Jawablah dengan teliti. Pastikan koneksi internet stabil saat mengirim jawaban.
                         </p>
                     </div>
                     <div className="text-right hidden md:block">
@@ -812,6 +839,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             index={index}
                             answer={answers[q.id] || ''}
                             shuffleAnswers={exam.config.shuffleAnswers}
+                            isHD={isHD}
+                            isHighlighted={highlightedQuestionId === q.id}
                             onAnswerChange={handleAnswerChange}
                         />
                     ))}
