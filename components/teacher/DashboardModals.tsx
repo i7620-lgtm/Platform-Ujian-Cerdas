@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
@@ -210,7 +210,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                             <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Nama Siswa</th>
                                             <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Kelas</th>
                                             <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Status</th>
-                                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Nilai Sementara</th>
+                                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-36">Nilai / Progress</th>
                                             <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[300px]">Aktivitas Terkini</th>
                                             {exam.config.trackLocation && (
                                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Lokasi (GPS)</th>
@@ -231,6 +231,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                             else if (result.status === 'force_submitted') statusBadge = <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold">! Ditangguhkan</span>;
                                             else statusBadge = <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-bold">Menunggu</span>;
 
+                                            // PROGRESS LOGIC
+                                            const questionsAnswered = Object.keys(result.answers).length;
+                                            const totalQuestions = exam.questions.length;
+
                                             return (
                                                 <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-red-50' : ''}`}>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-600">
@@ -246,15 +250,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         {statusBadge}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        {/* LOGIKA PENYEMBUNYIAN NILAI */}
                                                         {result.status === 'completed' || result.status === 'force_submitted' ? (
                                                              <div className="flex flex-col items-center">
                                                                 <span className="text-lg font-bold text-neutral">{result.score}</span>
                                                                 <span className="text-xs text-gray-500">B: {result.correctAnswers} | S: {incorrectCount}</span>
                                                              </div>
                                                         ) : (
-                                                            <div className="flex flex-col items-center opacity-50">
-                                                                 <span className="text-sm font-bold text-gray-400">Live: {result.score}</span>
-                                                                 <span className="text-[10px] text-gray-400">Prog: {Object.keys(result.answers).length}/{exam.questions.length}</span>
+                                                            <div className="flex flex-col items-center">
+                                                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Terisi</span>
+                                                                 <div className="flex items-center gap-1 mt-1">
+                                                                    <div className="w-20 bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                                                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${(questionsAnswered / totalQuestions) * 100}%` }}></div>
+                                                                    </div>
+                                                                    <span className="text-[10px] font-bold text-gray-600">{questionsAnswered}/{totalQuestions}</span>
+                                                                 </div>
                                                             </div>
                                                         )}
                                                     </td>
@@ -288,6 +298,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                             >
                                                                 <span>Izinkan Lanjut</span>
                                                             </button>
+                                                        )}
+                                                        {result.status === 'in_progress' && (
+                                                            <div className="flex justify-center text-gray-300">
+                                                                <LockClosedIcon className="w-4 h-4" />
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>
