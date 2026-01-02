@@ -769,69 +769,88 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                  />
             </div>
             
-            {/* GLASS HEADER */}
+            {/* GLASS HEADER (Responsive Adjusted) */}
             <header className="fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-xl shadow-sm z-40 border-b border-white/50 transition-all">
-                <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
+                {/* 
+                   RESPONSIVE CHANGES:
+                   - Reduced px/py on mobile: px-3 py-2 (mobile) vs px-8 py-3 (desktop)
+                   - Flex justify-between handles spacing
+                */}
+                <div className="max-w-6xl mx-auto px-3 md:px-8 py-2 md:py-3 flex items-center justify-between">
+                    
+                    {/* LEFT SECTION */}
+                    <div className="flex items-center gap-3 md:gap-6">
                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">KODE SOAL</span>
-                            <h1 className="text-xl font-black text-gray-800 tracking-tight">{exam.code}</h1>
+                            {/* Smaller Label for mobile */}
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">SOAL</span>
+                            {/* Smaller Code Font for mobile */}
+                            <h1 className="text-base md:text-xl font-black text-gray-800 tracking-tight leading-none">{exam.code}</h1>
                         </div>
+                        {/* Divider hidden on mobile */}
                         <div className="hidden md:block w-px h-8 bg-gray-200"></div>
+                        {/* Student Name hidden on mobile to save space */}
                         <div className="hidden md:flex flex-col">
                              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">SISWA</span>
                              <p className="text-sm font-semibold text-gray-600">{student.fullName}</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 md:gap-5">
-                         {/* GLOBAL HD TOGGLE */}
+                    {/* RIGHT SECTION (CONTROLS) */}
+                    <div className="flex items-center gap-2 md:gap-5">
+                         {/* GLOBAL HD TOGGLE - Compact on mobile */}
                          <button 
                             onClick={() => setIsHD(!isHD)}
-                            className={`flex items-center gap-1 px-3 py-2 rounded-xl transition-all border shadow-sm ${isHD ? 'bg-neutral text-white border-neutral' : 'bg-white text-gray-500 border-gray-200'}`}
+                            className={`flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-2 rounded-xl transition-all border shadow-sm ${isHD ? 'bg-neutral text-white border-neutral' : 'bg-white text-gray-500 border-gray-200'}`}
                             title={isHD ? "Matikan Mode HD" : "Hidupkan Mode HD (Teks Tajam)"}
                          >
-                            <PhotoIcon className="w-4 h-4" />
-                            <span className="text-xs font-bold hidden sm:inline">{isHD ? 'HD ON' : 'HD OFF'}</span>
-                            {isHD && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-1"></span>}
+                            <PhotoIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                            {/* Text hidden on very small screens, shown on small-ish */}
+                            <span className="text-[10px] font-bold hidden sm:inline">{isHD ? 'HD ON' : 'HD OFF'}</span>
+                            {isHD && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5"></span>}
                         </button>
 
-                        {/* TIMER */}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${isCriticalTime ? 'bg-red-50 border border-red-100 animate-pulse' : 'bg-gray-50 border border-gray-100'}`}>
-                            <ClockIcon className={`w-5 h-5 ${isCriticalTime ? 'text-red-500' : 'text-gray-400'}`} />
-                            <span className={`font-mono text-lg font-bold tracking-tight ${isCriticalTime ? 'text-red-600' : 'text-gray-700'}`}>{formatTime(timeLeft)}</span>
+                        {/* TIMER - Compact on mobile */}
+                        <div className={`flex items-center gap-1.5 md:gap-2 px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl transition-all ${isCriticalTime ? 'bg-red-50 border border-red-100 animate-pulse' : 'bg-gray-50 border border-gray-100'}`}>
+                            <ClockIcon className={`w-3.5 h-3.5 md:w-5 md:h-5 ${isCriticalTime ? 'text-red-500' : 'text-gray-400'}`} />
+                            {/* Smaller font on mobile */}
+                            <span className={`font-mono text-sm md:text-lg font-bold tracking-tight ${isCriticalTime ? 'text-red-600' : 'text-gray-700'}`}>{formatTime(timeLeft)}</span>
                         </div>
 
-                        {/* STATUS ICONS */}
-                        <div className="flex items-center gap-2">
-                             <div title={isOnline ? "Tersambung" : "Offline Mode"} className={`w-10 h-10 flex items-center justify-center rounded-full transition-all shadow-sm ${isOnline ? 'bg-white text-green-500 border border-green-100' : 'bg-yellow-50 text-yellow-600 border border-yellow-200'}`}>
-                                {isOnline ? <WifiIcon className="w-5 h-5"/> : <NoWifiIcon className="w-5 h-5"/>}
+                        {/* STATUS ICONS - Smaller on mobile */}
+                        <div className="flex items-center gap-1 md:gap-2">
+                             <div title={isOnline ? "Tersambung" : "Offline Mode"} className={`w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full transition-all shadow-sm ${isOnline ? 'bg-white text-green-500 border border-green-100' : 'bg-yellow-50 text-yellow-600 border border-yellow-200'}`}>
+                                {isOnline ? <WifiIcon className="w-4 h-4 md:w-5 md:h-5"/> : <NoWifiIcon className="w-4 h-4 md:w-5 md:h-5"/>}
                              </div>
-                             <div title={saveStatus === 'saved' ? 'Tersimpan' : 'Menyimpan...'} className={`hidden sm:flex w-10 h-10 items-center justify-center rounded-full transition-all shadow-sm ${saveStatus === 'saved' ? 'bg-white text-blue-500 border border-blue-100' : 'bg-gray-100 text-gray-400'}`}>
-                                <CheckCircleIcon className="w-5 h-5"/>
+                             {/* Save Icon hidden on very small screens if needed, but flex handles it */}
+                             <div title={saveStatus === 'saved' ? 'Tersimpan' : 'Menyimpan...'} className={`hidden sm:flex w-8 h-8 md:w-10 md:h-10 items-center justify-center rounded-full transition-all shadow-sm ${saveStatus === 'saved' ? 'bg-white text-blue-500 border border-blue-100' : 'bg-gray-100 text-gray-400'}`}>
+                                <CheckCircleIcon className="w-4 h-4 md:w-5 md:h-5"/>
                              </div>
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* MAIN CONTENT */}
-            <main className="max-w-5xl mx-auto px-4 md:px-6 pt-28 pb-10">
+            {/* MAIN CONTENT - Adjusted Top Padding for Mobile */}
+            <main className="max-w-5xl mx-auto px-4 md:px-6 pt-20 md:pt-28 pb-10">
                 
                 {/* WELCOME / INFO CARD */}
-                <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="mb-6 md:mb-10 flex flex-col md:flex-row md:items-end justify-between gap-2 md:gap-4">
                     <div>
-                        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">Lembar Jawaban</h2>
-                        <p className="text-gray-500 font-medium">
-                            Jawablah dengan teliti. Pastikan koneksi internet stabil saat mengirim jawaban.
+                        <h2 className="text-xl md:text-3xl font-black text-gray-800 mb-1 md:mb-2 tracking-tight">Lembar Jawaban</h2>
+                        <p className="text-xs md:text-base text-gray-500 font-medium">
+                            Jawablah dengan teliti. Pastikan koneksi internet stabil.
                         </p>
                     </div>
                     <div className="text-right hidden md:block">
                         <p className="text-4xl font-black text-gray-200">{answeredCount}<span className="text-2xl text-gray-300">/{displayedQuestions.length}</span></p>
                     </div>
+                     {/* Mobile Progress Counter */}
+                    <div className="md:hidden flex items-center gap-2 text-sm font-bold text-gray-400">
+                        <span>Progress: {answeredCount} / {displayedQuestions.length}</span>
+                    </div>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-6 md:space-y-8">
                     {displayedQuestions.map((q, index) => (
                         <QuestionDisplay
                             key={q.id}
@@ -847,17 +866,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
 
                 {/* FOOTER ACTION */}
-                <div className="mt-16 mb-12 flex flex-col items-center justify-center gap-6">
-                     <p className="text-sm font-medium text-gray-400 uppercase tracking-widest">
+                <div className="mt-12 md:mt-16 mb-8 md:mb-12 flex flex-col items-center justify-center gap-4 md:gap-6">
+                     <p className="text-xs md:text-sm font-medium text-gray-400 uppercase tracking-widest">
                         {answeredCount} dari {displayedQuestions.length} soal terjawab
                      </p>
 
                     <button 
                         onClick={submitExam} 
                         disabled={isSubmitting}
-                        className="group relative w-full max-w-lg bg-neutral text-white font-bold py-5 px-8 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.4)] transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden"
+                        className="group relative w-full max-w-lg bg-neutral text-white font-bold py-4 md:py-5 px-6 md:px-8 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.4)] transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden"
                     >
-                        <span className="relative z-10 text-lg tracking-widest flex items-center justify-center gap-3">
+                        <span className="relative z-10 text-sm md:text-lg tracking-widest flex items-center justify-center gap-3">
                             {isSubmitting ? "MENGIRIM..." : "KIRIM JAWABAN SAYA"}
                             {!isSubmitting && <span className="text-gray-400">→</span>}
                         </span>
