@@ -140,7 +140,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         await ensureSchema();
 
-        const { examCode, student, answers, activityLog, location } = req.body;
+        const { examCode, student, answers, activityLog, location, timestamp } = req.body;
+        
+        // Incoming Request Timestamp
+        const requestTime = timestamp ? parseInt(timestamp) : Date.now();
 
         // 1. Ambil Data Ujian (untuk Kunci Jawaban)
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
@@ -149,24 +152,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const fullExam = examResult.rows[0];
 
-        // 2. FETCH EXISTING RESULT (for merging activity log)
+        // 2. STALE DATA CHECK (Race Condition Protection)
+        // Fetch existing result to compare timestamps
+        const existingRes = await db.query(
+            'SELECT activity_log, status, timestamp FROM results WHERE exam_code = $1 AND student_id = $2', 
+            [examCode, student.studentId]
+        );
+
         let finalActivityLog = activityLog || [];
-        try {
-            const existingRes = await db.query(
-                'SELECT activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
-                [examCode, student.studentId]
-            );
-            if (existingRes.rows.length > 0) {
-                const prevLog = JSON.parse(existingRes.rows[0].activity_log || '[]');
-                // Jika log baru tidak kosong, append. Jika kosong, pertahankan yang lama.
-                if (activityLog && activityLog.length > 0) {
-                     // Filter duplicates if needed, or just append
-                     finalActivityLog = [...prevLog, ...activityLog];
-                } else {
-                     finalActivityLog = prevLog;
-                }
+        
+        if (existingRes.rows.length > 0) {
+            const row = existingRes.rows[0];
+            const dbTimestamp = row.timestamp ? parseInt(row.timestamp) : 0;
+            
+            // If the incoming packet is OLDER than what we have in DB, IGNORE IT.
+            // This happens when a "Zombie" packet from a locked student arrives AFTER a teacher has unlocked (creating a newer timestamp).
+            if (requestTime < dbTimestamp) {
+                console.log(`Ignoring stale update for ${student.studentId}. DB Time: ${dbTimestamp}, Req Time: ${requestTime}`);
+                // Return success (200) so the client stops retrying, but return the DB's current state (e.g. status: in_progress)
+                // so the client updates itself.
+                return res.status(200).json({
+                     examCode,
+                     student,
+                     answers: {}, // Don't care
+                     status: row.status, // Force client to adopt DB status
+                     isSynced: true,
+                     timestamp: dbTimestamp
+                });
             }
-        } catch(e) { /* Ignore read errors */ }
+
+            // Merging Activity Logs
+            const prevLog = JSON.parse(row.activity_log || '[]');
+            if (activityLog && activityLog.length > 0) {
+                 finalActivityLog = [...prevLog, ...activityLog];
+            } else {
+                 finalActivityLog = prevLog;
+            }
+        }
 
         // 3. Hitung Nilai (Server-Side Grading)
         const grading = calculateGrade(fullExam, answers);
@@ -192,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 correct_answers = EXCLUDED.correct_answers,
                 status = EXCLUDED.status,
                 status_code = EXCLUDED.status_code,
-                activity_log = EXCLUDED.activity_log, -- Now contains the merged logs
+                activity_log = EXCLUDED.activity_log, 
                 timestamp = EXCLUDED.timestamp,
                 location = EXCLUDED.location;
         `;
@@ -209,11 +231,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             status,
             statusCode,
             JSON.stringify(finalActivityLog), // Use merged logs
-            Date.now(),
+            requestTime, // Use the verified request time
             location || ''
         ]);
 
-        // 5. Respon Aman (Sembunyikan nilai jika masih pengerjaan)
+        // 5. Respon Aman
         const safeScore = status === 'in_progress' ? null : grading.score;
         const safeCorrectAnswers = status === 'in_progress' ? null : grading.correctCount;
 
@@ -227,7 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             status: status,
             statusCode: statusCode,
             isSynced: true,
-            timestamp: Date.now(),
+            timestamp: requestTime,
             location: location
         });
 
