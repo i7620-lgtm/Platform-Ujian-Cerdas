@@ -178,13 +178,15 @@ class StorageService {
       
       if (index !== -1) {
           const now = Date.now();
+          // TAGGING KHUSUS: '[Guru]' di awal log adalah sinyal otoritas untuk backend
+          const unlockLog = `[Guru] Membuka kunci akses ujian.`;
+          
           const updatedResult: Result = {
               ...results[index],
               status: 'in_progress', // FORCE STATUS
-              activityLog: [...(results[index].activityLog || []), `[Guru] Membuka kunci ujian.`],
+              activityLog: [...(results[index].activityLog || []), unlockLog],
               timestamp: now,
-              isSynced: false,
-              unlockedByTeacher: true // TAMBAHKAN FLAG OTORITAS
+              isSynced: false
           };
 
           // 1. Update UI Lokal segera (Optimistik)
@@ -201,8 +203,8 @@ class StorageService {
                  });
                  if (response.ok) {
                      const serverRes = await response.json();
-                     // Merge balik data server, TAPI pertahankan status in_progress jika server masih nge-lag
-                     results[index] = { ...serverRes, isSynced: true, status: 'in_progress' }; 
+                     // Update lokal dengan respons server (biasanya berisi status in_progress yang sudah dikonfirmasi DB)
+                     results[index] = { ...serverRes, isSynced: true };
                      this.saveLocal(KEYS.RESULTS, results);
                  }
              } catch (e) { console.error("Unlock sync failed", e); }
