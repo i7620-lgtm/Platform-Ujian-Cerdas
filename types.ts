@@ -70,5 +70,4 @@ export interface Result {
     isSynced?: boolean; 
     timestamp?: number;
     location?: string; // GPS Coordinates
-    unlockedByTeacher?: boolean; // FLAGGING KHUSUS UNTUK UNLOCK
 }
