@@ -97,17 +97,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await ensureSchema();
         const { examCode, student, answers, activityLog, location } = req.body;
         
-        // Kita gunakan Waktu Server sebagai 'Source of Truth' untuk penyimpanan
-        const serverTimestamp = Date.now(); 
-        const incomingStatus = req.body.status || 'completed';
-        const incomingLog = activityLog || [];
+        // Default values
+        let incomingStatus = req.body.status || 'completed';
+        let incomingLog = activityLog || [];
+        const serverTimestamp = Date.now();
 
         // 1. Ambil Data Ujian (untuk Grading)
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
         const fullExam = examResult.rows[0];
 
-        // 2. CEK DATA EKSISTING & FILTER "GHOST PACKET"
+        // 2. CEK STATUS DATABASE SAAT INI (SOURCE OF TRUTH)
         const existingRes = await db.query(
             'SELECT status, activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
             [examCode, student.studentId]
@@ -120,31 +120,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dbStatus = row.status;
             const dbLog = JSON.parse(row.activity_log || '[]');
 
-            // --- LOGIKA INTEGRITAS (ANTI GHOST PACKET) ---
-            // Skenario: Guru sudah Unlock (status DB = 'in_progress').
-            // Paket masuk meminta Lock (status Incoming = 'force_submitted').
+            // --- HIERARKI STATUS (THE FIX) ---
+            // Aturan: Jika DB berkata 'in_progress' (Unlocked), maka request 'force_submitted' (Locked) DIABAIKAN.
+            // Alasannya: 'in_progress' settelah 'force_submitted' berarti Guru telah melakukan Unlock manual.
+            // Paket 'force_submitted' yang datang belakangan dianggap sebagai paket sampah/terlambat.
+            
             if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
-                
-                // Cek: Apakah paket ini membawa informasi BARU?
-                // Paket Zombie (dikirim sebelum guru unlock) pasti memiliki log lebih sedikit atau sama dengan DB
-                // karena saat guru unlock, sistem menambah log "[Guru] Membuka kunci".
-                if (incomingLog.length <= dbLog.length) {
-                    console.log(`[ZOMBIE REJECTED] ${student.studentId} - Packet Ignored. DB Log: ${dbLog.length}, Incoming: ${incomingLog.length}`);
-                    
-                    // Kita tolak perubahan statusnya, tapi kita kembalikan respons SUKSES (200)
-                    // dengan status 'in_progress' agar frontend siswa sadar dia sudah di-unlock.
-                    return res.status(200).json({
-                        ...req.body,
-                        status: 'in_progress', // Override status kembali ke in_progress
-                        isSynced: true,
-                        timestamp: serverTimestamp
-                    });
-                }
+                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress' (Guru Unlocked).`);
+                incomingStatus = 'in_progress'; // Paksa status request menjadi in_progress
             }
 
-            // Merge activity logs (Append only untuk log baru)
+            // Merge activity logs (Hanya tambahkan yang baru)
             if (incomingLog.length > 0) {
-                 // Saring log yang belum ada di DB
                  const newLogs = incomingLog.filter((l: string) => !dbLog.includes(l));
                  finalActivityLog = [...dbLog, ...newLogs];
             } else {
@@ -152,8 +139,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
-        // 3. Simpan Data (Upsert Standar)
+        // 3. Simpan Data (Upsert dengan Status yang sudah diamankan)
         const grading = calculateGrade(fullExam, answers);
+        
+        // Tentukan Status Code berdasarkan status akhir yang sudah divalidasi
         let statusCode = 1;
         if (incomingStatus === 'force_submitted') statusCode = 2;
         if (incomingStatus === 'completed') statusCode = 3;
@@ -189,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             score: incomingStatus === 'in_progress' ? null : grading.score,
             correctAnswers: incomingStatus === 'in_progress' ? null : grading.correctCount,
             totalQuestions: grading.totalQuestions,
-            status: incomingStatus,
+            status: incomingStatus, // Kembalikan status yang sudah divalidasi ke frontend
             statusCode,
             isSynced: true,
             timestamp: serverTimestamp
