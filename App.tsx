@@ -77,34 +77,49 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Check URL for Public Stream Parameter
+  // Check URL for Public Stream Parameter with Retry Logic
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
+    
     if (streamCode) {
-        const loadStream = async () => {
+        const loadStream = async (retries = 3) => {
             setIsSyncing(true);
             try {
-                // Fetch specific exam for public view
+                // Try fetching specific exam
                 const exam = await storageService.getExamForStudent(streamCode);
+                
                 if (exam && exam.config.enablePublicStream) {
+                    // Success!
                     setCurrentExam(exam);
-                    setView('PUBLIC_STREAM');
-                    // Pre-fetch results
+                    // Fetch results before switching view to prevent empty modal
                     await refreshResults();
+                    setView('PUBLIC_STREAM');
                 } else {
-                    alert("Livestream tidak ditemukan atau tidak diizinkan.");
+                    if (retries > 0) {
+                        // Retry after delay (handle Vercel cold starts)
+                        console.log(`Stream load failed, retrying... (${retries} left)`);
+                        setTimeout(() => loadStream(retries - 1), 1500);
+                        return;
+                    }
+                    alert("Livestream tidak ditemukan atau belum dimulai. Silakan coba lagi nanti.");
                     window.history.replaceState(null, '', '/');
                 }
             } catch(e) {
                 console.error("Failed to load stream", e);
+                if (retries > 0) {
+                     setTimeout(() => loadStream(retries - 1), 1500);
+                }
             } finally {
-                setIsSyncing(false);
+                // Only stop syncing indicator if we are done or out of retries
+                if (retries <= 0 || view === 'PUBLIC_STREAM') {
+                    setIsSyncing(false);
+                }
             }
         };
         loadStream();
     }
-  }, [refreshResults]);
+  }, [refreshResults]); // Dependencies stable
 
 
   const handleTeacherLoginSuccess = async (id: string) => {
@@ -135,8 +150,6 @@ const App: React.FC = () => {
       const examStartDate = new Date(`${dateStr}T${exam.config.startTime}`);
       const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
-      // Bypass time check if status is 'in_progress' (allowing resume even if strictly late, optional policy)
-      // But generally enforce start time.
       if (now < examStartDate) {
         alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
         setIsSyncing(false);
@@ -146,8 +159,6 @@ const App: React.FC = () => {
       // Check Exisiting Result Status
       if (existingResult) {
           // --- STRICT SECURITY CHECK ---
-          // Memastikan Nama dan Kelas cocok persis dengan data sesi yang tersimpan.
-          // Ini mencegah siswa membajak sesi teman hanya dengan tahu Nomor Absen.
           const normalize = (str: string) => str.trim().toLowerCase();
           
           const inputName = normalize(student.fullName);
@@ -171,8 +182,6 @@ const App: React.FC = () => {
           // --- END STRICT CHECK ---
 
           if (existingResult.status === 'force_submitted') {
-              // Jika force_submitted, arahkan ke halaman Result yang "Terkunci"
-              // Biarkan komponen StudentResultPage menangani UI "Ditangguhkan"
               setCurrentExam(exam);
               setCurrentStudent(student);
               setStudentResult(existingResult);
@@ -187,19 +196,12 @@ const App: React.FC = () => {
                    setIsSyncing(false);
                    return;
                }
-               // If retake allowed, we proceed as new (ignoring existingResult for resumption)
           }
 
-          // --- LOGIC PERBAIKAN DI SINI ---
-          // Jika status 'in_progress', artinya guru sudah membuka blokir (unlock) 
-          // ATAU siswa refresh halaman/pindah device saat ujian belum selesai.
-          // Kita izinkan masuk dan memuat state sebelumnya.
           if (existingResult.status === 'in_progress') {
-               // Load previous state
                setResumedResult(existingResult);
                
                const resumeTime = new Date().toLocaleTimeString('id-ID');
-               // NEW: Send resume update (async, non-blocking)
                storageService.submitExamResult({
                   ...existingResult,
                   activityLog: [`[${resumeTime}] Melanjutkan ujian.`],
@@ -207,7 +209,6 @@ const App: React.FC = () => {
                });
           }
       } else {
-          // No result exists, checks end date for new entries
           if (now > examEndDate) {
               alert("Waktu untuk mengikuti ujian ini telah berakhir.");
               setIsSyncing(false);
@@ -215,8 +216,6 @@ const App: React.FC = () => {
           }
 
           const startTime = new Date().toLocaleTimeString('id-ID');
-
-          // NEW: Create initial record immediately so student appears in monitor
           const initialPayload = {
               student: student,
               examCode: exam.code,
@@ -249,14 +248,12 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        // FIX: Exclude INFO types from total count
         totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: activityLog || [],
-        location // Add location
+        location 
     };
     
-    // Pass 'completed' explicitly to override any previous status
     const finalResult = await storageService.submitExamResult({
         ...resultPayload,
         status: 'completed' 
@@ -268,32 +265,23 @@ const App: React.FC = () => {
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
 
-    // --- LOOP SECURITY LOGIC ---
-    // Segera hapus 'resumedResult'. Ini memastikan bahwa jika siswa mencoba refresh
-    // setelah pelanggaran berulang, aplikasi tidak memiliki memori tentang izin sebelumnya.
     setResumedResult(null);
 
     const time = new Date().toLocaleTimeString('id-ID');
     const logs = activityLog || [];
     logs.push(`[${time}] Ujian dihentikan paksa karena pelanggaran aturan.`);
 
-    // Construct the payload with status 'force_submitted' immediately
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        // FIX: Exclude INFO types from total count
         totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
         activityLog: logs,
         status: 'force_submitted' as ResultStatus
     };
     
-    // Submit with correct status directly. 
-    // Data ini akan menimpa status 'in_progress' di database, sehingga tiket dari guru hangus.
     const savedResult = await storageService.submitExamResult(resultPayload);
-    
-    // Update local state to show the Locked UI immediately
     setStudentResult(savedResult);
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
@@ -305,10 +293,10 @@ const App: React.FC = () => {
       const resultPayload = {
           student: currentStudent,
           examCode: currentExam.code,
-          answers, // This updates the progress
+          answers, 
           totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
           completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
-          activityLog: activityLog || [], // Append logs flushed from queue
+          activityLog: activityLog || [],
           location,
           status: 'in_progress' as ResultStatus
       };
@@ -318,43 +306,21 @@ const App: React.FC = () => {
 
 
   const handleAllowContinuation = async (studentId: string, examCode: string) => {
-      try {
-          setIsSyncing(true);
-          // 1. Update in Storage/Backend
-          await storageService.unlockStudentExam(examCode, studentId);
-          
-          // 2. Optimistic UI Update with Explicit Type Casting
-          setResults(prev => prev.map(r => {
-              if (r.student.studentId === studentId && r.examCode === examCode) {
-                  return { ...r, status: 'in_progress' as ResultStatus };
-              }
-              return r;
-          }));
-          
-          alert(`Siswa dengan ID ${studentId} diizinkan melanjutkan. Instruksikan siswa untuk Login kembali dengan data yang sama.`);
-      } catch(e) {
-          console.error(e);
-          alert("Gagal membuka blokir siswa.");
-      } finally {
-          setIsSyncing(false);
-      }
+      // NOTE: Logic is handled in DashboardModals.tsx now for granular loading state.
+      // This global handler is kept for legacy ref or if called from other contexts.
+      // But we will refresh the global results list afterwards.
+      await refreshResults();
   };
 
-  // NEW: Check Status Handler for Locked Students
   const handleCheckExamStatus = async () => {
       if (!currentExam || !currentStudent) return;
       
       setIsSyncing(true);
       try {
-          // UPDATE FIX: Gunakan getResults() alih-alih getStudentResult()
-          // getResults() akan memaksa sinkronisasi dengan cloud jika online,
-          // sehingga status 'in_progress' yang diupdate guru akan terbaca.
-          // Sedangkan getStudentResult() cenderung mengembalikan data lokal yang masih 'force_submitted' jika belum di-refresh.
           const allResults = await storageService.getResults();
           const result = allResults.find(r => r.examCode === currentExam.code && r.student.studentId === currentStudent.studentId);
           
           if (result && result.status === 'in_progress') {
-              // Status telah diubah oleh guru, izinkan resume
               setResumedResult(result);
               
               const resumeTime = new Date().toLocaleTimeString('id-ID');
@@ -392,7 +358,7 @@ const App: React.FC = () => {
     setResumedResult(null);
     setView('SELECTOR');
     setTeacherId('ANONYMOUS');
-    window.history.replaceState(null, '', '/'); // Clear URL params if any
+    window.history.replaceState(null, '', '/'); 
   }
 
   // --- UI Components ---
@@ -435,10 +401,10 @@ const App: React.FC = () => {
             <StudentExamPage 
                 exam={currentExam} 
                 student={currentStudent} 
-                initialData={resumedResult} // Pass resumed data here
+                initialData={resumedResult} 
                 onSubmit={handleExamSubmit} 
                 onForceSubmit={handleForceSubmit} 
-                onUpdate={handleExamUpdate} // Pass update handler
+                onUpdate={handleExamUpdate} 
             />
           );
         }
@@ -468,7 +434,7 @@ const App: React.FC = () => {
                         exam={currentExam} 
                         results={results} 
                         onClose={resetToHome} 
-                        onAllowContinuation={() => alert("Akses Publik: Anda tidak memiliki izin untuk mengubah status siswa.")}
+                        onAllowContinuation={() => {}} // No-op for public
                         isReadOnly={true}
                      />
                  </div>
