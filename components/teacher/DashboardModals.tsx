@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
@@ -18,11 +18,33 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
+    
+    // Track loading state for unlock actions
+    const [unlockingStudents, setUnlockingStudents] = useState<Set<string>>(new Set());
+
+    // REF PENTING: Menyimpan ID siswa yang baru saja di-unlock secara lokal.
+    // Tujuannya agar polling server TIDAK menimpa status 'in_progress' optimistik dengan data lama dari server
+    // selama beberapa detik setelah tombol ditekan.
+    const recentlyUnlockedRef = useRef<Set<string>>(new Set());
 
     // Sync local state when props change
     useEffect(() => {
         if(exam) {
-            setLocalResults(initialResults.filter(r => r.examCode === exam.code));
+            setLocalResults(prev => {
+                const relevantResults = initialResults.filter(r => r.examCode === exam.code);
+                
+                // GABUNGKAN DATA:
+                // Jika data prop (dari server/parent) masuk, kita terima KECUALI untuk siswa yang baru saja kita unlock manual.
+                return relevantResults.map(serverResult => {
+                    // Jika siswa ini baru saja di-unlock guru, pertahankan status lokal (in_progress) 
+                    // dan abaikan data server (yang mungkin masih force_submitted karena delay network)
+                    if (recentlyUnlockedRef.current.has(serverResult.student.studentId)) {
+                        const localVersion = prev.find(p => p.student.studentId === serverResult.student.studentId);
+                        return localVersion || { ...serverResult, status: 'in_progress' };
+                    }
+                    return serverResult;
+                });
+            });
         }
     }, [initialResults, exam]);
 
@@ -33,10 +55,24 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         const fetchLatest = async () => {
             setIsRefreshing(true);
             try {
-                const latest = await storageService.getResults(); // This should trigger a fetch if implemented in storage
-                // Filter only for this exam
+                const latest = await storageService.getResults(); 
                 const updatedForThisExam = latest.filter(r => r.examCode === exam.code);
-                setLocalResults(updatedForThisExam);
+                
+                setLocalResults(prev => {
+                    const currentMap = new Map(prev.map(p => [p.student.studentId, p]));
+                    
+                    updatedForThisExam.forEach(newItem => {
+                        // CRITICAL LOGIC: 
+                        // Jangan update item ini jika ID-nya ada di daftar 'baru saja diunlock'
+                        if (recentlyUnlockedRef.current.has(newItem.student.studentId)) {
+                            return; 
+                        }
+                        currentMap.set(newItem.student.studentId, newItem);
+                    });
+
+                    return Array.from(currentMap.values());
+                });
+                
                 setLastUpdated(new Date());
             } catch (e) {
                 console.error("Auto-refresh failed", e);
@@ -53,7 +89,55 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         return () => clearInterval(intervalId);
     }, [exam]);
 
-    // Derived Data (HOOKS MUST BE CALLED BEFORE EARLY RETURN)
+    const handleUnlockClick = async (studentId: string, examCode: string) => {
+        // 1. Set Loading State
+        setUnlockingStudents(prev => new Set(prev).add(studentId));
+
+        // 2. Tambahkan ke Ignore List (agar polling tidak menimpa perubahan ini)
+        recentlyUnlockedRef.current.add(studentId);
+        
+        // 3. Update Optimistik UI Lokal SEGERA
+        setLocalResults(prev => prev.map(r => {
+            if (r.student.studentId === studentId) {
+                return { 
+                    ...r, 
+                    status: 'in_progress',
+                    // Update log agar terlihat responsif
+                    activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci ujian secara manual.`]
+                };
+            }
+            return r;
+        }));
+
+        try {
+            // 4. Kirim ke Service (Database)
+            await storageService.unlockStudentExam(examCode, studentId);
+            
+            // 5. Trigger refresh global di parent (opsional, tapi bagus untuk sinkronisasi)
+            onAllowContinuation(studentId, examCode);
+
+            // 6. Set timeout untuk menghapus dari ignore list
+            // Beri waktu 15 detik bagi server untuk benar-benar konsisten sebelum kita mempercayai polling lagi untuk siswa ini
+            setTimeout(() => {
+                recentlyUnlockedRef.current.delete(studentId);
+            }, 15000);
+
+        } catch (error) {
+            console.error("Failed to unlock:", error);
+            alert("Gagal membuka akses ujian. Periksa koneksi internet.");
+            // Revert jika gagal total
+            recentlyUnlockedRef.current.delete(studentId);
+        } finally {
+            // Remove loading state indicator
+            setUnlockingStudents(prev => {
+                const next = new Set(prev);
+                next.delete(studentId);
+                return next;
+            });
+        }
+    };
+
+    // Derived Data
     const uniqueClasses = useMemo(() => {
         const classes = new Set(localResults.map(r => r.student.class));
         return Array.from(classes).sort();
@@ -67,7 +151,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         // Sort by Class then Student ID (Absen)
         return res.sort((a, b) => {
             if (a.student.class !== b.student.class) return a.student.class.localeCompare(b.student.class);
-            // Assuming studentId is numeric string for Absen
             return parseInt(a.student.studentId) - parseInt(b.student.studentId);
         });
     }, [localResults, filterClass]);
@@ -79,7 +162,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     // Statistics
     const totalStudents = localResults.length;
-    // Safe Comparison: Explicitly checking against string literals
     const activeStudents = localResults.filter(r => r.status === 'in_progress').length;
     const finishedStudents = localResults.filter(r => r.status === 'completed').length;
     const suspendedStudents = localResults.filter(r => r.status === 'force_submitted').length;
@@ -190,7 +272,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                 <div className="mt-8 pt-6 border-t w-full">
                                     <p className="text-sm text-gray-500 font-semibold uppercase tracking-wide mb-2">QR Code</p>
                                     <div className="bg-white p-2 inline-block rounded-lg">
-                                        {/* Simple QR Code placeholder - in a real app use a library like qrcode.react */}
                                         <img 
                                             src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(streamUrl)}`} 
                                             alt="QR Code Stream" 
@@ -228,6 +309,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                 ? result.activityLog[result.activityLog.length - 1] 
                                                 : "Memulai sesi...";
                                             
+                                            const isUnlockingThis = unlockingStudents.has(result.student.studentId);
+                                            // Check if visually locked (either server says so, OR we aren't currently overriding it)
+                                            const isVisuallyLocked = result.status === 'force_submitted' && !isUnlockingThis;
+
                                             let statusBadge;
                                             if (result.status === 'in_progress') statusBadge = <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold animate-pulse">● Mengerjakan</span>;
                                             else if (result.status === 'completed') statusBadge = <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">✓ Selesai</span>;
@@ -236,7 +321,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                                             // PROGRESS LOGIC
                                             const questionsAnswered = Object.keys(result.answers).length;
-                                            // FIX: Filter out INFO types for denominator
                                             const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
 
                                             return (
@@ -254,7 +338,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         {statusBadge}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        {/* LOGIKA PENYEMBUNYIAN NILAI */}
                                                         {result.status === 'completed' || result.status === 'force_submitted' ? (
                                                              <div className="flex flex-col items-center">
                                                                 <span className="text-lg font-bold text-neutral">{result.score}</span>
@@ -296,19 +379,26 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                     )}
                                                     {!isReadOnly && (
                                                         <td className="px-6 py-4 text-center">
-                                                            {result.status === 'force_submitted' && (
+                                                            {/* Show Button if Force Submitted OR currently Unlocking (Loading State) */}
+                                                            {isVisuallyLocked || isUnlockingThis ? (
                                                                 <button 
-                                                                    onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
+                                                                    onClick={() => handleUnlockClick(result.student.studentId, result.examCode)} 
+                                                                    disabled={isUnlockingThis}
+                                                                    className={`bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full ${isUnlockingThis ? 'opacity-70 cursor-wait' : ''}`}
                                                                 >
-                                                                    <span>Izinkan Lanjut</span>
+                                                                    {isUnlockingThis ? (
+                                                                        <>
+                                                                            <ArrowPathIcon className="w-3 h-3 animate-spin" /> Proses...
+                                                                        </>
+                                                                    ) : (
+                                                                        <span>Izinkan Lanjut</span>
+                                                                    )}
                                                                 </button>
-                                                            )}
-                                                            {result.status === 'in_progress' && (
+                                                            ) : result.status === 'in_progress' ? (
                                                                 <div className="flex justify-center text-gray-300">
                                                                     <LockClosedIcon className="w-4 h-4" />
                                                                 </div>
-                                                            )}
+                                                            ) : null}
                                                         </td>
                                                     )}
                                                 </tr>
