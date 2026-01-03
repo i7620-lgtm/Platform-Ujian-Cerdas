@@ -430,3 +430,4 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
         </div>
     );
 };
+ 
