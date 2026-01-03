@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
-import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, ListBulletIcon, ArrowLeftIcon, ArrowPathIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, WifiIcon, NoWifiIcon, ListBulletIcon, ArrowLeftIcon, ArrowPathIcon, XMarkIcon } from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -89,7 +89,8 @@ const QuestionCard: React.FC<{
     answer: string;
     shuffleAnswers: boolean;
     onAnswerChange: (id: string, val: string) => void;
-}> = React.memo(({ question, index, answer, shuffleAnswers, onAnswerChange }) => {
+    isError?: boolean;
+}> = React.memo(({ question, index, answer, shuffleAnswers, onAnswerChange, isError }) => {
     
     // Memoize options shuffling
     const displayedOptions = useMemo(() => {
@@ -148,7 +149,9 @@ const QuestionCard: React.FC<{
                                     className={`relative flex items-center p-4 cursor-pointer rounded-xl border transition-all duration-200 group
                                         ${isSelected 
                                             ? 'bg-indigo-50 border-indigo-500 shadow-sm ring-1 ring-indigo-500' 
-                                            : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                                            : isError 
+                                                ? 'bg-white border-red-200 hover:border-red-300 hover:bg-red-50' 
+                                                : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                                         }`}
                                 >
                                     <div className={`flex items-center justify-center w-6 h-6 rounded-full border mr-4 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
@@ -246,7 +249,7 @@ const QuestionCard: React.FC<{
                                     <select 
                                         value={matchAnswers[i] || ''}
                                         onChange={(e) => handleMatchingChange(i, e.target.value)}
-                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer shadow-sm hover:border-gray-300 transition-colors"
+                                        className={`w-full p-3 bg-white border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer shadow-sm hover:border-gray-300 transition-colors ${isError && !matchAnswers[i] ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                                     >
                                         <option value="" disabled>Pilih Pasangan...</option>
                                         {rightOptions.map((opt, idx) => (
@@ -266,7 +269,7 @@ const QuestionCard: React.FC<{
                             value={answer || ''}
                             onChange={(e) => onAnswerChange(question.id, e.target.value)}
                             rows={6}
-                            className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all text-base leading-relaxed"
+                            className={`w-full p-4 bg-white border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all text-base leading-relaxed ${isError ? 'border-red-400 ring-1 ring-red-100' : 'border-gray-200'}`}
                             placeholder="Ketik jawaban uraian Anda di sini..."
                         />
                         <div className="text-right mt-1 text-xs text-gray-400">{(answer || '').length} karakter</div>
@@ -280,7 +283,7 @@ const QuestionCard: React.FC<{
                             type="text"
                             value={answer || ''}
                             onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                            className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all font-medium"
+                            className={`w-full p-4 bg-white border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all font-medium ${isError ? 'border-red-400 ring-1 ring-red-100' : 'border-gray-200'}`}
                             placeholder="Jawaban singkat..."
                             autoComplete="off"
                         />
@@ -293,20 +296,28 @@ const QuestionCard: React.FC<{
 
     return (
         <div id={`question-${question.id}`} className="scroll-mt-32 mb-8 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
+            <div className={`bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.04)] border overflow-hidden transition-all duration-300 ${isError ? 'border-red-500 ring-2 ring-red-100 shadow-red-100' : 'border-gray-100'}`}>
                 {/* Header Card: Nomor & Teks */}
-                <div className="p-6 md:p-8">
+                <div className={`p-6 md:p-8 ${isError ? 'bg-red-50/30' : ''}`}>
                     <div className="flex gap-4 md:gap-6">
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex flex-col items-center gap-2">
                             {question.questionType === 'INFO' ? (
                                 <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">i</div>
                             ) : (
-                                <div className="w-10 h-10 rounded-lg bg-neutral text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-neutral/20">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shadow-lg ${isError ? 'bg-red-500 text-white shadow-red-300' : 'bg-neutral text-white shadow-neutral/20'}`}>
                                     {index + 1}
+                                </div>
+                            )}
+                            {isError && (
+                                <div className="text-red-500 animate-bounce">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
                                 </div>
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
+                            {isError && <p className="text-xs font-bold text-red-500 mb-1 uppercase tracking-wider animate-pulse">Pertanyaan ini wajib diisi</p>}
                             <div className="text-base md:text-lg text-gray-800 font-medium">
                                 {question.questionText && <RenderContent content={question.questionText} />}
                             </div>
@@ -343,6 +354,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    // VALIDATION STATE
+    const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set());
+
     // Time Management
     const endTimeRef = useRef<number>(0);
     const [timeLeft, setTimeLeft] = useState(0);
@@ -483,6 +497,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const handleAnswerChange = useCallback((id: string, val: string) => {
         if (isSubmitting) return;
 
+        // Clear error state if answered
+        setUnansweredIds(prev => {
+            if (prev.has(id)) {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            }
+            return prev;
+        });
+
         if (lastLoggedQuestionIdRef.current !== id) {
             const qIndex = questions.findIndex(q => q.id === id);
             if (qIndex !== -1 && questions[qIndex].questionType !== 'INFO') {
@@ -507,8 +531,33 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     };
 
+    const validateAnswers = () => {
+        const missing = new Set<string>();
+        questions.forEach(q => {
+            if (q.questionType === 'INFO') return;
+            const val = answers[q.id];
+            // Check if undefined, null, or empty string/array/object representation
+            if (!val || val === '[]' || val === '{}' || (typeof val === 'string' && val.trim() === '')) {
+                missing.add(q.id);
+            }
+        });
+        return missing;
+    };
+
     const handleSubmit = async (isAuto = false) => {
-        if (!isAuto && !confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
+        // Validation Logic (Only for manual submit)
+        if (!isAuto) {
+            const missing = validateAnswers();
+            if (missing.size > 0) {
+                setUnansweredIds(missing);
+                const firstMissingId = Array.from(missing)[0];
+                scrollToQuestion(firstMissingId);
+                alert(`Mohon maaf, Anda belum menjawab ${missing.size} soal. Silakan lengkapi jawaban pada soal yang berwarna merah.`);
+                return; // STOP SUBMISSION
+            }
+
+            if (!confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
+        }
         
         setIsSubmitting(true);
 
@@ -541,8 +590,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
                 <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg lg:hidden text-gray-600">
+                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg lg:hidden text-gray-600 relative">
                              <ListBulletIcon className="w-6 h-6" />
+                             {unansweredIds.size > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span>}
                         </button>
                         <div>
                             <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">{exam.code}</h1>
@@ -576,6 +626,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900">Lembar Jawaban</h2>
                         <p className="text-slate-500 text-sm mt-1">Kerjakan dengan jujur dan teliti.</p>
+                        {unansweredIds.size > 0 && (
+                             <p className="text-red-600 text-xs font-bold mt-2 animate-pulse">
+                                 ⚠ Terdapat {unansweredIds.size} soal yang belum dijawab.
+                             </p>
+                        )}
                     </div>
                     <div className="text-right hidden sm:block">
                         <div className="text-3xl font-bold text-indigo-600 leading-none">{progress}%</div>
@@ -596,6 +651,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 answer={answers[q.id] || ''}
                                 shuffleAnswers={exam.config.shuffleAnswers}
                                 onAnswerChange={handleAnswerChange}
+                                isError={unansweredIds.has(q.id)}
                             />
                          );
                     })}
@@ -641,19 +697,23 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 if (q.questionType === 'INFO') return null; // Skip numbering for INFO
                                 const visualNum = questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length + 1;
                                 const isAnswered = !!answers[q.id];
+                                const isError = unansweredIds.has(q.id);
                                 
                                 return (
                                     <button
                                         key={q.id}
                                         onClick={() => scrollToQuestion(q.id)}
-                                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border-2 transition-all
-                                            ${isAnswered 
-                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
-                                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'
+                                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border-2 transition-all relative
+                                            ${isError 
+                                                ? 'bg-red-500 border-red-600 text-white shadow-md animate-pulse'
+                                                : isAnswered 
+                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'
                                             }`}
                                     >
                                         <span>{visualNum}</span>
-                                        {isAnswered && <span className="text-[8px] leading-none mt-0.5">OK</span>}
+                                        {isAnswered && !isError && <span className="text-[8px] leading-none mt-0.5">OK</span>}
+                                        {isError && <span className="text-[8px] leading-none mt-0.5 text-white">!</span>}
                                     </button>
                                 );
                             })}
