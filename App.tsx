@@ -171,7 +171,12 @@ const App: React.FC = () => {
           // --- END STRICT CHECK ---
 
           if (existingResult.status === 'force_submitted') {
-              alert("Ujian Anda ditangguhkan karena pelanggaran. Silakan hubungi guru untuk membuka akses kembali.");
+              // Jika force_submitted, arahkan ke halaman Result yang "Terkunci"
+              // Biarkan komponen StudentResultPage menangani UI "Ditangguhkan"
+              setCurrentExam(exam);
+              setCurrentStudent(student);
+              setStudentResult(existingResult);
+              setView('STUDENT_RESULT');
               setIsSyncing(false);
               return;
           }
@@ -286,9 +291,11 @@ const App: React.FC = () => {
     
     // Submit with correct status directly. 
     // Data ini akan menimpa status 'in_progress' di database, sehingga tiket dari guru hangus.
-    await storageService.submitExamResult(resultPayload);
+    const savedResult = await storageService.submitExamResult(resultPayload);
     
-    // Alert is handled by UI locking
+    // Update local state to show the Locked UI immediately
+    setStudentResult(savedResult);
+    setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
 
   // NEW: Update Handler for Auto-Save
@@ -328,6 +335,34 @@ const App: React.FC = () => {
       } catch(e) {
           console.error(e);
           alert("Gagal membuka blokir siswa.");
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
+  // NEW: Check Status Handler for Locked Students
+  const handleCheckExamStatus = async () => {
+      if (!currentExam || !currentStudent) return;
+      
+      setIsSyncing(true);
+      try {
+          const result = await storageService.getStudentResult(currentExam.code, currentStudent.studentId);
+          if (result && result.status === 'in_progress') {
+              // Status telah diubah oleh guru, izinkan resume
+              setResumedResult(result);
+              
+              const resumeTime = new Date().toLocaleTimeString('id-ID');
+              await storageService.submitExamResult({
+                  ...result,
+                  activityLog: [...(result.activityLog || []), `[${resumeTime}] Siswa melanjutkan ujian setelah blokir dibuka.`]
+              });
+              
+              setView('STUDENT_EXAM');
+          } else {
+              alert("Guru belum memberikan izin. Silakan hubungi pengawas ujian.");
+          }
+      } catch(e) {
+          alert("Gagal mengecek status.");
       } finally {
           setIsSyncing(false);
       }
@@ -403,7 +438,14 @@ const App: React.FC = () => {
         return null;
       case 'STUDENT_RESULT':
         if (studentResult) {
-          return <StudentResultPage result={studentResult} config={currentExam?.config} onFinish={resetToHome} />;
+          return (
+            <StudentResultPage 
+                result={studentResult} 
+                config={currentExam?.config} 
+                onFinish={resetToHome} 
+                onCheckStatus={studentResult.status === 'force_submitted' ? handleCheckExamStatus : undefined}
+            />
+          );
         }
         return null;
       case 'PUBLIC_STREAM':
@@ -489,5 +531,5 @@ const App: React.FC = () => {
     </div>
   );
 };
- 
+
 export default App;
