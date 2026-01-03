@@ -1,6 +1,5 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
 
 let isSchemaChecked = false;
@@ -70,7 +69,6 @@ const ensureSchema = async () => {
                 PRIMARY KEY (exam_code, student_id)
             );
         `);
-        // Pastikan semua kolom ada
         const cols = [
             "student_name TEXT", "student_class TEXT", "correct_answers INTEGER", 
             "total_questions INTEGER", "status TEXT", "status_code INTEGER", 
@@ -97,69 +95,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await ensureSchema();
         const { examCode, student, answers, activityLog, location } = req.body;
         
-        // Default values
         let incomingStatus = req.body.status || 'completed';
         let incomingLog = activityLog || [];
         const serverTimestamp = Date.now();
 
-        // 1. Ambil Data Ujian (untuk Grading)
+        // 1. Ambil Data Ujian
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
         const fullExam = examResult.rows[0];
 
-        // 2. CEK STATUS DATABASE SAAT INI (SOURCE OF TRUTH)
+        // 2. CEK STATUS DATABASE
         const existingRes = await db.query(
-            'SELECT status, activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
+            'SELECT status, activity_log, timestamp FROM results WHERE exam_code = $1 AND student_id = $2', 
             [examCode, student.studentId]
         );
 
         let finalActivityLog = incomingLog;
-
-        // --- STATUS HIERARCHY & TEACHER AUTHORITY LOGIC ---
-        // Kita harus memastikan "Unlock" dari guru selalu menang, dan "Lock" dari siswa (Zombie Packet) selalu kalah jika sudah di-unlock.
-        
-        // Deteksi apakah ini tindakan Guru berdasarkan Log Khusus
-        const isTeacherAction = incomingLog.some((log: string) => log.includes('[Guru]'));
+        let finalStatus = incomingStatus;
 
         if (existingRes.rows.length > 0) {
             const row = existingRes.rows[0];
             const dbStatus = row.status;
             const dbLog = JSON.parse(row.activity_log || '[]');
+            
+            // --- RACE CONDITION PROTECTION ---
+            // Skenario: Guru meng-Unlock (status: in_progress, log: [Guru] Unlock).
+            // Tapi sesaat kemudian datang paket "force_submitted" dari siswa yang terlambat (lag).
+            // Jika kita terima paket siswa, ujian terkunci lagi.
+            
+            // Cek apakah aksi terakhir di Log adalah dari Guru
+            const lastLog = dbLog.length > 0 ? dbLog[dbLog.length - 1] : '';
+            const isJustUnlockedByTeacher = lastLog.includes('[Guru]') && dbStatus === 'in_progress';
 
-            if (isTeacherAction) {
-                // RULE 1: TEACHER AUTHORITY
-                // Jika log mengandung "[Guru]", PAKSA status jadi 'in_progress'.
-                // Ini menimpa apapun yang ada di DB.
-                console.log(`[STATUS OVERRIDE] ${student.studentId}: Guru melakukan Unlock Manual.`);
-                incomingStatus = 'in_progress';
-            } else if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
-                // RULE 2: ZOMBIE DEFENSE
-                // Jika DB sudah 'in_progress' (sudah di-unlock guru), tapi paket yang masuk 'force_submitted' (dari HP siswa yang lag/stale),
-                // maka TOLAK status 'force_submitted' tersebut.
-                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress' (Sudah di-unlock).`);
-                incomingStatus = 'in_progress';
+            if (isJustUnlockedByTeacher && incomingStatus === 'force_submitted') {
+                console.log(`[RACE CONDITION] Mengabaikan Lock Request dari ${student.studentId} karena Guru baru saja melakukan Unlock.`);
+                // Kita ABAIKAN perubahan status dari siswa. Tetap gunakan status 'in_progress' dari DB.
+                // Tapi kita TETAP update jawaban siswa agar progress tersimpan.
+                finalStatus = 'in_progress'; 
             }
 
-            // Merge activity logs (Hanya tambahkan yang baru)
+            // Merge Log
             if (incomingLog.length > 0) {
                  const newLogs = incomingLog.filter((l: string) => !dbLog.includes(l));
                  finalActivityLog = [...dbLog, ...newLogs];
             } else {
                  finalActivityLog = dbLog;
             }
-        } else {
-            // New record
-            if (isTeacherAction) incomingStatus = 'in_progress';
         }
 
-        // 3. Simpan Data (Upsert dengan Status yang sudah divalidasi)
+        // 3. Kalkulasi Nilai
         const grading = calculateGrade(fullExam, answers);
         
-        // Tentukan Status Code berdasarkan status akhir
-        let statusCode = 1; // Default: in_progress
-        if (incomingStatus === 'force_submitted') statusCode = 2;
-        if (incomingStatus === 'completed') statusCode = 3;
-        if (incomingStatus === 'in_progress') statusCode = 1;
+        let statusCode = 1; 
+        if (finalStatus === 'force_submitted') statusCode = 2;
+        if (finalStatus === 'completed') statusCode = 3;
+        if (finalStatus === 'in_progress') statusCode = 1;
 
         const query = `
             INSERT INTO results (
@@ -183,16 +173,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await db.query(query, [
             examCode, student.studentId, student.fullName, student.class,
             JSON.stringify(answers), grading.score, grading.correctCount, grading.totalQuestions,
-            incomingStatus, statusCode, JSON.stringify(finalActivityLog), 
+            finalStatus, statusCode, JSON.stringify(finalActivityLog), 
             serverTimestamp, location || ''
         ]);
 
         return res.status(200).json({
             examCode, student, answers,
-            score: incomingStatus === 'in_progress' ? null : grading.score,
-            correctAnswers: incomingStatus === 'in_progress' ? null : grading.correctCount,
+            score: finalStatus === 'in_progress' ? null : grading.score,
+            correctAnswers: finalStatus === 'in_progress' ? null : grading.correctCount,
             totalQuestions: grading.totalQuestions,
-            status: incomingStatus, // Kembalikan status final ke frontend
+            status: finalStatus,
             statusCode,
             isSynced: true,
             timestamp: serverTimestamp
@@ -203,4 +193,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: "Server Error", details: error.message });
     }
 }
- 
