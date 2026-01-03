@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
@@ -9,8 +9,19 @@ interface OngoingExamModalProps {
     results: Result[];
     onClose: () => void;
     onAllowContinuation: (studentId: string, examCode: string) => void;
-    isReadOnly?: boolean; // New prop to control visibility of actions
+    isReadOnly?: boolean; 
 }
+
+// Komponen Widget Statistik Sederhana
+const StatWidget: React.FC<{ label: string; value: number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
+    <div className={`p-4 rounded-2xl border bg-white shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02] ${color}`}>
+        {Icon && <div className={`p-2 rounded-xl bg-white/50 backdrop-blur-sm shadow-sm`}><Icon className="w-6 h-6 opacity-80" /></div>}
+        <div>
+            <p className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</p>
+            <p className="text-2xl font-black">{value}</p>
+        </div>
+    </div>
+);
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
     const [filterClass, setFilterClass] = useState<string>('ALL');
@@ -19,36 +30,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
     
-    // Track loading state for unlock actions
-    const [unlockingStudents, setUnlockingStudents] = useState<Set<string>>(new Set());
+    // Set untuk melacak ID siswa yang sedang diproses (sedang di-unlock)
+    const processingIdsRef = useRef<Set<string>>(new Set());
+    // Force re-render saat processingIds berubah (opsional, untuk UI feedback instan)
+    const [, setTick] = useState(0);
 
-    // REF PENTING: Menyimpan ID siswa yang baru saja di-unlock secara lokal.
-    // Tujuannya agar polling server TIDAK menimpa status 'in_progress' optimistik dengan data lama dari server
-    // selama beberapa detik setelah tombol ditekan.
-    const recentlyUnlockedRef = useRef<Set<string>>(new Set());
-
-    // Sync local state when props change
+    // Sync initial props
     useEffect(() => {
         if(exam) {
-            setLocalResults(prev => {
-                const relevantResults = initialResults.filter(r => r.examCode === exam.code);
-                
-                // GABUNGKAN DATA:
-                // Jika data prop (dari server/parent) masuk, kita terima KECUALI untuk siswa yang baru saja kita unlock manual.
-                return relevantResults.map(serverResult => {
-                    // Jika siswa ini baru saja di-unlock guru, pertahankan status lokal (in_progress) 
-                    // dan abaikan data server (yang mungkin masih force_submitted karena delay network)
-                    if (recentlyUnlockedRef.current.has(serverResult.student.studentId)) {
-                        const localVersion = prev.find(p => p.student.studentId === serverResult.student.studentId);
-                        return localVersion || { ...serverResult, status: 'in_progress' };
-                    }
-                    return serverResult;
-                });
-            });
+            // Hanya inisialisasi jika localResults kosong atau berbeda drastis, 
+            // untuk menghindari overwrite state internal saat parent re-render.
+            if (localResults.length === 0) {
+                 setLocalResults(initialResults.filter(r => r.examCode === exam.code));
+            }
         }
     }, [initialResults, exam]);
 
-    // Live Stream Effect (Auto Refresh)
+    // INTELLIGENT POLLING
     useEffect(() => {
         if (!exam) return;
         
@@ -58,19 +56,25 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                 const latest = await storageService.getResults(); 
                 const updatedForThisExam = latest.filter(r => r.examCode === exam.code);
                 
-                setLocalResults(prev => {
-                    const currentMap = new Map(prev.map(p => [p.student.studentId, p]));
+                setLocalResults(currentResults => {
+                    // Buat Map untuk akses cepat ke data saat ini
+                    const currentMap = new Map(currentResults.map(r => [r.student.studentId, r]));
                     
-                    updatedForThisExam.forEach(newItem => {
-                        // CRITICAL LOGIC: 
-                        // Jangan update item ini jika ID-nya ada di daftar 'baru saja diunlock'
-                        if (recentlyUnlockedRef.current.has(newItem.student.studentId)) {
-                            return; 
+                    return updatedForThisExam.map(newItem => {
+                        const sId = newItem.student.studentId;
+                        
+                        // CRITICAL FIX: ANTI-BLINK LOGIC
+                        // Jika siswa ini sedang dalam proses unlock (ada di processingIds),
+                        // JANGAN timpa data lokal dengan data server (karena data server mungkin masih 'locked'/stale).
+                        // Pertahankan state optimistik kita.
+                        if (processingIdsRef.current.has(sId)) {
+                             const currentItem = currentMap.get(sId);
+                             // Pastikan kita mengembalikan item yang statusnya 'in_progress' jika memang itu yg kita set
+                             return currentItem || newItem;
                         }
-                        currentMap.set(newItem.student.studentId, newItem);
+                        
+                        return newItem;
                     });
-
-                    return Array.from(currentMap.values());
                 });
                 
                 setLastUpdated(new Date());
@@ -81,60 +85,40 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
             }
         };
 
-        // Initial fetch
-        fetchLatest();
-
-        // Polling interval (5 seconds for "Livestream" feel)
-        const intervalId = setInterval(fetchLatest, 5000);
+        // Polling setiap 3 detik agar responsif
+        const intervalId = setInterval(fetchLatest, 3000);
         return () => clearInterval(intervalId);
-    }, [exam]);
+    }, [exam]); // Dependencies seminimal mungkin
 
     const handleUnlockClick = async (studentId: string, examCode: string) => {
-        // 1. Set Loading State
-        setUnlockingStudents(prev => new Set(prev).add(studentId));
-
-        // 2. Tambahkan ke Ignore List (agar polling tidak menimpa perubahan ini)
-        recentlyUnlockedRef.current.add(studentId);
+        // 1. Tandai sedang diproses (agar polling tidak menimpa)
+        processingIdsRef.current.add(studentId);
+        setTick(t => t + 1); // Trigger render untuk spinner
         
-        // 3. Update Optimistik UI Lokal SEGERA
-        setLocalResults(prev => prev.map(r => {
-            if (r.student.studentId === studentId) {
-                return { 
-                    ...r, 
-                    status: 'in_progress',
-                    // Update log agar terlihat responsif
-                    activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci ujian secara manual.`]
-                };
-            }
-            return r;
-        }));
+        // 2. Optimistic Update (Langsung ubah jadi hijau di UI)
+        setLocalResults(prev => prev.map(r => 
+            r.student.studentId === studentId 
+            ? { ...r, status: 'in_progress', activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci (Manual).`] } 
+            : r
+        ));
 
         try {
-            // 4. Kirim ke Service (Database)
-            // Kita pastikan service mengirim timestamp terbaru
+            // 3. Kirim ke Server
             await storageService.unlockStudentExam(examCode, studentId);
-            
-            // 5. Trigger refresh global di parent (opsional, tapi bagus untuk sinkronisasi)
             onAllowContinuation(studentId, examCode);
-
-            // 6. Set timeout untuk menghapus dari ignore list
-            // Beri waktu 15 detik bagi server untuk benar-benar konsisten sebelum kita mempercayai polling lagi untuk siswa ini
-            setTimeout(() => {
-                recentlyUnlockedRef.current.delete(studentId);
-            }, 15000);
-
         } catch (error) {
-            console.error("Failed to unlock:", error);
-            alert("Gagal membuka akses ujian. Periksa koneksi internet.");
-            // Revert jika gagal total
-            recentlyUnlockedRef.current.delete(studentId);
+            alert("Gagal koneksi. Coba lagi.");
+            // Revert jika gagal (opsional)
+            processingIdsRef.current.delete(studentId);
+            setTick(t => t + 1);
         } finally {
-            // Remove loading state indicator
-            setUnlockingStudents(prev => {
-                const next = new Set(prev);
-                next.delete(studentId);
-                return next;
-            });
+            // 4. Hapus dari processing list setelah delay aman
+            // Delay ini penting! Kita tunggu sebentar agar polling berikutnya (4s)
+            // punya kemungkinan besar sudah mendapatkan data 'Unlocked' dari server.
+            setTimeout(() => {
+                processingIdsRef.current.delete(studentId);
+                setTick(t => t + 1);
+            }, 5000); 
         }
     };
 
@@ -149,268 +133,232 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         if (filterClass !== 'ALL') {
             res = res.filter(r => r.student.class === filterClass);
         }
-        // Sort by Class then Student ID (Absen)
         return res.sort((a, b) => {
+            // Sort: Force Submitted (Locked) paling atas, lalu In Progress, lalu Completed
+            const scoreA = a.status === 'force_submitted' ? 0 : a.status === 'in_progress' ? 1 : 2;
+            const scoreB = b.status === 'force_submitted' ? 0 : b.status === 'in_progress' ? 1 : 2;
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
             if (a.student.class !== b.student.class) return a.student.class.localeCompare(b.student.class);
-            return parseInt(a.student.studentId) - parseInt(b.student.studentId);
+            return a.student.fullName.localeCompare(b.student.fullName);
         });
     }, [localResults, filterClass]);
 
-    // --- EARLY RETURN CHECK ---
     if (!exam) return null;
 
-    const scorableQuestionsCount = exam.questions.filter(q => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
-
-    // Statistics
     const totalStudents = localResults.length;
     const activeStudents = localResults.filter(r => r.status === 'in_progress').length;
     const finishedStudents = localResults.filter(r => r.status === 'completed').length;
     const suspendedStudents = localResults.filter(r => r.status === 'force_submitted').length;
-
     const streamUrl = `${window.location.origin}/?stream=${exam.code}`;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-base-100 rounded-xl shadow-2xl w-full max-w-[95vw] h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-[#F8FAFC] rounded-2xl shadow-2xl w-full max-w-[95vw] h-[92vh] flex flex-col overflow-hidden border border-white/20">
                 
-                {/* HEADER */}
-                <div className="p-5 border-b bg-base-100 sticky top-0 z-10 rounded-t-xl flex flex-col gap-4 shadow-sm shrink-0">
-                    <div className="flex justify-between items-start">
+                {/* HEADER AREA */}
+                <div className="bg-white border-b border-gray-200 px-6 py-5 flex-shrink-0">
+                    <div className="flex justify-between items-start mb-6">
                         <div>
-                             <div className="flex items-center gap-2">
-                                <span className="relative flex h-3 w-3">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                </span>
-                                <h2 className="text-xl font-bold text-neutral">Live Monitoring: {exam.code}</h2>
+                             <div className="flex items-center gap-3">
+                                <div className="bg-red-50 text-red-600 p-2 rounded-lg">
+                                    <div className="relative flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2>
+                                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                        <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{exam.code}</span>
+                                        <span>•</span>
+                                        <span className="flex items-center gap-1">
+                                            <ClockIcon className="w-3 h-3"/> {lastUpdated.toLocaleTimeString()}
+                                        </span>
+                                        {isRefreshing && <span className="text-blue-600 animate-pulse">Syncing...</span>}
+                                    </div>
+                                </div>
                              </div>
-                             <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                                <ClockIcon className="w-4 h-4"/> Terakhir diperbarui: {lastUpdated.toLocaleTimeString()}
-                                {isRefreshing && <span className="text-primary text-xs animate-pulse font-semibold">(Menyegarkan...)</span>}
-                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            {/* TAB BUTTONS */}
-                            <button 
-                                onClick={() => setActiveTab('MONITOR')}
-                                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'MONITOR' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                            >
-                                Monitor
-                            </button>
-                            {exam.config.enablePublicStream && !isReadOnly && (
-                                <button 
-                                    onClick={() => setActiveTab('STREAM_INFO')}
-                                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'STREAM_INFO' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                >
-                                    Info Stream
-                                </button>
-                            )}
-                            <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors ml-2">
-                                <XMarkIcon className="w-6 h-6 text-gray-600" />
+                        <div className="flex items-center gap-3">
+                            <div className="bg-slate-100 p-1 rounded-xl flex">
+                                <button onClick={() => setActiveTab('MONITOR')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'MONITOR' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Monitor</button>
+                                {exam.config.enablePublicStream && !isReadOnly && (
+                                    <button onClick={() => setActiveTab('STREAM_INFO')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'STREAM_INFO' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Stream</button>
+                                )}
+                            </div>
+                            <button onClick={onClose} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors border border-transparent hover:border-slate-200">
+                                <XMarkIcon className="w-6 h-6" />
                             </button>
                         </div>
                     </div>
 
                     {activeTab === 'MONITOR' && (
-                        <>
-                            {/* DASHBOARD STATS */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                                    <p className="text-xs text-blue-600 font-semibold uppercase">Total Peserta</p>
-                                    <p className="text-2xl font-bold text-blue-800">{totalStudents}</p>
-                                </div>
-                                <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-                                    <p className="text-xs text-green-600 font-semibold uppercase">Sedang Mengerjakan</p>
-                                    <p className="text-2xl font-bold text-green-800">{activeStudents}</p>
-                                </div>
-                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
-                                    <p className="text-xs text-purple-600 font-semibold uppercase">Selesai</p>
-                                    <p className="text-2xl font-bold text-purple-800">{finishedStudents}</p>
-                                </div>
-                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                                    <p className="text-xs text-yellow-600 font-semibold uppercase">Ditangguhkan</p>
-                                    <p className="text-2xl font-bold text-yellow-800">{suspendedStudents}</p>
-                                </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-stretch justify-between">
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+                                <StatWidget label="Total" value={totalStudents} color="bg-blue-50/50 border-blue-100 text-blue-700" icon={ChartBarIcon} />
+                                <StatWidget label="Aktif" value={activeStudents} color="bg-emerald-50/50 border-emerald-100 text-emerald-700" icon={WifiIcon} />
+                                <StatWidget label="Selesai" value={finishedStudents} color="bg-purple-50/50 border-purple-100 text-purple-700" icon={CheckCircleIcon} />
+                                <StatWidget label="Terkunci" value={suspendedStudents} color="bg-rose-50/50 border-rose-100 text-rose-700" icon={LockClosedIcon} />
                             </div>
-
-                            {/* FILTERS */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-gray-600">Filter Kelas:</span>
+                            
+                            {/* Filter */}
+                            <div className="flex flex-col justify-end min-w-[150px]">
+                                <label className="text-xs font-bold text-slate-400 mb-1.5 uppercase ml-1">Filter Kelas</label>
                                 <select 
                                     value={filterClass} 
-                                    onChange={(e) => setFilterClass(e.target.value)}
-                                    className="p-2 border rounded-md text-sm bg-white focus:ring-primary focus:border-primary"
+                                    onChange={(e) => setFilterClass(e.target.value)} 
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer hover:border-blue-300"
                                 >
                                     <option value="ALL">Semua Kelas</option>
                                     {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
 
                 {/* CONTENT AREA */}
-                <div className="overflow-auto flex-1 bg-gray-50 p-4">
+                <div className="flex-1 overflow-hidden relative bg-[#F8FAFC]">
                     {activeTab === 'STREAM_INFO' && !isReadOnly ? (
-                        <div className="flex flex-col items-center justify-center h-full space-y-6">
-                            <div className="bg-white p-8 rounded-xl shadow-md border text-center max-w-lg w-full">
-                                <h3 className="text-2xl font-bold text-gray-800 mb-4">Livestream Publik Aktif</h3>
-                                <p className="text-gray-600 mb-6">
-                                    Orang tua atau pengawas dapat memantau ujian ini secara real-time melalui tautan berikut tanpa perlu login.
-                                </p>
+                        <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-fade-in">
+                            <div className="bg-white p-10 rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full">
+                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                    <WifiIcon className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Public Livestream</h3>
+                                <p className="text-slate-500 mb-6">Bagikan link ini agar orang tua atau pengawas lain dapat memantau ujian secara real-time tanpa login.</p>
                                 
-                                <div className="bg-gray-100 p-4 rounded-lg mb-4 break-all font-mono text-sm border border-gray-300">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 font-mono text-sm text-slate-600 break-all select-all">
                                     {streamUrl}
                                 </div>
                                 
-                                <button 
-                                    onClick={() => navigator.clipboard.writeText(streamUrl)}
-                                    className="bg-primary text-white px-6 py-2 rounded-lg font-bold hover:bg-primary-focus transition-colors"
-                                >
-                                    Salin Link
-                                </button>
-                                
-                                <div className="mt-8 pt-6 border-t w-full">
-                                    <p className="text-sm text-gray-500 font-semibold uppercase tracking-wide mb-2">QR Code</p>
-                                    <div className="bg-white p-2 inline-block rounded-lg">
-                                        <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(streamUrl)}`} 
-                                            alt="QR Code Stream" 
-                                            className="w-32 h-32"
-                                        />
-                                    </div>
+                                <div className="flex gap-3 justify-center">
+                                    <button onClick={() => navigator.clipboard.writeText(streamUrl)} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-colors shadow-lg shadow-slate-200">
+                                        Salin Link
+                                    </button>
+                                    <a href={streamUrl} target="_blank" rel="noreferrer" className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition-colors">
+                                        Buka Link
+                                    </a>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        /* TABLE CONTENT */
-                        <div className="overflow-auto bg-white rounded-lg shadow border">
+                        <div className="h-full overflow-auto p-4 sm:p-6 custom-scrollbar">
                              {filteredResults.length > 0 ? (
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50 sticky top-0 shadow-sm z-10">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-20">No. Absen</th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Nama Siswa</th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Kelas</th>
-                                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Status</th>
-                                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-36">Nilai / Progress</th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[300px]">Aktivitas Terkini</th>
-                                            {exam.config.trackLocation && (
-                                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Lokasi (GPS)</th>
-                                            )}
-                                            {!isReadOnly && (
-                                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {filteredResults.map(result => {
-                                            const incorrectCount = scorableQuestionsCount - result.correctAnswers;
-                                            const lastActivity = result.activityLog && result.activityLog.length > 0 
-                                                ? result.activityLog[result.activityLog.length - 1] 
-                                                : "Memulai sesi...";
-                                            
-                                            const isUnlockingThis = unlockingStudents.has(result.student.studentId);
-                                            // Check if visually locked (either server says so, OR we aren't currently overriding it)
-                                            const isVisuallyLocked = result.status === 'force_submitted' && !isUnlockingThis;
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <table className="min-w-full divide-y divide-slate-100">
+                                        <thead className="bg-slate-50/80 backdrop-blur sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider w-16">#</th>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Siswa</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider w-32">Status</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider w-40">Progress</th>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider min-w-[250px]">Log Terakhir</th>
+                                                {!isReadOnly && <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider w-32">Kontrol</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                            {filteredResults.map(result => {
+                                                const isProcessing = processingIdsRef.current.has(result.student.studentId);
+                                                const isLocked = result.status === 'force_submitted';
+                                                const questionsAnswered = Object.keys(result.answers).length;
+                                                const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
+                                                const progressPercent = Math.round((questionsAnswered / totalQuestions) * 100) || 0;
 
-                                            let statusBadge;
-                                            if (result.status === 'in_progress') statusBadge = <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold animate-pulse">● Mengerjakan</span>;
-                                            else if (result.status === 'completed') statusBadge = <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">✓ Selesai</span>;
-                                            else if (result.status === 'force_submitted') statusBadge = <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold">! Ditangguhkan</span>;
-                                            else statusBadge = <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-bold">Menunggu</span>;
-
-                                            // PROGRESS LOGIC
-                                            const questionsAnswered = Object.keys(result.answers).length;
-                                            const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
-
-                                            return (
-                                                <tr key={result.student.studentId} className={`transition-colors hover:bg-blue-50/50 ${result.status === 'force_submitted' ? 'bg-red-50' : ''}`}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-600">
-                                                        #{result.student.studentId.padStart(2, '0')}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                        {result.student.fullName}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {result.student.class}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        {statusBadge}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        {result.status === 'completed' || result.status === 'force_submitted' ? (
-                                                             <div className="flex flex-col items-center">
-                                                                <span className="text-lg font-bold text-neutral">{result.score}</span>
-                                                                <span className="text-xs text-gray-500">B: {result.correctAnswers} | S: {incorrectCount}</span>
-                                                             </div>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center">
-                                                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Terisi</span>
-                                                                 <div className="flex items-center gap-1 mt-1">
-                                                                    <div className="w-20 bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                                                                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${(questionsAnswered / totalQuestions) * 100}%` }}></div>
-                                                                    </div>
-                                                                    <span className="text-[10px] font-bold text-gray-600">{questionsAnswered}/{totalQuestions}</span>
-                                                                 </div>
+                                                return (
+                                                    <tr key={result.student.studentId} className={`group transition-colors ${isLocked ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-slate-50'}`}>
+                                                        <td className="px-6 py-4 text-sm font-mono text-slate-400">
+                                                            {result.student.studentId}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-slate-700 text-sm">{result.student.fullName}</span>
+                                                                <span className="text-xs text-slate-400 font-medium">{result.student.class}</span>
                                                             </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-normal">
-                                                        <span title={lastActivity} className="flex items-start gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 shrink-0"></div>
-                                                            <span className="leading-relaxed break-words">{lastActivity}</span>
-                                                        </span>
-                                                    </td>
-                                                    {exam.config.trackLocation && (
-                                                        <td className="px-6 py-4 text-xs text-gray-500 font-mono whitespace-nowrap">
-                                                            {result.location ? (
-                                                                <a 
-                                                                    href={`https://www.google.com/maps/search/?api=1&query=${result.location}`} 
-                                                                    target="_blank" 
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-blue-600 hover:underline flex items-center gap-1"
-                                                                >
-                                                                    📍 {result.location.substring(0, 15)}...
-                                                                </a>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            {result.status === 'in_progress' ? 
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/> Aktif
+                                                                </span> :
+                                                             result.status === 'completed' ? 
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                                    Selesai
+                                                                </span> :
+                                                             result.status === 'force_submitted' ? 
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                                                                    <LockClosedIcon className="w-3 h-3"/> Terkunci
+                                                                </span> :
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500">
+                                                                    Offline
+                                                                </span>
+                                                            }
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {result.status === 'completed' || result.status === 'force_submitted' ? (
+                                                                 <div className="text-center">
+                                                                     <span className="text-lg font-black text-slate-800">{result.score}</span>
+                                                                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Nilai Akhir</span>
+                                                                 </div>
                                                             ) : (
-                                                                <span className="text-gray-400">-</span>
+                                                                <div className="w-full max-w-[120px] mx-auto">
+                                                                     <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
+                                                                        <span>{progressPercent}%</span>
+                                                                        <span>{questionsAnswered}/{totalQuestions}</span>
+                                                                     </div>
+                                                                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                                         <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                                                                     </div>
+                                                                </div>
                                                             )}
                                                         </td>
-                                                    )}
-                                                    {!isReadOnly && (
-                                                        <td className="px-6 py-4 text-center">
-                                                            {/* Show Button if Force Submitted OR currently Unlocking (Loading State) */}
-                                                            {isVisuallyLocked || isUnlockingThis ? (
-                                                                <button 
-                                                                    onClick={() => handleUnlockClick(result.student.studentId, result.examCode)} 
-                                                                    disabled={isUnlockingThis}
-                                                                    className={`bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full ${isUnlockingThis ? 'opacity-70 cursor-wait' : ''}`}
-                                                                >
-                                                                    {isUnlockingThis ? (
-                                                                        <>
-                                                                            <ArrowPathIcon className="w-3 h-3 animate-spin" /> Proses...
-                                                                        </>
-                                                                    ) : (
-                                                                        <span>Izinkan Lanjut</span>
-                                                                    )}
-                                                                </button>
-                                                            ) : result.status === 'in_progress' ? (
-                                                                <div className="flex justify-center text-gray-300">
-                                                                    <LockClosedIcon className="w-4 h-4" />
-                                                                </div>
-                                                            ) : null}
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-mono">
+                                                            <div className="truncate max-w-[250px] opacity-80" title={result.activityLog && result.activityLog.length > 0 ? result.activityLog[result.activityLog.length - 1] : ''}>
+                                                                {result.activityLog && result.activityLog.length > 0 ? result.activityLog[result.activityLog.length - 1].replace(/\[.*?\]/, '') : '-'}
+                                                            </div>
                                                         </td>
-                                                    )}
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
+                                                        {!isReadOnly && (
+                                                            <td className="px-6 py-4 text-center">
+                                                                {(isLocked || isProcessing) && (
+                                                                    <button 
+                                                                        onClick={() => handleUnlockClick(result.student.studentId, result.examCode)} 
+                                                                        disabled={isProcessing}
+                                                                        className={`w-full py-2 px-3 rounded-lg text-xs font-bold text-white shadow-md shadow-emerald-200 transition-all transform active:scale-95 flex items-center justify-center gap-2
+                                                                            ${isProcessing 
+                                                                                ? 'bg-emerald-400 cursor-wait opacity-80' 
+                                                                                : 'bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5'
+                                                                            }`}
+                                                                    >
+                                                                        {isProcessing ? (
+                                                                            <>
+                                                                                <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                                                                Memproses
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <LockClosedIcon className="w-3.5 h-3.5" />
+                                                                                BUKA KUNCI
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                              ) : (
-                                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                                    <WifiIcon className="w-12 h-12 text-gray-300 mb-2" />
-                                    <p className="font-medium">Menunggu data peserta...</p>
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[400px]">
+                                    <div className="bg-slate-100 p-6 rounded-full mb-4">
+                                        <WifiIcon className="w-12 h-12 text-slate-300" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-slate-600">Menunggu Peserta...</h3>
+                                    <p className="text-sm">Belum ada siswa yang bergabung dalam ujian ini.</p>
                                 </div>
                              )}
                         </div>
@@ -421,75 +369,62 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     );
 };
 
-interface FinishedExamModalProps {
-    exam: Exam | null;
-    results: Result[];
-    onClose: () => void;
-}
-
+interface FinishedExamModalProps { exam: Exam | null; results: Result[]; onClose: () => void; }
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, results, onClose }) => {
     if (!exam) return null;
-
-    const examResults = results.filter(r => r.examCode === exam.code);
-    const scorableQuestionsCount = exam.questions.filter(q => q.questionType !== 'ESSAY' && q.questionType !== 'INFO').length;
-
+    const examResults = results.filter(r => r.examCode === exam.code).sort((a,b) => b.score - a.score);
+    
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-base-100 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-lg font-bold text-neutral">Hasil Ujian: {exam.code}</h2>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
-                        <XMarkIcon className="w-6 h-6" />
-                    </button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Hasil Ujian: <span className="text-blue-600 font-mono">{exam.code}</span></h2>
+                        <p className="text-sm text-slate-500">Total Peserta: {examResults.length}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><XMarkIcon className="w-6 h-6 text-slate-500"/></button>
                 </div>
-                <div className="p-6 overflow-y-auto">
-                    {examResults.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Siswa</th>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Benar</th>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Salah</th>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hasil</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktivitas</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {examResults.map((result, index) => {
-                                        const incorrectCount = scorableQuestionsCount - result.correctAnswers;
-                                        return (
-                                            <tr key={result.student.studentId} className="transition-colors hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{result.student.fullName}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-center">{result.correctAnswers}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold text-center">{incorrectCount < 0 ? 0 : incorrectCount}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-center">{result.score}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 align-top">
-                                                    {result.activityLog && result.activityLog.length > 0 ? (
-                                                        <ul className="list-disc list-outside pl-5 space-y-1">
-                                                            {result.activityLog.map((log, logIndex) => (
-                                                                <li key={logIndex}>{log}</li>
-                                                            ))}
-                                                        </ul>
-                                                    ) : (
-                                                        <span>-</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 align-top">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${result.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                        {result.status === 'completed' ? 'Selesai' : 'Dibatalkan'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : <p className="text-center text-gray-500 py-8">Belum ada hasil untuk ujian ini.</p>}
+                <div className="p-0 overflow-y-auto bg-slate-50">
+                    <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="bg-white sticky top-0 shadow-sm">
+                            <tr>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Peringkat</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Siswa</th>
+                                <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Nilai</th>
+                                <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Benar / Total</th>
+                                <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                            {examResults.map((r, idx) => (
+                                <tr key={r.student.studentId} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {idx === 0 ? <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold text-xs">🥇 Ke-1</span> :
+                                         idx === 1 ? <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded font-bold text-xs">🥈 Ke-2</span> :
+                                         idx === 2 ? <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-bold text-xs">🥉 Ke-3</span> :
+                                         <span className="text-slate-500 font-mono text-sm ml-2">#{idx + 1}</span>}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-slate-700">{r.student.fullName}</span>
+                                            <span className="text-xs text-slate-400">{r.student.class} ({r.student.studentId})</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className={`text-lg font-black ${r.score >= 75 ? 'text-emerald-600' : r.score >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                            {r.score}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-center text-sm text-slate-600 font-medium">
+                                        {r.correctAnswers} / {r.totalQuestions}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-bold uppercase">{r.status}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
