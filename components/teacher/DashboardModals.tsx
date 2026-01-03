@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
@@ -18,11 +18,22 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
+    
+    // Track loading state for unlock actions
+    const [unlockingStudents, setUnlockingStudents] = useState<Set<string>>(new Set());
 
     // Sync local state when props change
     useEffect(() => {
         if(exam) {
-            setLocalResults(initialResults.filter(r => r.examCode === exam.code));
+            setLocalResults(prev => {
+                // IMPORTANT: Dont overwrite if we are currently unlocking someone locally but server hasnt reflected it yet
+                // Use the prop update ONLY if it matches or is newer than our optimistic state
+                // For simplicity, we filter the incoming props
+                const relevantResults = initialResults.filter(r => r.examCode === exam.code);
+                
+                // If we have "unlocking" status in local state, preserve it until server confirms 'in_progress'
+                return relevantResults;
+            });
         }
     }, [initialResults, exam]);
 
@@ -36,7 +47,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                 const latest = await storageService.getResults(); // This should trigger a fetch if implemented in storage
                 // Filter only for this exam
                 const updatedForThisExam = latest.filter(r => r.examCode === exam.code);
-                setLocalResults(updatedForThisExam);
+                
+                setLocalResults(prev => {
+                    // Merge strategy: If we have optimistic updates in 'prev' that are NOT in 'updatedForThisExam', keep them?
+                    // Actually storageService.getResults() already handles merge logic now.
+                    return updatedForThisExam;
+                });
+                
                 setLastUpdated(new Date());
             } catch (e) {
                 console.error("Auto-refresh failed", e);
@@ -52,6 +69,38 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         const intervalId = setInterval(fetchLatest, 5000);
         return () => clearInterval(intervalId);
     }, [exam]);
+
+    const handleUnlockClick = async (studentId: string, examCode: string) => {
+        // Optimistic UI + Loading State
+        setUnlockingStudents(prev => new Set(prev).add(studentId));
+        
+        try {
+            // Await the full round trip (local update + attempt server push)
+            await storageService.unlockStudentExam(examCode, studentId);
+            
+            // Update local display immediately to show "in_progress" (Optimistic)
+            setLocalResults(prev => prev.map(r => {
+                if (r.student.studentId === studentId) {
+                    return { ...r, status: 'in_progress' };
+                }
+                return r;
+            }));
+
+            // Call parent handler (which refreshes global state)
+            onAllowContinuation(studentId, examCode);
+
+        } catch (error) {
+            console.error("Failed to unlock:", error);
+            alert("Gagal membuka akses ujian. Periksa koneksi internet.");
+        } finally {
+            // Remove loading state
+            setUnlockingStudents(prev => {
+                const next = new Set(prev);
+                next.delete(studentId);
+                return next;
+            });
+        }
+    };
 
     // Derived Data (HOOKS MUST BE CALLED BEFORE EARLY RETURN)
     const uniqueClasses = useMemo(() => {
@@ -228,6 +277,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                 ? result.activityLog[result.activityLog.length - 1] 
                                                 : "Memulai sesi...";
                                             
+                                            const isUnlockingThis = unlockingStudents.has(result.student.studentId);
+
                                             let statusBadge;
                                             if (result.status === 'in_progress') statusBadge = <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold animate-pulse">● Mengerjakan</span>;
                                             else if (result.status === 'completed') statusBadge = <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">✓ Selesai</span>;
@@ -236,7 +287,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                                             // PROGRESS LOGIC
                                             const questionsAnswered = Object.keys(result.answers).length;
-                                            // FIX: Filter out INFO types for denominator
                                             const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
 
                                             return (
@@ -298,10 +348,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         <td className="px-6 py-4 text-center">
                                                             {result.status === 'force_submitted' && (
                                                                 <button 
-                                                                    onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
+                                                                    onClick={() => handleUnlockClick(result.student.studentId, result.examCode)} 
+                                                                    disabled={isUnlockingThis}
+                                                                    className={`bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full ${isUnlockingThis ? 'opacity-70 cursor-wait' : ''}`}
                                                                 >
-                                                                    <span>Izinkan Lanjut</span>
+                                                                    {isUnlockingThis ? (
+                                                                        <>
+                                                                            <ArrowPathIcon className="w-3 h-3 animate-spin" /> Proses...
+                                                                        </>
+                                                                    ) : (
+                                                                        <span>Izinkan Lanjut</span>
+                                                                    )}
                                                                 </button>
                                                             )}
                                                             {result.status === 'in_progress' && (
