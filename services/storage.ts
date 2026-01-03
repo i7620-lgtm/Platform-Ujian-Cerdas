@@ -334,8 +334,13 @@ class StorageService {
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
       if (index !== -1) {
+          // UPDATE CRITICAL: Set timestamp to NOW. 
+          // This ensures the teacher's unlock action has a newer timestamp than the student's stale lock packet.
+          const now = Date.now();
           results[index].status = 'in_progress' as ResultStatus;
           results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian.`);
+          results[index].timestamp = now; 
+          
           this.saveLocal(KEYS.RESULTS, results);
 
           if (this.isOnline) {
