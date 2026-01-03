@@ -4,15 +4,18 @@ import type { Exam, Result, Question, ResultStatus } from '../types';
 const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
 const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 
-const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
 const sanitizeExamForStudent = (exam: Exam): Exam => {
-    // ... (kode sanitize tetap sama, dipersingkat untuk fokus pada perubahan logika) ...
     const sanitizedQuestions = exam.questions.map(q => {
+        // Destructure to remove sensitive answers
         const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
         const sanitizedQ = { ...rest } as Question;
-        if (trueFalseRows) sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
+        
+        // Handle complex types sanitation
+        if (trueFalseRows) {
+            sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
+        }
         if (matchingPairs && Array.isArray(matchingPairs)) {
+            // Shuffle right side for security + UX (student sees options but not correct pairs)
             const rights = matchingPairs.map(p => p.right).sort(() => Math.random() - 0.5);
             sanitizedQ.matchingPairs = matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
         }
@@ -20,20 +23,6 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
     });
     return { ...exam, questions: sanitizedQuestions };
 };
-
-const gradeExam = (exam: Exam, answers: Record<string, string>) => {
-    // ... (grading logic offline tetap sama) ...
-    return { score: 0, correctCount: 0 }; 
-};
-
-async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
-    try { return await operation(); } 
-    catch (error) {
-        if (retries <= 0) throw error;
-        await new Promise(r => setTimeout(r, delay));
-        return retryOperation(operation, retries - 1, delay * 1.5);
-    }
-}
 
 class StorageService {
   private isOnline: boolean = navigator.onLine;
@@ -98,8 +87,6 @@ class StorageService {
                 const cloudResults: Result[] = await response.json();
                 
                 // MERGE STRATEGY: Server Authority
-                // Kita akan mengganti data lokal dengan data cloud JIKA status cloud berbeda
-                // khususnya jika cloud 'in_progress' sedangkan lokal 'force_submitted'.
                 const combined = [...localResults];
                 
                 cloudResults.forEach(cRes => {
@@ -154,8 +141,7 @@ class StorageService {
             if (response.ok) {
                 const serverRes: Result = await response.json();
                 
-                // CRITICAL: Jika kita kirim force_submitted TAPI server membalas dengan in_progress,
-                // Berarti paket kita ditolak (Zombie Packet). Kita harus update lokal ke in_progress.
+                // CRITICAL: Zombie Packet detection
                 if (resultPayload.status === 'force_submitted' && serverRes.status === 'in_progress') {
                     console.log("Server rejected lock request. Unlocking client...");
                 }
@@ -166,7 +152,7 @@ class StorageService {
         } catch (e) {}
     }
 
-    // Fallback Offline
+    // Fallback Offline - Grading is 0 for simplicity in offline mode as per current implementation
     const result = { ...resultPayload, score: 0, correctAnswers: 0, status: resultPayload.status as ResultStatus, isSynced: false };
     this.saveResultLocal(result, false);
     return result;
@@ -178,7 +164,6 @@ class StorageService {
       
       if (index !== -1) {
           const now = Date.now();
-          // TAGGING KHUSUS: '[Guru]' di awal log adalah sinyal otoritas untuk backend
           const unlockLog = `[Guru] Membuka kunci akses ujian.`;
           
           const updatedResult: Result = {
@@ -203,7 +188,6 @@ class StorageService {
                  });
                  if (response.ok) {
                      const serverRes = await response.json();
-                     // Update lokal dengan respons server (biasanya berisi status in_progress yang sudah dikonfirmasi DB)
                      results[index] = { ...serverRes, isSynced: true };
                      this.saveLocal(KEYS.RESULTS, results);
                  }
