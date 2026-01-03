@@ -138,7 +138,7 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay
         return await operation();
     } catch (error) {
         if (retries <= 0) throw error;
-        console.warn(`Operation failed, retrying in ${delay}ms... (${retries} retries left)`, error);
+        // console.warn(`Operation failed, retrying in ${delay}ms... (${retries} retries left)`, error);
         await wait(delay);
         return retryOperation(operation, retries - 1, delay * 1.5); // Exponential backoff
     }
@@ -163,6 +163,7 @@ class StorageService {
           const cloudExams: Exam[] = await response.json();
           const merged = { ...localExams };
           cloudExams.forEach(exam => {
+             // Keep local config if newer? For now simple merge.
              merged[exam.code] = { ...exam, isSynced: true };
           });
           this.saveLocal(KEYS.EXAMS, merged);
@@ -179,14 +180,27 @@ class StorageService {
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
 
-      if (!exam && this.isOnline) {
+      // If online and not found OR explicitly refreshing for public stream
+      if (this.isOnline) {
           try {
-              const response = await fetch(`${API_URL}/exams?code=${code}&public=true`);
-              if (response.ok) {
-                  exam = await response.json();
-              }
+              // Retry logic for cold start resilience
+              await retryOperation(async () => {
+                const response = await fetch(`${API_URL}/exams?code=${code}&public=true`);
+                if (response.ok) {
+                    exam = await response.json();
+                    // Save to local cache so subsequent calls are instant
+                    if (exam) {
+                        allExams[exam.code] = exam;
+                        this.saveLocal(KEYS.EXAMS, allExams);
+                    }
+                } else if(response.status === 404) {
+                    throw new Error("Not Found"); // Stop retrying if 404
+                } else {
+                    throw new Error("Network Error");
+                }
+              }, 2, 1000); // 2 Retries
           } catch(e) {
-               console.warn("Failed to fetch public exam.");
+               console.warn("Failed to fetch public exam or not found.");
           }
       }
 
@@ -232,22 +246,42 @@ class StorageService {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     if (this.isOnline) {
         try {
-            // FORCE NO-CACHE untuk memastikan kita mendapatkan status 'in_progress' terbaru dari guru
+            // FORCE NO-CACHE untuk memastikan kita mendapatkan status terbaru
             const response = await fetch(`${API_URL}/results`, { cache: 'no-store' });
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
                 const combined = [...localResults];
+                
                 cloudResults.forEach(cRes => {
                     const idx = combined.findIndex(lRes => 
                         lRes.examCode === cRes.examCode && lRes.student.studentId === cRes.student.studentId
                     );
+                    
                     if (idx === -1) {
+                        // Jika tidak ada di lokal, tambahkan
                         combined.push({ ...cRes, isSynced: true });
                     } else {
-                        // Priority to Cloud Data (Teacher's update wins locally too)
-                        combined[idx] = { ...cRes, isSynced: true };
+                        // CRITICAL FIX: TIMESTAMP PRIORITY MERGE
+                        // Jangan menimpa data lokal jika data lokal LEBIH BARU (timestamp lebih besar)
+                        // Ini mencegah Cloud data lama (status: force_submitted) menimpa Local data baru (status: in_progress)
+                        const localRes = combined[idx];
+                        const localTs = localRes.timestamp || 0;
+                        const cloudTs = cRes.timestamp || 0;
+
+                        // Gunakan Cloud data HANYA JIKA cloud >= local
+                        // Kecuali jika status berbeda, kita percayai yang memiliki timestamp tertinggi
+                        if (cloudTs >= localTs) {
+                            combined[idx] = { ...cRes, isSynced: true };
+                        } else {
+                            // Local is newer (likely just unlocked by teacher), keep local but maybe mark synced if content matches?
+                            // Keep local as is.
+                        }
                     }
                 });
+                
+                // Urutkan berdasarkan timestamp terbaru
+                combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+                
                 this.saveLocal(KEYS.RESULTS, combined);
                 return combined;
             }
@@ -271,21 +305,21 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: Omit<Result, 'score' | 'correctAnswers'>): Promise<Result> {
-    // --- READ-ONLY GUARD (THE FIX) ---
-    // Cek status lokal saat ini. Jika 'force_submitted', kita BLOKIR semua pengiriman data (Write)
-    // KECUALI payload yang mau dikirim bertujuan mengubah status menjadi 'in_progress' (Resume).
-    // Ini mencegah "Zombie Packet" dari interval auto-save atau retry logic.
     const allResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     const currentLocal = allResults.find(r => r.examCode === resultPayload.examCode && r.student.studentId === resultPayload.student.studentId);
     
+    // GUARD: Jika lokal sedang terkunci, tolak update kecuali update tersebut adalah pembukaan kunci
     if (currentLocal && currentLocal.status === 'force_submitted') {
-        // Jika sedang terkunci, TOLAK pengiriman jika payload bukan upaya pembukaan kunci ('in_progress')
         if (resultPayload.status !== 'in_progress') {
             console.log("Write blocked by Client Guard: Exam is locked.");
-            return currentLocal; // Return existing locked state, do nothing.
+            return currentLocal; 
         }
     }
-    // ---------------------------------
+
+    // Pastikan timestamp ter-set
+    if (!resultPayload.timestamp) {
+        resultPayload.timestamp = Date.now();
+    }
 
     if (this.isOnline) {
         try {
@@ -319,7 +353,6 @@ class StorageService {
             correctAnswers: correctCount,
             status: status ? (status as ResultStatus) : 'completed',
             isSynced: false,
-            timestamp: Date.now()
         };
     } else {
         gradedResult = {
@@ -328,9 +361,10 @@ class StorageService {
             correctAnswers: 0,
             status: status ? (status as ResultStatus) : 'pending_grading',
             isSynced: false,
-            timestamp: Date.now()
         };
     }
+    // Pastikan timestamp ada untuk offline
+    if (!gradedResult.timestamp) gradedResult.timestamp = Date.now();
 
     this.saveResultLocal(gradedResult, false);
     return gradedResult;
@@ -353,22 +387,37 @@ class StorageService {
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
       if (index !== -1) {
-          const now = Date.now();
-          results[index].status = 'in_progress' as ResultStatus;
-          results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian.`);
-          results[index].timestamp = now; 
+          // FORCE UPDATE TIMESTAMP
+          // This ensures this packet is "newer" than whatever the student's device sent last.
+          const now = Date.now(); 
           
+          const updatedResult: Result = {
+              ...results[index],
+              status: 'in_progress',
+              activityLog: [...(results[index].activityLog || []), `[Guru] Membuka kunci ujian secara manual.`],
+              timestamp: now,
+              isSynced: false
+          };
+
+          // Save Locally First
+          results[index] = updatedResult;
           this.saveLocal(KEYS.RESULTS, results);
 
           if (this.isOnline) {
              try { 
-                 await fetch(`${API_URL}/submit-exam`, {
+                 const response = await fetch(`${API_URL}/submit-exam`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(results[index])
+                    body: JSON.stringify(updatedResult)
                  });
-                 results[index].isSynced = true;
-                 this.saveLocal(KEYS.RESULTS, results);
+                 
+                 if (response.ok) {
+                     // Only mark synced after successful push
+                     const serverRes = await response.json();
+                     // Update local with server response (which might include proper timestamps or IDs)
+                     results[index] = { ...serverRes, isSynced: true };
+                     this.saveLocal(KEYS.RESULTS, results);
+                 }
              } catch (e) {
                  console.error("Unlock push failed, queued for sync.");
              }
@@ -380,16 +429,11 @@ class StorageService {
     if (!this.isOnline) return;
 
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
-    // Filter out forced_submitted from sync loop to prevent re-locking unless necessary
-    // Only sync if NOT force_submitted OR if we are forcing an unlock
     const pendingResults = results.filter(r => !r.isSynced);
     let resultsUpdated = false;
 
     for (const res of pendingResults) {
-         // GUARD: Double check inside sync loop too
          if (res.status === 'force_submitted') {
-             // Skip syncing "locked" status repeatedly. Only send it once (handled by submitExamResult).
-             // This prevents the sync loop from becoming a Zombie generator.
              continue; 
          }
 
@@ -428,4 +472,3 @@ class StorageService {
 }
 
 export const storageService = new StorageService();
- 
