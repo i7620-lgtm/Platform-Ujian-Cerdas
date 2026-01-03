@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         await ensureSchema();
-        const { examCode, student, answers, activityLog, location } = req.body;
+        const { examCode, student, answers, activityLog, location, unlockedByTeacher } = req.body;
         
         // Default values
         let incomingStatus = req.body.status || 'completed';
@@ -115,18 +115,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let finalActivityLog = incomingLog;
 
+        // --- HIERARKI STATUS (THE FIX) ---
+        // Jika DB kosong, kita anggap ini entry baru.
+        // Jika ada, kita cek logic.
+        
         if (existingRes.rows.length > 0) {
             const row = existingRes.rows[0];
             const dbStatus = row.status;
             const dbLog = JSON.parse(row.activity_log || '[]');
 
-            // --- HIERARKI STATUS (THE FIX) ---
-            // Aturan: Jika DB berkata 'in_progress' (Unlocked), maka request 'force_submitted' (Locked) DIABAIKAN.
-            // Alasannya: 'in_progress' settelah 'force_submitted' berarti Guru telah melakukan Unlock manual.
-            // Paket 'force_submitted' yang datang belakangan dianggap sebagai paket sampah/terlambat.
-            
-            if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
-                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress' (Guru Unlocked).`);
+            // LOGIKA GURU (ABSOLUTE OVERRIDE)
+            if (unlockedByTeacher === true) {
+                console.log(`[TEACHER OVERRIDE] ${student.studentId}: Guru memaksa UNLOCK.`);
+                incomingStatus = 'in_progress';
+                // Tambahkan log sistem jika belum ada di paket guru
+                if (!incomingLog.some((l: string) => l.includes('Membuka kunci (Manual)'))) {
+                     incomingLog.push(`[${new Date().toLocaleTimeString('id-ID')}] [Guru] Membuka kunci (Manual).`);
+                }
+            } 
+            // LOGIKA SISWA (PROTEKSI STATUS)
+            else if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
+                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress'.`);
                 incomingStatus = 'in_progress'; // Paksa status request menjadi in_progress
             }
 
