@@ -232,7 +232,7 @@ class StorageService {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     if (this.isOnline) {
         try {
-            const response = await fetch(`${API_URL}/results`);
+            const response = await fetch(`${API_URL}/results`, { cache: 'no-store' });
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
                 const combined = [...localResults];
