@@ -232,6 +232,7 @@ class StorageService {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     if (this.isOnline) {
         try {
+            // FORCE NO-CACHE untuk memastikan kita mendapatkan status 'in_progress' terbaru dari guru
             const response = await fetch(`${API_URL}/results`, { cache: 'no-store' });
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
@@ -243,6 +244,7 @@ class StorageService {
                     if (idx === -1) {
                         combined.push({ ...cRes, isSynced: true });
                     } else {
+                        // Priority to Cloud Data (Teacher's update wins locally too)
                         combined[idx] = { ...cRes, isSynced: true };
                     }
                 });
@@ -258,7 +260,8 @@ class StorageService {
     const localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     let result = localResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
 
-    if (!result && this.isOnline) {
+    // If local result is 'force_submitted', ALWAYS try to fetch fresh data to see if teacher unlocked it
+    if ((!result || result.status === 'force_submitted') && this.isOnline) {
         try {
             const allCloudResults = await this.getResults(); 
             result = allCloudResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
@@ -268,6 +271,22 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: Omit<Result, 'score' | 'correctAnswers'>): Promise<Result> {
+    // --- READ-ONLY GUARD (THE FIX) ---
+    // Cek status lokal saat ini. Jika 'force_submitted', kita BLOKIR semua pengiriman data (Write)
+    // KECUALI payload yang mau dikirim bertujuan mengubah status menjadi 'in_progress' (Resume).
+    // Ini mencegah "Zombie Packet" dari interval auto-save atau retry logic.
+    const allResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
+    const currentLocal = allResults.find(r => r.examCode === resultPayload.examCode && r.student.studentId === resultPayload.student.studentId);
+    
+    if (currentLocal && currentLocal.status === 'force_submitted') {
+        // Jika sedang terkunci, TOLAK pengiriman jika payload bukan upaya pembukaan kunci ('in_progress')
+        if (resultPayload.status !== 'in_progress') {
+            console.log("Write blocked by Client Guard: Exam is locked.");
+            return currentLocal; // Return existing locked state, do nothing.
+        }
+    }
+    // ---------------------------------
+
     if (this.isOnline) {
         try {
             const response = await fetch(`${API_URL}/submit-exam`, {
@@ -286,9 +305,9 @@ class StorageService {
         }
     }
 
+    // Offline Logic
     const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const fullExam = allExams[resultPayload.examCode];
-    
     const status = resultPayload.status;
 
     let gradedResult: Result;
@@ -334,8 +353,6 @@ class StorageService {
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
       if (index !== -1) {
-          // UPDATE CRITICAL: Set timestamp to NOW. 
-          // This ensures the teacher's unlock action has a newer timestamp than the student's stale lock packet.
           const now = Date.now();
           results[index].status = 'in_progress' as ResultStatus;
           results[index].activityLog?.push(`[Guru] Mengizinkan melanjutkan ujian.`);
@@ -344,7 +361,17 @@ class StorageService {
           this.saveLocal(KEYS.RESULTS, results);
 
           if (this.isOnline) {
-             try { await this.saveResult(results[index]); } catch (e) {}
+             try { 
+                 await fetch(`${API_URL}/submit-exam`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(results[index])
+                 });
+                 results[index].isSynced = true;
+                 this.saveLocal(KEYS.RESULTS, results);
+             } catch (e) {
+                 console.error("Unlock push failed, queued for sync.");
+             }
           }
       }
   }
@@ -352,18 +379,20 @@ class StorageService {
   async syncData() {
     if (!this.isOnline) return;
 
-    const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    const pendingExams = Object.values(exams).filter(e => !e.isSynced);
-    
-    for (const exam of pendingExams) {
-        try { await this.saveExam(exam); } catch (e) {}
-    }
-
     const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
+    // Filter out forced_submitted from sync loop to prevent re-locking unless necessary
+    // Only sync if NOT force_submitted OR if we are forcing an unlock
     const pendingResults = results.filter(r => !r.isSynced);
     let resultsUpdated = false;
 
     for (const res of pendingResults) {
+         // GUARD: Double check inside sync loop too
+         if (res.status === 'force_submitted') {
+             // Skip syncing "locked" status repeatedly. Only send it once (handled by submitExamResult).
+             // This prevents the sync loop from becoming a Zombie generator.
+             continue; 
+         }
+
          try {
              const response = await fetch(`${API_URL}/submit-exam`, {
                 method: 'POST',
