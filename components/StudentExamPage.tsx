@@ -352,6 +352,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const answersRef = useRef(answers);
     const timeLeftRef = useRef(timeLeft);
 
+    // CRITICAL FIX: Lock Reference to prevent Race Conditions
+    // This ensures that once a violation is detected, NO other updates (like auto-save) 
+    // can overwrite the 'force_submitted' status.
+    const isLockedRef = useRef(false);
+
     // Activity Logging Queue
     const activityQueueRef = useRef<string[]>([]);
     const lastLoggedQuestionIdRef = useRef<string | null>(null);
@@ -370,7 +375,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
 
         const intervalId = setInterval(() => {
-            if (!isSubmitting) {
+            // Check isLockedRef to stop auto-saving if exam is locked due to violation
+            if (!isSubmitting && !isLockedRef.current) {
                 // Flush activity queue
                 const logsToSend = [...activityQueueRef.current];
                 activityQueueRef.current = []; // Clear local queue
@@ -388,6 +394,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // LOGIKA PERBAIKAN: Memisahkan "Log Only" dengan "Log & Lock"
     useEffect(() => {
         const handleVisibilityChange = () => {
+            if (isLockedRef.current) return; // If already locked, do nothing
+
             if (document.hidden) {
                 if (exam.config.detectBehavior) {
                     logActivity("Meninggalkan halaman ujian (Tab/Aplikasi disembunyikan).");
@@ -397,7 +405,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
                     if (exam.config.continueWithPermission) {
                         // MODE A: DETECT & LOCK (STRICT)
-                        // Hentikan ujian dan kunci
+                        // 1. Set lock flag immediately to block future auto-saves
+                        isLockedRef.current = true;
+                        setIsSubmitting(true); // Disable UI interactions
+
+                        // 2. Force Submit immediately
                         onForceSubmit(answersRef.current, timeLeftRef.current, logsToSend);
                     } else {
                         // MODE B: DETECT & LOG ONLY (LENIENT)
@@ -408,10 +420,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     }
                 }
             } else {
-                if (exam.config.detectBehavior) {
+                if (exam.config.detectBehavior && !isLockedRef.current) {
                     logActivity("Kembali ke halaman ujian.");
-                    // Opsional: Kirim log 'Kembali' segera jika ingin real-time yang sangat presisi,
-                    // tapi biasanya ikut auto-save berikutnya sudah cukup.
                 }
             }
         };
@@ -435,7 +445,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             const diff = Math.floor((endTimeRef.current - now) / 1000);
             if (diff <= 0) {
                 setTimeLeft(0);
-                handleSubmit(true); // Auto Submit
+                if (!isLockedRef.current) handleSubmit(true); // Auto Submit only if not locked
             } else {
                 setTimeLeft(diff);
                 requestAnimationFrame(tick);
@@ -490,6 +500,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Handlers
     const handleAnswerChange = useCallback((id: string, val: string) => {
+        if (isLockedRef.current) return;
+
         // Logging Logic: Only log if switching to a new question to prevent spamming while typing
         if (lastLoggedQuestionIdRef.current !== id) {
             // Find visual index
@@ -521,6 +533,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (!isAuto && !confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
         
         setIsSubmitting(true);
+        isLockedRef.current = true; // Lock further interactions
+
         logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
         
         // Get Location if required
@@ -596,7 +610,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
 
                 {/* Question List */}
-                <div>
+                <div className={isSubmitting ? 'pointer-events-none opacity-50 filter blur-sm transition-all' : ''}>
                     {questions.map((q, idx) => {
                          // Hitung nomor urut visual (skip INFO)
                          const visualNum = questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length;
