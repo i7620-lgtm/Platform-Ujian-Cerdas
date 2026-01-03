@@ -28,9 +28,6 @@ const App: React.FC = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
-  // New state to prevent flash of home screen during stream load
-  const [isLoadingStream, setIsLoadingStream] = useState(false);
 
   // Keep track of view for event listeners
   const viewRef = useRef(view);
@@ -84,32 +81,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
-    
     if (streamCode) {
         const loadStream = async () => {
-            setIsLoadingStream(true);
             setIsSyncing(true);
             try {
                 // Fetch specific exam for public view
-                // storageService.getExamForStudent now has internal retry logic
                 const exam = await storageService.getExamForStudent(streamCode);
-                
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
                     setView('PUBLIC_STREAM');
-                    // Pre-fetch results once exam is loaded
+                    // Pre-fetch results
                     await refreshResults();
                 } else {
-                    alert("Livestream tidak ditemukan, belum siap, atau tidak diizinkan untuk publik.");
+                    alert("Livestream tidak ditemukan atau tidak diizinkan.");
                     window.history.replaceState(null, '', '/');
-                    setView('SELECTOR');
                 }
             } catch(e) {
                 console.error("Failed to load stream", e);
-                // Fallback UI handled by view check
             } finally {
                 setIsSyncing(false);
-                setIsLoadingStream(false);
             }
         };
         loadStream();
@@ -334,7 +324,6 @@ const App: React.FC = () => {
           await storageService.unlockStudentExam(examCode, studentId);
           
           // 2. Optimistic UI Update with Explicit Type Casting
-          // This ensures App's Result state is consistent, though the Modal has its own optimistic update now too.
           setResults(prev => prev.map(r => {
               if (r.student.studentId === studentId && r.examCode === examCode) {
                   return { ...r, status: 'in_progress' as ResultStatus };
@@ -342,8 +331,7 @@ const App: React.FC = () => {
               return r;
           }));
           
-          // Removed Alert to make flow faster
-          // alert(`Siswa dengan ID ${studentId} diizinkan melanjutkan...`);
+          alert(`Siswa dengan ID ${studentId} diizinkan melanjutkan. Instruksikan siswa untuk Login kembali dengan data yang sama.`);
       } catch(e) {
           console.error(e);
           alert("Gagal membuka blokir siswa.");
@@ -359,6 +347,9 @@ const App: React.FC = () => {
       setIsSyncing(true);
       try {
           // UPDATE FIX: Gunakan getResults() alih-alih getStudentResult()
+          // getResults() akan memaksa sinkronisasi dengan cloud jika online,
+          // sehingga status 'in_progress' yang diupdate guru akan terbaca.
+          // Sedangkan getStudentResult() cenderung mengembalikan data lokal yang masih 'force_submitted' jika belum di-refresh.
           const allResults = await storageService.getResults();
           const result = allResults.find(r => r.examCode === currentExam.code && r.student.studentId === currentStudent.studentId);
           
@@ -421,16 +412,6 @@ const App: React.FC = () => {
   );
 
   const renderView = () => {
-    if (isLoadingStream && view !== 'PUBLIC_STREAM') {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-700">Menghubungkan ke Livestream...</h2>
-                <p className="text-gray-500 mt-2">Mohon tunggu sebentar.</p>
-            </div>
-        );
-    }
-
     switch (view) {
       case 'TEACHER_LOGIN':
         return <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />;
