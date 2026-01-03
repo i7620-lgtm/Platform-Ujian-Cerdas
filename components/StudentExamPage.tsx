@@ -350,6 +350,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // Refs untuk akses state terbaru
     const answersRef = useRef(answers);
     const timeLeftRef = useRef(timeLeft);
+    // KILL SWITCH REF: Jika true, tidak ada data yang boleh keluar
     const isLockedRef = useRef(false);
 
     // Activity Logging Queue
@@ -365,13 +366,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
-    // NEW: Auto-save Logic with Activity Log Flush
+    // NEW: Auto-save Logic - DENGAN KILL SWITCH
     useEffect(() => {
         if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
 
         const intervalId = setInterval(() => {
-            // STOP EVERYTHING IF LOCKED
-            if (!isSubmitting && !isLockedRef.current) {
+            // KILL SWITCH: Jika sudah terkunci, HENTIKAN total semua pengiriman data.
+            if (isLockedRef.current) return;
+            
+            if (!isSubmitting) {
                 const logsToSend = [...activityQueueRef.current];
                 activityQueueRef.current = []; // Clear local queue
                 onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
@@ -385,7 +388,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // --- CRITICAL ANTI-CHEAT LOGIC ---
     useEffect(() => {
         const handleVisibilityChange = () => {
-            // Jika sudah terkunci, jangan lakukan apa-apa lagi (sudah di-handle)
+            // KILL SWITCH: Jika sudah terkunci, abaikan event apapun.
             if (isLockedRef.current) return;
 
             if (document.hidden) {
@@ -396,14 +399,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     activityQueueRef.current = []; 
 
                     if (exam.config.continueWithPermission) {
-                        // MODE A: LOCK IMMEDIATELY
-                        isLockedRef.current = true;
+                        // MODE A: LOCK IMMEDIATELY (KILL SWITCH ACTIVATED)
+                        isLockedRef.current = true; 
                         setIsSubmitting(true);
                         
-                        // CRITICAL FIX: Hapus listener segera agar tidak terpanggil lagi
+                        // Lepaskan event listener agar tidak bisa terpicu dua kali
                         document.removeEventListener('visibilitychange', handleVisibilityChange);
                         
-                        // Send FINAL lock packet
+                        // Kirim paket 'Force Submit' SEKALI SAJA.
+                        // Setelah ini, useEffect auto-save di atas akan otomatis berhenti bekerja karena isLockedRef=true.
                         onForceSubmit(answersRef.current, timeLeftRef.current, logsToSend);
                     } else {
                         // MODE B: LOG ONLY
@@ -427,7 +431,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Initial Setup Effect
     useEffect(() => {
-        // Calculate End Time based on Config Date/Time
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
         const startObj = new Date(`${dateStr}T${exam.config.startTime}`);
         const endObj = new Date(startObj.getTime() + (exam.config.timeLimit * 60 * 1000));
@@ -493,7 +496,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Handlers
     const handleAnswerChange = useCallback((id: string, val: string) => {
-        if (isLockedRef.current) return;
+        if (isLockedRef.current) return; // Prevent change if locked
 
         if (lastLoggedQuestionIdRef.current !== id) {
             const qIndex = questions.findIndex(q => q.id === id);
@@ -524,7 +527,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (!isAuto && !confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
         
         setIsSubmitting(true);
-        isLockedRef.current = true; 
+        isLockedRef.current = true; // Lock UI
 
         logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
         
