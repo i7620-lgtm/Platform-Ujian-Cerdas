@@ -346,7 +346,13 @@ const App: React.FC = () => {
       
       setIsSyncing(true);
       try {
-          const result = await storageService.getStudentResult(currentExam.code, currentStudent.studentId);
+          // UPDATE FIX: Gunakan getResults() alih-alih getStudentResult()
+          // getResults() akan memaksa sinkronisasi dengan cloud jika online,
+          // sehingga status 'in_progress' yang diupdate guru akan terbaca.
+          // Sedangkan getStudentResult() cenderung mengembalikan data lokal yang masih 'force_submitted' jika belum di-refresh.
+          const allResults = await storageService.getResults();
+          const result = allResults.find(r => r.examCode === currentExam.code && r.student.studentId === currentStudent.studentId);
+          
           if (result && result.status === 'in_progress') {
               // Status telah diubah oleh guru, izinkan resume
               setResumedResult(result);
@@ -362,6 +368,7 @@ const App: React.FC = () => {
               alert("Guru belum memberikan izin. Silakan hubungi pengawas ujian.");
           }
       } catch(e) {
+          console.error(e);
           alert("Gagal mengecek status.");
       } finally {
           setIsSyncing(false);
@@ -533,4 +540,3 @@ const App: React.FC = () => {
 };
 
 export default App;
- 
