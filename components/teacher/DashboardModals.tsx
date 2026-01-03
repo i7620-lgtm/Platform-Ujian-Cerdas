@@ -111,6 +111,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
         try {
             // 4. Kirim ke Service (Database)
+            // Kita pastikan service mengirim timestamp terbaru
             await storageService.unlockStudentExam(examCode, studentId);
             
             // 5. Trigger refresh global di parent (opsional, tapi bagus untuk sinkronisasi)
