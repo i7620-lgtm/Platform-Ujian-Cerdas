@@ -130,7 +130,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-    
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -144,18 +145,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         // Incoming Request Timestamp
         const requestTime = timestamp ? parseInt(timestamp) : Date.now();
+        const incomingStatus = req.body.status || 'completed';
 
-        // 1. Ambil Data Ujian (untuk Kunci Jawaban)
+        // 1. Ambil Data Ujian
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) {
             return res.status(404).json({ error: 'Exam not found (Offline)' });
         }
         const fullExam = examResult.rows[0];
 
-        // 2. STALE DATA CHECK (Race Condition Protection)
-        // Fetch existing result to compare timestamps
+        // 2. LOGIKA AUTHORITY GUARD (ANTI-ZOMBIE PACKET)
         const existingRes = await db.query(
-            'SELECT activity_log, status, timestamp FROM results WHERE exam_code = $1 AND student_id = $2', 
+            'SELECT activity_log, status, timestamp, answers, score, correct_answers, total_questions, location FROM results WHERE exam_code = $1 AND student_id = $2', 
             [examCode, student.studentId]
         );
 
@@ -163,22 +164,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         if (existingRes.rows.length > 0) {
             const row = existingRes.rows[0];
+            const dbStatus = row.status;
             const dbTimestamp = row.timestamp ? parseInt(row.timestamp) : 0;
             
-            // If the incoming packet is OLDER than what we have in DB, IGNORE IT.
-            // This happens when a "Zombie" packet from a locked student arrives AFTER a teacher has unlocked (creating a newer timestamp).
-            if (requestTime < dbTimestamp) {
-                console.log(`Ignoring stale update for ${student.studentId}. DB Time: ${dbTimestamp}, Req Time: ${requestTime}`);
-                // Return success (200) so the client stops retrying, but return the DB's current state (e.g. status: in_progress)
-                // so the client updates itself.
+            // --- CORE FIX 1: ZOMBIE GUARD ---
+            // Jika DB sudah 'in_progress', TOLAK semua request 'force_submitted' dari siswa.
+            if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
+                console.log(`[GUARD] Blocking stale force_submitted from ${student.studentId}. DB is in_progress.`);
+                
+                // Return data DB saat ini ke siswa, memaksa siswa menerima status 'in_progress'
                 return res.status(200).json({
                      examCode,
                      student,
-                     answers: {}, // Don't care
-                     status: row.status, // Force client to adopt DB status
+                     answers: JSON.parse(row.answers || '{}'),
+                     score: row.score,
+                     correctAnswers: row.correct_answers,
+                     totalQuestions: row.total_questions,
+                     status: 'in_progress', // FORCE CLIENT TO UNLOCK
                      isSynced: true,
-                     timestamp: dbTimestamp
+                     timestamp: dbTimestamp,
+                     location: row.location
                 });
+            }
+
+            // --- CORE FIX 2: TEACHER AUTHORITY OVERRIDE ---
+            // Jika request masuk adalah 'in_progress' (Unlock dari Guru), 
+            // kita IZINKAN menimpa 'force_submitted' (Lock dari Siswa)
+            // MESKIPUN timestamp Guru lebih tua dari timestamp Siswa (kasus jam siswa lebih cepat).
+            const isTeacherUnlock = incomingStatus === 'in_progress' && dbStatus === 'force_submitted';
+
+            if (!isTeacherUnlock) {
+                // Hanya lakukan cek timestamp jika BUKAN Unlock Guru
+                if (requestTime < dbTimestamp) {
+                    console.log(`[IGNORE] Ignoring old packet. Req: ${requestTime}, DB: ${dbTimestamp}`);
+                     return res.status(200).json({
+                         examCode,
+                         student,
+                         answers: JSON.parse(row.answers || '{}'),
+                         status: dbStatus,
+                         isSynced: true,
+                         timestamp: dbTimestamp
+                    });
+                }
+            } else {
+                 console.log(`[OVERRIDE] Teacher Unlock detected. Overriding Force Submit regardless of timestamp.`);
             }
 
             // Merging Activity Logs
@@ -192,12 +221,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // 3. Hitung Nilai (Server-Side Grading)
         const grading = calculateGrade(fullExam, answers);
-        const status = req.body.status || 'completed';
-
+        
         let statusCode = 0;
-        if (status === 'in_progress') statusCode = 1;
-        else if (status === 'force_submitted') statusCode = 2;
-        else if (status === 'completed') statusCode = 3;
+        if (incomingStatus === 'in_progress') statusCode = 1;
+        else if (incomingStatus === 'force_submitted') statusCode = 2;
+        else if (incomingStatus === 'completed') statusCode = 3;
 
         // 4. Simpan ke Database
         const query = `
@@ -219,6 +247,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 location = EXCLUDED.location;
         `;
 
+        // Gunakan timestamp terbaru (atau paksa timestamp baru jika ini adalah Override Guru)
+        const finalTimestamp = Date.now(); 
+
         await db.query(query, [
             examCode,
             student.studentId,
@@ -228,16 +259,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             grading.score,
             grading.correctCount,
             grading.totalQuestions,
-            status,
+            incomingStatus,
             statusCode,
-            JSON.stringify(finalActivityLog), // Use merged logs
-            requestTime, // Use the verified request time
+            JSON.stringify(finalActivityLog), 
+            finalTimestamp, // Always use Server Time for consistency
             location || ''
         ]);
 
-        // 5. Respon Aman
-        const safeScore = status === 'in_progress' ? null : grading.score;
-        const safeCorrectAnswers = status === 'in_progress' ? null : grading.correctCount;
+        const safeScore = incomingStatus === 'in_progress' ? null : grading.score;
+        const safeCorrectAnswers = incomingStatus === 'in_progress' ? null : grading.correctCount;
 
         return res.status(200).json({
             examCode,
@@ -246,10 +276,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             score: safeScore, 
             correctAnswers: safeCorrectAnswers,
             totalQuestions: grading.totalQuestions,
-            status: status,
+            status: incomingStatus,
             statusCode: statusCode,
             isSynced: true,
-            timestamp: requestTime,
+            timestamp: finalTimestamp,
             location: location
         });
 
