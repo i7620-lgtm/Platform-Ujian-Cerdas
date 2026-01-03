@@ -98,7 +98,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         // 2. Optimistic Update (Langsung ubah jadi hijau di UI)
         setLocalResults(prev => prev.map(r => 
             r.student.studentId === studentId 
-            ? { ...r, status: 'in_progress', activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci (Manual).`] } 
+            ? { ...r, status: 'in_progress', activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci akses ujian.`] } 
             : r
         ));
 
