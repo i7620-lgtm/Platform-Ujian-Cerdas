@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         await ensureSchema();
-        const { examCode, student, answers, activityLog, location, unlockedByTeacher } = req.body;
+        const { examCode, student, answers, activityLog, location } = req.body;
         
         // Default values
         let incomingStatus = req.body.status || 'completed';
@@ -115,28 +115,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let finalActivityLog = incomingLog;
 
-        // --- HIERARKI STATUS (THE FIX) ---
-        // Jika DB kosong, kita anggap ini entry baru.
-        // Jika ada, kita cek logic.
+        // --- STATUS HIERARCHY & TEACHER AUTHORITY LOGIC ---
+        // Kita harus memastikan "Unlock" dari guru selalu menang, dan "Lock" dari siswa (Zombie Packet) selalu kalah jika sudah di-unlock.
         
+        // Deteksi apakah ini tindakan Guru berdasarkan Log Khusus
+        const isTeacherAction = incomingLog.some((log: string) => log.includes('[Guru]'));
+
         if (existingRes.rows.length > 0) {
             const row = existingRes.rows[0];
             const dbStatus = row.status;
             const dbLog = JSON.parse(row.activity_log || '[]');
 
-            // LOGIKA GURU (ABSOLUTE OVERRIDE)
-            if (unlockedByTeacher === true) {
-                console.log(`[TEACHER OVERRIDE] ${student.studentId}: Guru memaksa UNLOCK.`);
+            if (isTeacherAction) {
+                // RULE 1: TEACHER AUTHORITY
+                // Jika log mengandung "[Guru]", PAKSA status jadi 'in_progress'.
+                // Ini menimpa apapun yang ada di DB.
+                console.log(`[STATUS OVERRIDE] ${student.studentId}: Guru melakukan Unlock Manual.`);
                 incomingStatus = 'in_progress';
-                // Tambahkan log sistem jika belum ada di paket guru
-                if (!incomingLog.some((l: string) => l.includes('Membuka kunci (Manual)'))) {
-                     incomingLog.push(`[${new Date().toLocaleTimeString('id-ID')}] [Guru] Membuka kunci (Manual).`);
-                }
-            } 
-            // LOGIKA SISWA (PROTEKSI STATUS)
-            else if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
-                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress'.`);
-                incomingStatus = 'in_progress'; // Paksa status request menjadi in_progress
+            } else if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
+                // RULE 2: ZOMBIE DEFENSE
+                // Jika DB sudah 'in_progress' (sudah di-unlock guru), tapi paket yang masuk 'force_submitted' (dari HP siswa yang lag/stale),
+                // maka TOLAK status 'force_submitted' tersebut.
+                console.log(`[STATUS PROTECTED] ${student.studentId}: Menolak 'force_submitted' karena status DB adalah 'in_progress' (Sudah di-unlock).`);
+                incomingStatus = 'in_progress';
             }
 
             // Merge activity logs (Hanya tambahkan yang baru)
@@ -146,15 +147,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } else {
                  finalActivityLog = dbLog;
             }
+        } else {
+            // New record
+            if (isTeacherAction) incomingStatus = 'in_progress';
         }
 
-        // 3. Simpan Data (Upsert dengan Status yang sudah diamankan)
+        // 3. Simpan Data (Upsert dengan Status yang sudah divalidasi)
         const grading = calculateGrade(fullExam, answers);
         
-        // Tentukan Status Code berdasarkan status akhir yang sudah divalidasi
-        let statusCode = 1;
+        // Tentukan Status Code berdasarkan status akhir
+        let statusCode = 1; // Default: in_progress
         if (incomingStatus === 'force_submitted') statusCode = 2;
         if (incomingStatus === 'completed') statusCode = 3;
+        if (incomingStatus === 'in_progress') statusCode = 1;
 
         const query = `
             INSERT INTO results (
@@ -187,7 +192,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             score: incomingStatus === 'in_progress' ? null : grading.score,
             correctAnswers: incomingStatus === 'in_progress' ? null : grading.correctCount,
             totalQuestions: grading.totalQuestions,
-            status: incomingStatus, // Kembalikan status yang sudah divalidasi ke frontend
+            status: incomingStatus, // Kembalikan status final ke frontend
             statusCode,
             isSynced: true,
             timestamp: serverTimestamp
