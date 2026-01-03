@@ -309,6 +309,7 @@ class StorageService {
     const currentLocal = allResults.find(r => r.examCode === resultPayload.examCode && r.student.studentId === resultPayload.student.studentId);
     
     // GUARD: Jika lokal sedang terkunci, tolak update kecuali update tersebut adalah pembukaan kunci
+    // Client Guard: jika local status force_submitted, jangan kirim update apapun KECUALI status baru adalah in_progress (unlock)
     if (currentLocal && currentLocal.status === 'force_submitted') {
         if (resultPayload.status !== 'in_progress') {
             console.log("Write blocked by Client Guard: Exam is locked.");
@@ -388,7 +389,6 @@ class StorageService {
       
       if (index !== -1) {
           // FORCE UPDATE TIMESTAMP
-          // This ensures this packet is "newer" than whatever the student's device sent last.
           const now = Date.now(); 
           
           const updatedResult: Result = {
@@ -399,7 +399,7 @@ class StorageService {
               isSynced: false
           };
 
-          // Save Locally First
+          // Save Locally First (Optimistic)
           results[index] = updatedResult;
           this.saveLocal(KEYS.RESULTS, results);
 
@@ -414,7 +414,6 @@ class StorageService {
                  if (response.ok) {
                      // Only mark synced after successful push
                      const serverRes = await response.json();
-                     // Update local with server response (which might include proper timestamps or IDs)
                      results[index] = { ...serverRes, isSynced: true };
                      this.saveLocal(KEYS.RESULTS, results);
                  }
@@ -472,4 +471,3 @@ class StorageService {
 }
 
 export const storageService = new StorageService();
- 
