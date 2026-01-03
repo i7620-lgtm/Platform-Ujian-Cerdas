@@ -193,10 +193,11 @@ const App: React.FC = () => {
                // Load previous state
                setResumedResult(existingResult);
                
+               const resumeTime = new Date().toLocaleTimeString('id-ID');
                // NEW: Send resume update (async, non-blocking)
                storageService.submitExamResult({
                   ...existingResult,
-                  activityLog: ["Melanjutkan ujian."],
+                  activityLog: [`[${resumeTime}] Melanjutkan ujian.`],
                   status: 'in_progress'
                });
           }
@@ -208,6 +209,8 @@ const App: React.FC = () => {
               return;
           }
 
+          const startTime = new Date().toLocaleTimeString('id-ID');
+
           // NEW: Create initial record immediately so student appears in monitor
           const initialPayload = {
               student: student,
@@ -215,7 +218,7 @@ const App: React.FC = () => {
               answers: {},
               totalQuestions: exam.questions.filter(q => q.questionType !== 'INFO').length,
               completionTime: 0,
-              activityLog: ["Memulai ujian."],
+              activityLog: [`[${startTime}] Memulai ujian.`],
               status: 'in_progress' as ResultStatus
           };
           storageService.submitExamResult(initialPayload);
@@ -234,7 +237,7 @@ const App: React.FC = () => {
   };
 
   // Submit Handler
-  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string) => {
+  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
     
     const resultPayload = {
@@ -244,9 +247,7 @@ const App: React.FC = () => {
         // FIX: Exclude INFO types from total count
         totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
-        activityLog: [
-            "Siswa menyelesaikan ujian secara normal."
-        ],
+        activityLog: activityLog || [],
         location // Add location
     };
     
@@ -259,13 +260,17 @@ const App: React.FC = () => {
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
 
-  const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number) => {
+  const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
 
     // --- LOOP SECURITY LOGIC ---
     // Segera hapus 'resumedResult'. Ini memastikan bahwa jika siswa mencoba refresh
     // setelah pelanggaran berulang, aplikasi tidak memiliki memori tentang izin sebelumnya.
     setResumedResult(null);
+
+    const time = new Date().toLocaleTimeString('id-ID');
+    const logs = activityLog || [];
+    logs.push(`[${time}] Ujian dihentikan paksa karena pelanggaran aturan.`);
 
     // Construct the payload with status 'force_submitted' immediately
     const resultPayload = {
@@ -275,7 +280,7 @@ const App: React.FC = () => {
         // FIX: Exclude INFO types from total count
         totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
         completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
-        activityLog: ["Ujian dihentikan paksa karena siswa terdeteksi membuka aplikasi/tab lain."],
+        activityLog: logs,
         status: 'force_submitted' as ResultStatus
     };
     
@@ -287,7 +292,7 @@ const App: React.FC = () => {
   }, [currentExam, currentStudent]);
 
   // NEW: Update Handler for Auto-Save
-  const handleExamUpdate = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string) => {
+  const handleExamUpdate = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
       if (!currentExam || !currentStudent) return;
       
       const resultPayload = {
@@ -296,7 +301,7 @@ const App: React.FC = () => {
           answers, // This updates the progress
           totalQuestions: currentExam.questions.filter(q => q.questionType !== 'INFO').length,
           completionTime: (currentExam.config.timeLimit * 60) - timeLeft,
-          activityLog: [], // Empty here, handled by backend merging
+          activityLog: activityLog || [], // Append logs flushed from queue
           location,
           status: 'in_progress' as ResultStatus
       };
@@ -415,6 +420,7 @@ const App: React.FC = () => {
                         results={results} 
                         onClose={resetToHome} 
                         onAllowContinuation={() => alert("Akses Publik: Anda tidak memiliki izin untuk mengubah status siswa.")}
+                        isReadOnly={true}
                      />
                  </div>
             </div>
@@ -485,4 +491,3 @@ const App: React.FC = () => {
 };
 
 export default App;
- 
