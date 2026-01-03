@@ -179,24 +179,14 @@ class StorageService {
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
 
-      // Use retry mechanism for fetching exam to handle Cold Start
       if (!exam && this.isOnline) {
           try {
-              await retryOperation(async () => {
-                  const response = await fetch(`${API_URL}/exams?code=${code}&public=true`);
-                  if (response.ok) {
-                      exam = await response.json();
-                  } else if (response.status === 404) {
-                      // Do not retry 404
-                      throw new Error("EXAM_NOT_FOUND");
-                  } else {
-                      throw new Error("FETCH_FAILED");
-                  }
-              }, 3, 1500); // 3 Retries, starting with 1.5s delay
-          } catch(e: any) {
-               if (e.message !== "EXAM_NOT_FOUND") {
-                   console.warn("Failed to fetch public exam after retries.");
-               }
+              const response = await fetch(`${API_URL}/exams?code=${code}&public=true`);
+              if (response.ok) {
+                  exam = await response.json();
+              }
+          } catch(e) {
+               console.warn("Failed to fetch public exam.");
           }
       }
 
@@ -227,7 +217,7 @@ class StorageService {
                     body: JSON.stringify(examToSave)
                 });
                 if (!response.ok) throw new Error("Server Error");
-            }, 2, 1000); 
+            }, 1, 500); 
             
             exams[exam.code].isSynced = true;
             this.saveLocal(KEYS.EXAMS, exams);
@@ -243,29 +233,24 @@ class StorageService {
     if (this.isOnline) {
         try {
             // FORCE NO-CACHE untuk memastikan kita mendapatkan status 'in_progress' terbaru dari guru
-            await retryOperation(async () => {
-                const response = await fetch(`${API_URL}/results`, { cache: 'no-store' });
-                if (response.ok) {
-                    const cloudResults: Result[] = await response.json();
-                    const combined = [...localResults];
-                    cloudResults.forEach(cRes => {
-                        const idx = combined.findIndex(lRes => 
-                            lRes.examCode === cRes.examCode && lRes.student.studentId === cRes.student.studentId
-                        );
-                        if (idx === -1) {
-                            combined.push({ ...cRes, isSynced: true });
-                        } else {
-                            // Priority to Cloud Data (Teacher's update wins locally too)
-                            combined[idx] = { ...cRes, isSynced: true };
-                        }
-                    });
-                    this.saveLocal(KEYS.RESULTS, combined);
-                    localResults = combined; // Update return variable
-                } else {
-                    throw new Error("Failed to fetch");
-                }
-            }, 2, 1000);
-            return localResults;
+            const response = await fetch(`${API_URL}/results`, { cache: 'no-store' });
+            if (response.ok) {
+                const cloudResults: Result[] = await response.json();
+                const combined = [...localResults];
+                cloudResults.forEach(cRes => {
+                    const idx = combined.findIndex(lRes => 
+                        lRes.examCode === cRes.examCode && lRes.student.studentId === cRes.student.studentId
+                    );
+                    if (idx === -1) {
+                        combined.push({ ...cRes, isSynced: true });
+                    } else {
+                        // Priority to Cloud Data (Teacher's update wins locally too)
+                        combined[idx] = { ...cRes, isSynced: true };
+                    }
+                });
+                this.saveLocal(KEYS.RESULTS, combined);
+                return combined;
+            }
         } catch (e) { console.warn("Failed to fetch results from cloud."); }
     }
     return localResults;
@@ -377,18 +362,15 @@ class StorageService {
 
           if (this.isOnline) {
              try { 
-                 // Gunakan fetch langsung tanpa await full result agar UI tidak terblokir
-                 // Data akan disinkronkan oleh background sync atau polling berikutnya
-                 fetch(`${API_URL}/submit-exam`, {
+                 await fetch(`${API_URL}/submit-exam`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(results[index])
-                 }).catch(e => console.error("Unlock sync failed (background)", e));
-                 
-                 // Tandai synced agar syncData() tidak mengirim ulang immediately jika fetch di atas sukses
-                 // Tapi biarkan false dulu agar aman jika fetch gagal
+                 });
+                 results[index].isSynced = true;
+                 this.saveLocal(KEYS.RESULTS, results);
              } catch (e) {
-                 console.error("Unlock push failed.");
+                 console.error("Unlock push failed, queued for sync.");
              }
           }
       }
