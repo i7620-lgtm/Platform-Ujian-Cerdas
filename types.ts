@@ -71,3 +71,4 @@ export interface Result {
     timestamp?: number;
     location?: string; // GPS Coordinates
 }
+ 
