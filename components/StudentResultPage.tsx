@@ -1,15 +1,16 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Result, ExamConfig } from '../types';
-import { CheckCircleIcon, WifiIcon, ClockIcon } from './Icons';
+import { CheckCircleIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon } from './Icons';
 
 interface StudentResultPageProps {
   result: Result;
   config?: ExamConfig;
   onFinish: () => void;
+  onCheckStatus?: () => void; // New prop to allow re-checking status
 }
 
-export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish }) => {
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish, onCheckStatus }) => {
     
     useEffect(() => {
         window.history.pushState(null, "", window.location.href);
@@ -19,6 +20,53 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         window.addEventListener("popstate", onPopState);
         return () => window.removeEventListener("popstate", onPopState);
     }, []);
+
+    // --- HANDLING FORCE SUBMITTED (LOCKED) STATE ---
+    if (result.status === 'force_submitted') {
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-red-50 p-4 animate-fade-in">
+                <div className="w-full max-w-lg text-center">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl border-2 border-red-100 transform transition-all">
+                        <div className="flex justify-center mb-6">
+                            <div className="bg-red-100 p-6 rounded-full animate-bounce">
+                                <LockClosedIcon className="w-16 h-16 text-red-600" />
+                            </div>
+                        </div>
+                        <h1 className="text-2xl font-bold text-red-800 mb-2">Ujian Ditangguhkan</h1>
+                        <p className="text-gray-600 mb-6">
+                            Sistem mendeteksi aktivitas mencurigakan (pindah tab/aplikasi). Akses Anda ke ujian ini telah dikunci sementara.
+                        </p>
+                        
+                        <div className="bg-orange-50 border-l-4 border-orange-400 p-4 text-left mb-6 text-sm text-orange-800">
+                            <p className="font-bold mb-1">Apa yang harus saya lakukan?</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                                <li>Hubungi pengawas ujian atau guru Anda.</li>
+                                <li>Minta izin untuk membuka kembali akses ujian.</li>
+                                <li>Setelah diizinkan, klik tombol di bawah ini.</li>
+                            </ul>
+                        </div>
+
+                        {onCheckStatus && (
+                            <button 
+                                onClick={onCheckStatus} 
+                                className="w-full bg-red-600 text-white font-bold py-3.5 px-4 rounded-xl hover:bg-red-700 transition-colors duration-300 shadow-lg hover:shadow-red-200 flex items-center justify-center gap-2 mb-3"
+                            >
+                                <ArrowPathIcon className="w-5 h-5" />
+                                Cek Izin / Lanjutkan Ujian
+                            </button>
+                        )}
+                        
+                        <button 
+                            onClick={onFinish} 
+                            className="text-sm text-gray-500 hover:text-gray-800 underline mt-2"
+                        >
+                            Kembali ke Halaman Utama
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // Handling Pending Grading (Offline Mode)
     if (result.status === 'pending_grading') {
