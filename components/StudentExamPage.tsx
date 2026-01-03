@@ -7,9 +7,9 @@ interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
-  onForceSubmit: (answers: Record<string, string>, timeLeft: number) => void;
-  onUpdate?: (answers: Record<string, string>, timeLeft: number, location?: string) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => void;
+  onForceSubmit: (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => void;
+  onUpdate?: (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => void;
 }
 
 // Helper: Format Waktu (MM:SS atau HH:MM:SS)
@@ -20,6 +20,9 @@ const formatTime = (seconds: number) => {
     if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
+
+// Helper: Get Current Time String
+const getCurrentTimeStr = () => `[${new Date().toLocaleTimeString('id-ID')}]`;
 
 // Helper: Shuffle Array
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -349,17 +352,31 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const answersRef = useRef(answers);
     const timeLeftRef = useRef(timeLeft);
 
+    // Activity Logging Queue
+    const activityQueueRef = useRef<string[]>([]);
+    const lastLoggedQuestionIdRef = useRef<string | null>(null);
+
+    // Helper to add log
+    const logActivity = (message: string) => {
+        const entry = `${getCurrentTimeStr()} ${message}`;
+        activityQueueRef.current.push(entry);
+    };
+
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
-    // NEW: Auto-save Logic
+    // NEW: Auto-save Logic with Activity Log Flush
     useEffect(() => {
         if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
 
         const intervalId = setInterval(() => {
             if (!isSubmitting) {
-                // Call update with current state (from refs)
-                onUpdate(answersRef.current, timeLeftRef.current);
+                // Flush activity queue
+                const logsToSend = [...activityQueueRef.current];
+                activityQueueRef.current = []; // Clear local queue
+
+                // Call update with current state (from refs) + logs
+                onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
             }
         }, exam.config.autoSaveInterval * 1000);
 
@@ -367,14 +384,35 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [exam.config.autoSaveInterval, isSubmitting, onUpdate]);
 
 
-    // Anti-Cheat: Detect Visibility Change
+    // Anti-Cheat: Detect Visibility Change with Logging
+    // LOGIKA PERBAIKAN: Memisahkan "Log Only" dengan "Log & Lock"
     useEffect(() => {
-        if (!exam.config.detectBehavior) return;
-
         const handleVisibilityChange = () => {
             if (document.hidden) {
-                // Gunakan state terbaru dari Ref
-                onForceSubmit(answersRef.current, timeLeftRef.current);
+                if (exam.config.detectBehavior) {
+                    logActivity("Meninggalkan halaman ujian (Tab/Aplikasi disembunyikan).");
+                    
+                    const logsToSend = [...activityQueueRef.current];
+                    activityQueueRef.current = []; // Clear queue immediately after capture
+
+                    if (exam.config.continueWithPermission) {
+                        // MODE A: DETECT & LOCK (STRICT)
+                        // Hentikan ujian dan kunci
+                        onForceSubmit(answersRef.current, timeLeftRef.current, logsToSend);
+                    } else {
+                        // MODE B: DETECT & LOG ONLY (LENIENT)
+                        // Kirim log ke server agar guru tahu, tapi biarkan siswa lanjut
+                        if (onUpdate) {
+                            onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
+                        }
+                    }
+                }
+            } else {
+                if (exam.config.detectBehavior) {
+                    logActivity("Kembali ke halaman ujian.");
+                    // Opsional: Kirim log 'Kembali' segera jika ingin real-time yang sangat presisi,
+                    // tapi biasanya ikut auto-save berikutnya sudah cukup.
+                }
             }
         };
 
@@ -382,7 +420,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [exam.config.detectBehavior, onForceSubmit]);
+    }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, onUpdate]);
 
     // Initial Setup Effect
     useEffect(() => {
@@ -409,8 +447,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Network Listeners
     useEffect(() => {
-        const setOn = () => setIsOnline(true);
-        const setOff = () => setIsOnline(false);
+        const setOn = () => { setIsOnline(true); logActivity("Koneksi internet pulih."); };
+        const setOff = () => { setIsOnline(false); logActivity("Koneksi internet terputus."); };
         window.addEventListener('online', setOn);
         window.addEventListener('offline', setOff);
         return () => {
@@ -452,13 +490,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // Handlers
     const handleAnswerChange = useCallback((id: string, val: string) => {
+        // Logging Logic: Only log if switching to a new question to prevent spamming while typing
+        if (lastLoggedQuestionIdRef.current !== id) {
+            // Find visual index
+            const qIndex = questions.findIndex(q => q.id === id);
+            if (qIndex !== -1 && questions[qIndex].questionType !== 'INFO') {
+                const visualNum = questions.slice(0, qIndex).filter(x => x.questionType !== 'INFO').length + 1;
+                logActivity(`Mulai mengerjakan soal No. ${visualNum}`);
+            }
+            lastLoggedQuestionIdRef.current = id;
+        }
+
         setAnswers(prev => {
             const next = { ...prev, [id]: val };
             // Debounced save to storage
             localStorage.setItem(`exam_answers_${exam.code}_${student.studentId}`, JSON.stringify(next));
             return next;
         });
-    }, [exam.code, student.studentId]);
+    }, [exam.code, student.studentId, questions]);
 
     const scrollToQuestion = (id: string) => {
         const el = document.getElementById(`question-${id}`);
@@ -472,6 +521,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (!isAuto && !confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
         
         setIsSubmitting(true);
+        logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
+        
         // Get Location if required
         let location = "";
         if (exam.config.trackLocation) {
@@ -485,7 +536,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         // Clean up storage
         localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
         
-        onSubmit(answers, timeLeft, location);
+        const logsToSend = [...activityQueueRef.current];
+        onSubmit(answers, timeLeft, location, logsToSend);
     };
 
     // Derived States for UI
