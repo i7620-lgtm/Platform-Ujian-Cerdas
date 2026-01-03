@@ -95,53 +95,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         await ensureSchema();
-        const { examCode, student, answers, activityLog, location, timestamp } = req.body;
+        const { examCode, student, answers, activityLog, location } = req.body;
         
-        // --- LOGIKA SEDERHANA & UMUM ---
-        // Kita menggunakan "Server Time Authority" dengan validasi timestamp sederhana.
-        // Tidak ada state machine yang rumit.
-        
+        // Kita gunakan Waktu Server sebagai 'Source of Truth' untuk penyimpanan
+        const serverTimestamp = Date.now(); 
         const incomingStatus = req.body.status || 'completed';
-        const clientTimestamp = timestamp ? parseInt(timestamp) : Date.now();
-        const serverTimestamp = Date.now(); // Ini menjadi 'truth' untuk operasi berikutnya
+        const incomingLog = activityLog || [];
 
         // 1. Ambil Data Ujian (untuk Grading)
         const examResult = await db.query('SELECT * FROM exams WHERE code = $1', [examCode]);
         if (!examResult || examResult.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
         const fullExam = examResult.rows[0];
 
-        // 2. CEK DATA EKSISTING (Conflict Resolution sederhana)
+        // 2. CEK DATA EKSISTING & FILTER "GHOST PACKET"
         const existingRes = await db.query(
-            'SELECT status, timestamp, activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
+            'SELECT status, activity_log FROM results WHERE exam_code = $1 AND student_id = $2', 
             [examCode, student.studentId]
         );
 
-        let finalActivityLog = activityLog || [];
+        let finalActivityLog = incomingLog;
 
         if (existingRes.rows.length > 0) {
             const row = existingRes.rows[0];
-            const dbTimestamp = row.timestamp ? parseInt(row.timestamp) : 0;
+            const dbStatus = row.status;
+            const dbLog = JSON.parse(row.activity_log || '[]');
 
-            // SAFETY CHECK: Jika data masuk lebih "tua" dari data DB, ABAIKAN saja.
-            // Ini otomatis membuang paket "Lock" lama yang datang terlambat setelah Guru melakukan "Unlock".
-            // Kita pakai toleransi 2 detik untuk clock drift wajar.
-            if (clientTimestamp < dbTimestamp - 2000) {
-                console.log(`[IGNORED] Old packet dropped. Client: ${clientTimestamp}, DB: ${dbTimestamp}`);
-                return res.status(200).json({
-                    ...req.body,
-                    status: row.status, // Balas dengan status terbaru dari DB
-                    isSynced: true,
-                    timestamp: dbTimestamp
-                });
+            // --- LOGIKA INTEGRITAS (ANTI GHOST PACKET) ---
+            // Skenario: Guru sudah Unlock (status DB = 'in_progress').
+            // Paket masuk meminta Lock (status Incoming = 'force_submitted').
+            if (dbStatus === 'in_progress' && incomingStatus === 'force_submitted') {
+                
+                // Cek: Apakah paket ini membawa informasi BARU?
+                // Paket Zombie (dikirim sebelum guru unlock) pasti memiliki log lebih sedikit atau sama dengan DB
+                // karena saat guru unlock, sistem menambah log "[Guru] Membuka kunci".
+                if (incomingLog.length <= dbLog.length) {
+                    console.log(`[ZOMBIE REJECTED] ${student.studentId} - Packet Ignored. DB Log: ${dbLog.length}, Incoming: ${incomingLog.length}`);
+                    
+                    // Kita tolak perubahan statusnya, tapi kita kembalikan respons SUKSES (200)
+                    // dengan status 'in_progress' agar frontend siswa sadar dia sudah di-unlock.
+                    return res.status(200).json({
+                        ...req.body,
+                        status: 'in_progress', // Override status kembali ke in_progress
+                        isSynced: true,
+                        timestamp: serverTimestamp
+                    });
+                }
             }
 
-            // Merge activity logs (Append only)
-            const prevLog = JSON.parse(row.activity_log || '[]');
-            if (activityLog && activityLog.length > 0) {
-                 const newLogs = activityLog.filter((l: string) => !prevLog.includes(l));
-                 finalActivityLog = [...prevLog, ...newLogs];
+            // Merge activity logs (Append only untuk log baru)
+            if (incomingLog.length > 0) {
+                 // Saring log yang belum ada di DB
+                 const newLogs = incomingLog.filter((l: string) => !dbLog.includes(l));
+                 finalActivityLog = [...dbLog, ...newLogs];
             } else {
-                 finalActivityLog = prevLog;
+                 finalActivityLog = dbLog;
             }
         }
 
@@ -151,7 +158,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (incomingStatus === 'force_submitted') statusCode = 2;
         if (incomingStatus === 'completed') statusCode = 3;
 
-        // Kita selalu memperbarui timestamp dengan Waktu Server saat ini untuk menjaga otoritas urutan
         const query = `
             INSERT INTO results (
                 exam_code, student_id, student_name, student_class, 
