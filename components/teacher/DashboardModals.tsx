@@ -9,9 +9,10 @@ interface OngoingExamModalProps {
     results: Result[];
     onClose: () => void;
     onAllowContinuation: (studentId: string, examCode: string) => void;
+    isReadOnly?: boolean; // New prop to control visibility of actions
 }
 
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation }) => {
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
     const [filterClass, setFilterClass] = useState<string>('ALL');
     const [localResults, setLocalResults] = useState<Result[]>(initialResults);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -113,7 +114,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                             >
                                 Monitor
                             </button>
-                            {exam.config.enablePublicStream && (
+                            {exam.config.enablePublicStream && !isReadOnly && (
                                 <button 
                                     onClick={() => setActiveTab('STREAM_INFO')}
                                     className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'STREAM_INFO' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -167,7 +168,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                 {/* CONTENT AREA */}
                 <div className="overflow-auto flex-1 bg-gray-50 p-4">
-                    {activeTab === 'STREAM_INFO' ? (
+                    {activeTab === 'STREAM_INFO' && !isReadOnly ? (
                         <div className="flex flex-col items-center justify-center h-full space-y-6">
                             <div className="bg-white p-8 rounded-xl shadow-md border text-center max-w-lg w-full">
                                 <h3 className="text-2xl font-bold text-gray-800 mb-4">Livestream Publik Aktif</h3>
@@ -215,7 +216,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                             {exam.config.trackLocation && (
                                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Lokasi (GPS)</th>
                                             )}
-                                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
+                                            {!isReadOnly && (
+                                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -291,21 +294,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                             )}
                                                         </td>
                                                     )}
-                                                    <td className="px-6 py-4 text-center">
-                                                        {result.status === 'force_submitted' && (
-                                                            <button 
-                                                                onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
-                                                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
-                                                            >
-                                                                <span>Izinkan Lanjut</span>
-                                                            </button>
-                                                        )}
-                                                        {result.status === 'in_progress' && (
-                                                            <div className="flex justify-center text-gray-300">
-                                                                <LockClosedIcon className="w-4 h-4" />
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                    {!isReadOnly && (
+                                                        <td className="px-6 py-4 text-center">
+                                                            {result.status === 'force_submitted' && (
+                                                                <button 
+                                                                    onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
+                                                                >
+                                                                    <span>Izinkan Lanjut</span>
+                                                                </button>
+                                                            )}
+                                                            {result.status === 'in_progress' && (
+                                                                <div className="flex justify-center text-gray-300">
+                                                                    <LockClosedIcon className="w-4 h-4" />
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             )
                                         })}
