@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Exam, Result, ResultStatus } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Exam, Result } from '../../types';
 import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
@@ -18,13 +18,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
-    
-    // Ref to control polling pause to prevent race conditions after manual updates
-    const isPausedRef = useRef(false);
 
-    // Sync local state when props change (only if not paused by manual action)
+    // Sync local state when props change
     useEffect(() => {
-        if(exam && !isPausedRef.current) {
+        if(exam) {
             setLocalResults(initialResults.filter(r => r.examCode === exam.code));
         }
     }, [initialResults, exam]);
@@ -34,8 +31,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         if (!exam) return;
         
         const fetchLatest = async () => {
-            if (isPausedRef.current) return;
-
             setIsRefreshing(true);
             try {
                 const latest = await storageService.getResults(); // This should trigger a fetch if implemented in storage
@@ -57,28 +52,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         const intervalId = setInterval(fetchLatest, 5000);
         return () => clearInterval(intervalId);
     }, [exam]);
-
-    // Handle Optimistic Update
-    const handleOptimisticAllow = async (studentId: string, examCode: string) => {
-        // 1. Pause polling to prevent server data overwriting local update immediately
-        isPausedRef.current = true;
-
-        // 2. Optimistic Update Local State
-        setLocalResults(prev => prev.map(r => {
-            if (r.student.studentId === studentId) {
-                return { ...r, status: 'in_progress' as ResultStatus };
-            }
-            return r;
-        }));
-
-        // 3. Call Parent Handler (API Call)
-        await onAllowContinuation(studentId, examCode);
-
-        // 4. Resume polling after a delay (enough time for server propagation)
-        setTimeout(() => {
-            isPausedRef.current = false;
-        }, 3000);
-    };
 
     // Derived Data (HOOKS MUST BE CALLED BEFORE EARLY RETURN)
     const uniqueClasses = useMemo(() => {
@@ -217,7 +190,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                 <div className="mt-8 pt-6 border-t w-full">
                                     <p className="text-sm text-gray-500 font-semibold uppercase tracking-wide mb-2">QR Code</p>
                                     <div className="bg-white p-2 inline-block rounded-lg">
-                                        {/* Simple QR Code placeholder */}
+                                        {/* Simple QR Code placeholder - in a real app use a library like qrcode.react */}
                                         <img 
                                             src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(streamUrl)}`} 
                                             alt="QR Code Stream" 
@@ -263,6 +236,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                                             // PROGRESS LOGIC
                                             const questionsAnswered = Object.keys(result.answers).length;
+                                            // FIX: Filter out INFO types for denominator
                                             const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
 
                                             return (
@@ -324,8 +298,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         <td className="px-6 py-4 text-center">
                                                             {result.status === 'force_submitted' && (
                                                                 <button 
-                                                                    onClick={() => handleOptimisticAllow(result.student.studentId, result.examCode)} 
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full active:scale-95"
+                                                                    onClick={() => onAllowContinuation(result.student.studentId, result.examCode)} 
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-xs rounded-md shadow font-bold transition-all hover:shadow-md flex items-center justify-center gap-1 mx-auto w-full"
                                                                 >
                                                                     <span>Izinkan Lanjut</span>
                                                                 </button>
@@ -430,4 +404,3 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
         </div>
     );
 };
- 
