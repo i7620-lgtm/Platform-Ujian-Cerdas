@@ -18,6 +18,16 @@ const CREATE_TABLE_SQL = `
     );
 `;
 
+// Helper Shuffle
+const shuffleArray = (array: any[]) => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+};
+
 // Fungsi inisialisasi tabel yang dijalankan sekali per cold-start
 const ensureSchema = async () => {
     if (isTableInitialized) return;
@@ -27,9 +37,7 @@ const ensureSchema = async () => {
         
         // MIGRATION CHECK:
         // Jika tabel sudah ada dengan created_at tipe BIGINT, kita harus mengubahnya menjadi TEXT
-        // agar sesuai dengan request user untuk menyimpan "tanggal dan waktu" yang dapat dibaca.
         try {
-             // Cek tipe data kolom (Postgres specific)
              const checkType = await db.query(`
                 SELECT data_type FROM information_schema.columns 
                 WHERE table_name = 'exams' AND column_name = 'created_at';
@@ -37,7 +45,6 @@ const ensureSchema = async () => {
              
              if (checkType.rows.length > 0 && checkType.rows[0].data_type !== 'text') {
                  console.log("Migrating created_at column to TEXT...");
-                 // Alter column type. Konversi angka ke string jika perlu.
                  await db.query(`ALTER TABLE exams ALTER COLUMN created_at TYPE TEXT USING created_at::text;`);
              }
         } catch (migError) {
@@ -59,14 +66,14 @@ const sanitizeExam = (examRow: any) => {
             authorId: examRow.author_id,
             questions,
             config: JSON.parse(examRow.config || '{}'),
-            createdAt: examRow.created_at || '' // Sekarang string
+            createdAt: examRow.created_at || '' 
         };
     } catch (e) {
         return { code: examRow.code, questions: [], config: {}, createdAt: '' };
     }
 };
 
-// Security: Strip answers for student view
+// Security: Strip answers for student view but KEEP OPTIONS valid
 const sanitizeForPublic = (exam: any) => {
     if (exam.questions && Array.isArray(exam.questions)) {
         exam.questions = exam.questions.map((q: any) => {
@@ -76,10 +83,20 @@ const sanitizeForPublic = (exam: any) => {
             
             // Handle complex types
             if (trueFalseRows) {
-                safeQ.trueFalseRows = trueFalseRows.map((r: any) => ({ text: r.text, answer: false })); // Dummy answer
+                // Keep text, set dummy answer
+                safeQ.trueFalseRows = trueFalseRows.map((r: any) => ({ text: r.text, answer: false }));
             }
-            if (matchingPairs) {
-                 safeQ.matchingPairs = matchingPairs.map((p: any) => ({ left: p.left, right: '?' })); // Strip pair
+            if (matchingPairs && Array.isArray(matchingPairs)) {
+                 // SECURITY FIX: Do not set to '?', instead SHUFFLE the right options.
+                 // This ensures the student sees valid options in the dropdown but the connection is broken.
+                 // If data is empty/missing, send empty string, NOT '?'.
+                 const rightValues = matchingPairs.map((p: any) => p.right || '');
+                 const shuffledRights = shuffleArray(rightValues);
+
+                 safeQ.matchingPairs = matchingPairs.map((p: any, idx: number) => ({ 
+                     left: p.left, 
+                     right: shuffledRights[idx] 
+                 })); 
             }
             return safeQ;
         });
@@ -93,6 +110,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    
+    // ANTI-CACHE HEADERS (CRITICAL FIX)
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -108,11 +130,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
                 
                 const exam = sanitizeExam(result.rows[0]);
-                // Secure the public endpoint by stripping answers
+                // Secure the public endpoint by stripping answers safely
                 return res.status(200).json(sanitizeForPublic(exam));
             } else {
-                // Teacher view gets full data (with answers)
-                // Order by created_at DESC (String sort is okay for ISO, acceptable for others)
                 const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
                 const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
                 return res.status(200).json(data);
@@ -124,10 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const exam = req.body;
             if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
-            // Pastikan authorId diambil dari body, fallback ke anonymous
             const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
-            
-            // createdAt sekarang berupa String tanggal & waktu
             const createdAt = exam.createdAt || new Date().toLocaleString(); 
 
             const questionsJson = JSON.stringify(exam.questions || []);
@@ -148,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json({ success: true, message: "Exam saved successfully" });
         }
         
-        // --- PATCH: UPDATE GAMBAR (TRANSAKSI) ---
+        // --- PATCH: UPDATE GAMBAR ---
         else if (req.method === 'PATCH') {
             const { code, questionId, imageUrl, optionImages } = req.body;
             if (!code || !questionId) return res.status(400).json({ error: "Missing parameters" });
