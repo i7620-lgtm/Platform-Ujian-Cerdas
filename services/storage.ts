@@ -133,7 +133,8 @@ class StorageService {
               if (isPoisoned) console.log(`[Storage] Detected poisoned cache for exam ${code}. Forcing refresh from cloud.`);
               
               try {
-                  const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true`));
+                  // Tambahkan timestamp (_t) untuk bypass cache Vercel Edge / Browser
+                  const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true&_t=${Date.now()}`));
                   if (res.ok) {
                       exam = await res.json();
                       if (exam) { 
@@ -170,6 +171,7 @@ class StorageService {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     if (this.isOnline) {
         try {
+            // cache: no-store added
             const response = await retryOperation(() => fetch(`${API_URL}/results`, { cache: 'no-store' }));
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
