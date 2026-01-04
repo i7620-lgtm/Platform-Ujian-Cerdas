@@ -233,8 +233,17 @@ const QuestionCard: React.FC<{
             case 'MATCHING':
                 if (!question.matchingPairs) return null;
                 const matchAnswers = (() => { try { return JSON.parse(answer || '{}'); } catch { return {}; } })();
-                // Extract JUST the right side options for dropdown
-                const rightOptions = question.matchingPairs.map(p => p.right);
+                
+                // Logic Perbaikan:
+                // 1. Ekstrak semua opsi kanan (right)
+                // 2. Filter nilai null/undefined
+                // 3. Urutkan secara alfabetis agar mudah dicari siswa
+                // 4. Bungkus dalam useMemo agar tidak re-render/shuffle tidak perlu
+                // eslint-disable-next-line react-hooks/rules-of-hooks
+                const rightOptions = useMemo(() => {
+                    const opts = question.matchingPairs?.map(p => p.right).filter(Boolean) || [];
+                    return opts.sort((a, b) => a.localeCompare(b));
+                }, [question.matchingPairs]);
                 
                 return (
                     <div className="mt-6 space-y-4">
@@ -253,7 +262,7 @@ const QuestionCard: React.FC<{
                                     >
                                         <option value="" disabled>Pilih Pasangan...</option>
                                         {rightOptions.map((opt, idx) => (
-                                            <option key={idx} value={opt}>{opt}</option>
+                                            <option key={`${idx}-${opt}`} value={opt}>{opt}</option>
                                         ))}
                                     </select>
                                 </div>
