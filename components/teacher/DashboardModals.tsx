@@ -241,8 +241,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                     <WifiIcon className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">Public Livestream</h3>
-                                <p className="text-sm text-slate-500 mb-6">Bagikan link ini agar orang tua atau pengawas lain dapat memantau ujian secara real-time tanpa login.</p>
+                                <p className="text-sm text-slate-500 mb-6">Bagikan link atau scan QR code di bawah ini agar orang tua atau pengawas lain dapat memantau ujian.</p>
                                 
+                                <div className="flex justify-center mb-6">
+                                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                        <img 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(streamUrl)}&margin=10`} 
+                                            alt="QR Code Stream" 
+                                            className="w-40 h-40 object-contain mix-blend-multiply"
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 font-mono text-xs sm:text-sm text-slate-600 break-all select-all">
                                     {streamUrl}
                                 </div>
