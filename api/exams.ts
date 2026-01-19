@@ -14,7 +14,8 @@ const CREATE_TABLE_SQL = `
         author_id TEXT DEFAULT 'anonymous',
         questions TEXT, 
         config TEXT,
-        created_at TEXT DEFAULT '' 
+        created_at TEXT DEFAULT '',
+        status TEXT DEFAULT 'PUBLISHED'
     );
 `;
 
@@ -47,8 +48,19 @@ const ensureSchema = async () => {
                  console.log("Migrating created_at column to TEXT...");
                  await db.query(`ALTER TABLE exams ALTER COLUMN created_at TYPE TEXT USING created_at::text;`);
              }
+
+             // Check status column
+             const checkStatus = await db.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'exams' AND column_name = 'status';
+             `);
+             if (checkStatus.rows.length === 0) {
+                 console.log("Adding 'status' column...");
+                 await db.query(`ALTER TABLE exams ADD COLUMN status TEXT DEFAULT 'PUBLISHED';`);
+             }
+
         } catch (migError) {
-            console.warn("Migration warning (created_at):", migError);
+            console.warn("Migration warning:", migError);
         }
 
         isTableInitialized = true;
@@ -66,10 +78,11 @@ const sanitizeExam = (examRow: any) => {
             authorId: examRow.author_id,
             questions,
             config: JSON.parse(examRow.config || '{}'),
-            createdAt: examRow.created_at || '' 
+            createdAt: examRow.created_at || '',
+            status: examRow.status || 'PUBLISHED'
         };
     } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: '' };
+        return { code: examRow.code, questions: [], config: {}, createdAt: '', status: 'PUBLISHED' };
     }
 };
 
@@ -130,10 +143,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
                 
                 const exam = sanitizeExam(result.rows[0]);
+                
+                // Block Drafts from Public View
+                if (exam.status === 'DRAFT') {
+                    return res.status(403).json({ error: 'Exam is currently in draft mode.' });
+                }
+
                 // Secure the public endpoint by stripping answers safely
                 return res.status(200).json(sanitizeForPublic(exam));
             } else {
-                const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 50');
+                // Return everything to teacher (Drafts + Published)
+                const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 100');
                 const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
                 return res.status(200).json(data);
             }
@@ -146,22 +166,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
             const createdAt = exam.createdAt || new Date().toLocaleString(); 
+            const status = exam.status || 'PUBLISHED';
 
             const questionsJson = JSON.stringify(exam.questions || []);
             const configJson = JSON.stringify(exam.config || {});
 
             const query = `
-                INSERT INTO exams (code, author_id, questions, config, created_at)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO exams (code, author_id, questions, config, created_at, status)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT (code) 
                 DO UPDATE SET 
                     author_id = EXCLUDED.author_id,
                     questions = EXCLUDED.questions,
                     config = EXCLUDED.config,
-                    created_at = EXCLUDED.created_at
+                    created_at = EXCLUDED.created_at,
+                    status = EXCLUDED.status
             `;
 
-            await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt]);
+            await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt, status]);
             return res.status(200).json({ success: true, message: "Exam saved successfully" });
         }
         
