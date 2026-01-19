@@ -46,6 +46,7 @@ export interface Exam {
   config: ExamConfig;
   isSynced?: boolean; 
   createdAt?: string; // Changed to string for readable Date & Time
+  status?: 'DRAFT' | 'PUBLISHED'; // New: Support Drafts
 }
 
 export interface Student {
@@ -71,4 +72,3 @@ export interface Result {
     timestamp?: number;
     location?: string; // GPS Coordinates
 }
- 
