@@ -14,13 +14,14 @@ interface ExamEditorProps {
     setConfig: React.Dispatch<React.SetStateAction<ExamConfig>>;
     isEditing: boolean;
     onSave: () => void;
+    onSaveDraft?: () => void;
     onCancel: () => void;
     generatedCode: string;
     onReset: () => void;
 }
 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
-    questions, setQuestions, config, setConfig, isEditing, onSave, onCancel, generatedCode, onReset 
+    questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
@@ -843,16 +844,28 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <button onClick={onCancel} className="bg-white text-gray-700 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-50 transition-colors duration-300 shadow-sm">
                             Batal
                         </button>
+                        {onSaveDraft && (
+                            <button onClick={onSaveDraft} className="bg-gray-200 text-gray-800 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-300 transition-colors duration-300 shadow-sm flex items-center gap-2">
+                                <PencilIcon className="w-5 h-5" />
+                                Simpan Draf
+                            </button>
+                        )}
                         <button onClick={onSave} className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
                             Simpan Perubahan
                         </button>
                     </div>
                 ) : (
                     <>
-                        <div className="border-t pt-8">
-                            <button onClick={onSave} className="bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 transition-colors duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2 mx-auto">
+                        <div className="border-t pt-8 flex justify-center gap-4">
+                            {onSaveDraft && (
+                                <button onClick={onSaveDraft} className="bg-white text-gray-600 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-50 transition-colors duration-300 shadow-sm flex items-center gap-2">
+                                    <PencilIcon className="w-5 h-5" />
+                                    Simpan sebagai Draf
+                                </button>
+                            )}
+                            <button onClick={onSave} className="bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 transition-colors duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2">
                                 <CheckCircleIcon className="w-6 h-6" />
-                                Buat Ujian
+                                Buat & Publikasikan
                             </button>
                         </div>
                         {generatedCode && (
