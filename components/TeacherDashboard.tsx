@@ -87,8 +87,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             alert("Tidak ada soal. Silakan buat atau unggah soal terlebih dahulu sebelum mempublikasikan.");
             return;
         }
-
-        const isNew = !editingExam || (editingExam && editingExam.status === 'DRAFT' && status === 'PUBLISHED'); // Logic: If moving draft to publish, treat effectively as new launch regarding date logic usually, but here we keep ID.
         
         // Kode: Gunakan yang ada jika edit, atau generate baru
         const code = editingExam ? editingExam.code : generateExamCode();
