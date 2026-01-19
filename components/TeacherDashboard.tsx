@@ -7,12 +7,11 @@ import {
     LogoutIcon, 
     ClockIcon,
     CalendarDaysIcon,
-    XMarkIcon,
-    PencilIcon
+    XMarkIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
-import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView } from './teacher/DashboardViews';
+import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 
 interface TeacherDashboardProps {
@@ -27,7 +26,7 @@ interface TeacherDashboardProps {
     onRefreshResults: () => Promise<void>;
 }
 
-type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS';
+type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
     teacherId, addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
@@ -65,14 +64,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // --- LAZY FETCHING LOGIC ---
     useEffect(() => {
-        // Always fetch exams when dashboard mounts or view changes to a list view
-        if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
+        // Only fetch what is needed for the current view
+        if (view === 'ONGOING') {
             onRefreshExams();
-        }
-        
-        if (view === 'ONGOING' || view === 'FINISHED_EXAMS') {
+            onRefreshResults();
+        } else if (view === 'UPCOMING_EXAMS') {
+            onRefreshExams();
+        } else if (view === 'FINISHED_EXAMS') {
+            onRefreshExams();
             onRefreshResults();
         }
+        // 'UPLOAD' view does NOT trigger fetch to prevent errors on mount
     }, [view, onRefreshExams, onRefreshResults]);
 
 
@@ -81,44 +83,51 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setManualMode(true);
     };
 
-    const handleSaveExam = (status: 'PUBLISHED' | 'DRAFT') => {
-        // Validasi hanya jika PUBLISH. Kalau Draft, boleh longgar.
-        if (status === 'PUBLISHED' && questions.length === 0) {
-            alert("Tidak ada soal. Silakan buat atau unggah soal terlebih dahulu sebelum mempublikasikan.");
+    const handleCreateExam = () => {
+        if (questions.length === 0) {
+            alert("Tidak ada soal. Silakan buat atau unggah soal terlebih dahulu.");
             return;
         }
 
-        const isNew = !editingExam || (editingExam && editingExam.status === 'DRAFT' && status === 'PUBLISHED'); // Logic: If moving draft to publish, treat effectively as new launch regarding date logic usually, but here we keep ID.
-        
-        // Kode: Gunakan yang ada jika edit, atau generate baru
-        const code = editingExam ? editingExam.code : generateExamCode();
-        
+        const code = generateExamCode();
+        // Format Tanggal dan Waktu yang mudah dibaca (YYYY-MM-DD HH:mm:ss)
         const now = new Date();
         const readableDate = now.toLocaleString('id-ID', { 
             year: 'numeric', month: '2-digit', day: '2-digit', 
             hour: '2-digit', minute: '2-digit', second: '2-digit'
         }).replace(/\//g, '-');
 
-        const examData: Exam = {
+        const newExam: Exam = {
             code,
-            authorId: teacherId || 'ANONYMOUS_TEACHER',
+            authorId: teacherId || 'ANONYMOUS_TEACHER', // Use actual logged-in teacher ID
             questions, 
             config,
-            createdAt: editingExam?.createdAt || String(readableDate),
-            status: status
+            createdAt: String(readableDate) // Ensure it is explicitly a string
         };
+        addExam(newExam); 
+        setGeneratedCode(code);
+    };
 
-        if (editingExam) {
-            updateExam(examData);
-            setIsEditModalOpen(false);
-            setEditingExam(null);
-            alert(status === 'DRAFT' ? 'Draf berhasil disimpan!' : 'Ujian berhasil diperbarui!');
-        } else {
-            addExam(examData); 
-            setGeneratedCode(code);
-            // Don't alert for draft, the UI usually handles "saved" state visually, but here alert is fine.
-            if (status === 'DRAFT') alert("Disimpan ke Draf.");
+    const handleUpdateExam = () => {
+        if (!editingExam) return;
+
+        if (questions.length === 0) {
+            alert("Ujian tidak boleh kosong. Harap tambahkan setidaknya satu soal.");
+            return;
         }
+        
+        const updatedExam: Exam = {
+            code: editingExam.code,
+            authorId: editingExam.authorId || teacherId,
+            questions,
+            config,
+            // Force conversion to string to handle any legacy number data
+            createdAt: editingExam.createdAt ? String(editingExam.createdAt) : new Date().toLocaleString('id-ID')
+        };
+        updateExam(updatedExam);
+        alert('Ujian berhasil diperbarui!');
+        setIsEditModalOpen(false);
+        setEditingExam(null);
     };
 
     const resetForm = () => {
@@ -153,30 +162,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setIsEditModalOpen(true);
     };
 
-    const continueDraft = (exam: Exam) => {
-        setEditingExam(exam);
-        setQuestions(exam.questions);
-        setConfig(exam.config);
-        // Switch to Upload/Editor view but in "editing" mode (essentially manual mode populated)
-        setManualMode(true); 
-        setView('UPLOAD');
-    };
-
     // -- Computed Data for Views --
     const now = new Date();
     const allExams: Exam[] = Object.values(exams);
 
-    // Filter by Status first
-    const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
-    const draftExams = allExams.filter(e => e.status === 'DRAFT');
-
-    const ongoingExams = publishedExams.filter((exam) => {
+    const ongoingExams = allExams.filter((exam) => {
         const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
         const examEndDateTime = new Date(examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000);
         return now >= examStartDateTime && now <= examEndDateTime;
     });
 
-    const upcomingExams = publishedExams.filter((exam) => {
+    const upcomingExams = allExams.filter((exam) => {
         const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
         return examStartDateTime > now;
     }).sort((a, b) => {
@@ -185,7 +181,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
          return aDate.getTime() - bDate.getTime();
     });
 
-    const finishedExams = publishedExams.filter((exam) => {
+    const finishedExams = allExams.filter((exam) => {
         const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
         const examEndDateTime = new Date(examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000);
         return examEndDateTime < now;
@@ -212,17 +208,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                          <button onClick={() => setView('UPLOAD')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'UPLOAD' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
                             <CheckCircleIcon className="w-5 h-5"/> Buat Ujian
                         </button>
-                        <button onClick={() => setView('DRAFTS')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'DRAFTS' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
-                            <PencilIcon className="w-5 h-5"/> Draf Soal <span className="ml-1 bg-gray-100 px-2 py-0.5 rounded-full text-xs text-gray-600">{draftExams.length}</span>
-                        </button>
                         <button onClick={() => setView('ONGOING')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'ONGOING' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
-                            <ClockIcon className="w-5 h-5"/> Berlangsung
+                            <ClockIcon className="w-5 h-5"/> Ujian Berlangsung
                         </button>
                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'UPCOMING_EXAMS' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
-                            <CalendarDaysIcon className="w-5 h-5"/> Akan Datang
+                            <CalendarDaysIcon className="w-5 h-5"/> Ujian Akan Datang
                         </button>
                         <button onClick={() => setView('FINISHED_EXAMS')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'FINISHED_EXAMS' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
-                            <ChartBarIcon className="w-5 h-5"/> Selesai
+                            <ChartBarIcon className="w-5 h-5"/> Ujian Selesai
                         </button>
                     </nav>
                 </div>
@@ -231,33 +224,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'UPLOAD' && (
                     <>
                         <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
-                        {(questions.length > 0 || manualMode || editingExam) && (
+                        {(questions.length > 0 || manualMode) && (
                             <ExamEditor 
                                 questions={questions}
                                 setQuestions={setQuestions}
                                 config={config}
                                 setConfig={setConfig}
-                                isEditing={!!editingExam && editingExam.status !== 'DRAFT'} // Jika draft, anggap seperti buat baru tapi pre-filled
-                                onSave={() => handleSaveExam('PUBLISHED')}
-                                onSaveDraft={() => handleSaveExam('DRAFT')}
-                                onCancel={() => {
-                                    setEditingExam(null); 
-                                    setManualMode(false); 
-                                    setQuestions([]); 
-                                    setResetKey(k => k+1);
-                                }} 
+                                isEditing={false}
+                                onSave={handleCreateExam}
+                                onCancel={() => {}} 
                                 generatedCode={generatedCode}
                                 onReset={resetForm}
                             />
                         )}
                     </>
-                )}
-
-                {view === 'DRAFTS' && (
-                    <DraftsView 
-                        exams={draftExams}
-                        onContinueDraft={continueDraft}
-                    />
                 )}
 
                 {view === 'ONGOING' && (
@@ -297,7 +277,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 onClose={() => setSelectedFinishedExam(null)}
             />
 
-            {/* EDIT EXAM MODAL (FOR PUBLISHED EXAMS) */}
+            {/* EDIT EXAM MODAL */}
             {isEditModalOpen && editingExam && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
                     <div className="bg-base-200 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -314,8 +294,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 config={config}
                                 setConfig={setConfig}
                                 isEditing={true}
-                                onSave={() => handleSaveExam('PUBLISHED')}
-                                onSaveDraft={() => handleSaveExam('DRAFT')}
+                                onSave={handleUpdateExam}
                                 onCancel={() => setIsEditModalOpen(false)}
                                 generatedCode={''}
                                 onReset={() => {}}
