@@ -315,6 +315,60 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
     );
 };
 
+// --- DRAFTS VIEW ---
+interface DraftsViewProps {
+    exams: Exam[];
+    onContinueDraft: (exam: Exam) => void;
+}
+
+export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft }) => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div>
+                <h2 className="text-2xl font-bold text-neutral">Draf Soal</h2>
+                <p className="text-base-content mt-1">Lanjutkan pembuatan soal yang belum selesai.</p>
+            </div>
+            {exams.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {exams.map(exam => (
+                        <div key={exam.code} className="bg-white p-5 rounded-lg border border-dashed border-gray-300 shadow-sm hover:shadow-md hover:border-primary transition-all duration-200">
+                            <div className="flex justify-between items-start mb-3">
+                                <h3 className="font-bold text-lg text-gray-700">{exam.code}</h3>
+                                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wider">
+                                    DRAFT
+                                </span>
+                            </div>
+                            <div className="text-sm text-gray-500 space-y-1 mb-4">
+                                <p className="flex items-center gap-2">
+                                    <CalendarDaysIcon className="w-4 h-4" />
+                                    {new Date(exam.config.date).toLocaleDateString('id-ID')}
+                                </p>
+                                <p className="flex items-center gap-2">
+                                    <ListBulletIcon className="w-4 h-4" />
+                                    {exam.questions.length} Soal Tersimpan
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => onContinueDraft(exam)}
+                                className="w-full py-2 px-4 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <PencilIcon className="w-4 h-4" />
+                                Lanjutkan Edit
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-16 bg-white rounded-lg border border-dashed border-gray-300">
+                    <PencilIcon className="mx-auto h-12 w-12 text-gray-300" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Belum Ada Draf</h3>
+                    <p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- ONGOING EXAMS VIEW ---
 interface OngoingExamsProps {
     exams: Exam[];
