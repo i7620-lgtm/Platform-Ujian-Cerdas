@@ -346,9 +346,12 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                                 <TrashIcon className="w-4 h-4" />
                             </button>
 
-                            <div className="flex justify-between items-start mb-3 pr-8">
+                            <div className="flex flex-col mb-3 pr-8">
                                 <h3 className="font-bold text-lg text-gray-700">{exam.code}</h3>
-                                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wider">
+                                {exam.config.subject && exam.config.subject !== 'Lainnya' && (
+                                     <span className="text-xs font-semibold text-primary/80 mb-1">{exam.config.subject}</span>
+                                )}
+                                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wider w-fit mt-1">
                                     DRAFT
                                 </span>
                             </div>
@@ -401,13 +404,18 @@ export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {exams.map(exam => (
                         <div key={exam.code} className="bg-white p-5 rounded-lg border shadow-sm hover:shadow-lg hover:border-primary transition-all duration-200 cursor-pointer" onClick={() => onSelectExam(exam)}>
-                            <div className="flex justify-between items-center">
-                                <h3 className="font-bold text-lg text-primary">{exam.code}</h3>
-                                <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                     <h3 className="font-bold text-lg text-primary">{exam.code}</h3>
+                                     {exam.config.subject && exam.config.subject !== 'Lainnya' && (
+                                         <p className="text-xs font-semibold text-gray-600 mt-0.5">{exam.config.subject} • {exam.config.classLevel}</p>
+                                     )}
+                                </div>
+                                <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full whitespace-nowrap">
                                     {results.filter(r => r.examCode === exam.code).length} Siswa
                                 </span>
                             </div>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-sm text-gray-500 mt-2">
                                 {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                             <div className="mt-4 pt-4 border-t flex items-center justify-between">
@@ -453,10 +461,15 @@ export const UpcomingExamsView: React.FC<UpcomingExamsProps> = ({ exams, onEditE
                                 </div>
                                 <div>
                                     <p className="font-bold text-lg text-neutral">{exam.code}</p>
-                                    <p className="text-sm text-gray-500">
-                                        {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                        {` - ${exam.config.startTime}`}
-                                    </p>
+                                    <div className="text-sm text-gray-500">
+                                        {exam.config.subject && exam.config.subject !== 'Lainnya' ? (
+                                            <span className="font-semibold text-gray-700 mr-2">{exam.config.subject} ({exam.config.classLevel})</span>
+                                        ) : null}
+                                        <span>
+                                            {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            {` • ${exam.config.startTime}`}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                             <button onClick={() => onEditExam(exam)} className="flex items-center gap-2 bg-accent text-white px-4 py-2 text-sm rounded-md hover:bg-accent-focus transition-colors font-semibold shadow-sm self-end sm:self-auto">
@@ -500,7 +513,12 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                                 </div>
                                 <div>
                                     <p className="font-bold text-lg text-neutral">{exam.code}</p>
-                                    <p className="text-sm text-gray-500">{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                    <div className="text-sm text-gray-500">
+                                        {exam.config.subject && exam.config.subject !== 'Lainnya' ? (
+                                             <span className="font-semibold text-gray-700 mr-2">{exam.config.subject}</span>
+                                        ) : null}
+                                        <span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                    </div>
                                 </div>
                             </div>
                             <button onClick={() => onSelectExam(exam)} className="flex items-center gap-2 bg-primary text-primary-content px-4 py-2 text-sm rounded-md hover:bg-primary-focus transition-colors font-semibold shadow-sm self-end sm:self-auto">
