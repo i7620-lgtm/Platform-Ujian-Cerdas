@@ -20,6 +20,27 @@ interface ExamEditorProps {
     onReset: () => void;
 }
 
+const SUBJECTS = [
+    "Agama Buddha", "Agama Hindu", "Agama Islam", "Agama Katolik", "Agama Khonghucu", "Agama Kristen", 
+    "Kepercayaan", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Pancasila", "Matematika", 
+    "Ilmu Pengetahuan Alam dan Sosial", "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", 
+    "Pendidikan Jasmani Olahraga dan Kesehatan", "Seni Budaya", "Muatan Lokal", 
+    "Koding dan Kecerdasan Artifisial", "Lainnya"
+];
+
+const CLASSES = [
+    "SD Kelas 1", "SD Kelas 2", "SD Kelas 3", "SD Kelas 4", "SD Kelas 5", "SD Kelas 6",
+    "SMP Kelas 7", "SMP Kelas 8", "SMP Kelas 9",
+    "SMA Kelas 10", "SMA Kelas 11", "SMA Kelas 12",
+    "SMK Kelas 10", "SMK Kelas 11", "SMK Kelas 12",
+    "Lainnya"
+];
+
+const EXAM_TYPES = [
+    "Latihan Soal", "Ulangan Harian (UH)", "Penilaian Tengah Semester (PTS)", 
+    "Penilaian Akhir Semester (PAS)", "Lomba", "Kuis", "Tes Kemampuan Akademik (TKA)", "Lainnya"
+];
+
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
@@ -56,7 +77,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     const isDataUrl = (str: string) => str.startsWith('data:image/');
 
-    const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
             const { checked } = e.target as HTMLInputElement;
@@ -390,11 +411,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     return (
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
             {/* --- SECTION 1: QUESTIONS --- */}
-            {/* 
-                IMPORTANT: scroll-mt-32 added here. 
-                This ensures that when scrollIntoView is called, 
-                the element is positioned with enough top margin to not be hidden behind the sticky header.
-            */}
             <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-primary/5 rounded-lg">
                     <h2 className="text-xl font-bold text-neutral">
@@ -805,53 +821,113 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     </h2>
                      <p className="text-sm text-base-content mt-1">Atur jadwal, durasi, dan aturan pengerjaan ujian.</p>
                 </div>
-                <div className="mt-4 bg-white p-6 border rounded-lg grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 shadow-sm">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Tanggal Ujian</label>
-                        <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
+                <div className="mt-4 bg-white p-6 border rounded-lg shadow-sm space-y-6">
+                    {/* METADATA SECTION - NEW */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
+                             <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Informasi Umum</h4>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Mata Pelajaran</label>
+                            <select 
+                                name="subject" 
+                                value={config.subject || 'Lainnya'} 
+                                onChange={handleConfigChange} 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                            >
+                                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                             <select 
+                                name="classLevel" 
+                                value={config.classLevel || 'Lainnya'} 
+                                onChange={handleConfigChange} 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                            >
+                                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Soal</label>
+                             <select 
+                                name="examType" 
+                                value={config.examType || 'Lainnya'} 
+                                onChange={handleConfigChange} 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                            >
+                                {EXAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+
+                         <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan Tambahan (Opsional)</label>
+                            <textarea
+                                name="description"
+                                value={config.description || ''}
+                                onChange={handleConfigChange}
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm min-h-[80px]"
+                                placeholder="Contoh: Materi Bab 1-3, Kerjakan dengan teliti."
+                            />
+                        </div>
                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Waktu Mulai Ujian</label>
-                        <input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Batas Waktu (menit)</label>
-                        <input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Simpan Otomatis (detik)</label>
-                        <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" />
-                    </div>
-                    <div className="md:col-span-2 space-y-3 pt-2">
-                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Acak Urutan Soal</span></label>
-                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Acak Urutan Jawaban (Pilihan Ganda)</span></label>
-                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Izinkan Siswa Mengerjakan Ulang</span></label>
-                       <label className="flex items-center cursor-pointer"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Deteksi Pindah Tab/Aplikasi</span></label>
-                       {config.detectBehavior && (
-                        <label className="flex items-center ml-6 cursor-pointer"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700">Hentikan Ujian & Perlu Izin Guru untuk Melanjutkan</span></label>
-                       )}
-                       
-                       {/* NEW CONFIGURATIONS */}
-                       <div className="pt-2 mt-2 border-t border-gray-100 space-y-3">
-                           <h4 className="text-sm font-bold text-gray-800">Pengaturan Lanjutan</h4>
-                           <label className="flex items-center cursor-pointer">
-                               <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <span className="ml-2 text-sm text-gray-700">Tampilkan Nilai ke Siswa Setelah Selesai</span>
-                           </label>
-                           {/* Feature prepared but hidden or disabled logic can be added later */}
-                           <label className="flex items-center cursor-pointer">
-                               <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <span className="ml-2 text-sm text-gray-700">Tampilkan Kunci Jawaban Setelah Selesai (Review)</span>
-                           </label>
-                           <label className="flex items-center cursor-pointer">
-                               <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <span className="ml-2 text-sm text-gray-700">Aktifkan Link Livestream Publik (Tanpa Login)</span>
-                           </label>
-                           <label className="flex items-center cursor-pointer">
-                               <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                               <span className="ml-2 text-sm text-gray-700">Lacak Lokasi Siswa saat Submit (GPS)</span>
-                           </label>
-                       </div>
+
+                    {/* SETTINGS SECTION */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-4 border-t border-gray-100">
+                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
+                             <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Waktu & Teknis</h4>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Ujian</label>
+                            <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Waktu Mulai</label>
+                            <input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Durasi (menit)</label>
+                            <input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Simpan Otomatis (detik)</label>
+                            <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                        </div>
+                        
+                        <div className="md:col-span-2 space-y-3 pt-2">
+                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Acak Urutan Soal</span></label>
+                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Acak Urutan Jawaban (Pilihan Ganda)</span></label>
+                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Izinkan Siswa Mengerjakan Ulang</span></label>
+                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Deteksi Pindah Tab/Aplikasi</span></label>
+                           {config.detectBehavior && (
+                            <label className="flex items-center ml-6 cursor-pointer group"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Hentikan Ujian & Perlu Izin Guru untuk Melanjutkan</span></label>
+                           )}
+                           
+                           {/* NEW CONFIGURATIONS */}
+                           <div className="pt-4 mt-4 border-t border-gray-100 space-y-3">
+                               <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-2">Pengaturan Lanjutan</h4>
+                               <label className="flex items-center cursor-pointer group">
+                                   <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Tampilkan Nilai ke Siswa Setelah Selesai</span>
+                               </label>
+                               <label className="flex items-center cursor-pointer group">
+                                   <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci Jawaban Setelah Selesai (Review)</span>
+                               </label>
+                               <label className="flex items-center cursor-pointer group">
+                                   <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Aktifkan Link Livestream Publik (Tanpa Login)</span>
+                               </label>
+                               <label className="flex items-center cursor-pointer group">
+                                   <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
+                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi Siswa saat Submit (GPS)</span>
+                               </label>
+                           </div>
+                        </div>
                     </div>
                 </div>
             </div>
