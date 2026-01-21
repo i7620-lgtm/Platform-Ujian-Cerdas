@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -229,6 +229,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             }, 100);
         } else {
             const newQuestions = [...questions];
+            // If insertIndex is -1 (Insert at Start), splice(0, 0, new) works perfectly
             newQuestions.splice(insertIndex + 1, 0, newQuestion);
             setQuestions(newQuestions);
         }
@@ -402,6 +403,24 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Anda dapat mengedit, menghapus, atau menambahkan soal baru.</p>
                 </div>
                 <div className="space-y-4">
+                    {/* INSERT QUESTION AT START DIVIDER */}
+                    {questions.length > 0 && (
+                        <div className="relative py-2 group/insert">
+                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                <div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div>
+                            </div>
+                            <div className="relative flex justify-center">
+                                <button
+                                    onClick={() => openTypeSelectionModal(-1)}
+                                    className="bg-gray-50 text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
+                                >
+                                    <PlusCircleIcon className="w-4 h-4" />
+                                    Tambah Soal / Keterangan Di Awal
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {questions.map((q, index) => {
                         // Calculate display number dynamically: Count all previous items that are NOT 'INFO'
                         const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
