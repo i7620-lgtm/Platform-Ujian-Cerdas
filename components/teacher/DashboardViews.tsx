@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -359,7 +359,7 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                                 </p>
                                 <p className="flex items-center gap-2">
                                     <ListBulletIcon className="w-4 h-4" />
-                                    {exam.questions.length} Soal Tersimpan
+                                    {exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan
                                 </p>
                             </div>
                             <button 
