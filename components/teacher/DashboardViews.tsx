@@ -11,7 +11,8 @@ import {
     ClockIcon,
     CalendarDaysIcon,
     ChartBarIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    TrashIcon
 } from '../Icons';
 
 // --- REMAINING TIME COMPONENT ---
@@ -319,9 +320,10 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
 interface DraftsViewProps {
     exams: Exam[];
     onContinueDraft: (exam: Exam) => void;
+    onDeleteDraft: (exam: Exam) => void;
 }
 
-export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft }) => {
+export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, onDeleteDraft }) => {
     return (
         <div className="space-y-6 animate-fade-in">
             <div>
@@ -331,8 +333,20 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft }
             {exams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-lg border border-dashed border-gray-300 shadow-sm hover:shadow-md hover:border-primary transition-all duration-200">
-                            <div className="flex justify-between items-start mb-3">
+                        <div key={exam.code} className="bg-white p-5 rounded-lg border border-dashed border-gray-300 shadow-sm hover:shadow-md hover:border-primary transition-all duration-200 relative group">
+                            {/* Delete Button */}
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteDraft(exam);
+                                }}
+                                className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                title="Hapus Draf"
+                            >
+                                <TrashIcon className="w-4 h-4" />
+                            </button>
+
+                            <div className="flex justify-between items-start mb-3 pr-8">
                                 <h3 className="font-bold text-lg text-gray-700">{exam.code}</h3>
                                 <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wider">
                                     DRAFT
