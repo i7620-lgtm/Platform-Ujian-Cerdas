@@ -309,6 +309,7 @@ const App: React.FC = () => {
       // NOTE: Logic is handled in DashboardModals.tsx now for granular loading state.
       // This global handler is kept for legacy ref or if called from other contexts.
       // But we will refresh the global results list afterwards.
+      console.log(`Global unlock sync triggered for Student: ${studentId}, Exam: ${examCode}`);
       await refreshResults();
   };
 
