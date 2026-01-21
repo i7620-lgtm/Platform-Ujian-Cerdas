@@ -166,6 +166,22 @@ class StorageService {
     }
   }
 
+  async deleteExam(code: string): Promise<void> {
+      // 1. Delete Local
+      const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
+      delete exams[code];
+      this.saveLocal(KEYS.EXAMS, exams);
+
+      // 2. Delete Cloud
+      if (this.isOnline) {
+          try {
+              await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, {
+                  method: 'DELETE'
+              }));
+          } catch (e) { console.warn("Failed to delete exam from cloud"); }
+      }
+  }
+
   // --- RESULTS ---
   async getResults(): Promise<Result[]> {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
