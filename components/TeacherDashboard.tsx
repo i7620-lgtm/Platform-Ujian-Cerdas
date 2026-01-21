@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result } from '../types';
 import { 
@@ -51,7 +51,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         showResultToStudent: true,
         showCorrectAnswer: false,
         enablePublicStream: false,
-        trackLocation: false
+        trackLocation: false,
+        subject: 'Lainnya',
+        classLevel: 'Lainnya',
+        examType: 'Lainnya',
+        description: ''
     });
     
     const [generatedCode, setGeneratedCode] = useState('');
@@ -157,7 +161,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             showResultToStudent: true,
             showCorrectAnswer: false,
             enablePublicStream: false,
-            trackLocation: false
+            trackLocation: false,
+            subject: 'Lainnya',
+            classLevel: 'Lainnya',
+            examType: 'Lainnya',
+            description: ''
         });
         setView('UPLOAD');
         setResetKey(prev => prev + 1);
