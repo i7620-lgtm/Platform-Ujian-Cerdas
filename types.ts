@@ -37,6 +37,11 @@ export interface ExamConfig {
   showCorrectAnswer: boolean;
   enablePublicStream: boolean;
   trackLocation: boolean;
+  // Metadata
+  subject: string;
+  classLevel: string;
+  examType: string;
+  description: string;
 }
 
 export interface Exam {
