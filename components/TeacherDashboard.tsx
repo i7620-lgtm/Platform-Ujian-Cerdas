@@ -19,6 +19,7 @@ interface TeacherDashboardProps {
     teacherId: string;
     addExam: (newExam: Exam) => void;
     updateExam: (updatedExam: Exam) => void;
+    deleteExam: (code: string) => Promise<void>;
     exams: Record<string, Exam>;
     results: Result[];
     onLogout: () => void;
@@ -30,7 +31,7 @@ interface TeacherDashboardProps {
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    teacherId, addExam, updateExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
+    teacherId, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     
@@ -88,7 +89,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             return;
         }
         
-        // Kode: Gunakan yang ada jika edit, atau generate baru
+        // LOGIC REVISI: Kode hanya digenerate saat KLIK SIMPAN pertama kali
         const code = editingExam ? editingExam.code : generateExamCode();
         
         const now = new Date();
@@ -108,14 +109,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         if (editingExam) {
             updateExam(examData);
-            setIsEditModalOpen(false);
-            setEditingExam(null);
-            alert(status === 'DRAFT' ? 'Draf berhasil disimpan!' : 'Ujian berhasil diperbarui!');
+            if (status === 'DRAFT') {
+                alert('Draf berhasil diperbarui!');
+            } else {
+                setIsEditModalOpen(false);
+                setEditingExam(null);
+                alert('Ujian berhasil diperbarui!');
+            }
         } else {
             addExam(examData); 
-            setGeneratedCode(code);
-            // Don't alert for draft, the UI usually handles "saved" state visually, but here alert is fine.
-            if (status === 'DRAFT') alert("Disimpan ke Draf.");
+            // PENTING: Set editingExam ke data baru agar jika user klik simpan lagi,
+            // dia tidak membuat draf baru dengan kode berbeda, tapi mengupdate yang ini.
+            setEditingExam(examData); 
+            
+            if (status === 'DRAFT') {
+                alert("Disimpan ke Draf.");
+            } else {
+                setGeneratedCode(code);
+            }
+        }
+    };
+
+    const handleDeleteExam = async (exam: Exam) => {
+        if(confirm(`Apakah Anda yakin ingin menghapus draf "${exam.code}"? Tindakan ini tidak dapat dibatalkan.`)) {
+            await deleteExam(exam.code);
+            // Refresh local state visually immediately 
+            // (Note: `deleteExam` implementation usually updates parent state, triggering re-render)
         }
     };
 
@@ -255,6 +274,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     <DraftsView 
                         exams={draftExams}
                         onContinueDraft={continueDraft}
+                        onDeleteDraft={handleDeleteExam}
                     />
                 )}
 
