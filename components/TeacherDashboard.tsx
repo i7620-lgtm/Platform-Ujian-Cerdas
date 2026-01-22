@@ -142,6 +142,34 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     };
 
+    const handleDuplicateExam = (exam: Exam) => {
+        if (!confirm(`Gunakan kembali soal dari ujian "${exam.code}" untuk sesi baru?`)) return;
+
+        // Reset state editor dengan data dari exam yang dipilih
+        setQuestions(exam.questions);
+        
+        // Reset konfigurasi waktu ke default "Sekarang/Besok" agar valid
+        setConfig({
+            ...exam.config,
+            date: new Date().toISOString().split('T')[0],
+            startTime: '08:00',
+        });
+
+        // Set mode ke manual agar editor muncul
+        setManualMode(true);
+        // Pastikan editingExam NULL agar saat disimpan membuat entri BARU dengan kode unik
+        setEditingExam(null);
+        setGeneratedCode('');
+        
+        // Pindah view
+        setView('UPLOAD');
+        // Trigger reset key untuk refresh komponen CreationView (opsional)
+        setResetKey(prev => prev + 1);
+
+        // Feedback
+        alert('Soal berhasil disalin ke editor! Silakan sesuaikan tanggal dan pengaturan lainnya sebelum menyimpan.');
+    };
+
     const resetForm = () => {
         setQuestions([]);
         setGeneratedCode('');
@@ -291,6 +319,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         exams={ongoingExams} 
                         results={results} 
                         onSelectExam={setSelectedOngoingExam} 
+                        onDuplicateExam={handleDuplicateExam}
                     />
                 )}
 
@@ -305,6 +334,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     <FinishedExamsView 
                         exams={finishedExams} 
                         onSelectExam={setSelectedFinishedExam} 
+                        onDuplicateExam={handleDuplicateExam}
                     />
                 )}
             </main>
