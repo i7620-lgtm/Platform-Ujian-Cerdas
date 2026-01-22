@@ -12,7 +12,8 @@ import {
     CalendarDaysIcon,
     ChartBarIcon,
     CheckCircleIcon,
-    TrashIcon
+    TrashIcon,
+    DocumentDuplicateIcon
 } from '../Icons';
 
 // --- REMAINING TIME COMPONENT ---
@@ -391,9 +392,10 @@ interface OngoingExamsProps {
     exams: Exam[];
     results: Result[];
     onSelectExam: (exam: Exam) => void;
+    onDuplicateExam: (exam: Exam) => void;
 }
 
-export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, onSelectExam }) => {
+export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     return (
         <div className="space-y-6 animate-fade-in">
             <div>
@@ -403,25 +405,38 @@ export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, 
             {exams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-lg border shadow-sm hover:shadow-lg hover:border-primary transition-all duration-200 cursor-pointer" onClick={() => onSelectExam(exam)}>
-                            <div className="flex justify-between items-start">
-                                <div>
-                                     <h3 className="font-bold text-lg text-primary">{exam.code}</h3>
-                                     {exam.config.subject && exam.config.subject !== 'Lainnya' && (
-                                         <p className="text-xs font-semibold text-gray-600 mt-0.5">{exam.config.subject} • {exam.config.classLevel}</p>
-                                     )}
-                                </div>
-                                <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full whitespace-nowrap">
-                                    {results.filter(r => r.examCode === exam.code).length} Siswa
-                                </span>
+                        <div key={exam.code} className="bg-white p-5 rounded-lg border shadow-sm hover:shadow-lg hover:border-primary transition-all duration-200 relative group">
+                            
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }}
+                                    className="p-1.5 bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-primary rounded-lg"
+                                    title="Gunakan Kembali Soal (Duplikasi)"
+                                >
+                                    <DocumentDuplicateIcon className="w-4 h-4" />
+                                </button>
                             </div>
-                            <p className="text-sm text-gray-500 mt-2">
-                                {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </p>
-                            <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                                <span className="text-sm font-semibold text-gray-600">Sisa Waktu:</span>
-                                <div className="text-lg text-red-500">
-                                    <RemainingTime exam={exam} />
+
+                            <div onClick={() => onSelectExam(exam)} className="cursor-pointer">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                         <h3 className="font-bold text-lg text-primary">{exam.code}</h3>
+                                         {exam.config.subject && exam.config.subject !== 'Lainnya' && (
+                                             <p className="text-xs font-semibold text-gray-600 mt-0.5">{exam.config.subject} • {exam.config.classLevel}</p>
+                                         )}
+                                    </div>
+                                    <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full whitespace-nowrap">
+                                        {results.filter(r => r.examCode === exam.code).length} Siswa
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-2">
+                                    {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </p>
+                                <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-gray-600">Sisa Waktu:</span>
+                                    <div className="text-lg text-red-500">
+                                        <RemainingTime exam={exam} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -494,19 +509,20 @@ export const UpcomingExamsView: React.FC<UpcomingExamsProps> = ({ exams, onEditE
 interface FinishedExamsProps {
     exams: Exam[];
     onSelectExam: (exam: Exam) => void;
+    onDuplicateExam: (exam: Exam) => void;
 }
 
-export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam }) => {
+export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam }) => {
     return (
         <div className="space-y-6 animate-fade-in">
             <div>
                 <h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2>
-                <p className="text-base-content mt-1">Lihat kembali hasil dari ujian yang telah selesai.</p>
+                <p className="text-base-content mt-1">Lihat kembali hasil dari ujian yang telah selesai atau gunakan kembali soalnya.</p>
             </div>
             {exams.length > 0 ? (
                 <div className="space-y-3">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all hover:shadow-md hover:border-gray-400">
+                        <div key={exam.code} className="bg-white p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all hover:shadow-md hover:border-gray-400 group">
                             <div className="flex items-center gap-4">
                                 <div className="bg-gray-100 p-3 rounded-lg">
                                     <CheckCircleIcon className="w-6 h-6 text-gray-600" />
@@ -521,10 +537,21 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => onSelectExam(exam)} className="flex items-center gap-2 bg-primary text-primary-content px-4 py-2 text-sm rounded-md hover:bg-primary-focus transition-colors font-semibold shadow-sm self-end sm:self-auto">
-                                <ChartBarIcon className="w-4 h-4" />
-                                Lihat Hasil
-                            </button>
+                            
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button 
+                                    onClick={() => onDuplicateExam(exam)} 
+                                    className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 text-sm rounded-md hover:bg-gray-200 hover:text-gray-800 transition-colors font-semibold shadow-sm"
+                                    title="Gunakan Kembali Soal (Duplikasi)"
+                                >
+                                    <DocumentDuplicateIcon className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Gunakan Lagi</span>
+                                </button>
+                                <button onClick={() => onSelectExam(exam)} className="flex items-center gap-2 bg-primary text-primary-content px-4 py-2 text-sm rounded-md hover:bg-primary-focus transition-colors font-semibold shadow-sm">
+                                    <ChartBarIcon className="w-4 h-4" />
+                                    Lihat Hasil
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
