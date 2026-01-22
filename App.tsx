@@ -77,11 +77,13 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Check URL for Public Stream Parameter with Retry Logic
+  // Check URL for Public Stream or Preview Parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
+    const previewCode = urlParams.get('preview');
     
+    // --- MODE 1: PUBLIC STREAM ---
     if (streamCode) {
         const loadStream = async (retries = 3) => {
             setIsSyncing(true);
@@ -111,13 +113,45 @@ const App: React.FC = () => {
                      setTimeout(() => loadStream(retries - 1), 1500);
                 }
             } finally {
-                // Only stop syncing indicator if we are done or out of retries
                 if (retries <= 0 || view === 'PUBLIC_STREAM') {
                     setIsSyncing(false);
                 }
             }
         };
         loadStream();
+        return;
+    }
+
+    // --- MODE 2: EXAM PREVIEW (DRAFT) ---
+    if (previewCode) {
+        const loadPreview = async () => {
+            setIsSyncing(true);
+            try {
+                // fetch with isPreview = true
+                const exam = await storageService.getExamForStudent(previewCode, true);
+                
+                if (exam) {
+                    const dummyStudent: Student = {
+                        fullName: "Mode Preview",
+                        class: "Guru",
+                        studentId: "PREVIEW-" + Date.now().toString().slice(-4)
+                    };
+                    setCurrentExam(exam);
+                    setCurrentStudent(dummyStudent);
+                    setView('STUDENT_EXAM');
+                    alert("Masuk ke Mode Preview. Jawaban Anda tidak akan disimpan secara permanen.");
+                } else {
+                     alert("Gagal memuat preview. Soal tidak ditemukan.");
+                     window.history.replaceState(null, '', '/');
+                }
+            } catch(e) {
+                 console.error("Failed to preview", e);
+                 alert("Terjadi kesalahan saat memuat preview.");
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+        loadPreview();
     }
   }, [refreshResults]); // Dependencies stable
 
@@ -244,6 +278,9 @@ const App: React.FC = () => {
   const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
     
+    // IF PREVIEW MODE: Don't save to DB (or save as dummy but don't care)
+    const isPreview = currentStudent.studentId.startsWith('PREVIEW');
+
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -254,6 +291,8 @@ const App: React.FC = () => {
         location 
     };
     
+    // In Preview, we just calculate score locally if possible, or send to API but ignore result
+    // To make it simple, we send it. The dashboard filter will show "Guru" class results if needed.
     const finalResult = await storageService.submitExamResult({
         ...resultPayload,
         status: 'completed' 
