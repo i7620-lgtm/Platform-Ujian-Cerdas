@@ -110,14 +110,11 @@ class StorageService {
     return localExams;
   }
 
-  async getExamForStudent(code: string): Promise<Exam | null> {
+  async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
 
       // CRITICAL FIX: Deteksi Cache "Beracun" (Old Version)
-      // Jika data lokal mengandung soal Menjodohkan dimana opsinya tertulis '?', 
-      // ini berarti data tersebut berasal dari versi lama yang menyembunyikan opsi.
-      // Kita harus memaksa refresh dari server.
       let isPoisoned = false;
       if (exam && exam.questions) {
           isPoisoned = exam.questions.some(q => 
@@ -128,18 +125,22 @@ class StorageService {
       }
 
       if (this.isOnline) {
-          // Jika tidak ada di lokal ATAU data lokal rusak (isPoisoned), ambil dari cloud
-          if (!exam || isPoisoned) {
+          // Jika tidak ada di lokal ATAU data lokal rusak (isPoisoned) ATAU ini mode preview, ambil dari cloud
+          if (!exam || isPoisoned || isPreview) {
               if (isPoisoned) console.log(`[Storage] Detected poisoned cache for exam ${code}. Forcing refresh from cloud.`);
               
               try {
+                  const previewParam = isPreview ? '&preview=true' : '';
                   // Tambahkan timestamp (_t) untuk bypass cache Vercel Edge / Browser
-                  const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true&_t=${Date.now()}`));
+                  const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`));
                   if (res.ok) {
                       exam = await res.json();
                       if (exam) { 
-                          allExams[exam.code] = exam; 
-                          this.saveLocal(KEYS.EXAMS, allExams); 
+                          // Jika preview, jangan simpan di local storage siswa biasa agar tidak mengotori cache
+                          if (!isPreview) {
+                              allExams[exam.code] = exam; 
+                              this.saveLocal(KEYS.EXAMS, allExams); 
+                          }
                       }
                   }
               } catch(e) { console.warn("Failed to fetch exam from cloud, checking local..."); }
