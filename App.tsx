@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -278,9 +277,6 @@ const App: React.FC = () => {
   const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
     
-    // IF PREVIEW MODE: Don't save to DB (or save as dummy but don't care)
-    const isPreview = currentStudent.studentId.startsWith('PREVIEW');
-
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
