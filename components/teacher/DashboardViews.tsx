@@ -724,3 +724,4 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
         </div>
     );
 };
+ 
