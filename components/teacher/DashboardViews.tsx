@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -15,7 +14,6 @@ import {
     TrashIcon,
     DocumentDuplicateIcon,
     EyeIcon,
-    QrCodeIcon,
     XMarkIcon
 } from '../Icons';
 
@@ -356,7 +354,7 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.map(exam => (
                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full">
-                            {/* Delete Button - UPDATED VISIBILITY */}
+                            {/* Delete Button */}
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
