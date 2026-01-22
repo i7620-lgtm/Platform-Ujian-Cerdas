@@ -36,7 +36,7 @@ export const RemainingTime: React.FC<{ exam: Exam }> = ({ exam }) => {
     }, [exam]);
 
     if (timeLeft === 0) {
-        return <span className="text-red-600 font-bold">Waktu Habis</span>;
+        return <span className="text-rose-600 font-bold">Waktu Habis</span>;
     }
 
     const hours = Math.floor(timeLeft / (1000 * 60 * 60));
@@ -44,8 +44,18 @@ export const RemainingTime: React.FC<{ exam: Exam }> = ({ exam }) => {
     const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
 
     return (
-        <span className="font-mono tracking-wider">
+        <span className="font-mono tracking-wider tabular-nums">
             {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+        </span>
+    );
+};
+
+// --- HELPER FOR METADATA BADGES ---
+const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => {
+    if (!text || text === 'Lainnya') return null;
+    return (
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>
+            {text}
         </span>
     );
 };
@@ -161,11 +171,11 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Method 3: Manual */}
                     <div 
-                        className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 group border-gray-200 hover:border-primary/50 hover:shadow-md`}
+                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group border-gray-100 hover:border-primary/50 hover:shadow-lg bg-white`}
                         onClick={handleManualCreateClick}
                     >
                         <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-full transition-colors bg-gray-100 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary`}>
+                            <div className={`p-4 rounded-2xl transition-colors bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary`}>
                                 <PencilIcon className="w-8 h-8" />
                             </div>
                             <h3 className="font-bold text-lg text-neutral">Buat Manual</h3>
@@ -177,11 +187,11 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
 
                     {/* Method 1: Upload PDF */}
                     <div 
-                        className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 group ${inputMethod === 'upload' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-200 hover:border-primary/50 hover:shadow-md'}`}
+                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'upload' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`}
                         onClick={() => setInputMethod('upload')}
                     >
                         <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-full transition-colors ${inputMethod === 'upload' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                            <div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'upload' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
                                 <CloudArrowUpIcon className="w-8 h-8" />
                             </div>
                             <h3 className="font-bold text-lg text-neutral">Unggah PDF Soal</h3>
@@ -193,11 +203,11 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
 
                     {/* Method 2: Paste Text */}
                     <div 
-                        className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 group ${inputMethod === 'paste' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-200 hover:border-primary/50 hover:shadow-md'}`}
+                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'paste' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`}
                         onClick={() => setInputMethod('paste')}
                     >
                         <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-full transition-colors ${inputMethod === 'paste' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                            <div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'paste' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
                                 <ListBulletIcon className="w-8 h-8" />
                             </div>
                             <h3 className="font-bold text-lg text-neutral">Tempel Teks Soal</h3>
@@ -208,7 +218,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border shadow-sm transition-all duration-300">
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-all duration-300">
                     <div className="mb-4">
                         <h3 className="text-lg font-bold text-neutral mb-1">
                             {inputMethod === 'upload' ? 'Unggah File PDF' : 'Tempel Teks Soal'}
@@ -220,7 +230,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
 
                     {inputMethod === 'upload' ? (
                         <div className="space-y-4">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors relative">
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative">
                                 <input 
                                     type="file" 
                                     accept=".pdf" 
@@ -248,8 +258,8 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                             {previewImages.length > 0 && (
                                 <div className="space-y-2">
                                     <p className="text-sm font-semibold text-gray-700">Pratinjau Halaman Pertama:</p>
-                                    <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto bg-gray-100 p-2 text-center">
-                                        <img src={previewImages[0]} alt="Preview PDF" className="max-w-full h-auto mx-auto shadow-sm" />
+                                    <div className="border rounded-xl overflow-hidden max-h-[300px] overflow-y-auto bg-gray-50 p-2 text-center">
+                                        <img src={previewImages[0]} alt="Preview PDF" className="max-w-full h-auto mx-auto shadow-sm rounded-lg" />
                                     </div>
                                     <div className="flex justify-end">
                                         <button 
@@ -269,7 +279,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                             <textarea
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                className="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm resize-y"
+                                className="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm resize-y"
                                 placeholder={`Contoh Format:\n\n1. Apa ibukota Indonesia?\nA. Bandung\nB. Jakarta\nC. Surabaya\nD. Medan\n\nKunci Jawaban: B`}
                             />
                             {inputText && (
@@ -287,7 +297,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                     )}
                     
                     {error && (
-                        <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-start gap-2">
+                        <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-xl flex items-start gap-2 border border-red-100">
                             <span className="font-bold">Error:</span> {error}
                         </div>
                     )}
@@ -296,7 +306,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                         <button 
                             onClick={handleStartAnalysis} 
                             disabled={isLoading || (!inputText && !uploadedFile)}
-                            className={`w-full sm:w-auto px-8 py-3 rounded-lg font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all ${isLoading || (!inputText && !uploadedFile) ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-focus hover:shadow-lg transform hover:-translate-y-0.5'}`}
+                            className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all ${isLoading || (!inputText && !uploadedFile) ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-focus hover:shadow-lg transform hover:-translate-y-0.5'}`}
                         >
                             {isLoading ? (
                                 <>
@@ -327,48 +337,64 @@ interface DraftsViewProps {
 export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, onDeleteDraft }) => {
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="text-2xl font-bold text-neutral">Draf Soal</h2>
-                <p className="text-base-content mt-1">Lanjutkan pembuatan soal yang belum selesai.</p>
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                    <PencilIcon className="w-6 h-6 text-gray-600" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-neutral">Draf Soal</h2>
+                    <p className="text-sm text-gray-500">Lanjutkan pembuatan soal yang belum selesai.</p>
+                </div>
             </div>
+
             {exams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-lg border border-dashed border-gray-300 shadow-sm hover:shadow-md hover:border-primary transition-all duration-200 relative group">
+                        <div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full">
                             {/* Delete Button */}
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onDeleteDraft(exam);
                                 }}
-                                className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
                                 title="Hapus Draf"
                             >
                                 <TrashIcon className="w-4 h-4" />
                             </button>
 
-                            <div className="flex flex-col mb-3 pr-8">
-                                <h3 className="font-bold text-lg text-gray-700">{exam.code}</h3>
-                                {exam.config.subject && exam.config.subject !== 'Lainnya' && (
-                                     <span className="text-xs font-semibold text-primary/80 mb-1">{exam.config.subject}</span>
-                                )}
-                                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wider w-fit mt-1">
-                                    DRAFT
-                                </span>
+                            <div className="flex-1">
+                                <div className="flex items-start justify-between mb-2">
+                                     <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase tracking-wider border border-gray-200">
+                                        Draft
+                                    </span>
+                                </div>
+                                <h3 className="font-bold text-lg text-gray-800 mb-1">{exam.config.subject || "Tanpa Judul"}</h3>
+                                <p className="text-sm text-gray-400 font-mono font-medium mb-3">{exam.code}</p>
+
+                                {/* Metadata Tags */}
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    <MetaBadge text={exam.config.classLevel} colorClass="bg-blue-50 text-blue-700 border-blue-100" />
+                                    <MetaBadge text={exam.config.examType} colorClass="bg-purple-50 text-purple-700 border-purple-100" />
+                                </div>
+
+                                <div className="h-px bg-gray-50 w-full mb-4"></div>
+
+                                <div className="text-xs text-gray-500 space-y-2 mb-6">
+                                    <div className="flex items-center gap-2">
+                                        <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
+                                        <span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <ListBulletIcon className="w-4 h-4 text-gray-400" />
+                                        <span>{exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="text-sm text-gray-500 space-y-1 mb-4">
-                                <p className="flex items-center gap-2">
-                                    <CalendarDaysIcon className="w-4 h-4" />
-                                    {new Date(exam.config.date).toLocaleDateString('id-ID')}
-                                </p>
-                                <p className="flex items-center gap-2">
-                                    <ListBulletIcon className="w-4 h-4" />
-                                    {exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan
-                                </p>
-                            </div>
+                            
                             <button 
                                 onClick={() => onContinueDraft(exam)}
-                                className="w-full py-2 px-4 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"
                             >
                                 <PencilIcon className="w-4 h-4" />
                                 Lanjutkan Edit
@@ -377,9 +403,11 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-16 bg-white rounded-lg border border-dashed border-gray-300">
-                    <PencilIcon className="mx-auto h-12 w-12 text-gray-300" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Belum Ada Draf</h3>
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <PencilIcon className="h-8 w-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">Belum Ada Draf</h3>
                     <p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p>
                 </div>
             )}
@@ -398,54 +426,81 @@ interface OngoingExamsProps {
 export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="text-2xl font-bold text-neutral">Ujian Sedang Berlangsung</h2>
-                <p className="text-base-content mt-1">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p>
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                    <ClockIcon className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-neutral">Ujian Sedang Berlangsung</h2>
+                    <p className="text-sm text-gray-500">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p>
+                </div>
             </div>
+
             {exams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-lg border shadow-sm hover:shadow-lg hover:border-primary transition-all duration-200 relative group">
+                    {exams.map(exam => {
+                        const activeCount = results.filter(r => r.examCode === exam.code).length;
+                        return (
+                        <div key={exam.code} className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-xl hover:shadow-emerald-50 hover:border-emerald-300 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
                             
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-4 right-4 z-10">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }}
-                                    className="p-1.5 bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-primary rounded-lg"
-                                    title="Gunakan Kembali Soal (Duplikasi)"
+                                    className="p-2 bg-white text-gray-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-transparent hover:border-gray-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                                    title="Gunakan Kembali Soal"
                                 >
                                     <DocumentDuplicateIcon className="w-4 h-4" />
                                 </button>
                             </div>
 
-                            <div onClick={() => onSelectExam(exam)} className="cursor-pointer">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                         <h3 className="font-bold text-lg text-primary">{exam.code}</h3>
-                                         {exam.config.subject && exam.config.subject !== 'Lainnya' && (
-                                             <p className="text-xs font-semibold text-gray-600 mt-0.5">{exam.config.subject} • {exam.config.classLevel}</p>
-                                         )}
-                                    </div>
-                                    <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full whitespace-nowrap">
-                                        {results.filter(r => r.examCode === exam.code).length} Siswa
-                                    </span>
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex flex-col">
+                                     <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5">
+                                        <span className="relative flex h-2 w-2">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                        </span>
+                                        Sedang Berlangsung
+                                     </span>
+                                     <h3 className="font-bold text-xl text-neutral">{exam.config.subject || exam.code}</h3>
+                                     <p className="text-sm font-mono text-gray-400 mt-0.5">{exam.code}</p>
                                 </div>
-                                <p className="text-sm text-gray-500 mt-2">
-                                    {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                </p>
-                                <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-gray-600">Sisa Waktu:</span>
-                                    <div className="text-lg text-red-500">
+                            </div>
+                            
+                            {/* Metadata */}
+                            <div className="flex flex-wrap gap-2 mt-3 mb-5">
+                                <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
+                                <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
+                            </div>
+
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Partisipan</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="flex -space-x-2">
+                                            {[...Array(Math.min(3, activeCount))].map((_, i) => (
+                                                <div key={i} className="w-6 h-6 rounded-full bg-emerald-200 border-2 border-white"></div>
+                                            ))}
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-700">{activeCount} Siswa</span>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Sisa Waktu</span>
+                                    <div className="text-lg font-bold text-rose-500 mt-0.5">
                                         <RemainingTime exam={exam} />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             ) : (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                    <ClockIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Tidak Ada Ujian Aktif</h3>
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <ClockIcon className="h-8 w-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Aktif</h3>
                     <p className="mt-1 text-sm text-gray-500">Saat ini tidak ada ujian yang sedang berlangsung.</p>
                 </div>
             )}
@@ -461,43 +516,63 @@ interface UpcomingExamsProps {
 
 export const UpcomingExamsView: React.FC<UpcomingExamsProps> = ({ exams, onEditExam }) => {
     return (
-        <div className="space-y-3">
-            <div>
-                <h2 className="text-2xl font-bold text-neutral">Ujian Akan Datang</h2>
-                <p className="text-base-content mt-1">Daftar semua ujian yang telah dijadwalkan untuk masa depan.</p>
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                    <CalendarDaysIcon className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-neutral">Ujian Akan Datang</h2>
+                    <p className="text-sm text-gray-500">Daftar semua ujian yang telah dijadwalkan.</p>
+                </div>
             </div>
+
             {exams.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all hover:shadow-md hover:border-secondary">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-secondary/10 p-3 rounded-lg">
-                                    <CalendarDaysIcon className="w-6 h-6 text-secondary" />
+                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 group">
+                            <div className="flex items-start gap-5">
+                                <div className="bg-blue-50 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 border border-blue-100 shrink-0">
+                                    <span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span>
+                                    <span className="text-xl font-black leading-none">{new Date(exam.config.date).getDate()}</span>
                                 </div>
                                 <div>
-                                    <p className="font-bold text-lg text-neutral">{exam.code}</p>
-                                    <div className="text-sm text-gray-500">
-                                        {exam.config.subject && exam.config.subject !== 'Lainnya' ? (
-                                            <span className="font-semibold text-gray-700 mr-2">{exam.config.subject} ({exam.config.classLevel})</span>
-                                        ) : null}
-                                        <span>
-                                            {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                            {` • ${exam.config.startTime}`}
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-bold text-lg text-neutral">{exam.config.subject || "Tanpa Judul"}</h3>
+                                        <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span>
+                                    </div>
+                                    
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
+                                        <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
+                                    </div>
+
+                                    <div className="text-xs text-gray-500 flex items-center gap-3 font-medium">
+                                        <span className="flex items-center gap-1.5">
+                                            <ClockIcon className="w-3.5 h-3.5"/> 
+                                            {exam.config.startTime} WIB
                                         </span>
+                                        <span className="text-gray-300">•</span>
+                                        <span>{exam.config.timeLimit} Menit</span>
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => onEditExam(exam)} className="flex items-center gap-2 bg-accent text-white px-4 py-2 text-sm rounded-md hover:bg-accent-focus transition-colors font-semibold shadow-sm self-end sm:self-auto">
+                            <button 
+                                onClick={() => onEditExam(exam)} 
+                                className="flex items-center justify-center gap-2 bg-white border-2 border-gray-100 text-gray-600 px-5 py-2.5 text-sm rounded-xl hover:border-primary hover:text-primary transition-all font-bold shadow-sm self-end md:self-center w-full md:w-auto"
+                            >
                                 <PencilIcon className="w-4 h-4" />
-                                Edit
+                                Edit Detail
                             </button>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-12 bg-white rounded-lg border mt-4">
-                    <CalendarDaysIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Tidak Ada Ujian Terjadwal</h3>
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CalendarDaysIcon className="h-8 w-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Terjadwal</h3>
                     <p className="mt-1 text-sm text-gray-500">Buat ujian baru untuk memulai.</p>
                 </div>
             )}
@@ -515,39 +590,54 @@ interface FinishedExamsProps {
 export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam }) => {
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2>
-                <p className="text-base-content mt-1">Lihat kembali hasil dari ujian yang telah selesai atau gunakan kembali soalnya.</p>
+             <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                    <ChartBarIcon className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2>
+                    <p className="text-sm text-gray-500">Riwayat dan hasil ujian yang telah berakhir.</p>
+                </div>
             </div>
+
             {exams.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all hover:shadow-md hover:border-gray-400 group">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-gray-100 p-3 rounded-lg">
-                                    <CheckCircleIcon className="w-6 h-6 text-gray-600" />
+                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-gray-300 group">
+                            <div className="flex items-start gap-4">
+                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <CheckCircleIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500 transition-colors" />
                                 </div>
                                 <div>
-                                    <p className="font-bold text-lg text-neutral">{exam.code}</p>
-                                    <div className="text-sm text-gray-500">
-                                        {exam.config.subject && exam.config.subject !== 'Lainnya' ? (
-                                             <span className="font-semibold text-gray-700 mr-2">{exam.config.subject}</span>
-                                        ) : null}
-                                        <span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                    <div className="flex items-center gap-2 mb-1">
+                                         <h3 className="font-bold text-lg text-neutral">{exam.config.subject || exam.code}</h3>
+                                         <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
+                                        <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
+                                    </div>
+
+                                    <div className="text-xs text-gray-400">
+                                        Berakhir pada: {new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
                                 <button 
                                     onClick={() => onDuplicateExam(exam)} 
-                                    className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 text-sm rounded-md hover:bg-gray-200 hover:text-gray-800 transition-colors font-semibold shadow-sm"
-                                    title="Gunakan Kembali Soal (Duplikasi)"
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-colors font-bold shadow-sm border border-gray-200"
+                                    title="Gunakan Kembali Soal"
                                 >
                                     <DocumentDuplicateIcon className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Gunakan Lagi</span>
+                                    <span className="md:hidden lg:inline">Reuse</span>
                                 </button>
-                                <button onClick={() => onSelectExam(exam)} className="flex items-center gap-2 bg-primary text-primary-content px-4 py-2 text-sm rounded-md hover:bg-primary-focus transition-colors font-semibold shadow-sm">
+                                <button 
+                                    onClick={() => onSelectExam(exam)} 
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black transition-all font-bold shadow-lg shadow-gray-200 transform active:scale-95"
+                                >
                                     <ChartBarIcon className="w-4 h-4" />
                                     Lihat Hasil
                                 </button>
@@ -556,9 +646,11 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                     ))}
                 </div>
             ) : (
-                    <div className="text-center py-12 bg-white rounded-lg border mt-4">
-                    <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Belum Ada Ujian Selesai</h3>
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <ChartBarIcon className="h-8 w-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">Belum Ada Riwayat</h3>
                     <p className="mt-1 text-sm text-gray-500">Hasil ujian yang telah selesai akan muncul di sini.</p>
                 </div>
             )}
