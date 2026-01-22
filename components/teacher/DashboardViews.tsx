@@ -351,13 +351,13 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.map(exam => (
                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full">
-                            {/* Delete Button */}
+                            {/* Delete Button - UPDATED VISIBILITY */}
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onDeleteDraft(exam);
                                 }}
-                                className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10"
                                 title="Hapus Draf"
                             >
                                 <TrashIcon className="w-4 h-4" />
