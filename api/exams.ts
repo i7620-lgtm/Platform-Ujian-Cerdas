@@ -136,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // --- GET: AMBIL DATA ---
         if (req.method === 'GET') {
-            const { code } = req.query;
+            const { code, preview } = req.query;
 
             if (code && req.url?.includes('public')) {
                 const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
@@ -144,8 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 const exam = sanitizeExam(result.rows[0]);
                 
-                // Block Drafts from Public View
-                if (exam.status === 'DRAFT') {
+                // Block Drafts from Public View UNLESS in Preview Mode
+                if (exam.status === 'DRAFT' && preview !== 'true') {
                     return res.status(403).json({ error: 'Exam is currently in draft mode.' });
                 }
 
