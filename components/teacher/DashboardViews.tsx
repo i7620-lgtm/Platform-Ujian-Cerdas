@@ -13,7 +13,10 @@ import {
     ChartBarIcon,
     CheckCircleIcon,
     TrashIcon,
-    DocumentDuplicateIcon
+    DocumentDuplicateIcon,
+    EyeIcon,
+    QrCodeIcon,
+    XMarkIcon
 } from '../Icons';
 
 // --- REMAINING TIME COMPONENT ---
@@ -335,6 +338,8 @@ interface DraftsViewProps {
 }
 
 export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, onDeleteDraft }) => {
+    const [previewExam, setPreviewExam] = useState<Exam | null>(null);
+
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex items-center gap-2">
@@ -392,13 +397,23 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                                 </div>
                             </div>
                             
-                            <button 
-                                onClick={() => onContinueDraft(exam)}
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                            >
-                                <PencilIcon className="w-4 h-4" />
-                                Lanjutkan Edit
-                            </button>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => setPreviewExam(exam)}
+                                    className="flex-1 py-2.5 px-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 hover:text-primary transition-colors flex items-center justify-center gap-2 shadow-sm"
+                                    title="Preview Soal"
+                                >
+                                    <EyeIcon className="w-4 h-4" />
+                                    Preview
+                                </button>
+                                <button 
+                                    onClick={() => onContinueDraft(exam)}
+                                    className="flex-[2] py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <PencilIcon className="w-4 h-4" />
+                                    Edit
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -409,6 +424,60 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                     </div>
                     <h3 className="text-base font-bold text-gray-900">Belum Ada Draf</h3>
                     <p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p>
+                </div>
+            )}
+
+            {/* PREVIEW MODAL */}
+            {previewExam && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up">
+                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-gray-800">Preview Ujian</h3>
+                            <button onClick={() => setPreviewExam(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+                                <XMarkIcon className="w-6 h-6 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="p-8 flex flex-col items-center text-center">
+                             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                                <EyeIcon className="w-8 h-8" />
+                            </div>
+                            <h4 className="text-xl font-bold text-gray-900 mb-1">{previewExam.config.subject || "Draf Ujian"}</h4>
+                            <p className="text-sm text-gray-500 mb-6 font-mono bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{previewExam.code}</p>
+                            
+                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?preview=${previewExam.code}`)}&margin=10`} 
+                                    alt="QR Preview" 
+                                    className="w-40 h-40 object-contain"
+                                />
+                            </div>
+                            
+                            <p className="text-xs text-gray-400 mb-4 max-w-xs">
+                                Pindai QR Code atau gunakan link di bawah untuk mencoba mengerjakan soal ini (Mode Preview).
+                            </p>
+
+                            <div className="flex gap-3 w-full">
+                                <button 
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/?preview=${previewExam.code}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert("Link Preview berhasil disalin!");
+                                    }}
+                                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm"
+                                >
+                                    Salin Link
+                                </button>
+                                <a 
+                                    href={`/?preview=${previewExam.code}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
+                                >
+                                    Coba Sekarang
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
