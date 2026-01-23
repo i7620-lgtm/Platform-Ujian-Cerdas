@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
-    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon 
+    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon, CalculatorIcon 
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -41,6 +41,237 @@ const EXAM_TYPES = [
     "Penilaian Akhir Semester (PAS)", "Lomba", "Kuis", "Tes Kemampuan Akademik (TKA)", "Lainnya"
 ];
 
+// --- MATH TOOLBAR COMPONENT (ENHANCED WITH UNIVERSAL n x n MATRICES) ---
+const MathToolbar: React.FC<{ 
+    onInsert: (latex: string) => void,
+    className?: string 
+}> = ({ onInsert, className = "" }) => {
+    const [activeTab, setActiveTab] = useState<'STR' | 'SYM' | 'GREEK' | 'SCI'>('STR');
+    const [showCustomMatrix, setShowCustomMatrix] = useState(false);
+    const [matrixRows, setMatrixRows] = useState(2);
+    const [matrixCols, setMatrixCols] = useState(2);
+    const [matrixType, setMatrixType] = useState<'pmatrix' | 'vmatrix'>('pmatrix');
+
+    const generateCustomMatrix = () => {
+        let latex = `\\begin{${matrixType}}\n`;
+        for (let r = 1; r <= matrixRows; r++) {
+            let row = [];
+            for (let c = 1; c <= matrixCols; c++) {
+                row.push(`a_{${r},${c}}`);
+            }
+            latex += "  " + row.join(" & ") + (r < matrixRows ? " \\\\" : "") + "\n";
+        }
+        latex += `\\end{${matrixType}}`;
+        onInsert(latex);
+        setShowCustomMatrix(false);
+    };
+
+    const categories = {
+        STR: {
+            name: 'Struktur',
+            items: [
+                { label: 'a/b', latex: '\\frac{atas}{bawah}', title: 'Pecahan' },
+                { label: '√', latex: '\\sqrt{x}', title: 'Akar Kuadrat' },
+                { label: 'ⁿ√', latex: '\\sqrt[n]{x}', title: 'Akar Pangkat n' },
+                { label: 'xⁿ', latex: '^{n}', title: 'Pangkat' },
+                { label: 'xₙ', latex: '_{n}', title: 'Indeks' },
+                { label: '()', latex: '\\left( x \\right)', title: 'Kurung Otomatis' },
+                { 
+                    label: 'M[n,n]', 
+                    action: () => { setMatrixType('pmatrix'); setShowCustomMatrix(true); }, 
+                    title: 'Matriks Custom ( )' 
+                },
+                { 
+                    label: 'D[n,n]', 
+                    action: () => { setMatrixType('vmatrix'); setShowCustomMatrix(true); }, 
+                    title: 'Determinan Custom | |' 
+                },
+                { label: '∑', latex: '\\sum_{i=1}^{n}', title: 'Sumasi' },
+                { label: '∫', latex: '\\int_{a}^{b}', title: 'Integral' },
+                { label: 'lim', latex: '\\lim_{x \\to \\infty}', title: 'Limit' },
+            ]
+        },
+        SYM: {
+            name: 'Simbol',
+            items: [
+                { label: '±', latex: '\\pm', title: 'Plus Minus' },
+                { label: '×', latex: '\\times', title: 'Kali' },
+                { label: '÷', latex: '\\div', title: 'Bagi' },
+                { label: '≠', latex: '\\neq', title: 'Tidak Sama Dengan' },
+                { label: '≈', latex: '\\approx', title: 'Mendekati' },
+                { label: '≤', latex: '\\le', title: 'Kurang Dari Sama Dengan' },
+                { label: '≥', latex: '\\ge', title: 'Lebih Dari Sama Dengan' },
+                { label: '∞', latex: '\\infty', title: 'Tak Hingga' },
+                { label: '∴', latex: '\\therefore', title: 'Oleh Karena Itu' },
+                { label: '⇒', latex: '\\implies', title: 'Implikasi' },
+                { label: '⇔', latex: '\\iff', title: 'Ekuivalensi' },
+                { label: '∈', latex: '\\in', title: 'Elemen Himpunan' },
+                { label: '∅', latex: '\\emptyset', title: 'Himpunan Kosong' },
+            ]
+        },
+        GREEK: {
+            name: 'Yunani',
+            items: [
+                { label: 'α', latex: '\\alpha', title: 'Alpha' },
+                { label: 'β', latex: '\\beta', title: 'Beta' },
+                { label: 'γ', latex: '\\gamma', title: 'Gamma' },
+                { label: 'δ', latex: '\\delta', title: 'Delta' },
+                { label: 'ε', latex: '\\epsilon', title: 'Epsilon' },
+                { label: 'θ', latex: '\\theta', title: 'Theta' },
+                { label: 'λ', latex: '\\lambda', title: 'Lambda' },
+                { label: 'μ', latex: '\\mu', title: 'Mu' },
+                { label: 'π', latex: '\\pi', title: 'Pi' },
+                { label: 'σ', latex: '\\sigma', title: 'Sigma' },
+                { label: 'φ', latex: '\\phi', title: 'Phi' },
+                { label: 'ω', latex: '\\omega', title: 'Omega' },
+                { label: 'Δ', latex: '\\Delta', title: 'Delta Kapital' },
+                { label: 'Ω', latex: '\\Omega', title: 'Omega Kapital' },
+            ]
+        },
+        SCI: {
+            name: 'Sains',
+            items: [
+                { label: 'ⁿlog', latex: '^{n}\\log(x)', title: 'Logaritma Berbasis' },
+                { label: 'sin', latex: '\\sin', title: 'Sinus' },
+                { label: 'cos', latex: '\\cos', title: 'Cosinus' },
+                { label: 'tan', latex: '\\tan', title: 'Tangen' },
+                { label: 'log', latex: '\\log', title: 'Logaritma' },
+                { label: 'ln', latex: '\\ln', title: 'Logaritma Natural' },
+                { label: '°', latex: '^{\\circ}', title: 'Derajat' },
+                { label: '∠', latex: '\\angle', title: 'Sudut' },
+                { label: '⊥', latex: '\\perp', title: 'Tegak Lurus' },
+                { label: '||', latex: '\\parallel', title: 'Sejajar' },
+                { label: '→', latex: '\\vec{v}', title: 'Vektor' },
+                { label: 'x̄', latex: '\\bar{x}', title: 'Rata-rata (Mean)' },
+                { label: '°C', latex: '^{\\circ}C', title: 'Celcius' },
+            ]
+        }
+    };
+
+    return (
+        <div className={`flex flex-col bg-slate-50 border-b border-gray-200 rounded-t-lg overflow-visible relative ${className}`}>
+            {/* Tab Selector */}
+            <div className="flex border-b border-gray-100 bg-white px-2 pt-1 gap-1">
+                {(Object.keys(categories) as Array<keyof typeof categories>).map((key) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setActiveTab(key)}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all rounded-t-md ${activeTab === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        {categories[key].name}
+                    </button>
+                ))}
+                <div className="ml-auto flex items-center gap-1.5 px-2">
+                    <CalculatorIcon className="w-3.5 h-3.5 text-slate-300" />
+                    <button 
+                        type="button"
+                        onClick={() => onInsert('$$\n\\text{Baris Baru}\n$$')}
+                        className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 uppercase"
+                    >
+                        + Baris Baru
+                    </button>
+                </div>
+            </div>
+
+            {/* Custom Matrix Popover */}
+            {showCustomMatrix && (
+                <div className="absolute top-full left-0 z-50 mt-1 bg-white border border-indigo-100 shadow-xl rounded-xl p-4 w-64 animate-fade-in ring-4 ring-indigo-500/5">
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-xs font-black uppercase tracking-tight text-indigo-600">
+                            {matrixType === 'pmatrix' ? 'Konfigurasi Matriks' : 'Konfigurasi Determinan'}
+                        </h4>
+                        <button type="button" onClick={() => setShowCustomMatrix(false)}><XMarkIcon className="w-4 h-4 text-gray-400"/></button>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                                <span>BARIS</span>
+                                <span className="text-indigo-600 bg-indigo-50 px-1.5 rounded">{matrixRows}</span>
+                            </div>
+                            <input 
+                                type="range" min="1" max="10" 
+                                value={matrixRows} 
+                                onChange={(e) => setMatrixRows(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                                <span>KOLOM</span>
+                                <span className="text-indigo-600 bg-indigo-50 px-1.5 rounded">{matrixCols}</span>
+                            </div>
+                            <input 
+                                type="range" min="1" max="10" 
+                                value={matrixCols} 
+                                onChange={(e) => setMatrixCols(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            />
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={generateCustomMatrix}
+                            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            Sisipkan {matrixRows}x{matrixCols}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Symbols Grid */}
+            <div className="flex flex-wrap items-center gap-1 p-2 min-h-[44px]">
+                {categories[activeTab].items.map((item: any, idx) => (
+                    <button
+                        key={idx}
+                        type="button"
+                        onClick={() => item.action ? item.action() : onInsert(item.latex)}
+                        title={item.title}
+                        className="min-w-[38px] h-[32px] flex items-center justify-center text-[11px] font-bold bg-white border border-gray-200 rounded hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm active:scale-90"
+                    >
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// --- REAL-TIME MATH PREVIEW ---
+const MathPreview: React.FC<{ text: string }> = ({ text }) => {
+    const previewRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (previewRef.current && (window as any).katex) {
+            try {
+                if (text.includes('$')) {
+                    const html = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+                        return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
+                    }).replace(/\$([\s\S]+?)\$/g, (_, math) => {
+                        return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
+                    });
+                    previewRef.current.innerHTML = html;
+                } else {
+                    previewRef.current.textContent = "";
+                }
+            } catch (e) {
+                previewRef.current.textContent = "Format matematika salah...";
+            }
+        }
+    }, [text]);
+
+    if (!text.includes('$')) return null;
+
+    return (
+        <div className="mt-2 p-3 bg-indigo-50/30 border border-dashed border-indigo-100 rounded-lg text-sm text-gray-800">
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <CheckCircleIcon className="w-3 h-3"/> Hasil Render Matematika:
+            </p>
+            <div ref={previewRef} className="prose prose-sm max-w-none overflow-x-auto py-2"></div>
+        </div>
+    );
+};
+
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
@@ -49,23 +280,20 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
 
-    // Scroll Effect - Handled Robustly
+    // Scroll Effect
     useEffect(() => {
-        // Hanya jalankan jika dalam mode pembuatan baru (bukan edit) dan belum ada kode yang digenerate (belum selesai)
         if (!isEditing && !generatedCode) {
-            // Gunakan timeout yang sedikit lebih lama untuk memastikan DOM sudah ter-paint sepenuhnya
-            // dan layout shift dari komponen lain sudah selesai.
             const timer = setTimeout(() => {
                 if (questionsSectionRef.current) {
                     questionsSectionRef.current.scrollIntoView({ 
                         behavior: 'smooth', 
-                        block: 'start' // scroll-mt-32 CSS class will handle the offset for sticky header
+                        block: 'start' 
                     });
                 }
             }, 300);
             return () => clearTimeout(timer);
         }
-    }, [isEditing, generatedCode]); // Dependensi yang lebih eksplisit
+    }, [isEditing, generatedCode]);
 
     useEffect(() => {
         if (generatedCode && generatedCodeSectionRef.current) {
@@ -101,8 +329,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setQuestions(prev => prev.map(q => {
             if (q.id === qId) {
                 const updated = { ...q, questionType: newType };
-
-                // Smart Initialization: Create structures if switching to a complex type
                 if (['MULTIPLE_CHOICE', 'COMPLEX_MULTIPLE_CHOICE'].includes(newType) && (!updated.options || updated.options.length === 0)) {
                     updated.options = ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'];
                     updated.correctAnswer = newType === 'MULTIPLE_CHOICE' ? 'Opsi A' : '';
@@ -113,11 +339,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 if (newType === 'MATCHING' && (!updated.matchingPairs || updated.matchingPairs.length === 0)) {
                     updated.matchingPairs = [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }];
                 }
-                // Reset answer for simple types to avoid type mismatch
-                if (newType === 'ESSAY' || newType === 'FILL_IN_THE_BLANK') {
-                    // Keep text but maybe reset complex answer structures if necessary, usually safe to keep string
-                }
-                
                 return updated;
             }
             return q;
@@ -148,6 +369,32 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
 
+    const handleInsertMath = (qId: string, latex: string, optIndex?: number) => {
+        if (optIndex !== undefined) {
+             setQuestions(prev => prev.map(q => {
+                 if (q.id === qId && q.options) {
+                     const currentVal = q.options[optIndex] || '';
+                     const insert = latex.includes('$$') ? latex : `$${latex}$`;
+                     const newVal = currentVal + " " + insert;
+                     const newOptions = [...q.options];
+                     newOptions[optIndex] = newVal;
+                     return { ...q, options: newOptions };
+                 }
+                 return q;
+             }));
+        } else {
+             setQuestions(prev => prev.map(q => {
+                 if (q.id === qId) {
+                     const currentVal = q.questionText || '';
+                     const insert = latex.includes('$$') ? latex : `$${latex}$`;
+                     const newVal = currentVal + " " + insert;
+                     return { ...q, questionText: newVal };
+                 }
+                 return q;
+             }));
+        }
+    };
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, qId: string, optIndex?: number) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -155,7 +402,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const rawDataUrl = ev.target?.result as string;
-            // Compress Image before setting state to avoid payload too large
             const dataUrl = await compressImage(rawDataUrl, 0.7);
 
             setQuestions(prev => prev.map(q => {
@@ -250,7 +496,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             }, 100);
         } else {
             const newQuestions = [...questions];
-            // If insertIndex is -1 (Insert at Start), splice(0, 0, new) works perfectly
             newQuestions.splice(insertIndex + 1, 0, newQuestion);
             setQuestions(newQuestions);
         }
@@ -364,8 +609,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
 
-    // --- RENDER HELPERS ---
-
     const renderTypeSelectionModal = () => {
         if (!isTypeSelectionModalOpen) return null;
         
@@ -410,16 +653,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     return (
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
-            {/* --- SECTION 1: QUESTIONS --- */}
             <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-primary/5 rounded-lg">
                     <h2 className="text-xl font-bold text-neutral">
                         {isEditing ? '1. Tinjau dan Edit Soal' : '3. Tinjau dan Edit Soal'}
                     </h2>
-                    <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Anda dapat mengedit, menghapus, atau menambahkan soal baru.</p>
+                    <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Gunakan tombol matematika untuk menulis rumus.</p>
                 </div>
                 <div className="space-y-4">
-                    {/* INSERT QUESTION AT START DIVIDER */}
                     {questions.length > 0 && (
                         <div className="relative py-2 group/insert">
                             <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -438,14 +679,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     )}
 
                     {questions.map((q, index) => {
-                        // Calculate display number dynamically: Count all previous items that are NOT 'INFO'
                         const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                         
                         return (
                         <React.Fragment key={q.id}>
-                            <div id={q.id} className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm group hover:shadow-md transition-shadow relative">
-                                    <div>
-                                        {/* TYPE BADGE / SELECTOR */}
+                            <div id={q.id} className="bg-white border border-gray-200 rounded-lg shadow-sm group hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="p-4">
                                         <div className="flex justify-center mb-4">
                                             <div className="relative inline-block">
                                                 <select
@@ -475,15 +714,20 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     ) : (
                                                         <span className="text-primary font-bold mt-2">{questionNumber}.</span>
                                                     )}
-                                                    <div className="flex-1 space-y-2">
-                                                        <textarea
-                                                            value={q.questionText}
-                                                            onChange={(e) => handleQuestionTextChange(q.id, e.target.value)}
-                                                            className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-sm leading-relaxed break-words ${isDataUrl(q.questionText) ? 'hidden' : 'min-h-[80px]'}`}
-                                                            placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."}
-                                                        />
+                                                    <div className="flex-1">
+                                                        <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex)} />
+                                                            <textarea
+                                                                value={q.questionText}
+                                                                onChange={(e) => handleQuestionTextChange(q.id, e.target.value)}
+                                                                className={`w-full p-3 bg-white border-0 focus:ring-0 text-sm leading-relaxed break-words outline-none ${isDataUrl(q.questionText) ? 'hidden' : 'min-h-[100px]'}`}
+                                                                placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."}
+                                                            />
+                                                        </div>
+                                                        <MathPreview text={q.questionText} />
+
                                                         {(isDataUrl(q.questionText) || q.imageUrl) && (
-                                                            <div className="relative inline-block group/img mt-2">
+                                                            <div className="relative inline-block group/img mt-4">
                                                                 <img 
                                                                     src={q.imageUrl || q.questionText} 
                                                                     alt="Gambar Soal" 
@@ -500,7 +744,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 </button>
                                                             </div>
                                                         )}
-                                                        <div className="flex justify-end">
+                                                        <div className="flex justify-end mt-2">
                                                             <label className="cursor-pointer flex items-center gap-1 text-xs text-primary hover:text-primary-focus font-semibold">
                                                                 <PhotoIcon className="w-4 h-4" />
                                                                 <span>{q.imageUrl ? "Ganti Gambar" : "Tambah Gambar"}</span>
@@ -518,57 +762,61 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         {/* EDITOR: MULTIPLE CHOICE */}
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                             <div className="mt-3 ml-8">
-                                                <div className="space-y-3">
+                                                <div className="space-y-4">
                                                     {q.options.map((option, i) => (
-                                                        <div key={i} className={`relative flex items-start gap-3 p-3 pr-10 rounded-md border group/opt ${q.correctAnswer === option ? 'bg-green-50 border-green-300 ring-1 ring-green-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <button 
-                                                                onClick={() => handleDeleteOption(q.id, i)}
-                                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"
-                                                            >
-                                                                <TrashIcon className="w-4 h-4" />
-                                                            </button>
+                                                        <div key={i} className={`relative rounded-lg border transition-all duration-200 group/opt ${q.correctAnswer === option ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex, i)} className="rounded-t-lg bg-white/50" />
+                                                            <div className="p-3 pr-10 flex items-start gap-3">
+                                                                <button 
+                                                                    onClick={() => handleDeleteOption(q.id, i)}
+                                                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
 
-                                                            <input
-                                                                type="radio"
-                                                                name={`correct-answer-${q.id}`}
-                                                                value={option} 
-                                                                checked={q.correctAnswer === option}
-                                                                onChange={() => handleCorrectAnswerChange(q.id, option)}
-                                                                className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer"
-                                                            />
-                                                            <div className="flex-1 space-y-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={option}
-                                                                        onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
-                                                                        className={`block w-full px-2 py-1.5 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
-                                                                        placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
-                                                                    />
-                                                                </div>
-                                                                {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
-                                                                    <div className="relative inline-block group/optImg">
-                                                                        <img 
-                                                                            src={(q.optionImages && q.optionImages[i]) || option} 
-                                                                            alt={`Opsi ${i+1}`} 
-                                                                            className="max-w-full h-auto border rounded-md max-h-[150px]" 
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`correct-answer-${q.id}`}
+                                                                    value={option} 
+                                                                    checked={q.correctAnswer === option}
+                                                                    onChange={() => handleCorrectAnswerChange(q.id, option)}
+                                                                    className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer"
+                                                                />
+                                                                <div className="flex-1 space-y-2">
+                                                                    <div className="flex flex-col">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={option}
+                                                                            onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
+                                                                            className={`block w-full px-2 py-1.5 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
+                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
                                                                         />
-                                                                        <button 
-                                                                            onClick={() => {
-                                                                                if (q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i);
-                                                                                else handleOptionTextChange(q.id, i, ''); 
-                                                                            }}
-                                                                            className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"
-                                                                        >
-                                                                            <XMarkIcon className="w-3 h-3" />
-                                                                        </button>
+                                                                        <MathPreview text={option} />
                                                                     </div>
-                                                                )}
-                                                                <div className="flex justify-end">
-                                                                    <label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
-                                                                        <PhotoIcon className="w-4 h-4" />
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} />
-                                                                    </label>
+                                                                    {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
+                                                                        <div className="relative inline-block group/optImg">
+                                                                            <img 
+                                                                                src={(q.optionImages && q.optionImages[i]) || option} 
+                                                                                alt={`Opsi ${i+1}`} 
+                                                                                className="max-w-full h-auto border rounded-md max-h-[150px]" 
+                                                                            />
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    if (q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i);
+                                                                                    else handleOptionTextChange(q.id, i, ''); 
+                                                                                }}
+                                                                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"
+                                                                            >
+                                                                                <XMarkIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex justify-end">
+                                                                        <label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
+                                                                            <PhotoIcon className="w-4 h-4" />
+                                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} />
+                                                                        </label>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -576,7 +824,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 </div>
                                                 <button 
                                                     onClick={() => handleAddOption(q.id)}
-                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                    className="mt-4 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
                                                 >
                                                     <PlusCircleIcon className="w-4 h-4" />
                                                     Tambah Opsi
@@ -588,57 +836,61 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                             <div className="mt-3 ml-8">
                                                 <p className="text-xs text-gray-500 mb-2 italic">Centang kotak untuk menandai semua jawaban yang benar.</p>
-                                                <div className="space-y-3">
+                                                <div className="space-y-4">
                                                     {q.options.map((option, i) => {
                                                         const isChecked = q.correctAnswer ? q.correctAnswer.split(',').includes(option) : false;
                                                         return (
-                                                        <div key={i} className={`relative flex items-start gap-3 p-3 pr-10 rounded-md border group/opt ${isChecked ? 'bg-green-50 border-green-300 ring-1 ring-green-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <button 
-                                                                onClick={() => handleDeleteOption(q.id, i)}
-                                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"
-                                                            >
-                                                                <TrashIcon className="w-4 h-4" />
-                                                            </button>
+                                                        <div key={i} className={`relative rounded-lg border transition-all duration-200 group/opt ${isChecked ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex, i)} className="rounded-t-lg bg-white/50" />
+                                                            <div className="p-3 pr-10 flex items-start gap-3">
+                                                                <button 
+                                                                    onClick={() => handleDeleteOption(q.id, i)}
+                                                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1 transition-colors z-10 bg-white/50 hover:bg-white rounded-full"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
 
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isChecked}
-                                                                onChange={(e) => handleComplexCorrectAnswerChange(q.id, option, e.target.checked)}
-                                                                className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer rounded"
-                                                            />
-                                                            <div className="flex-1 space-y-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={option}
-                                                                        onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
-                                                                        className={`block w-full px-2 py-1.5 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
-                                                                        placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
-                                                                    />
-                                                                </div>
-                                                                 {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
-                                                                    <div className="relative inline-block group/optImg">
-                                                                        <img 
-                                                                            src={(q.optionImages && q.optionImages[i]) || option} 
-                                                                            alt={`Opsi ${i+1}`} 
-                                                                            className="max-w-full h-auto border rounded-md max-h-[150px]" 
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={(e) => handleComplexCorrectAnswerChange(q.id, option, e.target.checked)}
+                                                                    className="h-4 w-4 mt-2 text-primary focus:ring-primary border-gray-300 flex-shrink-0 cursor-pointer rounded"
+                                                                />
+                                                                <div className="flex-1 space-y-2">
+                                                                    <div className="flex flex-col">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={option}
+                                                                            onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
+                                                                            className={`block w-full px-2 py-1.5 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
+                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
                                                                         />
-                                                                         <button 
-                                                                            onClick={() => {
-                                                                                if (q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i);
-                                                                                else handleOptionTextChange(q.id, i, ''); 
-                                                                            }}
-                                                                            className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"
-                                                                        >
-                                                                            <XMarkIcon className="w-3 h-3" />
-                                                                        </button>
+                                                                        <MathPreview text={option} />
                                                                     </div>
-                                                                )}
-                                                                <div className="flex justify-end">
-                                                                    <label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
-                                                                        <PhotoIcon className="w-4 h-4" />
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} />
-                                                                    </label>
+                                                                     {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
+                                                                        <div className="relative inline-block group/optImg">
+                                                                            <img 
+                                                                                src={(q.optionImages && q.optionImages[i]) || option} 
+                                                                                alt={`Opsi ${i+1}`} 
+                                                                                className="max-w-full h-auto border rounded-md max-h-[150px]" 
+                                                                            />
+                                                                             <button 
+                                                                                onClick={() => {
+                                                                                    if (q.optionImages && q.optionImages[i]) handleDeleteImage(q.id, i);
+                                                                                    else handleOptionTextChange(q.id, i, ''); 
+                                                                                }}
+                                                                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover/optImg:opacity-100 transition-opacity shadow-sm"
+                                                                            >
+                                                                                <XMarkIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex justify-end">
+                                                                        <label className="cursor-pointer p-1 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
+                                                                            <PhotoIcon className="w-4 h-4" />
+                                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, q.id, i)} />
+                                                                        </label>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -646,7 +898,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 </div>
                                                  <button 
                                                     onClick={() => handleAddOption(q.id)}
-                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                    className="mt-4 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
                                                 >
                                                     <PlusCircleIcon className="w-4 h-4" />
                                                     Tambah Opsi
@@ -657,49 +909,48 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         {/* EDITOR: TRUE/FALSE */}
                                         {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                             <div className="mt-3 ml-8">
-                                                <p className="text-xs text-gray-500 mb-2 italic">Tentukan pernyataan dan kunci jawabannya (Benar/Salah).</p>
-                                                <div className="overflow-x-auto border rounded-md">
+                                                <div className="overflow-x-auto border rounded-md shadow-inner">
                                                     <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                                                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                                                             <tr>
-                                                                <th className="px-4 py-2 w-full">Pernyataan</th>
-                                                                <th className="px-4 py-2 text-center w-24">Benar</th>
-                                                                <th className="px-4 py-2 text-center w-24">Salah</th>
-                                                                <th className="px-2 py-2 w-10"></th>
+                                                                <th className="px-4 py-3 w-full">Pernyataan</th>
+                                                                <th className="px-4 py-3 text-center w-24">Benar</th>
+                                                                <th className="px-4 py-3 text-center w-24">Salah</th>
+                                                                <th className="px-2 py-3 w-10"></th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-100">
                                                             {q.trueFalseRows.map((row, i) => (
-                                                                <tr key={i} className="bg-white hover:bg-gray-50">
-                                                                    <td className="px-4 py-2">
+                                                                <tr key={i} className="bg-white hover:bg-indigo-50/30 transition-colors">
+                                                                    <td className="px-4 py-3">
                                                                         <input 
                                                                             type="text"
                                                                             value={row.text}
                                                                             onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)}
-                                                                            className="w-full border-gray-300 rounded focus:ring-primary focus:border-primary text-sm p-1.5"
+                                                                            className="w-full border-gray-200 rounded focus:ring-2 focus:ring-indigo-500 text-sm p-1.5"
                                                                             placeholder="Tulis pernyataan..."
                                                                         />
                                                                     </td>
-                                                                    <td className="px-4 py-2 text-center">
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <input 
                                                                             type="radio"
                                                                             name={`tf-row-${q.id}-${i}`}
                                                                             checked={row.answer === true}
                                                                             onChange={() => handleTrueFalseRowAnswerChange(q.id, i, true)}
-                                                                            className="w-4 h-4 text-green-600 focus:ring-green-500 cursor-pointer"
+                                                                            className="w-5 h-5 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                                                         />
                                                                     </td>
-                                                                    <td className="px-4 py-2 text-center">
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <input 
                                                                             type="radio"
                                                                             name={`tf-row-${q.id}-${i}`}
                                                                             checked={row.answer === false}
                                                                             onChange={() => handleTrueFalseRowAnswerChange(q.id, i, false)}
-                                                                            className="w-4 h-4 text-red-600 focus:ring-red-500 cursor-pointer"
+                                                                            className="w-5 h-5 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                                                         />
                                                                     </td>
-                                                                    <td className="px-2 py-2 text-center">
-                                                                         <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-400 hover:text-red-500 p-1">
+                                                                    <td className="px-2 py-3 text-center">
+                                                                         <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-300 hover:text-rose-500 p-1 transition-colors">
                                                                              <TrashIcon className="w-4 h-4"/>
                                                                          </button>
                                                                     </td>
@@ -710,7 +961,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 </div>
                                                 <button 
                                                     onClick={() => handleAddTrueFalseRow(q.id)}
-                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                    className="mt-3 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
                                                 >
                                                     <PlusCircleIcon className="w-4 h-4" />
                                                     Tambah Pernyataan
@@ -721,38 +972,37 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         {/* EDITOR: MATCHING */}
                                         {q.questionType === 'MATCHING' && q.matchingPairs && (
                                              <div className="mt-3 ml-8">
-                                                <p className="text-xs text-gray-500 mb-2 italic">Pasangkan item di kolom kiri dengan jawaban yang benar di kolom kanan.</p>
-                                                <div className="space-y-2">
+                                                <div className="space-y-3">
                                                     {q.matchingPairs.map((pair, i) => (
-                                                        <div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded border">
+                                                        <div key={i} className="flex gap-3 items-center bg-slate-50 p-3 rounded-lg border border-slate-200 shadow-sm">
                                                              <div className="flex-1">
                                                                  <input 
                                                                     type="text" 
                                                                     placeholder="Item Kiri"
                                                                     value={pair.left}
                                                                     onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)}
-                                                                    className="w-full text-sm p-1 border rounded"
+                                                                    className="w-full text-sm p-2 bg-white border border-gray-200 rounded shadow-inner"
                                                                  />
                                                              </div>
-                                                             <div className="text-gray-400">→</div>
+                                                             <div className="text-slate-400 font-bold">➜</div>
                                                              <div className="flex-1">
                                                                  <input 
                                                                     type="text" 
-                                                                    placeholder="Pasangan Kanan (Benar)"
+                                                                    placeholder="Pasangan Kanan"
                                                                     value={pair.right}
                                                                     onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)}
-                                                                    className="w-full text-sm p-1 border rounded bg-green-50 border-green-200"
+                                                                    className="w-full text-sm p-2 bg-emerald-50 border border-emerald-100 rounded shadow-inner text-emerald-800"
                                                                  />
                                                              </div>
-                                                             <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-gray-400 hover:text-red-500 p-1">
-                                                                 <TrashIcon className="w-4 h-4"/>
+                                                             <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-slate-300 hover:text-rose-500 p-1.5 transition-colors">
+                                                                 <TrashIcon className="w-5 h-5"/>
                                                              </button>
                                                         </div>
                                                     ))}
                                                 </div>
                                                 <button 
                                                     onClick={() => handleAddMatchingPair(q.id)}
-                                                    className="mt-2 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
+                                                    className="mt-3 text-xs text-primary font-semibold hover:text-primary-focus flex items-center gap-1 hover:underline"
                                                 >
                                                     <PlusCircleIcon className="w-4 h-4" />
                                                     Tambah Pasangan
@@ -761,32 +1011,35 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         )}
 
                                         {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
-                                             <div className="mt-3 ml-8">
-                                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                                    {q.questionType === 'ESSAY' ? 'Jawaban Referensi / Poin Penting' : 'Kunci Jawaban'}
+                                             <div className="mt-4 ml-8">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
+                                                    {q.questionType === 'ESSAY' ? 'Panduan Jawaban' : 'Kunci Jawaban'}
                                                 </label>
                                                 {q.questionType === 'ESSAY' ? (
                                                      <textarea 
                                                         value={q.correctAnswer || ''}
                                                         onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
-                                                        className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words min-h-[60px]"
-                                                        placeholder="Tuliskan poin-poin jawaban yang diharapkan (opsional, untuk referensi guru)"
+                                                        className="mt-1 block w-full px-3 py-3 bg-white border border-gray-200 rounded-lg shadow-inner focus:ring-2 focus:ring-primary text-sm break-words min-h-[80px]"
+                                                        placeholder="Tuliskan poin-poin jawaban yang diharapkan..."
                                                     />
                                                 ) : (
-                                                    <input 
-                                                        type="text"
-                                                        value={q.correctAnswer || ''}
-                                                        onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
-                                                        className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm break-words"
-                                                        placeholder="Masukkan jawaban yang benar"
-                                                    />
+                                                    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary transition-all">
+                                                        <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex)} />
+                                                        <input 
+                                                            type="text"
+                                                            value={q.correctAnswer || ''}
+                                                            onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
+                                                            className="block w-full px-3 py-3 bg-white border-0 text-sm break-words outline-none"
+                                                            placeholder="Masukkan jawaban yang benar..."
+                                                        />
+                                                    </div>
                                                 )}
+                                                <MathPreview text={q.correctAnswer || ''} />
                                              </div>
                                         )}
                                     </div>
                             </div>
                             
-                            {/* INSERT QUESTION DIVIDER */}
                             <div className="relative py-2 group/insert">
                                 <div className="absolute inset-0 flex items-center" aria-hidden="true">
                                     <div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div>
@@ -805,179 +1058,183 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         );
                     })}
                 </div>
-                 <div className="mt-6 text-center">
-                    <button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-semibold hover:text-primary-focus mx-auto transition-colors bg-primary/5 px-4 py-2 rounded-full hover:bg-primary/10">
+                 <div className="mt-10 text-center">
+                    <button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-bold hover:text-primary-focus mx-auto transition-all bg-primary/5 px-6 py-3 rounded-full hover:bg-primary/10 hover:shadow-md active:scale-95">
                         <PlusCircleIcon className="w-5 h-5" />
-                        Tambah Soal Manual Di Bawah
+                        Tambah Soal Manual
                     </button>
                 </div>
              </div>
 
-            {/* --- SECTION 2: CONFIGURATION --- */}
-            <div>
-                 <div className="p-4 bg-primary/5 rounded-lg">
+            {/* --- CONFIGURATION --- */}
+            <div className="pt-10">
+                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
                     <h2 className="text-xl font-bold text-neutral">
-                        {isEditing ? '2. Atur Konfigurasi Ujian' : '4. Atur Konfigurasi Ujian'}
+                        {isEditing ? '2. Konfigurasi Ujian' : '4. Konfigurasi Ujian'}
                     </h2>
-                     <p className="text-sm text-base-content mt-1">Atur jadwal, durasi, dan aturan pengerjaan ujian.</p>
+                     <p className="text-sm text-base-content mt-1">Lengkapi detail mata pelajaran dan aturan pengerjaan.</p>
                 </div>
-                <div className="mt-4 bg-white p-6 border rounded-lg shadow-sm space-y-6">
-                    {/* METADATA SECTION - NEW */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div className="mt-6 bg-white p-8 border border-gray-200 rounded-2xl shadow-sm space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
-                             <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Informasi Umum</h4>
+                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Umum</h4>
                         </div>
                         
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mata Pelajaran</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Mata Pelajaran</label>
                             <select 
                                 name="subject" 
                                 value={config.subject || 'Lainnya'} 
                                 onChange={handleConfigChange} 
-                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
                             >
                                 {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Kelas</label>
                              <select 
                                 name="classLevel" 
                                 value={config.classLevel || 'Lainnya'} 
                                 onChange={handleConfigChange} 
-                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
                             >
                                 {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Soal</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Evaluasi</label>
                              <select 
                                 name="examType" 
                                 value={config.examType || 'Lainnya'} 
                                 onChange={handleConfigChange} 
-                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm"
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
                             >
                                 {EXAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
 
                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan Tambahan (Opsional)</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Instruksi Pengerjaan</label>
                             <textarea
                                 name="description"
                                 value={config.description || ''}
                                 onChange={handleConfigChange}
-                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm min-h-[80px]"
-                                placeholder="Contoh: Materi Bab 1-3, Kerjakan dengan teliti."
+                                className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner"
+                                placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..."
                             />
                         </div>
                     </div>
 
-                    {/* SETTINGS SECTION */}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-4 border-t border-gray-100">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 pt-8 border-t border-gray-100">
                          <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
-                             <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Waktu & Teknis</h4>
+                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Keamanan</h4>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Ujian</label>
-                            <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Pelaksanaan</label>
+                            <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Waktu Mulai</label>
-                            <input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Jam Mulai</label>
+                            <input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Durasi (menit)</label>
-                            <input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Durasi Pengerjaan (Menit)</label>
+                            <input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Simpan Otomatis (detik)</label>
-                            <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Interval Auto-Save (Detik)</label>
+                            <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
                         </div>
                         
-                        <div className="md:col-span-2 space-y-3 pt-2">
-                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Acak Urutan Soal</span></label>
-                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Acak Urutan Jawaban (Pilihan Ganda)</span></label>
-                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Izinkan Siswa Mengerjakan Ulang</span></label>
-                           <label className="flex items-center cursor-pointer group"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Deteksi Pindah Tab/Aplikasi</span></label>
+                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Acak Soal</span></label>
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Acak Opsi</span></label>
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Deteksi Pindah Tab</span></label>
                            {config.detectBehavior && (
-                            <label className="flex items-center ml-6 cursor-pointer group"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Hentikan Ujian & Perlu Izin Guru untuk Melanjutkan</span></label>
+                            <label className="flex items-center ml-6 p-2 bg-rose-50 rounded-lg text-rose-700 cursor-pointer group"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-rose-600 focus:ring-rose-500 border-rose-300" /><span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span></label>
                            )}
-                           
-                           {/* NEW CONFIGURATIONS */}
-                           <div className="pt-4 mt-4 border-t border-gray-100 space-y-3">
-                               <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-2">Pengaturan Lanjutan</h4>
-                               <label className="flex items-center cursor-pointer group">
-                                   <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Tampilkan Nilai ke Siswa Setelah Selesai</span>
-                               </label>
-                               <label className="flex items-center cursor-pointer group">
-                                   <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci Jawaban Setelah Selesai (Review)</span>
-                               </label>
-                               <label className="flex items-center cursor-pointer group">
-                                   <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Aktifkan Link Livestream Publik (Tanpa Login)</span>
-                               </label>
-                               <label className="flex items-center cursor-pointer group">
-                                   <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300" />
-                                   <span className="ml-2 text-sm text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi Siswa saat Submit (GPS)</span>
-                               </label>
-                           </div>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100">
+                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pengaturan Hasil & Stream</h4>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
+                                    <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span>
+                                </label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
+                                    <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span>
+                                </label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
+                                    <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Pantauan Orang Tua (Live)</span>
+                                </label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
+                                    <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span>
+                                </label>
+                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* --- SECTION 3: ACTIONS --- */}
-            <div className="text-center pt-4 mt-8 pb-12">
+            {/* --- ACTIONS --- */}
+            <div className="text-center pt-10 pb-20">
                 {isEditing ? (
                     <div className="flex justify-center items-center gap-4">
-                        <button onClick={onCancel} className="bg-white text-gray-700 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-50 transition-colors duration-300 shadow-sm">
+                        <button onClick={onCancel} className="bg-white text-gray-700 border border-gray-300 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 transition-all shadow-sm active:scale-95">
                             Batal
                         </button>
                         {onSaveDraft && (
-                            <button onClick={onSaveDraft} className="bg-gray-200 text-gray-800 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-300 transition-colors duration-300 shadow-sm flex items-center gap-2">
+                            <button onClick={onSaveDraft} className="bg-slate-100 text-slate-700 border border-slate-200 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 transition-all shadow-sm flex items-center gap-2 active:scale-95">
                                 <PencilIcon className="w-5 h-5" />
-                                Simpan Draf
+                                Perbarui Draf
                             </button>
                         )}
-                        <button onClick={onSave} className="bg-primary text-primary-content font-bold py-3 px-12 rounded-lg hover:bg-primary-focus transition-colors duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                            Simpan Perubahan
+                        <button onClick={onSave} className="bg-primary text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus transition-all shadow-xl shadow-indigo-100 transform hover:-translate-y-1 active:scale-95">
+                            Simpan Ujian
                         </button>
                     </div>
                 ) : (
                     <>
-                        <div className="border-t pt-8 flex justify-center gap-4">
+                        <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
                             {onSaveDraft && (
-                                <button onClick={onSaveDraft} className="bg-white text-gray-600 border border-gray-300 font-bold py-3 px-8 rounded-lg hover:bg-gray-50 transition-colors duration-300 shadow-sm flex items-center gap-2">
+                                <button onClick={onSaveDraft} className="w-full sm:w-auto bg-white text-slate-600 border-2 border-slate-100 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95">
                                     <PencilIcon className="w-5 h-5" />
-                                    Simpan sebagai Draf
+                                    Simpan Draf
                                 </button>
                             )}
-                            <button onClick={onSave} className="bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 transition-colors duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2">
+                            <button onClick={onSave} className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95">
                                 <CheckCircleIcon className="w-6 h-6" />
-                                Buat & Publikasikan
+                                Publikasikan Sekarang
                             </button>
                         </div>
                         {generatedCode && (
-                            <div ref={generatedCodeSectionRef} className="mt-8 p-4 rounded-lg animate-fade-in text-center max-w-md mx-auto">
-                                <div className="bg-green-50 border border-green-200 text-green-800 p-6 rounded-xl text-left shadow-sm">
-                                    <h4 className="font-bold text-lg mb-2 flex items-center gap-2"><CheckCircleIcon className="w-5 h-5 text-green-600"/> Ujian Berhasil Dibuat!</h4>
-                                    <p className="text-sm text-green-700 mb-4">Bagikan kode berikut kepada siswa untuk memulai ujian:</p>
-                                    <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-green-200 shadow-inner">
-                                        <span className="text-3xl font-mono tracking-widest text-neutral font-bold">{generatedCode}</span>
-                                        <button onClick={() => navigator.clipboard.writeText(generatedCode)} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded hover:bg-gray-200 font-semibold transition-colors border border-gray-300">
-                                            Salin Kode
+                            <div ref={generatedCodeSectionRef} className="mt-12 p-1 rounded-3xl animate-fade-in text-center max-w-md mx-auto bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-2xl">
+                                <div className="bg-white p-8 rounded-[1.4rem] text-center">
+                                    <h4 className="font-black text-2xl text-slate-800 mb-2">Ujian Aktif!</h4>
+                                    <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">Berikan kode unik ini kepada siswa Anda agar mereka dapat mulai mengerjakan.</p>
+                                    <div className="flex flex-col gap-4">
+                                        <div className="bg-slate-50 p-6 rounded-2xl border-2 border-emerald-50 shadow-inner group transition-all hover:bg-emerald-50/30">
+                                            <span className="text-4xl font-black tracking-[0.3em] text-emerald-600 font-mono block">{generatedCode}</span>
+                                        </div>
+                                        <button onClick={() => {
+                                            navigator.clipboard.writeText(generatedCode);
+                                            alert("Kode berhasil disalin!");
+                                        }} className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors py-2">
+                                            Salin Kode Akses
                                         </button>
                                     </div>
+                                    <button onClick={onReset} className="mt-8 w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-black transition-all shadow-lg active:scale-95">
+                                        Selesai & Tutup
+                                    </button>
                                 </div>
-                                <button onClick={onReset} className="mt-8 bg-white text-primary border border-primary font-bold py-2 px-8 rounded-lg hover:bg-primary-50 transition-colors duration-300 shadow-sm">
-                                    Buat Ujian Baru
-                                </button>
                             </div>
                         )}
                     </>
