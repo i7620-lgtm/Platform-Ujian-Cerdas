@@ -134,14 +134,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     };
 
-    const handleDeleteExam = async (exam: Exam) => {
+    const handleDeleteExam = (exam: Exam) => {
         const isDraft = exam.status === 'DRAFT';
         const confirmMsg = isDraft 
             ? `Apakah Anda yakin ingin menghapus draf "${exam.code}"?`
             : `Apakah Anda yakin ingin menghapus ujian "${exam.code}"? Seluruh data hasil pengerjaan siswa untuk ujian ini juga akan terhapus secara permanen.`;
 
         if(confirm(confirmMsg)) {
-            await deleteExam(exam.code);
+            // Kita bungkus pemanggilan deleteExam (string) di dalam fungsi yang menerima Exam
+            deleteExam(exam.code);
         }
     };
 
