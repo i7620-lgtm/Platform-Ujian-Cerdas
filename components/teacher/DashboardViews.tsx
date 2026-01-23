@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -83,7 +84,6 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                     const images = await convertPdfToImages(uploadedFile, 1.5);
                     setPreviewImages(images);
                 } catch (e) {
-                    console.error("Gagal memuat pratinjau PDF:", e);
                     setPreviewImages([]);
                 }
             } else {
@@ -134,15 +134,13 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
             if (inputMethod === 'paste') {
                 if (!inputText.trim()) throw new Error("Silakan tempel konten soal terlebih dahulu.");
                 const parsedQuestions = parseQuestionsFromPlainText(inputText);
-                if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid. Pastikan format soal menggunakan penomoran (1. Soal) dan opsi (A. Opsi).");
+                if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid.");
                 onQuestionsGenerated(parsedQuestions, 'auto');
             } else if (inputMethod === 'upload' && uploadedFile) {
-                if (uploadedFile.type !== 'application/pdf') throw new Error("Fitur ini hanya mendukung file PDF.");
+                if (uploadedFile.type !== 'application/pdf') throw new Error("Hanya mendukung file PDF.");
                 const parsedQuestions = await parsePdfAndAutoCrop(uploadedFile);
-                if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid dari PDF. Pastikan format soal jelas.");
+                if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid.");
                 onQuestionsGenerated(parsedQuestions, 'manual');
-            } else {
-                 throw new Error("Silakan pilih file untuk diunggah.");
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Gagal memproses file.');
@@ -151,127 +149,89 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
         }
     };
 
-    const handleManualCreateClick = () => {
-        setInputText('');
-        setUploadedFile(null);
-        setError('');
-        onQuestionsGenerated([], 'manual');
-    };
-
     return (
         <div className="max-w-4xl mx-auto animate-fade-in space-y-12">
             <div className="space-y-8">
                 <div className="text-center space-y-4">
-                    <h2 className="text-3xl font-bold text-neutral">Buat Ujian Baru</h2>
-                    <p className="text-gray-500 max-w-2xl mx-auto">
-                        Mulai dengan mengunggah soal dalam format PDF, menempelkan teks soal, atau membuat soal secara manual. 
-                        Sistem kami akan membantu Anda menyusun ujian dengan mudah.
+                    <h2 className="text-3xl font-black text-slate-800 tracking-tight">Buat Ujian Baru</h2>
+                    <p className="text-slate-500 max-w-2xl mx-auto font-medium">
+                        Pilih metode pembuatan soal yang paling nyaman bagi Anda.
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Method 3: Manual */}
                     <div 
-                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group border-gray-100 hover:border-primary/50 hover:shadow-lg bg-white`}
-                        onClick={handleManualCreateClick}
+                        className={`p-6 border-2 rounded-3xl cursor-pointer transition-all duration-500 group border-slate-100 hover:border-primary/40 hover:shadow-2xl hover:shadow-slate-100 bg-white`}
+                        onClick={() => onQuestionsGenerated([], 'manual')}
                     >
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-2xl transition-colors bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary`}>
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className={`p-5 rounded-2xl transition-colors bg-slate-50 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary`}>
                                 <PencilIcon className="w-8 h-8" />
                             </div>
-                            <h3 className="font-bold text-lg text-neutral">Buat Manual</h3>
-                            <p className="text-sm text-gray-500">
-                                Buat soal dari awal secara manual tanpa impor file atau teks.
-                            </p>
+                            <h3 className="font-bold text-lg text-slate-800">Manual</h3>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">Buat butir soal satu per satu dengan editor.</p>
                         </div>
                     </div>
 
-                    {/* Method 1: Upload PDF */}
                     <div 
-                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'upload' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`}
+                        className={`p-6 border-2 rounded-3xl cursor-pointer transition-all duration-500 group ${inputMethod === 'upload' ? 'border-primary bg-primary/5 shadow-xl shadow-primary/5' : 'border-slate-100 bg-white hover:border-primary/40 hover:shadow-2xl hover:shadow-slate-100'}`}
                         onClick={() => setInputMethod('upload')}
                     >
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'upload' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className={`p-5 rounded-2xl transition-colors ${inputMethod === 'upload' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-slate-50 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary'}`}>
                                 <CloudArrowUpIcon className="w-8 h-8" />
                             </div>
-                            <h3 className="font-bold text-lg text-neutral">Unggah PDF Soal</h3>
-                            <p className="text-sm text-gray-500">
-                                Sistem akan otomatis mendeteksi dan memotong soal dari file PDF Anda.
-                            </p>
+                            <h3 className="font-bold text-lg text-slate-800">Impor PDF</h3>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">Deteksi dan potong soal otomatis dari PDF.</p>
                         </div>
                     </div>
 
-                    {/* Method 2: Paste Text */}
                     <div 
-                        className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'paste' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`}
+                        className={`p-6 border-2 rounded-3xl cursor-pointer transition-all duration-500 group ${inputMethod === 'paste' ? 'border-primary bg-primary/5 shadow-xl shadow-primary/5' : 'border-slate-100 bg-white hover:border-primary/40 hover:shadow-2xl hover:shadow-slate-100'}`}
                         onClick={() => setInputMethod('paste')}
                     >
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'paste' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className={`p-5 rounded-2xl transition-colors ${inputMethod === 'paste' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-slate-50 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary'}`}>
                                 <ListBulletIcon className="w-8 h-8" />
                             </div>
-                            <h3 className="font-bold text-lg text-neutral">Tempel Teks Soal</h3>
-                            <p className="text-sm text-gray-500">
-                                Salin dan tempel teks soal langsung dari dokumen Word atau sumber lain.
-                            </p>
+                            <h3 className="font-bold text-lg text-slate-800">Tempel Teks</h3>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">Ekstrak soal dari teks yang Anda tempel.</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-all duration-300">
-                    <div className="mb-4">
-                        <h3 className="text-lg font-bold text-neutral mb-1">
-                            {inputMethod === 'upload' ? 'Unggah File PDF' : 'Tempel Teks Soal'}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                            {inputMethod === 'upload' ? 'Pilih file PDF dari perangkat Anda.' : 'Pastikan format soal jelas (nomor dan opsi).'}
-                        </p>
-                    </div>
-
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-100/50">
                     {inputMethod === 'upload' ? (
-                        <div className="space-y-4">
-                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative">
+                        <div className="space-y-6">
+                            <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-12 text-center hover:bg-slate-50 transition-colors group">
                                 <input 
                                     type="file" 
                                     accept=".pdf" 
-                                    onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            setUploadedFile(e.target.files[0]);
-                                            setInputText('');
-                                        }
-                                    }}
+                                    onChange={(e) => e.target.files?.[0] && setUploadedFile(e.target.files[0])}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
-                                <div className="space-y-2 pointer-events-none">
-                                    <CloudArrowUpIcon className="w-10 h-10 text-gray-400 mx-auto" />
+                                <div className="space-y-3 pointer-events-none">
+                                    <CloudArrowUpIcon className="w-12 h-12 text-slate-300 mx-auto group-hover:text-primary transition-colors" />
                                     {uploadedFile ? (
-                                        <p className="font-semibold text-primary">{uploadedFile.name}</p>
+                                        <p className="font-bold text-primary text-lg">{uploadedFile.name}</p>
                                     ) : (
                                         <>
-                                            <p className="text-gray-600 font-medium">Klik atau seret file PDF ke sini</p>
-                                            <p className="text-xs text-gray-400">Maksimal ukuran file 10MB</p>
+                                            <p className="text-slate-700 font-bold text-lg">Seret file PDF ke sini</p>
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Atau klik untuk memilih file</p>
                                         </>
                                     )}
                                 </div>
                             </div>
 
                             {previewImages.length > 0 && (
-                                <div className="space-y-2">
-                                    <p className="text-sm font-semibold text-gray-700">Pratinjau Halaman Pertama:</p>
-                                    <div className="border rounded-xl overflow-hidden max-h-[300px] overflow-y-auto bg-gray-50 p-2 text-center">
-                                        <img src={previewImages[0]} alt="Preview PDF" className="max-w-full h-auto mx-auto shadow-sm rounded-lg" />
+                                <div className="space-y-3">
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Preview PDF:</p>
+                                    <div className="border border-slate-100 rounded-2xl overflow-hidden max-h-[240px] overflow-y-auto bg-slate-50 p-4">
+                                        <img src={previewImages[0]} alt="Preview" className="max-w-full h-auto mx-auto shadow-sm rounded-lg" />
                                     </div>
-                                    <div className="flex justify-end">
-                                        <button 
-                                            onClick={handleExtractText}
-                                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                                            disabled={isLoading}
-                                        >
-                                            <FileTextIcon className="w-4 h-4" />
-                                            Ekstrak Teks dari PDF (Jika Auto-Crop Gagal)
-                                        </button>
-                                    </div>
+                                    <button onClick={handleExtractText} className="text-xs font-bold text-primary hover:text-primary-focus transition-colors flex items-center gap-2">
+                                        <FileTextIcon className="w-4 h-4" /> Ekstrak Teks saja?
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -280,46 +240,26 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                             <textarea
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                className="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm resize-y"
-                                placeholder={`Contoh Format:\n\n1. Apa ibukota Indonesia?\nA. Bandung\nB. Jakarta\nC. Surabaya\nD. Medan\n\nKunci Jawaban: B`}
+                                className="w-full h-72 p-6 bg-slate-50 border border-slate-200 rounded-[2rem] focus:ring-4 focus:ring-primary/5 focus:border-primary font-mono text-sm resize-none outline-none transition-all"
+                                placeholder={`Tulis atau tempel soal di sini...\n\nContoh:\n1. Siapa penemu lampu?\nA. Tesla\nB. Edison\nC. Newton\nD. Galileo\nKunci: B`}
                             />
                             {inputText && (
-                                <div className="flex justify-end">
-                                    <button 
-                                        onClick={handleDirectManualTransfer}
-                                        className="text-sm text-secondary hover:underline flex items-center gap-1"
-                                    >
-                                        <PencilIcon className="w-4 h-4" />
-                                        Gunakan sebagai Soal Manual (Tanpa Parsing Otomatis)
-                                    </button>
-                                </div>
+                                <button onClick={handleDirectManualTransfer} className="text-xs font-bold text-slate-400 hover:text-primary flex items-center gap-2 transition-colors ml-2">
+                                    <PencilIcon className="w-4 h-4" /> Transfer sebagai soal manual
+                                </button>
                             )}
                         </div>
                     )}
                     
-                    {error && (
-                        <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-xl flex items-start gap-2 border border-red-100">
-                            <span className="font-bold">Error:</span> {error}
-                        </div>
-                    )}
+                    {error && <div className="mt-6 p-4 bg-rose-50 text-rose-700 text-xs font-bold rounded-2xl border border-rose-100 animate-fade-in">{error}</div>}
 
-                    <div className="mt-6 flex justify-end">
+                    <div className="mt-10 flex justify-center">
                         <button 
                             onClick={handleStartAnalysis} 
                             disabled={isLoading || (!inputText && !uploadedFile)}
-                            className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all ${isLoading || (!inputText && !uploadedFile) ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-focus hover:shadow-lg transform hover:-translate-y-0.5'}`}
+                            className={`px-12 py-4 rounded-2xl font-black text-white shadow-xl flex items-center justify-center gap-3 transition-all transform active:scale-95 ${isLoading || (!inputText && !uploadedFile) ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-black hover:shadow-slate-200'}`}
                         >
-                            {isLoading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    Memproses...
-                                </>
-                            ) : (
-                                <>
-                                    <CogIcon className="w-5 h-5" />
-                                    {inputMethod === 'upload' ? 'Analisis & Crop PDF' : 'Analisis Teks'}
-                                </>
-                            )}
+                            {isLoading ? <><div className="animate-spin rounded-full h-5 w-5 border-2 border-white/20 border-t-white"></div> Memproses...</> : <><CogIcon className="w-5 h-5" /> Analisis Sekarang</>}
                         </button>
                     </div>
                 </div>
@@ -336,146 +276,43 @@ interface DraftsViewProps {
 }
 
 export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, onDeleteDraft }) => {
-    const [previewExam, setPreviewExam] = useState<Exam | null>(null);
-
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                    <PencilIcon className="w-6 h-6 text-gray-600" />
-                </div>
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-slate-100 rounded-2xl"><PencilIcon className="w-6 h-6 text-slate-600" /></div>
                 <div>
-                    <h2 className="text-2xl font-bold text-neutral">Draf Soal</h2>
-                    <p className="text-sm text-gray-500">Lanjutkan pembuatan soal yang belum selesai.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Draf Soal</h2>
+                    <p className="text-sm text-slate-500 font-medium">Lanjutkan penyusunan soal Anda.</p>
                 </div>
             </div>
 
             {exams.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full">
-                            {/* Delete Button */}
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteDraft(exam);
-                                }}
-                                className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10"
-                                title="Hapus Draf"
-                            >
-                                <TrashIcon className="w-4 h-4" />
-                            </button>
-
-                            <div className="flex-1">
-                                <div className="flex items-start justify-between mb-2">
-                                     <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase tracking-wider border border-gray-200">
-                                        Draft
-                                    </span>
+                        <div key={exam.code} className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 hover:shadow-2xl transition-all duration-500 flex flex-col group relative">
+                            <button onClick={() => onDeleteDraft(exam)} className="absolute top-5 right-5 p-2.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-4 h-4"/></button>
+                            <div className="mb-6">
+                                <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2.5 py-1 rounded-lg uppercase tracking-widest border border-slate-200">Draft</span>
+                                <h3 className="font-black text-xl text-slate-800 mt-4 mb-1 line-clamp-1">{exam.config.subject || "Tanpa Judul"}</h3>
+                                <p className="text-xs font-mono font-bold text-slate-400 tracking-wider">{exam.code}</p>
+                            </div>
+                            <div className="flex-1 space-y-3 mb-8">
+                                <div className="flex flex-wrap gap-2">
+                                    <MetaBadge text={exam.config.classLevel} colorClass="bg-blue-50 text-blue-700" />
+                                    <MetaBadge text={exam.config.examType} colorClass="bg-purple-50 text-purple-700" />
                                 </div>
-                                <h3 className="font-bold text-lg text-gray-800 mb-1">{exam.config.subject || "Tanpa Judul"}</h3>
-                                <p className="text-sm text-gray-400 font-mono font-medium mb-3">{exam.code}</p>
-
-                                {/* Metadata Tags */}
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    <MetaBadge text={exam.config.classLevel} colorClass="bg-blue-50 text-blue-700 border-blue-100" />
-                                    <MetaBadge text={exam.config.examType} colorClass="bg-purple-50 text-purple-700 border-purple-100" />
-                                </div>
-
-                                <div className="h-px bg-gray-50 w-full mb-4"></div>
-
-                                <div className="text-xs text-gray-500 space-y-2 mb-6">
-                                    <div className="flex items-center gap-2">
-                                        <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
-                                        <span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <ListBulletIcon className="w-4 h-4 text-gray-400" />
-                                        <span>{exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan</span>
-                                    </div>
+                                <div className="flex items-center gap-2 text-xs text-slate-400 font-bold">
+                                    <ListBulletIcon className="w-4 h-4" /> {exam.questions.length} Butir Soal
                                 </div>
                             </div>
-                            
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={() => setPreviewExam(exam)}
-                                    className="flex-1 py-2.5 px-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 hover:text-primary transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                    title="Preview Soal"
-                                >
-                                    <EyeIcon className="w-4 h-4" />
-                                    Preview
-                                </button>
-                                <button 
-                                    onClick={() => onContinueDraft(exam)}
-                                    className="flex-[2] py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                >
-                                    <PencilIcon className="w-4 h-4" />
-                                    Edit
-                                </button>
-                            </div>
+                            <button onClick={() => onContinueDraft(exam)} className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-black transition-all shadow-lg shadow-slate-200 text-sm">Lanjutkan Edit</button>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <PencilIcon className="h-8 w-8 text-gray-300" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">Belum Ada Draf</h3>
-                    <p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p>
-                </div>
-            )}
-
-            {/* PREVIEW MODAL */}
-            {previewExam && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up">
-                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-gray-800">Preview Ujian</h3>
-                            <button onClick={() => setPreviewExam(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
-                                <XMarkIcon className="w-6 h-6 text-gray-500" />
-                            </button>
-                        </div>
-                        <div className="p-8 flex flex-col items-center text-center">
-                             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-                                <EyeIcon className="w-8 h-8" />
-                            </div>
-                            <h4 className="text-xl font-bold text-gray-900 mb-1">{previewExam.config.subject || "Draf Ujian"}</h4>
-                            <p className="text-sm text-gray-500 mb-6 font-mono bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{previewExam.code}</p>
-                            
-                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6">
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?preview=${previewExam.code}`)}&margin=10`} 
-                                    alt="QR Preview" 
-                                    className="w-40 h-40 object-contain"
-                                />
-                            </div>
-                            
-                            <p className="text-xs text-gray-400 mb-4 max-w-xs">
-                                Pindai QR Code atau gunakan link di bawah untuk mencoba mengerjakan soal ini (Mode Preview).
-                            </p>
-
-                            <div className="flex gap-3 w-full">
-                                <button 
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/?preview=${previewExam.code}`;
-                                        navigator.clipboard.writeText(url);
-                                        alert("Link Preview berhasil disalin!");
-                                    }}
-                                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm"
-                                >
-                                    Salin Link
-                                </button>
-                                <a 
-                                    href={`/?preview=${previewExam.code}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
-                                >
-                                    Coba Sekarang
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+                <div className="text-center py-24 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+                    <PencilIcon className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-400">Belum ada draf soal</h3>
                 </div>
             )}
         </div>
@@ -492,83 +329,47 @@ interface OngoingExamsProps {
 
 export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                    <ClockIcon className="w-6 h-6 text-emerald-600" />
-                </div>
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-50 rounded-2xl"><ClockIcon className="w-6 h-6 text-emerald-600" /></div>
                 <div>
-                    <h2 className="text-2xl font-bold text-neutral">Ujian Sedang Berlangsung</h2>
-                    <p className="text-sm text-gray-500">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Sedang Berlangsung</h2>
+                    <p className="text-sm text-slate-500 font-medium">Pantau aktivitas ujian secara real-time.</p>
                 </div>
             </div>
 
             {exams.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {exams.map(exam => {
-                        const activeCount = results.filter(r => r.examCode === exam.code).length;
+                        const count = results.filter(r => r.examCode === exam.code).length;
                         return (
-                        <div key={exam.code} className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-xl hover:shadow-emerald-50 hover:border-emerald-300 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
-                            
-                            <div className="absolute top-4 right-4 z-10">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }}
-                                    className="p-2 bg-white text-gray-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-transparent hover:border-gray-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
-                                    title="Gunakan Kembali Soal"
-                                >
-                                    <DocumentDuplicateIcon className="w-4 h-4" />
-                                </button>
-                            </div>
-
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="flex flex-col">
-                                     <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5">
-                                        <span className="relative flex h-2 w-2">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                        </span>
-                                        Sedang Berlangsung
+                            <div key={exam.code} className="bg-white p-8 rounded-[2.5rem] border border-emerald-100 shadow-xl shadow-emerald-100/20 hover:shadow-2xl transition-all duration-500 cursor-pointer group" onClick={() => onSelectExam(exam)}>
+                                <div className="flex justify-between items-start mb-6">
+                                     <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-2">
+                                        <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative rounded-full h-2 w-2 bg-emerald-500"></span></span> LIVE
                                      </span>
-                                     <h3 className="font-bold text-xl text-neutral">{exam.config.subject || exam.code}</h3>
-                                     <p className="text-sm font-mono text-gray-400 mt-0.5">{exam.code}</p>
+                                     <button onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }} className="p-2 text-slate-300 hover:text-primary transition-colors"><DocumentDuplicateIcon className="w-5 h-5"/></button>
                                 </div>
-                            </div>
-                            
-                            {/* Metadata */}
-                            <div className="flex flex-wrap gap-2 mt-3 mb-5">
-                                <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
-                                <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
-                            </div>
-
-                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Partisipan</span>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="flex -space-x-2">
-                                            {[...Array(Math.min(3, activeCount))].map((_, i) => (
-                                                <div key={i} className="w-6 h-6 rounded-full bg-emerald-200 border-2 border-white"></div>
-                                            ))}
-                                        </div>
-                                        <span className="text-sm font-bold text-gray-700">{activeCount} Siswa</span>
+                                <h3 className="font-black text-2xl text-slate-800 mb-2">{exam.config.subject || exam.code}</h3>
+                                <p className="text-sm font-mono font-bold text-slate-400 mb-6">{exam.code}</p>
+                                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Peserta</p>
+                                        <p className="text-xl font-black text-slate-800">{count} Siswa</p>
                                     </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Sisa Waktu</span>
-                                    <div className="text-lg font-bold text-rose-500 mt-0.5">
-                                        <RemainingTime exam={exam} />
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sisa Waktu</p>
+                                        <p className="text-xl font-black text-rose-500"><RemainingTime exam={exam} /></p>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )})}
+                        )
+                    })}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <ClockIcon className="h-8 w-8 text-gray-300" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Aktif</h3>
-                    <p className="mt-1 text-sm text-gray-500">Saat ini tidak ada ujian yang sedang berlangsung.</p>
+                <div className="text-center py-24 bg-white rounded-[2.5rem] border border-slate-100">
+                    <ClockIcon className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-400">Tidak ada ujian aktif</h3>
                 </div>
             )}
         </div>
@@ -583,64 +384,41 @@ interface UpcomingExamsProps {
 
 export const UpcomingExamsView: React.FC<UpcomingExamsProps> = ({ exams, onEditExam }) => {
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                    <CalendarDaysIcon className="w-6 h-6 text-blue-600" />
-                </div>
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-50 rounded-2xl"><CalendarDaysIcon className="w-6 h-6 text-blue-600" /></div>
                 <div>
-                    <h2 className="text-2xl font-bold text-neutral">Ujian Akan Datang</h2>
-                    <p className="text-sm text-gray-500">Daftar semua ujian yang telah dijadwalkan.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Akan Datang</h2>
+                    <p className="text-sm text-slate-500 font-medium">Jadwal ujian yang sudah dipublikasikan.</p>
                 </div>
             </div>
 
             {exams.length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid gap-4">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 group">
-                            <div className="flex items-start gap-5">
-                                <div className="bg-blue-50 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 border border-blue-100 shrink-0">
-                                    <span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span>
-                                    <span className="text-xl font-black leading-none">{new Date(exam.config.date).getDate()}</span>
+                        <div key={exam.code} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all">
+                            <div className="flex items-center gap-6">
+                                <div className="bg-blue-50 w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-blue-700 border border-blue-100 shrink-0">
+                                    <span className="text-[10px] font-black uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span>
+                                    <span className="text-2xl font-black">{new Date(exam.config.date).getDate()}</span>
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-bold text-lg text-neutral">{exam.config.subject || "Tanpa Judul"}</h3>
-                                        <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span>
-                                    </div>
-                                    
-                                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
-                                        <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
-                                    </div>
-
-                                    <div className="text-xs text-gray-500 flex items-center gap-3 font-medium">
-                                        <span className="flex items-center gap-1.5">
-                                            <ClockIcon className="w-3.5 h-3.5"/> 
-                                            {exam.config.startTime} WIB
-                                        </span>
-                                        <span className="text-gray-300">•</span>
-                                        <span>{exam.config.timeLimit} Menit</span>
+                                    <h3 className="font-black text-lg text-slate-800">{exam.config.subject || "Ujian"}</h3>
+                                    <div className="flex gap-3 items-center mt-1">
+                                        <span className="text-xs font-mono font-bold text-slate-400">{exam.code}</span>
+                                        <span className="text-slate-200">•</span>
+                                        <span className="text-xs font-bold text-slate-500">{exam.config.startTime} WIB</span>
                                     </div>
                                 </div>
                             </div>
-                            <button 
-                                onClick={() => onEditExam(exam)} 
-                                className="flex items-center justify-center gap-2 bg-white border-2 border-gray-100 text-gray-600 px-5 py-2.5 text-sm rounded-xl hover:border-primary hover:text-primary transition-all font-bold shadow-sm self-end md:self-center w-full md:w-auto"
-                            >
-                                <PencilIcon className="w-4 h-4" />
-                                Edit Detail
-                            </button>
+                            <button onClick={() => onEditExam(exam)} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all text-sm">Edit</button>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CalendarDaysIcon className="h-8 w-8 text-gray-300" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Terjadwal</h3>
-                    <p className="mt-1 text-sm text-gray-500">Buat ujian baru untuk memulai.</p>
+                <div className="text-center py-24 bg-white rounded-[2.5rem] border border-slate-100">
+                    <CalendarDaysIcon className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-400">Belum ada jadwal</h3>
                 </div>
             )}
         </div>
@@ -652,76 +430,57 @@ interface FinishedExamsProps {
     exams: Exam[];
     onSelectExam: (exam: Exam) => void;
     onDuplicateExam: (exam: Exam) => void;
+    onDeleteExam: (code: string) => Promise<void>;
 }
 
-export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam }) => {
+export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam }) => {
     return (
-        <div className="space-y-6 animate-fade-in">
-             <div className="flex items-center gap-2">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                    <ChartBarIcon className="w-6 h-6 text-purple-600" />
-                </div>
+        <div className="space-y-8 animate-fade-in">
+             <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-50 rounded-2xl"><ChartBarIcon className="w-6 h-6 text-purple-600" /></div>
                 <div>
-                    <h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2>
-                    <p className="text-sm text-gray-500">Riwayat dan hasil ujian yang telah berakhir.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Riwayat Ujian</h2>
+                    <p className="text-sm text-slate-500 font-medium">Data dan hasil ujian yang telah selesai.</p>
                 </div>
             </div>
 
             {exams.length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid gap-4">
                     {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-gray-300 group">
-                            <div className="flex items-start gap-4">
-                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                    <CheckCircleIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500 transition-colors" />
-                                </div>
+                        <div key={exam.code} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all">
+                            <div className="flex items-center gap-6">
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100"><CheckCircleIcon className="w-6 h-6 text-slate-300" /></div>
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                         <h3 className="font-bold text-lg text-neutral">{exam.config.subject || exam.code}</h3>
-                                         <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span>
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
-                                        <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
-                                    </div>
-
-                                    <div className="text-xs text-gray-400">
-                                        Berakhir pada: {new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </div>
+                                    <h3 className="font-black text-lg text-slate-800">{exam.config.subject || exam.code}</h3>
+                                    <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                                 </div>
                             </div>
-                            
-                            <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
+                            <div className="flex items-center gap-3">
                                 <button 
                                     onClick={() => onDuplicateExam(exam)} 
-                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-colors font-bold shadow-sm border border-gray-200"
-                                    title="Gunakan Kembali Soal"
-                                >
-                                    <DocumentDuplicateIcon className="w-4 h-4" />
-                                    <span className="md:hidden lg:inline">Reuse</span>
-                                </button>
+                                    className="p-3 text-slate-400 hover:text-primary transition-colors"
+                                    title="Reuse"
+                                ><DocumentDuplicateIcon className="w-5 h-5"/></button>
                                 <button 
-                                    onClick={() => onSelectExam(exam)} 
-                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black transition-all font-bold shadow-lg shadow-gray-200 transform active:scale-95"
-                                >
-                                    <ChartBarIcon className="w-4 h-4" />
-                                    Lihat Hasil
-                                </button>
+                                    onClick={() => {
+                                        if(confirm(`Hapus seluruh data ujian "${exam.code}"? Tindakan ini permanen.`)) {
+                                            onDeleteExam(exam.code);
+                                        }
+                                    }}
+                                    className="p-3 text-slate-400 hover:text-rose-600 transition-colors"
+                                    title="Hapus"
+                                ><TrashIcon className="w-5 h-5"/></button>
+                                <button onClick={() => onSelectExam(exam)} className="px-8 py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-black transition-all shadow-lg shadow-slate-200 text-sm">Lihat Hasil</button>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <ChartBarIcon className="h-8 w-8 text-gray-300" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">Belum Ada Riwayat</h3>
-                    <p className="mt-1 text-sm text-gray-500">Hasil ujian yang telah selesai akan muncul di sini.</p>
+                <div className="text-center py-24 bg-white rounded-[2.5rem] border border-slate-100">
+                    <ChartBarIcon className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-400">Belum ada riwayat</h3>
                 </div>
             )}
         </div>
     );
 };
- 
