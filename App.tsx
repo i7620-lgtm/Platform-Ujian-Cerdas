@@ -408,13 +408,13 @@ const App: React.FC = () => {
   const SyncStatus = () => (
       <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           {!isOnline && (
-              <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-md border border-yellow-200">
-                  <NoWifiIcon className="w-4 h-4"/> Offline
+              <div className="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm border border-rose-100">
+                  <NoWifiIcon className="w-3 h-3"/> Offline
               </div>
           )}
           {isSyncing && isOnline && (
-               <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-md animate-pulse border border-indigo-100">
-                  <CloudArrowUpIcon className="w-4 h-4"/> Syncing...
+               <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm animate-pulse border border-indigo-100">
+                  <CloudArrowUpIcon className="w-3 h-3"/> Syncing...
               </div>
           )}
       </div>
@@ -469,7 +469,7 @@ const App: React.FC = () => {
         return (
             <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
                  <div className="w-full max-w-7xl mb-4 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-gray-800">Platform Ujian Cerdas - Public Live View</h1>
+                    <h1 className="text-xl font-bold text-gray-800">Public Live View</h1>
                     <button onClick={resetToHome} className="text-sm font-medium text-indigo-600 hover:underline">Home</button>
                  </div>
                  {/* Reusing Modal logic but rendered directly */}
@@ -487,53 +487,31 @@ const App: React.FC = () => {
       case 'SELECTOR':
       default:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 via-white to-gray-100 p-6 animate-fade-in relative">
-             <div className="w-full max-w-md text-center">
-                <div className="bg-white/70 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/80">
-                    <div className="flex justify-center mb-8">
-                        <div className="bg-gradient-to-tr from-primary to-indigo-500 p-4 rounded-2xl shadow-xl shadow-primary/20 transform rotate-3">
-                            <LogoIcon className="w-12 h-12 text-white" />
-                        </div>
+          <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6 animate-fade-in relative">
+             <div className="w-full max-w-sm text-center">
+                <div className="mb-10 flex justify-center">
+                    <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center text-white">
+                        <LogoIcon className="w-8 h-8" />
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">Platform Ujian Cerdas</h1>
-                    <p className="text-gray-500 mb-10 leading-relaxed text-sm md:text-base">Platform evaluasi modern yang aman, cepat, dan terpercaya untuk semua.</p>
-                    
-                    <div className="space-y-5">
-                        {/* TEACHER BUTTON - Blue Theme */}
-                        <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-white border-2 border-indigo-100 text-indigo-700 font-bold py-5 px-6 rounded-2xl hover:border-indigo-600 hover:shadow-xl hover:shadow-indigo-100 transition-all duration-300 flex items-center justify-between relative overflow-hidden">
-                            <div className="flex items-center gap-4 relative z-10">
-                                <div className="bg-indigo-50 p-2 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                    </svg>
-                                </div>
-                                <span className="text-lg">Masuk sebagai Guru</span>
-                            </div>
-                            <span className="bg-indigo-50 group-hover:bg-indigo-600 group-hover:text-white p-2 rounded-lg transition-colors duration-300 relative z-10">→</span>
-                        </button>
+                </div>
+                
+                <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Platform Ujian Cerdas</h1>
+                <p className="text-slate-500 mb-10 text-sm">Evaluasi modern, cepat, dan terpercaya.</p>
+                
+                <div className="space-y-4">
+                     <button onClick={() => setView('STUDENT_LOGIN')} className="w-full bg-slate-900 text-white font-bold py-4 px-6 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
+                        <span>Masuk sebagai Siswa</span>
+                        <span className="opacity-70">→</span>
+                    </button>
 
-                        {/* STUDENT BUTTON - Green Theme */}
-                        <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold py-5 px-6 rounded-2xl hover:shadow-xl hover:shadow-teal-200 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-between">
-                             <div className="flex items-center gap-4">
-                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.499 5.216 50.59 50.59 0 00-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
-                                    </svg>
-                                </div>
-                                <span className="text-lg">Masuk sebagai Siswa</span>
-                            </div>
-                            <span className="bg-white/20 p-2 rounded-lg backdrop-blur-sm group-hover:bg-white/30 transition-colors">→</span>
-                        </button>
-                    </div>
-                    
-                    <div className="mt-12 pt-6 border-t border-gray-100 flex justify-center items-center gap-3">
-                        <div className={`relative flex items-center justify-center w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-yellow-500'}`}>
-                             {isOnline && <span className="absolute inset-0 inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"></span>}
-                        </div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-                            System Status: <span className={isOnline ? "text-green-600" : "text-yellow-600"}>{isOnline ? "Online Ready" : "Offline Mode"}</span>
-                        </p>
-                    </div>
+                    <button onClick={() => setView('TEACHER_LOGIN')} className="w-full bg-white text-slate-600 font-bold py-4 px-6 rounded-2xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95">
+                        Masuk sebagai Guru
+                    </button>
+                </div>
+                
+                <div className="mt-16 flex justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-300">
+                    <span className={isOnline ? "text-emerald-400" : "text-rose-400"}>●</span>
+                    <span>{isOnline ? "System Online" : "System Offline"}</span>
                 </div>
              </div>
           </div>
@@ -542,7 +520,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-primary/20">
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <SyncStatus />
         {renderView()}
     </div>
