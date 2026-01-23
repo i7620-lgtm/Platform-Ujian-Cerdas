@@ -75,34 +75,69 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
     );
 };
 
-// --- KOMPONEN RENDERING MATEMATIKA ---
+// --- KOMPONEN RENDERING MATEMATIKA + RICH TEXT ---
 const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     if (content.startsWith('data:image/')) {
         return <SmartImageViewer src={content} alt="Konten Visual" />;
     }
 
-    // Deteksi jika mengandung format KaTeX ($)
-    if (content.includes('$') && (window as any).katex) {
-        try {
-            // Proses blok $$ ... $$ dan inline $ ... $
-            const html = content.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    try {
+        // 1. Process Rich Text first
+        let processedText = content
+            .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
+            .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
+            .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
+
+        // 2. Accurate List Parsing
+        const lines = processedText.split('\n');
+        let finalHtmlChunks = [];
+        let inUl = false;
+        let inOl = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const bulletMatch = line.match(/^\s*-\s+(.*)/);
+            const numberedMatch = line.match(/^\s*\d+[\.\)]\s+(.*)/);
+
+            if (bulletMatch) {
+                if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
+                if (!inUl) { finalHtmlChunks.push('<ul class="list-disc list-outside ml-5 space-y-1 my-2">'); inUl = true; }
+                finalHtmlChunks.push(`<li>${bulletMatch[1]}</li>`);
+            } else if (numberedMatch) {
+                if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
+                if (!inOl) { finalHtmlChunks.push('<ol class="list-decimal list-outside ml-5 space-y-1 my-2">'); inOl = true; }
+                finalHtmlChunks.push(`<li>${numberedMatch[1]}</li>`);
+            } else {
+                if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
+                if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
+                finalHtmlChunks.push(line + (line.trim() ? '<br/>' : ''));
+            }
+        }
+        if (inUl) finalHtmlChunks.push('</ul>');
+        if (inOl) finalHtmlChunks.push('</ol>');
+
+        let html = finalHtmlChunks.join('\n');
+
+        // 3. KaTeX Rendering
+        if (html.includes('$') && (window as any).katex) {
+            html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
                 return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
             }).replace(/\$([\s\S]+?)\$/g, (_, math) => {
                 return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
             });
-            
-            return (
-                <div 
-                    className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: html }}
-                />
-            );
-        } catch (e) {
-            console.error("Math rendering error", e);
         }
+        
+        return (
+            <div 
+                className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: html }}
+            />
+        );
+    } catch (e) {
+        console.error("Content rendering error", e);
+        return <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap">{content}</div>;
     }
-
-    return <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap">{content}</div>;
 };
 
 // --- KOMPONEN CARD SOAL ---
