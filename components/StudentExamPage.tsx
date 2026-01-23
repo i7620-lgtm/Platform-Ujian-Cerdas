@@ -82,14 +82,14 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
-        // 1. Process Rich Text first
+        // 1. Process Rich Text (Bold, Italic, Del, Underline)
         let processedText = content
             .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
             .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
             .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
 
-        // 2. Accurate List Parsing
+        // 2. Accurate List Parsing (Line by line)
         const lines = processedText.split('\n');
         let finalHtmlChunks = [];
         let inUl = false;
@@ -102,22 +102,22 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
 
             if (bulletMatch) {
                 if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                if (!inUl) { finalHtmlChunks.push('<ul class="list-disc list-outside ml-5 space-y-1 my-2">'); inUl = true; }
+                if (!inUl) { finalHtmlChunks.push('<ul class="list-disc list-outside pl-6 space-y-1 my-2">'); inUl = true; }
                 finalHtmlChunks.push(`<li>${bulletMatch[1]}</li>`);
             } else if (numberedMatch) {
                 if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
-                if (!inOl) { finalHtmlChunks.push('<ol class="list-decimal list-outside ml-5 space-y-1 my-2">'); inOl = true; }
+                if (!inOl) { finalHtmlChunks.push('<ol class="list-decimal list-outside pl-6 space-y-1 my-2">'); inOl = true; }
                 finalHtmlChunks.push(`<li>${numberedMatch[1]}</li>`);
             } else {
                 if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
                 if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                finalHtmlChunks.push(line + (line.trim() ? '<br/>' : ''));
+                finalHtmlChunks.push(line.trim() === '' ? '<div class="h-2"></div>' : line + '<br/>');
             }
         }
         if (inUl) finalHtmlChunks.push('</ul>');
         if (inOl) finalHtmlChunks.push('</ol>');
 
-        let html = finalHtmlChunks.join('\n');
+        let html = finalHtmlChunks.join('');
 
         // 3. KaTeX Rendering
         if (html.includes('$') && (window as any).katex) {
