@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
-    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon, CalculatorIcon 
+    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon, CalculatorIcon,
+    EyeIcon 
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -41,12 +42,12 @@ const EXAM_TYPES = [
     "Penilaian Akhir Semester (PAS)", "Lomba", "Kuis", "Tes Kemampuan Akademik (TKA)", "Lainnya"
 ];
 
-// --- MATH TOOLBAR COMPONENT (ENHANCED WITH UNIVERSAL n x n MATRICES) ---
-const MathToolbar: React.FC<{ 
-    onInsert: (latex: string) => void,
+// --- UNIVERSAL EDITOR TOOLBAR (MATH + RICH TEXT) ---
+const EditorToolbar: React.FC<{ 
+    onInsert: (prefix: string, suffix?: string, isBlock?: boolean) => void,
     className?: string 
 }> = ({ onInsert, className = "" }) => {
-    const [activeTab, setActiveTab] = useState<'STR' | 'SYM' | 'GREEK' | 'SCI'>('STR');
+    const [activeTab, setActiveTab] = useState<'TEXT' | 'STR' | 'SYM' | 'GREEK' | 'SCI'>('TEXT');
     const [showCustomMatrix, setShowCustomMatrix] = useState(false);
     const [matrixRows, setMatrixRows] = useState(2);
     const [matrixCols, setMatrixCols] = useState(2);
@@ -62,11 +63,11 @@ const MathToolbar: React.FC<{
             latex += "  " + row.join(" & ") + (r < matrixRows ? " \\\\" : "") + "\n";
         }
         latex += `\\end{${matrixType}}`;
-        onInsert(latex);
+        onInsert('$' + latex + '$');
         setShowCustomMatrix(false);
     };
 
-    const categories = {
+    const mathCategories = {
         STR: {
             name: 'Struktur',
             items: [
@@ -148,30 +149,36 @@ const MathToolbar: React.FC<{
         }
     };
 
+    const textFormatting = [
+        { label: 'B', action: () => onInsert('**', '**'), title: 'Tebal (Bold)' },
+        { label: 'I', action: () => onInsert('*', '*'), title: 'Miring (Italic)' },
+        { label: 'U', action: () => onInsert('<u>', '</u>'), title: 'Garis Bawah (Underline)' },
+        { label: 'S', action: () => onInsert('~~', '~~'), title: 'Coret (Strikethrough)' },
+        { label: 'List', action: () => onInsert('- ', '', true), title: 'Daftar Bullets' },
+        { label: '1.', action: () => onInsert('1. ', '', true), title: 'Daftar Penomoran' },
+    ];
+
     return (
         <div className={`flex flex-col bg-slate-50 border-b border-gray-200 rounded-t-lg overflow-visible relative ${className}`}>
             {/* Tab Selector */}
             <div className="flex border-b border-gray-100 bg-white px-2 pt-1 gap-1">
-                {(Object.keys(categories) as Array<keyof typeof categories>).map((key) => (
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('TEXT')}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all rounded-t-md ${activeTab === 'TEXT' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                >
+                    Format Teks
+                </button>
+                {(Object.keys(mathCategories) as Array<keyof typeof mathCategories>).map((key) => (
                     <button
                         key={key}
                         type="button"
                         onClick={() => setActiveTab(key)}
                         className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all rounded-t-md ${activeTab === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                     >
-                        {categories[key].name}
+                        {mathCategories[key].name}
                     </button>
                 ))}
-                <div className="ml-auto flex items-center gap-1.5 px-2">
-                    <CalculatorIcon className="w-3.5 h-3.5 text-slate-300" />
-                    <button 
-                        type="button"
-                        onClick={() => onInsert('$$\n\\text{Baris Baru}\n$$')}
-                        className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 uppercase"
-                    >
-                        + Baris Baru
-                    </button>
-                </div>
             </div>
 
             {/* Custom Matrix Popover */}
@@ -184,90 +191,133 @@ const MathToolbar: React.FC<{
                         <button type="button" onClick={() => setShowCustomMatrix(false)}><XMarkIcon className="w-4 h-4 text-gray-400"/></button>
                     </div>
                     <div className="space-y-4">
-                        <div>
-                            <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                                <span>BARIS</span>
-                                <span className="text-indigo-600 bg-indigo-50 px-1.5 rounded">{matrixRows}</span>
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">BARIS</label>
+                                <input type="number" min="1" max="10" value={matrixRows} onChange={(e) => setMatrixRows(parseInt(e.target.value))} className="w-full p-2 bg-slate-50 border rounded-lg text-xs" />
                             </div>
-                            <input 
-                                type="range" min="1" max="10" 
-                                value={matrixRows} 
-                                onChange={(e) => setMatrixRows(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                            />
-                        </div>
-                        <div>
-                            <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                                <span>KOLOM</span>
-                                <span className="text-indigo-600 bg-indigo-50 px-1.5 rounded">{matrixCols}</span>
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">KOLOM</label>
+                                <input type="number" min="1" max="10" value={matrixCols} onChange={(e) => setMatrixCols(parseInt(e.target.value))} className="w-full p-2 bg-slate-50 border rounded-lg text-xs" />
                             </div>
-                            <input 
-                                type="range" min="1" max="10" 
-                                value={matrixCols} 
-                                onChange={(e) => setMatrixCols(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                            />
                         </div>
-                        <button 
-                            type="button"
-                            onClick={generateCustomMatrix}
-                            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
+                        <button type="button" onClick={generateCustomMatrix} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-indigo-700">
                             Sisipkan {matrixRows}x{matrixCols}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Symbols Grid */}
+            {/* Content Area */}
             <div className="flex flex-wrap items-center gap-1 p-2 min-h-[44px]">
-                {categories[activeTab].items.map((item: any, idx) => (
-                    <button
-                        key={idx}
+                {activeTab === 'TEXT' ? (
+                    textFormatting.map((item, idx) => (
+                        <button
+                            key={idx}
+                            type="button"
+                            onClick={item.action}
+                            title={item.title}
+                            className={`min-w-[38px] h-[32px] flex items-center justify-center text-[11px] font-black bg-white border border-gray-200 rounded hover:bg-slate-100 transition-all shadow-sm active:scale-90 ${item.label === 'B' ? 'font-black' : item.label === 'I' ? 'italic font-serif' : item.label === 'U' ? 'underline' : item.label === 'S' ? 'line-through' : ''}`}
+                        >
+                            {item.label}
+                        </button>
+                    ))
+                ) : (
+                    mathCategories[activeTab as keyof typeof mathCategories].items.map((item: any, idx) => (
+                        <button
+                            key={idx}
+                            type="button"
+                            onClick={() => item.action ? item.action() : onInsert('$' + item.latex + '$')}
+                            title={item.title}
+                            className="min-w-[38px] h-[32px] flex items-center justify-center text-[11px] font-bold bg-white border border-gray-200 rounded hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm active:scale-90"
+                        >
+                            {item.label}
+                        </button>
+                    ))
+                )}
+                
+                {activeTab !== 'TEXT' && (
+                    <button 
                         type="button"
-                        onClick={() => item.action ? item.action() : onInsert(item.latex)}
-                        title={item.title}
-                        className="min-w-[38px] h-[32px] flex items-center justify-center text-[11px] font-bold bg-white border border-gray-200 rounded hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm active:scale-90"
+                        onClick={() => onInsert('$$\n', '\n$$')}
+                        className="ml-auto text-[10px] font-bold text-indigo-500 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded"
                     >
-                        {item.label}
+                        + Baris Matematika
                     </button>
-                ))}
+                )}
             </div>
         </div>
     );
 };
 
-// --- REAL-TIME MATH PREVIEW ---
-const MathPreview: React.FC<{ text: string }> = ({ text }) => {
+// --- REAL-TIME RICH TEXT + MATH PREVIEW ---
+const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
     const previewRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (previewRef.current && (window as any).katex) {
+        if (previewRef.current) {
             try {
-                if (text.includes('$')) {
-                    const html = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+                // 1. Pre-process Formatting
+                let processedText = text
+                    .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
+                    .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
+                    .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
+
+                // 2. Line by Line List Parsing (Lebih akurat dari regex global)
+                const lines = processedText.split('\n');
+                let finalHtml = [];
+                let inUl = false;
+                let inOl = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const bulletMatch = line.match(/^\s*-\s+(.*)/);
+                    const numberedMatch = line.match(/^\s*\d+[\.\)]\s+(.*)/);
+
+                    if (bulletMatch) {
+                        if (inOl) { finalHtml.push('</ol>'); inOl = false; }
+                        if (!inUl) { finalHtml.push('<ul class="list-disc list-outside ml-5 space-y-1 my-2">'); inUl = true; }
+                        finalHtml.push(`<li>${bulletMatch[1]}</li>`);
+                    } else if (numberedMatch) {
+                        if (inUl) { finalHtml.push('</ul>'); inUl = false; }
+                        if (!inOl) { finalHtml.push('<ol class="list-decimal list-outside ml-5 space-y-1 my-2">'); inOl = true; }
+                        finalHtml.push(`<li>${numberedMatch[1]}</li>`);
+                    } else {
+                        if (inUl) { finalHtml.push('</ul>'); inUl = false; }
+                        if (inOl) { finalHtml.push('</ol>'); inOl = false; }
+                        finalHtml.push(line + (line.trim() ? '<br/>' : ''));
+                    }
+                }
+                if (inUl) finalHtml.push('</ul>');
+                if (inOl) finalHtml.push('</ol>');
+
+                let html = finalHtml.join('\n');
+
+                // 3. KaTeX handling
+                if (html.includes('$') && (window as any).katex) {
+                    html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
                         return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
                     }).replace(/\$([\s\S]+?)\$/g, (_, math) => {
                         return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
                     });
-                    previewRef.current.innerHTML = html;
-                } else {
-                    previewRef.current.textContent = "";
                 }
+                
+                previewRef.current.innerHTML = html;
             } catch (e) {
-                previewRef.current.textContent = "Format matematika salah...";
+                previewRef.current.textContent = "Terjadi kesalahan format...";
             }
         }
     }, [text]);
 
-    if (!text.includes('$')) return null;
+    if (!text.trim()) return null;
 
     return (
-        <div className="mt-2 p-3 bg-indigo-50/30 border border-dashed border-indigo-100 rounded-lg text-sm text-gray-800">
-            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                <CheckCircleIcon className="w-3 h-3"/> Hasil Render Matematika:
+        <div className="mt-3 p-4 bg-slate-50 border border-dashed border-gray-200 rounded-xl text-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <EyeIcon className="w-3.5 h-3.5"/> Pratinjau Tampilan Siswa:
             </p>
-            <div ref={previewRef} className="prose prose-sm max-w-none overflow-x-auto py-2"></div>
+            <div ref={previewRef} className="prose prose-slate prose-sm max-w-none overflow-x-auto min-h-[1.5rem] text-slate-700"></div>
         </div>
     );
 };
@@ -279,16 +329,16 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
+    
+    // Track textareas for inserting text
+    const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
     // Scroll Effect
     useEffect(() => {
         if (!isEditing && !generatedCode) {
             const timer = setTimeout(() => {
                 if (questionsSectionRef.current) {
-                    questionsSectionRef.current.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'start' 
-                    });
+                    questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }, 300);
             return () => clearTimeout(timer);
@@ -369,30 +419,47 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
 
-    const handleInsertMath = (qId: string, latex: string, optIndex?: number) => {
-        if (optIndex !== undefined) {
-             setQuestions(prev => prev.map(q => {
-                 if (q.id === qId && q.options) {
-                     const currentVal = q.options[optIndex] || '';
-                     const insert = latex.includes('$$') ? latex : `$${latex}$`;
-                     const newVal = currentVal + " " + insert;
-                     const newOptions = [...q.options];
-                     newOptions[optIndex] = newVal;
-                     return { ...q, options: newOptions };
-                 }
-                 return q;
-             }));
+    const insertToTextarea = (textareaId: string, prefix: string, suffix: string = '', isBlock: boolean = false) => {
+        const textarea = textareaRefs.current[textareaId];
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const before = text.substring(0, start);
+        const selection = text.substring(start, end);
+        const after = text.substring(end);
+
+        let newText = "";
+        if (isBlock) {
+            // Logic for list items
+            const lines = selection.split('\n');
+            const formattedLines = lines.map(line => prefix + line);
+            newText = before + formattedLines.join('\n') + after;
         } else {
-             setQuestions(prev => prev.map(q => {
-                 if (q.id === qId) {
-                     const currentVal = q.questionText || '';
-                     const insert = latex.includes('$$') ? latex : `$${latex}$`;
-                     const newVal = currentVal + " " + insert;
-                     return { ...q, questionText: newVal };
-                 }
-                 return q;
-             }));
+            newText = before + prefix + selection + suffix + after;
         }
+
+        // We need to update state
+        const parts = textareaId.split('-');
+        const qId = parts.slice(1, -1).join('-'); // Re-assemble if qId contains dashes
+        const type = parts[0]; // 'q' for question, 'opt' for option
+        
+        if (type === 'q') {
+            handleQuestionTextChange(qId, newText);
+        } else if (type === 'opt') {
+            const optIdx = parseInt(parts[parts.length - 1]);
+            handleOptionTextChange(qId, optIdx, newText);
+        } else if (type === 'key') {
+             handleCorrectAnswerChange(qId, newText);
+        }
+
+        // Maintain focus and set selection
+        setTimeout(() => {
+            textarea.focus();
+            const newPos = start + prefix.length;
+            textarea.setSelectionRange(newPos, newPos + selection.length);
+        }, 10);
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, qId: string, optIndex?: number) => {
@@ -658,7 +725,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     <h2 className="text-xl font-bold text-neutral">
                         {isEditing ? '1. Tinjau dan Edit Soal' : '3. Tinjau dan Edit Soal'}
                     </h2>
-                    <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Gunakan tombol matematika untuk menulis rumus.</p>
+                    <p className="text-sm text-base-content mt-1">Periksa kembali soal yang telah dibuat. Gunakan bilah alat di atas textarea untuk format teks dan rumus matematika.</p>
                 </div>
                 <div className="space-y-4">
                     {questions.length > 0 && (
@@ -680,7 +747,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
                     {questions.map((q, index) => {
                         const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                        
+                        const qTextareaId = `q-${q.id}-0`;
+
                         return (
                         <React.Fragment key={q.id}>
                             <div id={q.id} className="bg-white border border-gray-200 rounded-lg shadow-sm group hover:shadow-md transition-shadow relative overflow-hidden">
@@ -715,16 +783,18 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                         <span className="text-primary font-bold mt-2">{questionNumber}.</span>
                                                     )}
                                                     <div className="flex-1">
-                                                        <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
-                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex)} />
+                                                        <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-800 focus-within:border-transparent transition-all">
+                                                            <EditorToolbar onInsert={(pre, suf, blk) => insertToTextarea(qTextareaId, pre, suf, blk)} />
                                                             <textarea
+                                                                // Fixed ref callback to return void
+                                                                ref={(el) => { textareaRefs.current[qTextareaId] = el; }}
                                                                 value={q.questionText}
                                                                 onChange={(e) => handleQuestionTextChange(q.id, e.target.value)}
-                                                                className={`w-full p-3 bg-white border-0 focus:ring-0 text-sm leading-relaxed break-words outline-none ${isDataUrl(q.questionText) ? 'hidden' : 'min-h-[100px]'}`}
+                                                                className={`w-full p-3 bg-white border-0 focus:ring-0 text-sm leading-relaxed break-words outline-none font-sans ${isDataUrl(q.questionText) ? 'hidden' : 'min-h-[120px]'}`}
                                                                 placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."}
                                                             />
                                                         </div>
-                                                        <MathPreview text={q.questionText} />
+                                                        <EditorPreview text={q.questionText} />
 
                                                         {(isDataUrl(q.questionText) || q.imageUrl) && (
                                                             <div className="relative inline-block group/img mt-4">
@@ -763,9 +833,11 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                             <div className="mt-3 ml-8">
                                                 <div className="space-y-4">
-                                                    {q.options.map((option, i) => (
+                                                    {q.options.map((option, i) => {
+                                                        const optTextareaId = `opt-${q.id}-${i}`;
+                                                        return (
                                                         <div key={i} className={`relative rounded-lg border transition-all duration-200 group/opt ${q.correctAnswer === option ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex, i)} className="rounded-t-lg bg-white/50" />
+                                                            <EditorToolbar onInsert={(pre, suf, blk) => insertToTextarea(optTextareaId, pre, suf, blk)} className="rounded-t-lg bg-white/50" />
                                                             <div className="p-3 pr-10 flex items-start gap-3">
                                                                 <button 
                                                                     onClick={() => handleDeleteOption(q.id, i)}
@@ -785,13 +857,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 <div className="flex-1 space-y-2">
                                                                     <div className="flex flex-col">
                                                                         <input
+                                                                            // Fixed ref callback to return void
+                                                                            ref={(el) => { textareaRefs.current[optTextareaId] = el as any; }}
                                                                             type="text"
                                                                             value={option}
                                                                             onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
                                                                             className={`block w-full px-2 py-1.5 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
                                                                             placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
                                                                         />
-                                                                        <MathPreview text={option} />
+                                                                        <EditorPreview text={option} />
                                                                     </div>
                                                                     {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
                                                                         <div className="relative inline-block group/optImg">
@@ -820,7 +894,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                    )})}
                                                 </div>
                                                 <button 
                                                     onClick={() => handleAddOption(q.id)}
@@ -839,9 +913,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 <div className="space-y-4">
                                                     {q.options.map((option, i) => {
                                                         const isChecked = q.correctAnswer ? q.correctAnswer.split(',').includes(option) : false;
+                                                        const optTextareaId = `opt-${q.id}-${i}`;
                                                         return (
                                                         <div key={i} className={`relative rounded-lg border transition-all duration-200 group/opt ${isChecked ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                            <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex, i)} className="rounded-t-lg bg-white/50" />
+                                                            <EditorToolbar onInsert={(pre, suf, blk) => insertToTextarea(optTextareaId, pre, suf, blk)} className="rounded-t-lg bg-white/50" />
                                                             <div className="p-3 pr-10 flex items-start gap-3">
                                                                 <button 
                                                                     onClick={() => handleDeleteOption(q.id, i)}
@@ -859,13 +934,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 <div className="flex-1 space-y-2">
                                                                     <div className="flex flex-col">
                                                                         <input
+                                                                            // Fixed ref callback to return void
+                                                                            ref={(el) => { textareaRefs.current[optTextareaId] = el as any; }}
                                                                             type="text"
                                                                             value={option}
                                                                             onChange={(e) => handleOptionTextChange(q.id, i, e.target.value)}
                                                                             className={`block w-full px-2 py-1.5 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm break-words ${isDataUrl(option) ? 'hidden' : ''}`}
                                                                             placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
                                                                         />
-                                                                        <MathPreview text={option} />
+                                                                        <EditorPreview text={option} />
                                                                     </div>
                                                                      {(isDataUrl(option) || (q.optionImages && q.optionImages[i])) && (
                                                                         <div className="relative inline-block group/optImg">
@@ -1024,8 +1101,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     />
                                                 ) : (
                                                     <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary transition-all">
-                                                        <MathToolbar onInsert={(latex) => handleInsertMath(q.id, latex)} />
+                                                        <EditorToolbar onInsert={(pre, suf, blk) => insertToTextarea(`key-${q.id}-0`, pre, suf, blk)} />
                                                         <input 
+                                                            // Fixed ref callback to return void
+                                                            ref={(el) => { textareaRefs.current[`key-${q.id}-0`] = el as any; }}
                                                             type="text"
                                                             value={q.correctAnswer || ''}
                                                             onChange={(e) => handleCorrectAnswerChange(q.id, e.target.value)}
@@ -1034,7 +1113,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                         />
                                                     </div>
                                                 )}
-                                                <MathPreview text={q.correctAnswer || ''} />
+                                                <EditorPreview text={q.correctAnswer || ''} />
                                              </div>
                                         )}
                                     </div>
