@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
-    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon, CalculatorIcon,
+    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     EyeIcon 
 } from '../Icons';
 import { compressImage } from './examUtils';
@@ -257,16 +257,16 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
     useEffect(() => {
         if (previewRef.current) {
             try {
-                // 1. Pre-process Formatting
+                // 1. Pre-process Formatting (Bold, Italic, Delete, Underline)
                 let processedText = text
                     .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
                     .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
                     .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
                     .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
 
-                // 2. Line by Line List Parsing (Lebih akurat dari regex global)
+                // 2. State-based Line Parsing for Correct Lists
                 const lines = processedText.split('\n');
-                let finalHtml = [];
+                let finalHtmlChunks = [];
                 let inUl = false;
                 let inOl = false;
 
@@ -276,23 +276,26 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
                     const numberedMatch = line.match(/^\s*\d+[\.\)]\s+(.*)/);
 
                     if (bulletMatch) {
-                        if (inOl) { finalHtml.push('</ol>'); inOl = false; }
-                        if (!inUl) { finalHtml.push('<ul class="list-disc list-outside ml-5 space-y-1 my-2">'); inUl = true; }
-                        finalHtml.push(`<li>${bulletMatch[1]}</li>`);
+                        if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
+                        if (!inUl) { finalHtmlChunks.push('<ul class="list-disc list-outside pl-6 space-y-1 my-2">'); inUl = true; }
+                        finalHtmlChunks.push(`<li>${bulletMatch[1]}</li>`);
                     } else if (numberedMatch) {
-                        if (inUl) { finalHtml.push('</ul>'); inUl = false; }
-                        if (!inOl) { finalHtml.push('<ol class="list-decimal list-outside ml-5 space-y-1 my-2">'); inOl = true; }
-                        finalHtml.push(`<li>${numberedMatch[1]}</li>`);
+                        if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
+                        if (!inOl) { finalHtmlChunks.push('<ol class="list-decimal list-outside pl-6 space-y-1 my-2">'); inOl = true; }
+                        finalHtmlChunks.push(`<li>${numberedMatch[1]}</li>`);
                     } else {
-                        if (inUl) { finalHtml.push('</ul>'); inUl = false; }
-                        if (inOl) { finalHtml.push('</ol>'); inOl = false; }
-                        finalHtml.push(line + (line.trim() ? '<br/>' : ''));
+                        // Close any open list tags when meeting plain text
+                        if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
+                        if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
+                        // Use <br/> for line breaks in normal text, but skip if it's an empty line to avoid huge gaps
+                        finalHtmlChunks.push(line.trim() === '' ? '<div class="h-2"></div>' : line + '<br/>');
                     }
                 }
-                if (inUl) finalHtml.push('</ul>');
-                if (inOl) finalHtml.push('</ol>');
+                // Final close
+                if (inUl) finalHtmlChunks.push('</ul>');
+                if (inOl) finalHtmlChunks.push('</ol>');
 
-                let html = finalHtml.join('\n');
+                let html = finalHtmlChunks.join('');
 
                 // 3. KaTeX handling
                 if (html.includes('$') && (window as any).katex) {
