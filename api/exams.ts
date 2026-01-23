@@ -1,4 +1,4 @@
- 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
@@ -234,12 +234,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { code } = req.query;
             if (!code) return res.status(400).json({ error: "Exam code is required" });
             
+            const client = await db.getClient();
             try {
-                // Opsional: Hapus result terkait juga jika perlu, tapi untuk sekarang kita hapus exam saja
-                await db.query('DELETE FROM exams WHERE code = $1', [code]);
+                await client.query('BEGIN');
+                // Hapus result terkait terlebih dahulu untuk integritas data
+                await client.query('DELETE FROM results WHERE exam_code = $1', [code]);
+                // Hapus ujian itu sendiri
+                await client.query('DELETE FROM exams WHERE code = $1', [code]);
+                await client.query('COMMIT');
                 return res.status(200).json({ success: true });
             } catch (e) {
+                await client.query('ROLLBACK');
                 throw e;
+            } finally {
+                client.release();
             }
         }
 
