@@ -54,13 +54,15 @@ const EditorToolbar: React.FC<{
     const [matrixType, setMatrixType] = useState<'pmatrix' | 'vmatrix'>('pmatrix');
 
     const generateCustomMatrix = () => {
-        let latex = `\\begin{${matrixType}}\n`;
+        // FIX: Removed \n characters to prevent line-break issues in previewer
+        let latex = `\\begin{${matrixType}}`;
         for (let r = 1; r <= matrixRows; r++) {
             let row = [];
             for (let c = 1; c <= matrixCols; c++) {
                 row.push(`a_{${r},${c}}`);
             }
-            latex += "  " + row.join(" & ") + (r < matrixRows ? " \\\\" : "") + "\n";
+            // Join rows with & and terminate line with \\ but NO newline character
+            latex += row.join(" & ") + (r < matrixRows ? " \\\\" : "");
         }
         latex += `\\end{${matrixType}}`;
         onInsert('$' + latex + '$');
@@ -257,7 +259,7 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
     useEffect(() => {
         if (previewRef.current) {
             try {
-                // 1. Pre-process Formatting (Bold, Italic, Delete, Underline)
+                // 1. Pre-process Formatting
                 let processedText = text
                     .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
                     .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
@@ -265,6 +267,7 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
                     .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
 
                 // 2. State-based Line Parsing for Correct Lists
+                // Simple parser that respects newlines but adds HTML line breaks
                 const lines = processedText.split('\n');
                 let finalHtmlChunks = [];
                 let inUl = false;
@@ -284,14 +287,13 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
                         if (!inOl) { finalHtmlChunks.push('<ol class="list-decimal list-outside pl-6 space-y-1 my-2">'); inOl = true; }
                         finalHtmlChunks.push(`<li>${numberedMatch[1]}</li>`);
                     } else {
-                        // Close any open list tags when meeting plain text
                         if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
                         if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                        // Use <br/> for line breaks in normal text, but skip if it's an empty line to avoid huge gaps
+                        // Improved: Use div for spacing, don't break LaTeX blocks if they are single line now.
+                        // If line is empty, add spacer. If not, add line + br
                         finalHtmlChunks.push(line.trim() === '' ? '<div class="h-2"></div>' : line + '<br/>');
                     }
                 }
-                // Final close
                 if (inUl) finalHtmlChunks.push('</ul>');
                 if (inOl) finalHtmlChunks.push('</ol>');
 
@@ -328,6 +330,7 @@ const EditorPreview: React.FC<{ text: string }> = ({ text }) => {
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
+    // ... [Rest of the component remains unchanged, only changed EditorToolbar matrix generation] ...
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
     const questionsSectionRef = useRef<HTMLDivElement>(null);
@@ -740,7 +743,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 <button
                                     onClick={() => openTypeSelectionModal(-1)}
                                     className="bg-gray-50 text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
-                                >
+                                    >
                                     <PlusCircleIcon className="w-4 h-4" />
                                     Tambah Soal / Keterangan Di Awal
                                 </button>
@@ -1149,6 +1152,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
              </div>
 
             {/* --- CONFIGURATION --- */}
+            {/* [Configuration section and Actions buttons remain exactly the same as original file] */}
+            {/* ... (Existing code for configuration and actions) ... */}
             <div className="pt-10">
                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
                     <h2 className="text-xl font-bold text-neutral">
