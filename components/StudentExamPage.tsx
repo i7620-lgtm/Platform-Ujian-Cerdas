@@ -75,10 +75,33 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
     );
 };
 
+// --- KOMPONEN RENDERING MATEMATIKA ---
 const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     if (content.startsWith('data:image/')) {
         return <SmartImageViewer src={content} alt="Konten Visual" />;
     }
+
+    // Deteksi jika mengandung format KaTeX ($)
+    if (content.includes('$') && (window as any).katex) {
+        try {
+            // Proses blok $$ ... $$ dan inline $ ... $
+            const html = content.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+                return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
+            }).replace(/\$([\s\S]+?)\$/g, (_, math) => {
+                return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
+            });
+            
+            return (
+                <div 
+                    className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: html }}
+                />
+            );
+        } catch (e) {
+            console.error("Math rendering error", e);
+        }
+    }
+
     return <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap">{content}</div>;
 };
 
@@ -119,7 +142,6 @@ const QuestionCard: React.FC<{
     const handleTrueFalseChange = (idx: number, val: boolean) => {
         let current: boolean[] = [];
         try { current = JSON.parse(answer || '[]'); } catch { current = []; }
-        // Ensure array size matches
         const size = question.trueFalseRows?.length || 0;
         if (current.length !== size) current = new Array(size).fill(null);
         
@@ -134,7 +156,6 @@ const QuestionCard: React.FC<{
         onAnswerChange(question.id, JSON.stringify(current));
     };
 
-    // Render Input Area based on Type
     const renderInput = () => {
         switch (question.questionType) {
             case 'MULTIPLE_CHOICE':
@@ -233,13 +254,6 @@ const QuestionCard: React.FC<{
             case 'MATCHING':
                 if (!question.matchingPairs) return null;
                 const matchAnswers = (() => { try { return JSON.parse(answer || '{}'); } catch { return {}; } })();
-                
-                // Logic Perbaikan:
-                // 1. Ekstrak semua opsi kanan (right)
-                // 2. Filter nilai null/undefined
-                // 3. Urutkan secara alfabetis agar mudah dicari siswa
-                // 4. Bungkus dalam useMemo agar tidak re-render/shuffle tidak perlu
-                // eslint-disable-next-line react-hooks/rules-of-hooks
                 const rightOptions = useMemo(() => {
                     const opts = question.matchingPairs?.map(p => p.right).filter(Boolean) || [];
                     return opts.sort((a, b) => a.localeCompare(b));
@@ -306,7 +320,6 @@ const QuestionCard: React.FC<{
     return (
         <div id={`question-${question.id}`} className="scroll-mt-32 mb-8 animate-fade-in">
             <div className={`bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.04)] border overflow-hidden transition-all duration-300 ${isError ? 'border-red-500 ring-2 ring-red-100 shadow-red-100' : 'border-gray-100'}`}>
-                {/* Header Card: Nomor & Teks */}
                 <div className={`p-6 md:p-8 ${isError ? 'bg-red-50/30' : ''}`}>
                     <div className="flex gap-4 md:gap-6">
                         <div className="shrink-0 flex flex-col items-center gap-2">
@@ -315,13 +328,6 @@ const QuestionCard: React.FC<{
                             ) : (
                                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shadow-lg ${isError ? 'bg-red-500 text-white shadow-red-300' : 'bg-neutral text-white shadow-neutral/20'}`}>
                                     {index + 1}
-                                </div>
-                            )}
-                            {isError && (
-                                <div className="text-red-500 animate-bounce">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                    </svg>
                                 </div>
                             )}
                         </div>
@@ -338,7 +344,6 @@ const QuestionCard: React.FC<{
                         </div>
                     </div>
 
-                    {/* Input Area */}
                     <div className="mt-2 md:pl-16">
                         {renderInput()}
                     </div>
@@ -350,7 +355,6 @@ const QuestionCard: React.FC<{
 
 // --- HALAMAN UTAMA ---
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit, onUpdate }) => {
-    // 1. Initial State & Setup
     const [answers, setAnswers] = useState<Record<string, string>>(() => {
         try {
             const saved = localStorage.getItem(`exam_answers_${exam.code}_${student.studentId}`);
@@ -362,23 +366,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
-    // VALIDATION STATE
     const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set());
 
-    // Time Management
     const endTimeRef = useRef<number>(0);
     const [timeLeft, setTimeLeft] = useState(0);
 
-    // Refs untuk akses state terbaru
     const answersRef = useRef(answers);
     const timeLeftRef = useRef(timeLeft);
-
-    // Activity Logging Queue
     const activityQueueRef = useRef<string[]>([]);
     const lastLoggedQuestionIdRef = useRef<string | null>(null);
 
-    // Helper to add log
     const logActivity = (message: string) => {
         const entry = `${getCurrentTimeStr()} ${message}`;
         activityQueueRef.current.push(entry);
@@ -387,14 +384,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
-    // Auto-save Logic
     useEffect(() => {
         if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
 
         const intervalId = setInterval(() => {
             if (!isSubmitting) {
                 const logsToSend = [...activityQueueRef.current];
-                activityQueueRef.current = []; // Clear local queue
+                activityQueueRef.current = [];
                 onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
             }
         }, exam.config.autoSaveInterval * 1000);
@@ -402,42 +398,29 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => clearInterval(intervalId);
     }, [exam.config.autoSaveInterval, isSubmitting, onUpdate]);
 
-
-    // Anti-Cheat (Visibility Check Only)
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 if (exam.config.detectBehavior && !isSubmitting) {
                     logActivity("Meninggalkan halaman ujian (Tab/Aplikasi disembunyikan).");
-                    
                     const logsToSend = [...activityQueueRef.current];
                     activityQueueRef.current = []; 
-
                     if (exam.config.continueWithPermission) {
                         setIsSubmitting(true);
-                        // Trigger Force Submit SEKALI. Backend akan menangani apakah ini diterima atau ditolak (jika sudah di-unlock).
                         onForceSubmit(answersRef.current, timeLeftRef.current, logsToSend);
-                    } else {
-                        // Log Only
-                        if (onUpdate) {
-                            onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
-                        }
+                    } else if (onUpdate) {
+                        onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
                     }
                 }
-            } else {
-                if (exam.config.detectBehavior && !isSubmitting) {
-                    logActivity("Kembali ke halaman ujian.");
-                }
+            } else if (exam.config.detectBehavior && !isSubmitting) {
+                logActivity("Kembali ke halaman ujian.");
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, onUpdate, isSubmitting]);
 
-    // Initial Setup Effect
     useEffect(() => {
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
         const startObj = new Date(`${dateStr}T${exam.config.startTime}`);
@@ -446,7 +429,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
         const tick = () => {
             if (isSubmitting) return;
-
             const now = Date.now();
             const diff = Math.floor((endTimeRef.current - now) / 1000);
             if (diff <= 0) {
@@ -461,7 +443,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => cancelAnimationFrame(timer);
     }, [exam, isSubmitting]);
 
-    // Network Listeners
     useEffect(() => {
         const setOn = () => { setIsOnline(true); logActivity("Koneksi internet pulih."); };
         const setOff = () => { setIsOnline(false); logActivity("Koneksi internet terputus."); };
@@ -473,23 +454,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, []);
 
-    // Questions Logic (Shuffle)
     const questions = useMemo(() => {
         const key = `exam_order_${exam.code}_${student.studentId}`;
         const storedOrder = localStorage.getItem(key);
-        
         let qList = [...exam.questions];
         if (exam.config.shuffleQuestions) {
             if (storedOrder) {
                 try {
                     const ids = JSON.parse(storedOrder) as string[];
-                    qList.sort((a, b) => {
-                        const idxA = ids.indexOf(a.id);
-                        const idxB = ids.indexOf(b.id);
-                        if (idxA === -1) return 1;
-                        if (idxB === -1) return -1;
-                        return idxA - idxB;
-                    });
+                    qList.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
                 } catch {
                     qList = shuffleArray(qList);
                     localStorage.setItem(key, JSON.stringify(qList.map(q => q.id)));
@@ -502,11 +475,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return qList;
     }, [exam]);
 
-    // Handlers
     const handleAnswerChange = useCallback((id: string, val: string) => {
         if (isSubmitting) return;
-
-        // Clear error state if answered
         setUnansweredIds(prev => {
             if (prev.has(id)) {
                 const next = new Set(prev);
@@ -545,7 +515,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         questions.forEach(q => {
             if (q.questionType === 'INFO') return;
             const val = answers[q.id];
-            // Check if undefined, null, or empty string/array/object representation
             if (!val || val === '[]' || val === '{}' || (typeof val === 'string' && val.trim() === '')) {
                 missing.add(q.id);
             }
@@ -554,24 +523,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     };
 
     const handleSubmit = async (isAuto = false) => {
-        // Validation Logic (Only for manual submit)
         if (!isAuto) {
             const missing = validateAnswers();
             if (missing.size > 0) {
                 setUnansweredIds(missing);
-                const firstMissingId = Array.from(missing)[0];
-                scrollToQuestion(firstMissingId);
-                alert(`Mohon maaf, Anda belum menjawab ${missing.size} soal. Silakan lengkapi jawaban pada soal yang berwarna merah.`);
-                return; // STOP SUBMISSION
+                scrollToQuestion(Array.from(missing)[0]);
+                alert(`Mohon maaf, Anda belum menjawab ${missing.size} soal. Silakan lengkapi jawaban.`);
+                return;
             }
-
             if (!confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
         }
-        
         setIsSubmitting(true);
-
         logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
-        
         let location = "";
         if (exam.config.trackLocation) {
              try {
@@ -580,22 +543,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                  location = `${pos.coords.latitude},${pos.coords.longitude}`;
              } catch {}
         }
-
         localStorage.removeItem(`exam_answers_${exam.code}_${student.studentId}`);
-        const logsToSend = [...activityQueueRef.current];
-        onSubmit(answers, timeLeft, location, logsToSend);
+        onSubmit(answers, timeLeft, location, [...activityQueueRef.current]);
     };
 
-    // Derived States for UI
     const answeredCount = questions.filter(q => q.questionType !== 'INFO' && answers[q.id]).length;
     const totalQuestions = questions.filter(q => q.questionType !== 'INFO').length;
     const progress = Math.round((answeredCount / totalQuestions) * 100) || 0;
-    const isCritical = timeLeft < 300; // 5 mins
+    const isCritical = timeLeft < 300;
 
-    // --- RENDER ---
     return (
         <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans pb-24">
-            {/* Top Bar (Sticky) */}
             <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
                 <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -608,38 +566,27 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             <p className="text-xs text-slate-500 font-medium hidden sm:block">Siswa: {student.fullName}</p>
                         </div>
                     </div>
-
                     <div className="flex items-center gap-3">
-                        {/* Timer Badge */}
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm shadow-sm transition-colors ${isCritical ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-white border-gray-200 text-slate-700'}`}>
                             <ClockIcon className="w-4 h-4" />
                             <span>{formatTime(timeLeft)}</span>
                         </div>
-                        
-                        {/* Network Status */}
                         <div className={`w-8 h-8 flex items-center justify-center rounded-full ${isOnline ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
                             {isOnline ? <WifiIcon className="w-4 h-4" /> : <NoWifiIcon className="w-4 h-4" />}
                         </div>
                     </div>
                 </div>
-                {/* Progress Line */}
                 <div className="h-1 w-full bg-gray-100">
                     <div className="h-full bg-indigo-600 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="max-w-3xl mx-auto px-4 pt-8">
-                {/* Intro/Header Content */}
                 <div className="mb-8 flex items-end justify-between">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900">Lembar Jawaban</h2>
                         <p className="text-slate-500 text-sm mt-1">Kerjakan dengan jujur dan teliti.</p>
-                        {unansweredIds.size > 0 && (
-                             <p className="text-red-600 text-xs font-bold mt-2 animate-pulse">
-                                 ⚠ Terdapat {unansweredIds.size} soal yang belum dijawab.
-                             </p>
-                        )}
+                        {unansweredIds.size > 0 && <p className="text-red-600 text-xs font-bold mt-2 animate-pulse">⚠ Terdapat {unansweredIds.size} soal belum dijawab.</p>}
                     </div>
                     <div className="text-right hidden sm:block">
                         <div className="text-3xl font-bold text-indigo-600 leading-none">{progress}%</div>
@@ -647,88 +594,58 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     </div>
                 </div>
 
-                {/* Question List */}
                 <div className={isSubmitting ? 'pointer-events-none opacity-50 filter blur-sm transition-all' : ''}>
-                    {questions.map((q, idx) => {
-                         // Hitung nomor urut visual (skip INFO)
-                         const visualNum = questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length;
-                         return (
-                            <QuestionCard 
-                                key={q.id}
-                                question={q}
-                                index={visualNum}
-                                answer={answers[q.id] || ''}
-                                shuffleAnswers={exam.config.shuffleAnswers}
-                                onAnswerChange={handleAnswerChange}
-                                isError={unansweredIds.has(q.id)}
-                            />
-                         );
-                    })}
+                    {questions.map((q, idx) => (
+                        <QuestionCard 
+                            key={q.id}
+                            question={q}
+                            index={questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length}
+                            answer={answers[q.id] || ''}
+                            shuffleAnswers={exam.config.shuffleAnswers}
+                            onAnswerChange={handleAnswerChange}
+                            isError={unansweredIds.has(q.id)}
+                        />
+                    ))}
                 </div>
 
-                {/* Submit Area */}
                 <div className="mt-12 mb-20">
                     <button 
                         onClick={() => handleSubmit(false)}
                         disabled={isSubmitting}
-                        className="w-full bg-slate-900 hover:bg-black text-white font-bold text-lg py-4 rounded-xl shadow-xl shadow-slate-200 hover:shadow-2xl transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait flex items-center justify-center gap-3"
+                        className="w-full bg-slate-900 hover:bg-black text-white font-bold text-lg py-4 rounded-xl shadow-xl shadow-slate-200 transition-all transform active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-3"
                     >
-                        {isSubmitting ? (
-                            <>
-                                <ArrowPathIcon className="w-5 h-5 animate-spin" /> Mengumpulkan...
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircleIcon className="w-6 h-6" /> Selesai & Kumpulkan
-                            </>
-                        )}
+                        {isSubmitting ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <CheckCircleIcon className="w-6 h-6" />}
+                        {isSubmitting ? 'Mengumpulkan...' : 'Selesai & Kumpulkan'}
                     </button>
-                    <p className="text-center text-xs text-slate-400 mt-4 max-w-sm mx-auto">
-                        Pastikan koneksi internet stabil saat mengumpulkan. Jawaban akan otomatis tersimpan di perangkat jika offline.
-                    </p>
                 </div>
             </div>
 
-            {/* Navigation Drawer (Sidebar) */}
             <div className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />
                 <div className="relative w-80 max-w-[80vw] h-full bg-white shadow-2xl flex flex-col">
                     <div className="p-4 border-b flex items-center justify-between bg-slate-50">
                         <h3 className="font-bold text-slate-800">Navigasi Soal</h3>
-                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-slate-200 rounded-full">
-                            <ArrowLeftIcon className="w-5 h-5 text-slate-600" />
-                        </button>
+                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-slate-200 rounded-full"><ArrowLeftIcon className="w-5 h-5 text-slate-600" /></button>
                     </div>
-                    
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="grid grid-cols-4 gap-3">
                             {questions.map((q, idx) => {
-                                if (q.questionType === 'INFO') return null; // Skip numbering for INFO
+                                if (q.questionType === 'INFO') return null;
                                 const visualNum = questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length + 1;
                                 const isAnswered = !!answers[q.id];
                                 const isError = unansweredIds.has(q.id);
-                                
                                 return (
                                     <button
                                         key={q.id}
                                         onClick={() => scrollToQuestion(q.id)}
-                                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border-2 transition-all relative
-                                            ${isError 
-                                                ? 'bg-red-500 border-red-600 text-white shadow-md animate-pulse'
-                                                : isAnswered 
-                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
-                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'
-                                            }`}
+                                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border-2 transition-all relative ${isError ? 'bg-red-500 border-red-600 text-white animate-pulse' : isAnswered ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'}`}
                                     >
                                         <span>{visualNum}</span>
-                                        {isAnswered && !isError && <span className="text-[8px] leading-none mt-0.5">OK</span>}
-                                        {isError && <span className="text-[8px] leading-none mt-0.5 text-white">!</span>}
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
-
                     <div className="p-4 border-t bg-slate-50 text-xs text-slate-500 text-center">
                         <p>Total {answeredCount} dari {totalQuestions} soal terjawab</p>
                     </div>
