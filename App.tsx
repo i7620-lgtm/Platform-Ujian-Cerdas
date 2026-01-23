@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -487,30 +487,53 @@ const App: React.FC = () => {
       case 'SELECTOR':
       default:
         return (
-          <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6 animate-fade-in relative">
-             <div className="w-full max-w-sm text-center">
-                <div className="mb-10 flex justify-center">
-                    <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center text-white">
-                        <LogoIcon className="w-8 h-8" />
+          <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden bg-slate-50">
+             {/* Grid Background */}
+             <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(to right, #cbd5e1 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+                opacity: 0.25
+             }}></div>
+             
+             {/* Gradient Overlay for depth */}
+             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-slate-100/80 pointer-events-none"></div>
+
+             <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white p-8 sm:p-12 relative z-10 animate-fade-in">
+                <div className="mb-10 flex flex-col items-center text-center">
+                    <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center text-white mb-6 transform rotate-3 hover:rotate-6 transition-transform duration-500">
+                        <LogoIcon className="w-10 h-10" />
                     </div>
+                    
+                    <h1 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">Ujian Cerdas</h1>
+                    <p className="text-slate-500 text-sm font-medium leading-relaxed">Platform evaluasi modern berbasis AI.<br/>Cepat, Tepat, dan Terpercaya.</p>
                 </div>
-                
-                <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Platform Ujian Cerdas</h1>
-                <p className="text-slate-500 mb-10 text-sm">Evaluasi modern, cepat, dan terpercaya.</p>
                 
                 <div className="space-y-4">
-                     <button onClick={() => setView('STUDENT_LOGIN')} className="w-full bg-slate-900 text-white font-bold py-4 px-6 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
-                        <span>Masuk sebagai Siswa</span>
-                        <span className="opacity-70">→</span>
+                     {/* Student Button - Green */}
+                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
+                        <div className="flex flex-col items-start">
+                            <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
+                            <span className="text-lg">Siswa</span>
+                        </div>
+                        <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors">
+                           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        </div>
                     </button>
 
-                    <button onClick={() => setView('TEACHER_LOGIN')} className="w-full bg-white text-slate-600 font-bold py-4 px-6 rounded-2xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95">
-                        Masuk sebagai Guru
+                    {/* Teacher Button - Blue */}
+                    <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
+                        <div className="flex flex-col items-start">
+                            <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
+                            <span className="text-lg">Guru</span>
+                        </div>
+                        <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors">
+                           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+                        </div>
                     </button>
                 </div>
                 
-                <div className="mt-16 flex justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-300">
-                    <span className={isOnline ? "text-emerald-400" : "text-rose-400"}>●</span>
+                <div className="mt-12 flex justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100/50 py-2 px-4 rounded-full w-fit mx-auto">
+                    <span className={isOnline ? "text-emerald-500 animate-pulse" : "text-rose-500"}>●</span>
                     <span>{isOnline ? "System Online" : "System Offline"}</span>
                 </div>
              </div>
