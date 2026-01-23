@@ -41,7 +41,7 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
     return (
         <>
             <div 
-                className="relative group cursor-zoom-in overflow-hidden rounded-lg border border-gray-100 bg-gray-50 max-w-full md:max-w-md"
+                className="relative group cursor-zoom-in overflow-hidden rounded-lg border border-gray-100 bg-gray-50 max-w-full md:max-w-md my-4"
                 onClick={() => setIsOpen(true)}
             >
                 <img 
@@ -50,9 +50,6 @@ const SmartImageViewer: React.FC<{ src: string; alt: string }> = ({ src, alt }) 
                     className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <span className="bg-white/90 px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm">Perbesar</span>
-                </div>
             </div>
 
             {/* Lightbox Modal */}
@@ -130,13 +127,13 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
         
         return (
             <div 
-                className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap"
+                className="prose prose-slate prose-lg max-w-none text-slate-800 leading-relaxed font-normal break-words whitespace-pre-wrap selection:bg-indigo-100 selection:text-indigo-900"
                 dangerouslySetInnerHTML={{ __html: html }}
             />
         );
     } catch (e) {
         console.error("Content rendering error", e);
-        return <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-normal break-words whitespace-pre-wrap">{content}</div>;
+        return <div className="prose prose-slate prose-lg max-w-none text-slate-800 leading-relaxed font-normal break-words whitespace-pre-wrap">{content}</div>;
     }
 };
 
@@ -195,29 +192,29 @@ const QuestionCard: React.FC<{
         switch (question.questionType) {
             case 'MULTIPLE_CHOICE':
                 return (
-                    <div className="grid grid-cols-1 gap-3 mt-4">
+                    <div className="grid grid-cols-1 gap-3 mt-6">
                         {displayedOptions.map((opt, i) => {
                             const isSelected = answer === opt.text;
                             return (
                                 <div 
                                     key={i}
                                     onClick={() => onAnswerChange(question.id, opt.text)}
-                                    className={`relative flex items-center p-4 cursor-pointer rounded-xl border transition-all duration-200 group
+                                    className={`relative flex items-start p-4 cursor-pointer rounded-xl border transition-all duration-200 group
                                         ${isSelected 
-                                            ? 'bg-indigo-50 border-indigo-500 shadow-sm ring-1 ring-indigo-500' 
+                                            ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
                                             : isError 
-                                                ? 'bg-white border-red-200 hover:border-red-300 hover:bg-red-50' 
-                                                : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                                                ? 'bg-white border-red-200 hover:border-red-300' 
+                                                : 'bg-white border-slate-100 hover:border-indigo-200 hover:bg-slate-50'
                                         }`}
                                 >
-                                    <div className={`flex items-center justify-center w-6 h-6 rounded-full border mr-4 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
-                                        {isSelected && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
+                                    <div className={`mt-0.5 flex items-center justify-center w-5 h-5 rounded-full border flex-shrink-0 mr-4 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 bg-white'}`}>
+                                        {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
                                     </div>
                                     <div className="flex-1">
                                         {opt.text && <RenderContent content={opt.text} />}
                                         {opt.image && <SmartImageViewer src={opt.image} alt="Opsi" />}
                                     </div>
-                                    <span className={`absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded ${isSelected ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                                    <span className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
                                         {String.fromCharCode(65 + i)}
                                     </span>
                                 </div>
@@ -228,8 +225,8 @@ const QuestionCard: React.FC<{
 
             case 'COMPLEX_MULTIPLE_CHOICE':
                 return (
-                    <div className="grid grid-cols-1 gap-3 mt-4">
-                        <div className="bg-blue-50 text-blue-800 text-sm px-4 py-2 rounded-lg mb-2 inline-block font-medium w-fit">
+                    <div className="grid grid-cols-1 gap-3 mt-6">
+                        <div className="bg-slate-50 text-slate-500 text-xs px-3 py-1.5 rounded-md mb-2 inline-block font-medium w-fit border border-slate-100">
                             Pilih satu atau lebih jawaban benar
                         </div>
                         {displayedOptions.map((opt, i) => {
@@ -240,14 +237,14 @@ const QuestionCard: React.FC<{
                                 <div 
                                     key={i}
                                     onClick={() => handleComplexChange(opt.text, !isChecked)}
-                                    className={`relative flex items-center p-4 cursor-pointer rounded-xl border transition-all duration-200 select-none
+                                    className={`relative flex items-start p-4 cursor-pointer rounded-xl border transition-all duration-200 select-none
                                         ${isChecked 
-                                            ? 'bg-emerald-50 border-emerald-500 shadow-sm ring-1 ring-emerald-500' 
-                                            : 'bg-white border-gray-200 hover:border-emerald-300 hover:bg-gray-50'
+                                            ? 'bg-emerald-50 border-emerald-200 shadow-sm' 
+                                            : 'bg-white border-slate-100 hover:border-emerald-200 hover:bg-slate-50'
                                         }`}
                                 >
-                                    <div className={`flex items-center justify-center w-6 h-6 rounded border mr-4 transition-colors ${isChecked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-gray-300 bg-white'}`}>
-                                        {isChecked && <CheckCircleIcon className="w-4 h-4"/>}
+                                    <div className={`mt-0.5 flex items-center justify-center w-5 h-5 rounded flex-shrink-0 border mr-4 transition-colors ${isChecked ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>
+                                        {isChecked && <CheckCircleIcon className="w-3.5 h-3.5"/>}
                                     </div>
                                     <div className="flex-1">
                                         {opt.text && <RenderContent content={opt.text} />}
@@ -263,20 +260,20 @@ const QuestionCard: React.FC<{
                 if (!question.trueFalseRows) return null;
                 const tfAnswers = (() => { try { return JSON.parse(answer || '[]'); } catch { return []; } })();
                 return (
-                    <div className="mt-4 space-y-3">
+                    <div className="mt-6 space-y-4">
                         {question.trueFalseRows.map((row, i) => (
-                            <div key={i} className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="text-gray-800 font-medium text-sm flex-1">{row.text}</div>
+                            <div key={i} className="p-4 bg-white rounded-xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-slate-700 font-medium text-base flex-1">{row.text}</div>
                                 <div className="flex gap-2 shrink-0">
                                     <button 
                                         onClick={() => handleTrueFalseChange(i, true)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${tfAnswers[i] === true ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:bg-green-50'}`}
+                                        className={`px-6 py-2 rounded-full text-xs font-bold border transition-all ${tfAnswers[i] === true ? 'bg-emerald-500 text-white border-emerald-500 shadow-md transform scale-105' : 'bg-white text-slate-400 border-slate-200 hover:border-emerald-300'}`}
                                     >
                                         BENAR
                                     </button>
                                     <button 
                                         onClick={() => handleTrueFalseChange(i, false)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${tfAnswers[i] === false ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:bg-red-50'}`}
+                                        className={`px-6 py-2 rounded-full text-xs font-bold border transition-all ${tfAnswers[i] === false ? 'bg-rose-500 text-white border-rose-500 shadow-md transform scale-105' : 'bg-white text-slate-400 border-slate-200 hover:border-rose-300'}`}
                                     >
                                         SALAH
                                     </button>
@@ -295,19 +292,21 @@ const QuestionCard: React.FC<{
                 }, [question.matchingPairs]);
                 
                 return (
-                    <div className="mt-6 space-y-4">
-                        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pasangkan Kiri dengan Kanan</div>
+                    <div className="mt-8 space-y-6">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Pasangkan Item</div>
                         {question.matchingPairs.map((pair, i) => (
-                            <div key={i} className="flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-gray-50 p-3 rounded-xl border border-gray-200">
-                                <div className="flex-1 font-medium text-gray-800 text-sm bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                            <div key={i} className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+                                <div className="flex-1 font-medium text-slate-700 text-base bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                                     {pair.left}
                                 </div>
-                                <div className="hidden md:block text-gray-400">➜</div>
+                                <div className="hidden md:block text-slate-300">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                </div>
                                 <div className="flex-1">
                                     <select 
                                         value={matchAnswers[i] || ''}
                                         onChange={(e) => handleMatchingChange(i, e.target.value)}
-                                        className={`w-full p-3 bg-white border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer shadow-sm hover:border-gray-300 transition-colors ${isError && !matchAnswers[i] ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                                        className={`w-full p-4 bg-slate-50 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer transition-colors appearance-none ${isError && !matchAnswers[i] ? 'border-rose-300 bg-rose-50' : 'border-slate-100 hover:border-indigo-200'}`}
                                     >
                                         <option value="" disabled>Pilih Pasangan...</option>
                                         {rightOptions.map((opt, idx) => (
@@ -322,26 +321,26 @@ const QuestionCard: React.FC<{
 
             case 'ESSAY':
                 return (
-                    <div className="mt-4">
+                    <div className="mt-6">
                         <textarea
                             value={answer || ''}
                             onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                            rows={6}
-                            className={`w-full p-4 bg-white border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all text-base leading-relaxed ${isError ? 'border-red-400 ring-1 ring-red-100' : 'border-gray-200'}`}
-                            placeholder="Ketik jawaban uraian Anda di sini..."
+                            rows={8}
+                            className={`w-full p-5 bg-white border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 placeholder-slate-300 shadow-sm transition-all text-base leading-relaxed resize-none ${isError ? 'border-rose-300 ring-1 ring-rose-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            placeholder="Ketik jawaban uraian Anda di sini secara lengkap..."
                         />
-                        <div className="text-right mt-1 text-xs text-gray-400">{(answer || '').length} karakter</div>
+                        <div className="text-right mt-2 text-xs text-slate-400 font-medium">{(answer || '').length} karakter</div>
                     </div>
                 );
 
             case 'FILL_IN_THE_BLANK':
                 return (
-                    <div className="mt-4">
+                    <div className="mt-6">
                         <input
                             type="text"
                             value={answer || ''}
                             onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                            className={`w-full p-4 bg-white border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-800 placeholder-gray-400 shadow-sm transition-all font-medium ${isError ? 'border-red-400 ring-1 ring-red-100' : 'border-gray-200'}`}
+                            className={`w-full p-4 bg-white border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 placeholder-slate-300 shadow-sm transition-all font-medium ${isError ? 'border-rose-300 ring-1 ring-rose-100' : 'border-slate-200 hover:border-slate-300'}`}
                             placeholder="Jawaban singkat..."
                             autoComplete="off"
                         />
@@ -353,34 +352,42 @@ const QuestionCard: React.FC<{
     };
 
     return (
-        <div id={`question-${question.id}`} className="scroll-mt-32 mb-8 animate-fade-in">
-            <div className={`bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.04)] border overflow-hidden transition-all duration-300 ${isError ? 'border-red-500 ring-2 ring-red-100 shadow-red-100' : 'border-gray-100'}`}>
-                <div className={`p-6 md:p-8 ${isError ? 'bg-red-50/30' : ''}`}>
-                    <div className="flex gap-4 md:gap-6">
-                        <div className="shrink-0 flex flex-col items-center gap-2">
-                            {question.questionType === 'INFO' ? (
-                                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">i</div>
-                            ) : (
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shadow-lg ${isError ? 'bg-red-500 text-white shadow-red-300' : 'bg-neutral text-white shadow-neutral/20'}`}>
-                                    {index + 1}
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            {isError && <p className="text-xs font-bold text-red-500 mb-1 uppercase tracking-wider animate-pulse">Pertanyaan ini wajib diisi</p>}
-                            <div className="text-base md:text-lg text-gray-800 font-medium">
-                                {question.questionText && <RenderContent content={question.questionText} />}
-                            </div>
-                            {question.imageUrl && (
-                                <div className="mt-4">
-                                    <SmartImageViewer src={question.imageUrl} alt="Gambar Soal" />
-                                </div>
-                            )}
-                        </div>
+        <div id={`question-${question.id}`} className="scroll-mt-32 mb-12 animate-fade-in group">
+            <div className={`bg-white rounded-[1.5rem] p-6 md:p-10 transition-all duration-300 ${isError ? 'ring-2 ring-rose-100 shadow-lg shadow-rose-50' : 'shadow-sm hover:shadow-md'}`}>
+                <div className="flex gap-6">
+                    <div className="shrink-0 hidden md:block">
+                        {question.questionType === 'INFO' ? (
+                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">i</div>
+                        ) : (
+                            <span className="text-slate-300 font-bold text-xl select-none">
+                                {String(index + 1).padStart(2, '0')}
+                            </span>
+                        )}
                     </div>
+                    
+                    <div className="flex-1 min-w-0">
+                         {/* Mobile Number Indicator */}
+                         <div className="md:hidden mb-4 flex items-center gap-2">
+                            {question.questionType !== 'INFO' && (
+                                <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                    Soal {index + 1}
+                                </span>
+                            )}
+                            {isError && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider animate-pulse">Wajib Diisi</span>}
+                         </div>
 
-                    <div className="mt-2 md:pl-16">
-                        {renderInput()}
+                        <div className="text-lg md:text-xl text-slate-800 font-medium leading-relaxed">
+                            {question.questionText && <RenderContent content={question.questionText} />}
+                        </div>
+                        {question.imageUrl && (
+                            <div className="mt-6">
+                                <SmartImageViewer src={question.imageUrl} alt="Gambar Soal" />
+                            </div>
+                        )}
+                        
+                        <div className="mt-2">
+                            {renderInput()}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -398,7 +405,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return (initialData?.answers as Record<string, string>) || {};
     });
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set());
@@ -541,7 +548,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const el = document.getElementById(`question-${id}`);
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setIsSidebarOpen(false);
+            setIsDrawerOpen(false);
         }
     };
 
@@ -563,10 +570,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             if (missing.size > 0) {
                 setUnansweredIds(missing);
                 scrollToQuestion(Array.from(missing)[0]);
-                alert(`Mohon maaf, Anda belum menjawab ${missing.size} soal. Silakan lengkapi jawaban.`);
+                alert(`Masih ada ${missing.size} soal yang belum dijawab. Mohon lengkapi terlebih dahulu.`);
                 return;
             }
-            if (!confirm("Apakah Anda yakin ingin menyelesaikan ujian ini?")) return;
+            if (!confirm("Apakah Anda yakin ingin menyelesaikan ujian? Jawaban tidak dapat diubah setelah dikirim.")) return;
         }
         setIsSubmitting(true);
         logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
@@ -588,45 +595,38 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const isCritical = timeLeft < 300;
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans pb-24">
-            <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
-                <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg lg:hidden text-gray-600 relative">
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-32">
+            {/* Minimalist Header */}
+            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                        <button onClick={() => setIsDrawerOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 relative transition-colors">
                              <ListBulletIcon className="w-6 h-6" />
-                             {unansweredIds.size > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span>}
+                             {unansweredIds.size > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>}
                         </button>
-                        <div>
-                            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">{exam.code}</h1>
-                            <p className="text-xs text-slate-500 font-medium hidden sm:block">Siswa: {student.fullName}</p>
+                        <div className="hidden sm:block">
+                            <h1 className="text-sm font-bold text-slate-900 tracking-tight">{exam.config.subject || exam.code}</h1>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm shadow-sm transition-colors ${isCritical ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-white border-gray-200 text-slate-700'}`}>
+                    
+                    <div className="flex items-center gap-4">
+                        <div className={`flex items-center gap-2 text-sm font-mono font-bold transition-colors ${isCritical ? 'text-rose-600 animate-pulse' : 'text-slate-600'}`}>
                             <ClockIcon className="w-4 h-4" />
                             <span>{formatTime(timeLeft)}</span>
                         </div>
-                        <div className={`w-8 h-8 flex items-center justify-center rounded-full ${isOnline ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
-                            {isOnline ? <WifiIcon className="w-4 h-4" /> : <NoWifiIcon className="w-4 h-4" />}
-                        </div>
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`} title={isOnline ? "Online" : "Offline"}></div>
                     </div>
                 </div>
-                <div className="h-1 w-full bg-gray-100">
-                    <div className="h-full bg-indigo-600 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+                {/* Slim Progress Bar */}
+                <div className="h-[2px] w-full bg-slate-100">
+                    <div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${progress}%` }} />
                 </div>
             </div>
 
-            <div className="max-w-3xl mx-auto px-4 pt-8">
-                <div className="mb-8 flex items-end justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-900">Lembar Jawaban</h2>
-                        <p className="text-slate-500 text-sm mt-1">Kerjakan dengan jujur dan teliti.</p>
-                        {unansweredIds.size > 0 && <p className="text-red-600 text-xs font-bold mt-2 animate-pulse">⚠ Terdapat {unansweredIds.size} soal belum dijawab.</p>}
-                    </div>
-                    <div className="text-right hidden sm:block">
-                        <div className="text-3xl font-bold text-indigo-600 leading-none">{progress}%</div>
-                        <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Selesai</div>
-                    </div>
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12">
+                <div className="mb-8 md:mb-12">
+                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Lembar Soal</h2>
+                    <p className="text-slate-500 mt-2">Pastikan semua jawaban terisi sebelum waktu habis.</p>
                 </div>
 
                 <div className={isSubmitting ? 'pointer-events-none opacity-50 filter blur-sm transition-all' : ''}>
@@ -643,26 +643,27 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     ))}
                 </div>
 
-                <div className="mt-12 mb-20">
+                <div className="mt-16 mb-20 flex justify-center">
                     <button 
                         onClick={() => handleSubmit(false)}
                         disabled={isSubmitting}
-                        className="w-full bg-slate-900 hover:bg-black text-white font-bold text-lg py-4 rounded-xl shadow-xl shadow-slate-200 transition-all transform active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-3"
+                        className="w-full max-w-sm bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl shadow-xl shadow-slate-200 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-sm tracking-wider uppercase"
                     >
-                        {isSubmitting ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <CheckCircleIcon className="w-6 h-6" />}
-                        {isSubmitting ? 'Mengumpulkan...' : 'Selesai & Kumpulkan'}
+                        {isSubmitting ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <CheckCircleIcon className="w-5 h-5" />}
+                        {isSubmitting ? 'Mengirim Jawaban...' : 'Selesai & Kumpulkan'}
                     </button>
                 </div>
             </div>
 
-            <div className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />
-                <div className="relative w-80 max-w-[80vw] h-full bg-white shadow-2xl flex flex-col">
-                    <div className="p-4 border-b flex items-center justify-between bg-slate-50">
+            {/* Navigation Drawer */}
+            <div className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${isDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsDrawerOpen(false)} />
+                <div className="relative w-72 h-full bg-white shadow-2xl flex flex-col">
+                    <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-bold text-slate-800">Navigasi Soal</h3>
-                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-slate-200 rounded-full"><ArrowLeftIcon className="w-5 h-5 text-slate-600" /></button>
+                        <button onClick={() => setIsDrawerOpen(false)} className="text-slate-400 hover:text-slate-600"><ArrowLeftIcon className="w-5 h-5" /></button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-6">
                         <div className="grid grid-cols-4 gap-3">
                             {questions.map((q, idx) => {
                                 if (q.questionType === 'INFO') return null;
@@ -673,16 +674,25 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     <button
                                         key={q.id}
                                         onClick={() => scrollToQuestion(q.id)}
-                                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border-2 transition-all relative ${isError ? 'bg-red-500 border-red-600 text-white animate-pulse' : isAnswered ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-400'}`}
+                                        className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all relative
+                                            ${isError ? 'bg-rose-500 text-white shadow-md shadow-rose-200' : 
+                                              isAnswered ? 'bg-slate-900 text-white' : 
+                                              'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'}`}
                                     >
-                                        <span>{visualNum}</span>
+                                        {visualNum}
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
-                    <div className="p-4 border-t bg-slate-50 text-xs text-slate-500 text-center">
-                        <p>Total {answeredCount} dari {totalQuestions} soal terjawab</p>
+                    <div className="p-6 bg-slate-50 border-t border-slate-100">
+                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                            <span>Progress</span>
+                            <span>{Math.round(progress)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                             <div className="h-full bg-indigo-600" style={{ width: `${progress}%` }} />
+                        </div>
                     </div>
                 </div>
             </div>
