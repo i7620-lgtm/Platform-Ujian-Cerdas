@@ -1,9 +1,22 @@
+
 import React from 'react';
 
 export const LogoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 2.25c-5.376 0-9.75 4.374-9.75 9.75s4.374 9.75 9.75 9.75 9.75-4.374 9.75-9.75S17.376 2.25 12 2.25Zm.094 15.341a.75.75 0 0 1-.884-.652l-.003-2.435-.002-3.35c0-1.242.02-2.484.058-3.725.011-.371.363-.642.736-.642.373 0 .725.27.736.642.038 1.24.058 2.482.058 3.725l.001 5.79.001.002a.75.75 0 0 1-.696.749Z" />
     <path d="M12 2.25a9.715 9.715 0 0 0-7.398 3.482c.453.053.918.14 1.39.26 1.768.442 3.536.885 3.536 2.213v1.332a.75.75 0 0 1-1.5 0V9.528c0-.501-.83-1.028-1.66-1.272a.75.75 0 0 1-.51-1.337A8.21 8.21 0 0 1 12 3.75c2.193 0 4.212.85 5.733 2.25a.75.75 0 0 1-.53 1.282c-1.428.1-1.678.89-1.678 1.51v4.101a.75.75 0 0 1-1.5 0V10.5c0-1.328 1.768-1.77 3.536-2.214.472-.118.937-.206 1.39-.26A9.715 9.715 0 0 0 12 2.25Z" />
+  </svg>
+);
+
+export const MathIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-3-3V18m-3-3V18m3-15v.75M12 3.75l.45 2.25m-1.35 0L12 3.75m0 0l-.45 2.25m1.35 0L12 3.75m-6 15h12M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5a2.25 2.25 0 002.25 2.25zm.75-12h13.5m-13.5 3h13.5m-13.5 3h13.5" />
+  </svg>
+);
+
+export const CalculatorIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-3-3V18m-3-3V18m3-15v.75M12 3.75l.45 2.25m-1.35 0L12 3.75m0 0l-.45 2.25m1.35 0L12 3.75m-6 15h12M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5a2.25 2.25 0 002.25 2.25zm.75-12h13.5m-13.5 3h13.5m-13.5 3h13.5" />
   </svg>
 );
 
@@ -184,4 +197,3 @@ export const QrCodeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
   </svg>
 );
- 
