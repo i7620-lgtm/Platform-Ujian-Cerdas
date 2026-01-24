@@ -79,21 +79,59 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
-        // 1. Process Rich Text (Bold, Italic, Del, Underline)
+        // 1. Process Alignment Blocks
         let processedText = content
+            .replace(/:::left([\s\S]+?):::/g, '<div class="text-left">$1</div>')
+            .replace(/:::center([\s\S]+?):::/g, '<div class="text-center">$1</div>')
+            .replace(/:::right([\s\S]+?):::/g, '<div class="text-right">$1</div>')
+            .replace(/:::justify([\s\S]+?):::/g, '<div class="text-justify">$1</div>');
+
+        // 2. Process Rich Text (Bold, Italic, Del, Underline)
+        processedText = processedText
             .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
             .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
             .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
 
-        // 2. Accurate List Parsing (Line by line)
+        // 3. Process Tables
         const lines = processedText.split('\n');
         let finalHtmlChunks = [];
         let inUl = false;
         let inOl = false;
+        let inTable = false;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
+            const line = lines[i].trim();
+            
+            // Check for Table Row
+            if (line.startsWith('|') && line.endsWith('|')) {
+                if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
+                if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
+                
+                if (!inTable) {
+                    finalHtmlChunks.push('<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-slate-200 text-sm">');
+                    inTable = true;
+                }
+                
+                // Detection for separator row |---|---|
+                if (line.match(/^\|[\s\-\|:]+\|$/)) {
+                    continue; 
+                }
+
+                const cells = line.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+                const isHeader = i === 0 || (lines[i+1] && lines[i+1].trim().match(/^\|[\s\-\|:]+\|$/));
+                
+                finalHtmlChunks.push(`<tr class="${isHeader ? 'bg-slate-50 font-bold' : 'hover:bg-slate-50'}">`);
+                cells.forEach(cell => {
+                    finalHtmlChunks.push(`<${isHeader ? 'th' : 'td'} class="border border-slate-200 px-4 py-2">${cell.trim()}</${isHeader ? 'th' : 'td'}>`);
+                });
+                finalHtmlChunks.push('</tr>');
+                continue;
+            } else if (inTable) {
+                finalHtmlChunks.push('</table></div>');
+                inTable = false;
+            }
+
             const bulletMatch = line.match(/^\s*-\s+(.*)/);
             const numberedMatch = line.match(/^\s*\d+[\.\)]\s+(.*)/);
 
@@ -108,15 +146,16 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
             } else {
                 if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
                 if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                finalHtmlChunks.push(line.trim() === '' ? '<div class="h-2"></div>' : line + '<br/>');
+                finalHtmlChunks.push(line === '' ? '<div class="h-2"></div>' : line + '<br/>');
             }
         }
         if (inUl) finalHtmlChunks.push('</ul>');
         if (inOl) finalHtmlChunks.push('</ol>');
+        if (inTable) finalHtmlChunks.push('</table></div>');
 
         let html = finalHtmlChunks.join('');
 
-        // 3. KaTeX Rendering
+        // 4. KaTeX Rendering
         if (html.includes('$') && (window as any).katex) {
             html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
                 return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
