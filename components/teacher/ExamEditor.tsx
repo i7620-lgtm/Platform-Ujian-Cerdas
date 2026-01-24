@@ -201,9 +201,13 @@ const VisualMathModal: React.FC<{
     const [tab, setTab] = useState<'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS'>('BASIC');
     
     // Inputs State
+    // val1 = Numerator / Base / Arg 1
+    // val2 = Denominator / Power / Arg 2
+    // val3 = Mixed Whole Number / Limits / Functions
     const [val1, setVal1] = useState('');
     const [val2, setVal2] = useState('');
-    const [val3, setVal3] = useState(''); // Extra for limits/integrals
+    const [val3, setVal3] = useState(''); 
+    
     const [rows, setRows] = useState(2);
     const [cols, setCols] = useState(2);
     const [matData, setMatData] = useState<string[][]>([]);
@@ -231,7 +235,12 @@ const VisualMathModal: React.FC<{
     const insertStructure = (type: 'FRAC' | 'ROOT' | 'LIMIT' | 'INT' | 'SUM' | 'MATRIX' | 'SYMBOL', symbolVal?: string) => {
         let latex = '';
         switch(type) {
-            case 'FRAC': latex = `\\frac{${val1 || 'x'}}{${val2 || 'y'}}`; break;
+            case 'FRAC': 
+                // Mendukung pecahan campuran. val3 = bilangan bulat, val1 = pembilang, val2 = penyebut
+                const wholePart = val3 ? `${val3}` : '';
+                const fractionPart = `\\frac{${val1 || 'x'}}{${val2 || 'y'}}`;
+                latex = wholePart + fractionPart;
+                break;
             case 'ROOT': latex = val1 ? `\\sqrt[${val1}]{${val2 || 'x'}}` : `\\sqrt{${val2 || 'x'}}`; break;
             case 'LIMIT': latex = `\\lim_{${val1 || 'x'} \\to ${val2 || '\\infty'}} ${val3 || 'f(x)'}`; break;
             case 'INT': latex = `\\int_{${val1 || 'a'}}^{${val2 || 'b'}} ${val3 || 'x'} \\,dx`; break;
@@ -276,21 +285,48 @@ const VisualMathModal: React.FC<{
                     {tab === 'BASIC' && (
                         <div className="space-y-6">
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Pecahan</p>
-                                <div className="flex flex-col items-center gap-1">
-                                    <input placeholder="Atas" className="w-20 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none" value={val1} onChange={e => setVal1(e.target.value)} />
-                                    <div className="w-24 h-0.5 bg-gray-800"></div>
-                                    <input placeholder="Bawah" className="w-20 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none" value={val2} onChange={e => setVal2(e.target.value)} />
-                                    <button onClick={() => insertStructure('FRAC')} className="mt-2 w-full text-xs bg-white border font-bold py-1 rounded hover:bg-gray-50 shadow-sm">Sisipkan</button>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 text-center">Pecahan & Pecahan Campuran</p>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-center gap-3">
+                                        {/* Bilangan Bulat (Campuran) */}
+                                        <div className="flex flex-col items-center">
+                                            <input 
+                                                placeholder="Int" 
+                                                className="w-12 h-10 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
+                                                value={val3} 
+                                                onChange={e => setVal3(e.target.value)} 
+                                                title="Bilangan Bulat (Opsional)"
+                                            />
+                                        </div>
+                                        
+                                        {/* Pecahan */}
+                                        <div className="flex flex-col items-center gap-1">
+                                            <input 
+                                                placeholder="Atas" 
+                                                className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
+                                                value={val1} 
+                                                onChange={e => setVal1(e.target.value)} 
+                                            />
+                                            <div className="w-20 h-0.5 bg-gray-800 rounded-full"></div>
+                                            <input 
+                                                placeholder="Bawah" 
+                                                className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
+                                                value={val2} 
+                                                onChange={e => setVal2(e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => insertStructure('FRAC')} className="mt-2 w-full text-xs bg-indigo-600 text-white border border-indigo-600 font-bold py-1.5 rounded hover:bg-indigo-700 shadow-sm transition-colors">Sisipkan Pecahan</button>
                                 </div>
                             </div>
+
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Akar</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">Akar</p>
                                 <div className="flex items-end gap-1 justify-center">
                                     <input placeholder="n" className="w-8 text-center text-xs p-1 border rounded mb-4 focus:ring-1 focus:ring-indigo-300 outline-none" value={val1} onChange={e => setVal1(e.target.value)} />
                                     <span className="text-3xl text-gray-400 font-light">√</span>
                                     <input placeholder="Nilai" className="w-24 text-sm p-1 border rounded mb-1 focus:ring-1 focus:ring-indigo-300 outline-none" value={val2} onChange={e => setVal2(e.target.value)} />
-                                    <button onClick={() => insertStructure('ROOT')} className="mb-1 text-xs bg-white border font-bold px-2 py-1 rounded hover:bg-gray-50 shadow-sm">OK</button>
+                                    <button onClick={() => insertStructure('ROOT')} className="mb-1 text-xs bg-white border font-bold px-3 py-1.5 rounded hover:bg-gray-50 shadow-sm">OK</button>
                                 </div>
                             </div>
                         </div>
@@ -299,7 +335,7 @@ const VisualMathModal: React.FC<{
                     {tab === 'CALCULUS' && (
                         <div className="space-y-4">
                             <div className="flex gap-2 justify-center border-b pb-2">
-                                <button onClick={() => {setVal1(''); setVal2(''); setVal3('');}} className="text-xs font-bold px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Reset</button>
+                                <button onClick={() => {setVal1(''); setVal2(''); setVal3('');}} className="text-xs font-bold px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Reset Input</button>
                             </div>
                             
                             <div className="grid grid-cols-1 gap-4">
@@ -375,9 +411,11 @@ const WysiwygEditor: React.FC<{
 }> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px" }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const savedRange = useRef<Range | null>(null); // NEW: Store selection range
+    
     const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>('FORMAT');
     const [activeCmds, setActiveCmds] = useState<string[]>([]);
-    const [isInsideTable, setIsInsideTable] = useState(false); // New State
+    const [isInsideTable, setIsInsideTable] = useState(false);
     
     // Modals State
     const [showMath, setShowMath] = useState(false);
@@ -400,11 +438,37 @@ const WysiwygEditor: React.FC<{
     const handleInput = () => {
         if (editorRef.current) {
             onChange(editorRef.current.innerHTML);
+            saveSelection(); // Save position on typing
             checkActiveFormats();
         }
     };
 
+    // --- SELECTION HELPERS ---
+    const saveSelection = () => {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+            savedRange.current = sel.getRangeAt(0).cloneRange();
+        }
+    };
+
+    const restoreSelection = () => {
+        const sel = window.getSelection();
+        if (sel && savedRange.current) {
+            sel.removeAllRanges();
+            sel.addRange(savedRange.current);
+        } else if (editorRef.current) {
+            // Fallback: move cursor to end if no saved selection
+            editorRef.current.focus();
+            const range = document.createRange();
+            range.selectNodeContents(editorRef.current);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+        }
+    };
+
     const checkActiveFormats = () => {
+        saveSelection(); // Save selection on click/navigate
         const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'];
         const active = cmds.filter(cmd => document.queryCommandState(cmd));
         setActiveCmds(active);
@@ -426,8 +490,10 @@ const WysiwygEditor: React.FC<{
     };
 
     const runCmd = (cmd: string, val?: string) => {
+        restoreSelection(); // Restore cursor before command
         if(editorRef.current) editorRef.current.focus();
         execCmd(cmd, val);
+        saveSelection(); // Save new position
         checkActiveFormats();
     };
 
@@ -464,8 +530,9 @@ const WysiwygEditor: React.FC<{
     const insertMath = (latex: string) => {
         if ((window as any).katex) {
             const html = (window as any).katex.renderToString(latex, { throwOnError: false });
+            // contenteditable="false" prevents cursor from entering the span easily, making it treated as a block
             const wrapper = `<span class="math-visual inline-block mx-1 px-1 rounded select-all cursor-pointer hover:bg-indigo-50" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>&nbsp;`;
-            runCmd('insertHTML', wrapper);
+            runCmd('insertHTML', wrapper); // runCmd already handles restoreSelection
             handleInput();
         }
     };
@@ -478,17 +545,15 @@ const WysiwygEditor: React.FC<{
                 const rawDataUrl = ev.target?.result as string;
                 try {
                     const dataUrl = await compressImage(rawDataUrl, 0.7);
-                    // Insert image with max-width style to ensure responsiveness
                     const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />&nbsp;`;
                     runCmd('insertHTML', imgTag);
-                    handleInput(); // Trigger change
+                    handleInput(); 
                 } catch (error) {
                     console.error("Image compression failed", error);
                 }
             };
             reader.readAsDataURL(file);
         }
-        // Reset input
         e.target.value = '';
     };
 
@@ -616,8 +681,8 @@ const WysiwygEditor: React.FC<{
                 onInput={handleInput}
                 onKeyUp={checkActiveFormats}
                 onMouseUp={checkActiveFormats}
-                onBlur={() => checkActiveFormats()}
-                onClick={() => checkActiveFormats()}
+                onBlur={saveSelection} // Save selection when leaving editor
+                onClick={checkActiveFormats}
                 data-placeholder={placeholder}
                 spellCheck={false}
             />
