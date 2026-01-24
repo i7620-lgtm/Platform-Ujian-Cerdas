@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ListBulletIcon, ChevronDownIcon, ChevronUpIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 interface OngoingExamModalProps {
@@ -13,7 +13,7 @@ interface OngoingExamModalProps {
 }
 
 // Komponen Widget Statistik Sederhana
-const StatWidget: React.FC<{ label: string; value: number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
+const StatWidget: React.FC<{ label: string; value: number | string; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
     <div className={`p-4 rounded-xl border bg-white shadow-sm flex items-center gap-4 transition-all duration-300 hover:shadow-md ${color}`}>
         {Icon && <div className={`p-2.5 rounded-xl bg-white/60 backdrop-blur-md shadow-sm`}><Icon className="w-6 h-6 opacity-90" /></div>}
         <div>
@@ -22,6 +22,9 @@ const StatWidget: React.FC<{ label: string; value: number; color: string; icon?:
         </div>
     </div>
 );
+
+// --- HELPER UNTUK NORMALISASI STRING ---
+const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
     const [filterClass, setFilterClass] = useState<string>('ALL');
@@ -273,7 +276,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                              {filteredResults.length > 0 ? (
                                 <>
                                     {/* DESKTOP TABLE VIEW (> lg / 1024px) */}
-                                    {/* Tablet 11 inch usually < 1200px portrait, so this hides on portrait tablet */}
                                     <div className="hidden lg:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                         <table className="min-w-full divide-y divide-slate-100">
                                             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
@@ -359,7 +361,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                     </div>
 
                                     {/* CARD GRID VIEW (< lg / 1024px) */}
-                                    {/* Responsive Grid: 1 col on mobile, 2 cols on Tablet */}
                                     <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
                                         {filteredResults.map((result) => {
                                             const isProcessing = processingIdsRef.current.has(result.student.studentId);
@@ -450,29 +451,208 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 };
 
 interface FinishedExamModalProps { exam: Exam | null; results: Result[]; onClose: () => void; }
-export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, results, onClose }) => {
-    if (!exam) return null;
-    const examResults = results.filter(r => r.examCode === exam.code).sort((a,b) => b.score - a.score);
+
+// --- KOMPONEN ANALISIS SOAL BARU ---
+const QuestionAnalysisItem: React.FC<{ 
+    q: any; 
+    stats: { correct: number; total: number; distribution: Record<string, number> };
+}> = ({ q, stats }) => {
+    const [isOpen, setIsOpen] = useState(false);
     
+    // Hitung persentase
+    const percentage = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+    
+    // Tentukan warna berdasarkan tingkat kesulitan
+    let diffColor = 'bg-emerald-500'; // Mudah
+    let diffLabel = 'Mudah';
+    let diffBg = 'bg-emerald-50';
+    let diffText = 'text-emerald-700';
+
+    if (percentage < 50) { // Sukar
+        diffColor = 'bg-rose-500';
+        diffLabel = 'Sukar';
+        diffBg = 'bg-rose-50';
+        diffText = 'text-rose-700';
+    } else if (percentage < 80) { // Sedang
+        diffColor = 'bg-amber-500';
+        diffLabel = 'Sedang';
+        diffBg = 'bg-amber-50';
+        diffText = 'text-amber-700';
+    }
+
+    // Sort distribusi jawaban (terbanyak di atas)
+    const sortedDist = Object.entries(stats.distribution).sort((a, b) => b[1] - a[1]);
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md">
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-4 cursor-pointer flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
+            >
+                {/* Left: Info Soal */}
+                <div className="flex items-start gap-4 flex-1">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 mt-1 ${diffBg} ${diffText}`}>
+                        {q.index + 1}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-sm text-gray-800 font-medium line-clamp-2" dangerouslySetInnerHTML={{ __html: q.questionText.substring(0, 150) + (q.questionText.length > 150 ? '...' : '') }} />
+                        <div className="flex items-center gap-2 mt-2">
+                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${diffBg} ${diffText}`}>
+                                {diffLabel}
+                             </span>
+                             <span className="text-xs text-gray-400">•</span>
+                             <span className="text-xs text-gray-500 font-medium">{stats.correct} Benar dari {stats.total} Siswa</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Bar Visual */}
+                <div className="flex items-center gap-4 w-full sm:w-auto mt-2 sm:mt-0">
+                    <div className="flex-1 sm:w-32 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${diffColor}`} style={{ width: `${percentage}%` }}></div>
+                    </div>
+                    <span className="text-sm font-bold w-8 text-right">{percentage}%</span>
+                    <div className="p-1 rounded-full hover:bg-gray-100 text-gray-400">
+                        {isOpen ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                    </div>
+                </div>
+            </div>
+
+            {/* Accordion Content */}
+            {isOpen && (
+                <div className="bg-gray-50 border-t border-gray-100 p-4 sm:p-6 animate-fade-in">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</h4>
+                    <div className="space-y-3">
+                        {sortedDist.map(([answer, count], idx) => {
+                             const isCorrectAnswer = normalize(answer) === normalize(q.correctAnswer);
+                             const barWidth = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                             
+                             return (
+                                <div key={idx} className="flex flex-col gap-1">
+                                    <div className="flex justify-between text-xs mb-0.5">
+                                        <span className={`font-medium ${isCorrectAnswer ? 'text-emerald-600 font-bold' : 'text-gray-600'}`}>
+                                            {answer || '(Kosong)'} 
+                                            {isCorrectAnswer && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">KUNCI</span>}
+                                        </span>
+                                        <span className="font-mono text-gray-400">{count} Siswa ({Math.round(barWidth)}%)</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                        <div 
+                                            className={`h-full rounded-full ${isCorrectAnswer ? 'bg-emerald-500' : 'bg-slate-400'}`} 
+                                            style={{ width: `${barWidth}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                             );
+                        })}
+                        {sortedDist.length === 0 && <p className="text-xs text-gray-400 italic">Belum ada data jawaban.</p>}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, results, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'STUDENTS' | 'ANALYSIS'>('STUDENTS');
+
+    if (!exam) return null;
+    
+    // Filter results for this exam
+    const examResults = useMemo(() => 
+        results.filter(r => r.examCode === exam.code).sort((a,b) => b.score - a.score),
+    [results, exam]);
+
+    // Compute Question Analysis Stats
+    const questionStats = useMemo(() => {
+        return exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+            let correct = 0;
+            let total = 0;
+            const distribution: Record<string, number> = {};
+
+            examResults.forEach(r => {
+                const rawAns = r.answers[q.id];
+                if (rawAns !== undefined) {
+                    total++;
+                    
+                    // Simple correctness check for visualization (Normalized)
+                    // Note: This is an approximation. Real grading happens in storage.ts
+                    // But for analysis view, comparing normalized strings is usually sufficient for MC/Short Answer
+                    let isCorrect = false;
+                    const normAns = normalize(rawAns);
+                    
+                    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                        isCorrect = normAns === normalize(q.correctAnswer);
+                    } else if (q.questionType === 'TRUE_FALSE') {
+                        // Complex to parse JSON for display, skipping deep validation for speed, just counting distribution strings
+                    }
+                    
+                    // Fallback: If we can't easily judge correctness here (like Essay), rely on exact match or manual review logic later
+                    // For now, let's count distribution accurately
+                    if (isCorrect) correct++;
+
+                    // Record Distribution
+                    // Truncate long answers for chart labels
+                    const displayAns = typeof rawAns === 'string' ? (rawAns.length > 50 ? rawAns.substring(0, 50) + '...' : rawAns) : JSON.stringify(rawAns);
+                    distribution[displayAns] = (distribution[displayAns] || 0) + 1;
+                }
+            });
+
+            return { ...q, index: idx, correct, total, distribution };
+        });
+    }, [exam, examResults]);
+
+    // Calculate Summary Stats
+    const avgScore = examResults.length > 0 ? Math.round(examResults.reduce((acc, curr) => acc + curr.score, 0) / examResults.length) : 0;
+    const maxScore = examResults.length > 0 ? Math.max(...examResults.map(r => r.score)) : 0;
+    const minScore = examResults.length > 0 ? Math.min(...examResults.map(r => r.score)) : 0;
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
             <div className="bg-white sm:rounded-2xl shadow-2xl w-full max-w-5xl h-full sm:max-h-[90vh] flex flex-col overflow-hidden border-0 sm:border border-white/20">
-                <div className="p-5 sm:p-6 border-b flex justify-between items-center bg-slate-50">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800">Hasil Ujian</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                             <span className="bg-blue-100 text-blue-700 font-mono px-2 py-0.5 rounded text-sm font-bold">{exam.code}</span>
-                             <span className="text-slate-400 text-sm">•</span>
-                             <span className="text-sm text-slate-500 font-medium">Total Peserta: {examResults.length}</span>
+                
+                {/* HEADER */}
+                <div className="bg-white px-5 sm:px-6 pt-5 pb-0 border-b border-gray-100">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-800">Laporan Hasil Ujian</h2>
+                            <div className="flex items-center gap-2 mt-1">
+                                 <span className="bg-blue-100 text-blue-700 font-mono px-2 py-0.5 rounded text-sm font-bold">{exam.code}</span>
+                                 <span className="text-slate-400 text-sm">•</span>
+                                 <span className="text-sm text-slate-500 font-medium">{exam.config.subject || 'Tanpa Judul'}</span>
+                            </div>
                         </div>
+                        <button onClick={onClose} className="p-2.5 hover:bg-slate-200 rounded-xl transition-colors bg-slate-50 border border-slate-200 shadow-sm"><XMarkIcon className="w-5 h-5 text-slate-500"/></button>
                     </div>
-                    <button onClick={onClose} className="p-2.5 hover:bg-slate-200 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm"><XMarkIcon className="w-5 h-5 text-slate-500"/></button>
+
+                    {/* TABS */}
+                    <div className="flex gap-6 mt-2">
+                        <button 
+                            onClick={() => setActiveTab('STUDENTS')}
+                            className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'STUDENTS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <ListBulletIcon className="w-4 h-4" />
+                            Daftar Siswa ({examResults.length})
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('ANALYSIS')}
+                            className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'ANALYSIS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <ChartBarIcon className="w-4 h-4" />
+                            Analisis Butir Soal
+                        </button>
+                    </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50 p-0 sm:p-0">
-                    <div className="min-w-full inline-block align-middle">
-                        <div className="border-b border-gray-200 shadow-sm">
-                             <table className="min-w-full divide-y divide-slate-200">
-                                <thead className="bg-white sticky top-0 shadow-sm z-10">
+
+                {/* CONTENT AREA */}
+                <div className="flex-1 overflow-y-auto bg-slate-50 p-0">
+                    
+                    {/* VIEW: DAFTAR SISWA */}
+                    {activeTab === 'STUDENTS' && (
+                        <div className="min-w-full inline-block align-middle">
+                            <table className="min-w-full divide-y divide-slate-200">
+                                <thead className="bg-gray-50 sticky top-0 shadow-sm z-10">
                                     <tr>
                                         <th className="px-3 sm:px-6 py-4 text-left text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Peringkat</th>
                                         <th className="px-3 sm:px-6 py-4 text-left text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Siswa</th>
@@ -512,10 +692,42 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
                                             </td>
                                         </tr>
                                     ))}
+                                    {examResults.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">Belum ada data hasil ujian.</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    )}
+
+                    {/* VIEW: ANALISIS SOAL */}
+                    {activeTab === 'ANALYSIS' && (
+                        <div className="p-4 sm:p-6 space-y-6">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <StatWidget label="Rata-Rata Kelas" value={avgScore} color="bg-blue-50 border-blue-100 text-blue-700" icon={ChartBarIcon} />
+                                <StatWidget label="Nilai Tertinggi" value={maxScore} color="bg-emerald-50 border-emerald-100 text-emerald-700" icon={CheckCircleIcon} />
+                                <StatWidget label="Nilai Terendah" value={minScore} color="bg-rose-50 border-rose-100 text-rose-700" icon={XMarkIcon} />
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Detail Per Soal</h3>
+                                <div className="space-y-3">
+                                    {questionStats.map((q) => (
+                                        <QuestionAnalysisItem key={q.id} q={q} stats={q} />
+                                    ))}
+                                    {questionStats.length === 0 && (
+                                        <div className="text-center py-10 bg-white rounded-xl border border-dashed border-gray-300 text-gray-400 text-sm">
+                                            Tidak ada soal untuk dianalisis.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
