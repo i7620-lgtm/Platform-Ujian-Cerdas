@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
 import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon } from '../Icons';
@@ -207,7 +208,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         
         setLocalResults(prev => prev.map(r => 
             r.student.studentId === studentId 
-            ? { ...r, status: 'in_progress', activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci akses ujian.`] } 
+            ? { ...r, status: 'in_progress', activityLog: [...(r.activityLog || []), `[Guru] Membuka kunci akses ujian secara manual.`] } 
             : r
         ));
 
@@ -376,7 +377,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                                     <span className="text-xs text-slate-500 font-medium mt-0.5 inline-flex items-center gap-1.5">
                                                                         <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{result.student.class}</span> 
                                                                         <span className="text-slate-300">|</span> 
-                                                                        <span className="font-mono text-slate-400">{result.student.studentId}</span>
+                                                                        <span className="font-mono text-slate-400">Absen: {result.student.studentId}</span>
                                                                     </span>
                                                                 </div>
                                                             </td>
@@ -430,6 +431,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         <h4 className="font-bold text-slate-800 text-base">{result.student.fullName}</h4>
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{result.student.class}</span>
+                                                            <span className="text-[10px] text-slate-400 font-mono">Absen: {result.student.studentId}</span>
                                                         </div>
                                                     </div>
                                                     <div>{renderStatusBadge(result.status || '')}</div>
@@ -476,11 +478,27 @@ interface FinishedExamModalProps {
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, results, onClose }) => {
     // Hooks must be called at the top level
     const [activeTab, setActiveTab] = useState<'STUDENTS' | 'ANALYSIS'>('STUDENTS');
+    const [filterClass, setFilterClass] = useState<string>('ALL');
+
+    const uniqueClasses = useMemo(() => {
+        if (!exam) return [];
+        const classes = new Set(results.filter(r => r.examCode === exam.code).map(r => r.student.class));
+        return Array.from(classes).sort();
+    }, [results, exam]);
 
     const examResults = useMemo(() => {
         if (!exam) return [];
-        return results.filter(r => r.examCode === exam.code).sort((a,b) => (b.score || 0) - (a.score || 0));
-    }, [results, exam]);
+        let filtered = results.filter(r => r.examCode === exam.code);
+        if (filterClass !== 'ALL') {
+            filtered = filtered.filter(r => r.student.class === filterClass);
+        }
+        return filtered.sort((a,b) => {
+            if (filterClass === 'ALL' && a.student.class !== b.student.class) {
+                return a.student.class.localeCompare(b.student.class);
+            }
+            return (b.score || 0) - (a.score || 0);
+        });
+    }, [results, exam, filterClass]);
 
     const questionStats = useMemo(() => {
         if (!exam) return [];
@@ -525,48 +543,101 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
                         <h2 className="text-xl font-bold text-slate-800">Laporan Hasil Ujian</h2>
                         <div className="text-sm text-slate-500 font-mono mt-1">{exam.code} • {exam.config.subject}</div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg"><XMarkIcon className="w-5 h-5 text-slate-500"/></button>
+                    <div className="flex items-center gap-4">
+                         <div className="hidden sm:flex items-center gap-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter Kelas:</label>
+                            <select 
+                                value={filterClass} 
+                                onChange={(e) => setFilterClass(e.target.value)}
+                                className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                                <option value="ALL">Semua Kelas</option>
+                                {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                         </div>
+                         <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg"><XMarkIcon className="w-5 h-5 text-slate-500"/></button>
+                    </div>
                 </div>
+                
+                {/* Mobile Class Filter */}
+                <div className="sm:hidden px-5 py-2 bg-slate-50 border-b flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Filter:</span>
+                    <select 
+                        value={filterClass} 
+                        onChange={(e) => setFilterClass(e.target.value)}
+                        className="p-1.5 bg-white border border-slate-200 rounded text-[10px] font-bold outline-none"
+                    >
+                        <option value="ALL">Semua Kelas</option>
+                        {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+
                 <div className="flex gap-6 px-6 bg-white border-b">
                     <button onClick={() => setActiveTab('STUDENTS')} className={`pb-3 pt-4 text-sm font-bold border-b-2 transition-all ${activeTab === 'STUDENTS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>Daftar Siswa</button>
                     <button onClick={() => setActiveTab('ANALYSIS')} className={`pb-3 pt-4 text-sm font-bold border-b-2 transition-all ${activeTab === 'ANALYSIS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>Analisis Soal</button>
                 </div>
+                
                 <div className="flex-1 overflow-y-auto bg-slate-50">
                     {activeTab === 'STUDENTS' ? (
-                        <table className="min-w-full divide-y divide-slate-200">
-                            <thead className="bg-gray-50 sticky top-0">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Rank</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Siswa</th>
-                                    <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Nilai</th>
-                                    <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
-                                {examResults.map((r, idx) => (
-                                    <tr key={r.student.studentId} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-slate-400">#{idx + 1}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800">{r.student.fullName}</div>
-                                            <div className="text-xs text-slate-400">{r.student.class}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center font-black text-lg text-slate-800">{r.score}</td>
-                                        <td className="px-6 py-4 text-center"><span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase">{r.status}</span></td>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200">
+                                <thead className="bg-gray-50 sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Rank</th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Siswa</th>
+                                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Absen</th>
+                                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Kelas</th>
+                                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Nilai</th>
+                                        <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {examResults.map((r, idx) => (
+                                        <tr key={r.student.studentId} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-400">#{idx + 1}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-slate-800">{r.student.fullName}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-mono text-xs text-slate-500">{r.student.studentId}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{r.student.class}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-black text-lg text-slate-800">{r.score}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${r.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {r.status === 'completed' ? 'Selesai' : r.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {examResults.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">Belum ada data pengerjaan untuk filter ini.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     ) : (
                         <div className="p-6 space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <StatWidget label="Rata-Rata" value={stats.avg} color="bg-blue-50 border-blue-100 text-blue-700" icon={ChartBarIcon} />
-                                <StatWidget label="Tertinggi" value={stats.max} color="bg-emerald-50 border-emerald-100 text-emerald-700" icon={CheckCircleIcon} />
-                                <StatWidget label="Terendah" value={stats.min} color="bg-rose-50 border-rose-100 text-rose-700" icon={XMarkIcon} />
+                                <StatWidget label={filterClass === 'ALL' ? "Rata-Rata Umum" : `Rata-Rata ${filterClass}`} value={stats.avg} color="bg-blue-50 border-blue-100 text-blue-700" icon={ChartBarIcon} />
+                                <StatWidget label="Nilai Tertinggi" value={stats.max} color="bg-emerald-50 border-emerald-100 text-emerald-700" icon={CheckCircleIcon} />
+                                <StatWidget label="Nilai Terendah" value={stats.min} color="bg-rose-50 border-rose-100 text-rose-700" icon={XMarkIcon} />
                             </div>
+                            
+                            <div className="flex items-center justify-between mt-8 border-b border-slate-200 pb-2">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Analisis Per Soal {filterClass !== 'ALL' && `(${filterClass})`}</h3>
+                                <span className="text-xs text-slate-400">{questionStats.length} Soal Dianalisis</span>
+                            </div>
+
                             <div className="space-y-3">
                                 {questionStats.map((q) => (
                                     <QuestionAnalysisItem key={q.id} q={q} stats={q} />
-                                ))}\
+                                ))}
+                                {questionStats.length === 0 && (
+                                    <div className="text-center py-20 text-slate-400 italic">Belum ada data untuk dianalisis.</div>
+                                )}
                             </div>
                         </div>
                     )}
