@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ListBulletIcon, ChevronDownIcon, ChevronUpIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 // --- UTILITY GLOBAL ---
@@ -566,7 +566,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
                             <div className="space-y-3">
                                 {questionStats.map((q) => (
                                     <QuestionAnalysisItem key={q.id} q={q} stats={q} />
-                                ))}
+                                ))}\
                             </div>
                         </div>
                     )}
