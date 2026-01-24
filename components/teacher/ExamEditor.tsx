@@ -1,11 +1,12 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
-    StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon
+    StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
+    ArrowPathIcon // Used as chevron/search icon usually, referencing existing icons
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -23,13 +24,122 @@ interface ExamEditorProps {
     onReset: () => void;
 }
 
-const SUBJECTS = ["Matematika", "Bahasa Indonesia", "Bahasa Inggris", "IPA", "IPS", "PKN", "Agama", "Seni Budaya", "PJOK", "TIK", "Lainnya"];
+// Daftar Mata Pelajaran Diurutkan A-Z
+const SUBJECTS = [
+    "Agama Buddha",
+    "Agama Hindu",
+    "Agama Islam",
+    "Agama Katolik",
+    "Agama Khonghucu",
+    "Agama Kristen",
+    "Bahasa Indonesia",
+    "Bahasa Inggris",
+    "IPA",
+    "IPAS",
+    "IPS",
+    "Kepercayaan",
+    "KKA",
+    "Lainnya",
+    "Matematika",
+    "Muatan Lokal",
+    "Pendidikan Pancasila",
+    "PJOK",
+    "Seni Budaya",
+    "TIK"
+];
+
 const CLASSES = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6", "Kelas 7", "Kelas 8", "Kelas 9", "Kelas 10", "Kelas 11", "Kelas 12", "Mahasiswa", "Umum"];
-const EXAM_TYPES = ["Ulangan Harian", "PTS", "PAS", "Ujian Sekolah", "Kuis", "Latihan", "Olimpiade"];
+
+// Daftar Jenis Evaluasi Diurutkan A-Z
+const EXAM_TYPES = [
+    "Kuis",
+    "Lainnya",
+    "Latihan",
+    "Olimpiade",
+    "PAS",
+    "PTS",
+    "TKA",
+    "Ulangan Harian"
+];
 
 // --- HELPER FUNCTIONS ---
 const execCmd = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
+};
+
+// --- GENERIC SELECTION MODAL ---
+const SelectionModal: React.FC<{
+    isOpen: boolean;
+    title: string;
+    options: string[];
+    selectedValue: string;
+    onClose: () => void;
+    onSelect: (value: string) => void;
+    searchPlaceholder?: string;
+}> = ({ isOpen, title, options, selectedValue, onClose, onSelect, searchPlaceholder = "Cari..." }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        if (isOpen) setSearchTerm('');
+    }, [isOpen]);
+
+    const filteredOptions = useMemo(() => {
+        return options.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [searchTerm, options]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 flex flex-col max-h-[85vh]">
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+                        <p className="text-xs text-slate-500">Silakan pilih salah satu opsi dari daftar.</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                        <XMarkIcon className="w-5 h-5"/>
+                    </button>
+                </div>
+                
+                <div className="p-4 bg-slate-50/50">
+                    <input 
+                        type="text" 
+                        placeholder={searchPlaceholder} 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full p-3 pl-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all shadow-sm"
+                        autoFocus
+                    />
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {filteredOptions.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {filteredOptions.map((opt) => (
+                                <button
+                                    key={opt}
+                                    onClick={() => { onSelect(opt); onClose(); }}
+                                    className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border flex items-center justify-between group
+                                        ${selectedValue === opt 
+                                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/20' 
+                                            : 'bg-white text-slate-600 border-gray-100 hover:border-primary/30 hover:bg-slate-50 hover:shadow-sm'
+                                        }`}
+                                >
+                                    <span>{opt}</span>
+                                    {selectedValue === opt && <CheckIcon className="w-4 h-4 text-white" />}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 text-slate-400">
+                            <p className="text-sm">Opsi tidak ditemukan.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- TABLE CONFIG MODAL ---
@@ -531,6 +641,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
+    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); // Modal Mata Pelajaran
+    const [isClassModalOpen, setIsClassModalOpen] = useState(false); // Modal Kelas
+    const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); // Modal Jenis Evaluasi
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
@@ -569,6 +682,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         } else {
             setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' || name === 'autoSaveInterval' ? parseInt(value) : value }));
         }
+    };
+
+    const handleSubjectSelect = (subject: string) => {
+        setConfig(prev => ({ ...prev, subject }));
     };
 
     const handleQuestionTextChange = (id: string, text: string) => {
@@ -1079,38 +1196,41 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Mata Pelajaran</label>
-                            <select 
-                                name="subject" 
-                                value={config.subject || 'Lainnya'} 
-                                onChange={handleConfigChange} 
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
+                            <div 
+                                onClick={() => setIsSubjectModalOpen(true)}
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
                             >
-                                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                                <span className={config.subject ? 'text-slate-800' : 'text-gray-400'}>
+                                    {config.subject || 'Pilih Mata Pelajaran...'}
+                                </span>
+                                <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
+                            </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Kelas</label>
-                             <select 
-                                name="classLevel" 
-                                value={config.classLevel || 'Lainnya'} 
-                                onChange={handleConfigChange} 
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
+                            <div 
+                                onClick={() => setIsClassModalOpen(true)}
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
                             >
-                                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                                <span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>
+                                    {config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}
+                                </span>
+                                <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
+                            </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Evaluasi</label>
-                             <select 
-                                name="examType" 
-                                value={config.examType || 'Lainnya'} 
-                                onChange={handleConfigChange} 
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm font-medium"
+                            <div 
+                                onClick={() => setIsExamTypeModalOpen(true)}
+                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
                             >
-                                {EXAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                                <span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>
+                                    {config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}
+                                </span>
+                                <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
+                            </div>
                         </div>
 
                          <div className="md:col-span-2">
@@ -1239,6 +1359,33 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             </div>
 
             {renderTypeSelectionModal()}
+            <SelectionModal 
+                isOpen={isSubjectModalOpen}
+                title="Pilih Mata Pelajaran"
+                options={SUBJECTS}
+                selectedValue={config.subject || ''}
+                onClose={() => setIsSubjectModalOpen(false)}
+                onSelect={handleSubjectSelect}
+                searchPlaceholder="Cari mata pelajaran..."
+            />
+            <SelectionModal 
+                isOpen={isClassModalOpen}
+                title="Pilih Kelas"
+                options={CLASSES}
+                selectedValue={config.classLevel || ''}
+                onClose={() => setIsClassModalOpen(false)}
+                onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))}
+                searchPlaceholder="Cari kelas..."
+            />
+            <SelectionModal 
+                isOpen={isExamTypeModalOpen}
+                title="Pilih Jenis Evaluasi"
+                options={EXAM_TYPES}
+                selectedValue={config.examType || ''}
+                onClose={() => setIsExamTypeModalOpen(false)}
+                onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))}
+                searchPlaceholder="Cari jenis evaluasi..."
+            />
         </div>
     );
 };
