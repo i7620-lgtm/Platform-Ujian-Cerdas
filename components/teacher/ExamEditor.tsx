@@ -422,8 +422,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }
     }, [generatedCode]);
 
-    const isDataUrl = (str: string) => str.startsWith('data:image/');
-
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
@@ -820,6 +818,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <label className="block text-sm font-bold text-gray-700 mb-2">Kelas</label>
                         <select name="classLevel" value={config.classLevel || 'Lainnya'} onChange={handleConfigChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm">
                             {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Tipe Ujian</label>
+                        <select name="examType" value={config.examType || 'Lainnya'} onChange={handleConfigChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm">
+                            {EXAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                     <div className="flex gap-4">
