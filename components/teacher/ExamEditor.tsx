@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
@@ -434,12 +434,12 @@ const WysiwygEditor: React.FC<{
                             <Btn cmd="bold" label="B" active={activeCmds.includes('bold')} />
                             <Btn cmd="italic" label="I" active={activeCmds.includes('italic')} />
                             <Btn cmd="underline" label="U" active={activeCmds.includes('underline')} />
-                            <Btn cmd="strikethrough" label="S" active={activeCmds.includes('strikethrough')} />
+                            <Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} />
                             <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                            <Btn cmd="superscript" label="x²" active={activeCmds.includes('superscript')} />
-                            <Btn cmd="subscript" label="x₂" active={activeCmds.includes('subscript')} />
+                            <Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} />
+                            <Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} />
                             <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                            <Btn cmd="removeFormat" icon={XMarkIcon} label="Clear" />
+                            <Btn cmd="removeFormat" icon={EraserIcon} label="Clear" />
                         </>
                     )}
 
@@ -475,7 +475,8 @@ const WysiwygEditor: React.FC<{
                     {activeTab === 'MATH' && (
                         <div className="flex items-center gap-2 w-full">
                             <button onMouseDown={(e) => {e.preventDefault(); setShowMath(true);}} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all">
-                                <span className="text-sm font-serif italic">Σ</span> Buka Math Builder Pro
+                                <FunctionIcon className="w-4 h-4" />
+                                Buka Math Builder Pro
                             </button>
                             <span className="text-[10px] text-gray-400 italic">Untuk Limit, Integral, Matriks, dll.</span>
                         </div>
@@ -553,8 +554,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             }, 200);
         }
     }, [generatedCode]);
-
-    const isDataUrl = (str: string) => str.startsWith('data:image/');
 
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
