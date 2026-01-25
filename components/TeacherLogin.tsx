@@ -13,8 +13,8 @@ interface TeacherLoginProps {
   onBack: () => void;
 }
 
-// Placeholder Client ID - Replace with your actual Google Cloud Console Client ID
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE"; 
+// Mengambil Client ID dari Environment Variable (Vercel)
+const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [username, setUsername] = useState('');
@@ -24,26 +24,32 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
 
   // Initialize Google Sign-In
   useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
     // Check if Google script is loaded
     const initGoogle = () => {
         if (window.google && window.google.accounts) {
-            window.google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: handleGoogleCallback,
-                auto_select: false,
-                cancel_on_tap_outside: true
-            });
-            
-            // Render the button
-            const btnDiv = document.getElementById("googleSignInBtn");
-            if (btnDiv) {
-                window.google.accounts.id.renderButton(btnDiv, {
-                    theme: "outline",
-                    size: "large",
-                    text: "continue_with",
-                    shape: "pill",
-                    width: "100%"
+            try {
+                window.google.accounts.id.initialize({
+                    client_id: GOOGLE_CLIENT_ID,
+                    callback: handleGoogleCallback,
+                    auto_select: false,
+                    cancel_on_tap_outside: true
                 });
+                
+                // Render the button
+                const btnDiv = document.getElementById("googleSignInBtn");
+                if (btnDiv) {
+                    window.google.accounts.id.renderButton(btnDiv, {
+                        theme: "outline",
+                        size: "large",
+                        text: "continue_with",
+                        shape: "pill",
+                        width: "100%" // Akan mengikuti lebar container parent
+                    });
+                }
+            } catch (e) {
+                console.error("Google Sign-In Error:", e);
             }
         }
     };
@@ -176,15 +182,16 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                     </div>
                 </div>
 
-                <div className="flex justify-center">
+                <div className="flex justify-center min-h-[44px]">
                      {/* Google Button Container */}
-                     <div id="googleSignInBtn" className="w-full"></div>
+                     <div id="googleSignInBtn" className="w-full flex justify-center"></div>
                 </div>
                 
-                {GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID_HERE" && (
-                     <p className="text-[10px] text-center text-gray-400 mt-4">
-                        *Fitur Google Login memerlukan konfigurasi Client ID pada kode.
-                     </p>
+                {!GOOGLE_CLIENT_ID && (
+                     <div className="mt-4 p-3 bg-blue-50 text-blue-700 text-[10px] rounded-lg border border-blue-100 text-center">
+                        <strong>Konfigurasi Diperlukan:</strong><br/>
+                        Tambahkan <code>VITE_GOOGLE_CLIENT_ID</code> di Environment Variables Vercel untuk mengaktifkan tombol Google Login.
+                     </div>
                 )}
             </div>
         </div>
