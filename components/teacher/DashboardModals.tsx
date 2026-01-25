@@ -123,12 +123,15 @@ interface OngoingExamModalProps {
     results: Result[];
     onClose: () => void;
     onAllowContinuation: (studentId: string, examCode: string) => void;
+    onUpdateExam?: (exam: Exam) => void; // Added callback for parent update
     isReadOnly?: boolean; 
 }
 
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
-    const [filterClass, setFilterClass] = useState<string>('ALL');
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, onUpdateExam, isReadOnly = false }) => {
+    // Maintain local state of exam to allow optimistic updates
+    const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     
+    const [filterClass, setFilterClass] = useState<string>('ALL');
     const [localResults, setLocalResults] = useState<Result[]>(() => {
         if (!exam) return [];
         return initialResults.filter(r => r.examCode === exam.code);
@@ -146,6 +149,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const processingIdsRef = useRef<Set<string>>(new Set());
     const [, setTick] = useState(0);
 
+    // Sync state when prop changes
+    useEffect(() => {
+        setDisplayExam(exam);
+    }, [exam]);
+
     // Sync results when prop changes
     useEffect(() => {
         if(exam) {
@@ -155,12 +163,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     // Auto-refresh logic (Optimized)
     useEffect(() => {
-        if (!exam) return;
+        if (!displayExam) return;
         
         const fetchLatest = async () => {
             setIsRefreshing(true);
             try {
-                const latest = await storageService.getResults(exam.code); 
+                const latest = await storageService.getResults(displayExam.code); 
                 const updatedForThisExam = latest;
                 
                 setLocalResults(currentResults => {
@@ -184,7 +192,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
         const intervalId = setInterval(fetchLatest, 3000);
         return () => clearInterval(intervalId);
-    }, [exam]);
+    }, [displayExam]);
 
     const uniqueClasses = useMemo(() => {
         const classes = new Set(localResults.map(r => r.student.class));
@@ -205,13 +213,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         });
     }, [localResults, filterClass]);
 
-    if (!exam) return null;
+    if (!displayExam) return null;
 
     const totalStudents = localResults.length;
     const activeStudents = localResults.filter(r => r.status === 'in_progress').length;
     const finishedStudents = localResults.filter(r => r.status === 'completed').length;
     const suspendedStudents = localResults.filter(r => r.status === 'force_submitted').length;
-    const streamUrl = `${window.location.origin}/?stream=${exam.code}`;
+    const streamUrl = `${window.location.origin}/?stream=${displayExam.code}`;
 
     const handleUnlockClick = async (studentId: string, examCode: string) => {
         processingIdsRef.current.add(studentId);
@@ -240,12 +248,29 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     const handleAddTimeSubmit = async () => {
         if (!addTimeValue || typeof addTimeValue !== 'number' || addTimeValue <= 0) return;
+        if (!displayExam) return;
         if (!confirm(`Tambahkan ${addTimeValue} menit untuk SEMUA siswa?`)) return;
 
         setIsSubmittingTime(true);
         try {
-            await storageService.extendExamTime(exam.code, addTimeValue);
-            alert(`Berhasil menambahkan ${addTimeValue} menit.`);
+            await storageService.extendExamTime(displayExam.code, addTimeValue);
+            
+            // Optimistic Update
+            const newTimeLimit = displayExam.config.timeLimit + addTimeValue;
+            const updatedExam: Exam = {
+                ...displayExam,
+                config: {
+                    ...displayExam.config,
+                    timeLimit: newTimeLimit
+                }
+            };
+            
+            setDisplayExam(updatedExam);
+            
+            // Notify parent to update dashboard list
+            if (onUpdateExam) onUpdateExam(updatedExam);
+
+            alert(`Berhasil menambahkan ${addTimeValue} menit. Waktu baru: ${newTimeLimit} menit.`);
             setIsAddTimeOpen(false);
             setAddTimeValue('');
         } catch (e) {
@@ -346,10 +371,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                     <h2 className="text-xl font-black text-slate-800 tracking-tight truncate">Live Monitor</h2>
                                     <div className="flex items-center flex-wrap gap-2 text-xs font-medium text-slate-500 mt-0.5">
                                         <span className="font-mono text-slate-400">Kode:</span>
-                                        <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border border-slate-200 font-bold font-mono tracking-wide">{exam.code}</span>
+                                        <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border border-slate-200 font-bold font-mono tracking-wide">{displayExam.code}</span>
                                         <span className="hidden sm:inline text-slate-300">•</span>
                                         {/* Added Timer Here */}
-                                        <RemainingTime exam={exam} minimal={false} />
+                                        <RemainingTime exam={displayExam} minimal={false} />
                                         
                                         <span className="hidden sm:inline text-slate-300 ml-1">•</span>
                                         <span className="flex items-center gap-1">
@@ -375,7 +400,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
                             <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
                                 <button onClick={() => setActiveTab('MONITOR')} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${activeTab === 'MONITOR' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}>Monitor</button>
-                                {exam.config.enablePublicStream && !isReadOnly && (
+                                {displayExam.config.enablePublicStream && !isReadOnly && (
                                     <button onClick={() => setActiveTab('STREAM_INFO')} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${activeTab === 'STREAM_INFO' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}>Stream</button>
                                 )}
                             </div>
@@ -454,7 +479,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                     const isProcessing = processingIdsRef.current.has(result.student.studentId);
                                                     const isLocked = result.status === 'force_submitted';
                                                     const questionsAnswered = Object.keys(result.answers).length;
-                                                    const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
+                                                    const totalQuestions = displayExam.questions.filter(q => q.questionType !== 'INFO').length;
                                                     const progressPercent = Math.round((questionsAnswered / totalQuestions) * 100) || 0;
                                                     return (
                                                         <tr key={result.student.studentId} className={`group transition-colors ${isLocked ? 'bg-red-50/30 hover:bg-red-50/60' : 'hover:bg-slate-50'}`}>
@@ -532,7 +557,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                          </div>
                                                      ) : (
                                                          <div className="w-full bg-white rounded-full h-3 border border-slate-200">
-                                                             <div className="h-3 bg-blue-500 transition-all duration-500" style={{ width: `${Math.round((Object.keys(result.answers).length / exam.questions.filter(q => q.questionType !== 'INFO').length) * 100)}%` }}></div>
+                                                             <div className="h-3 bg-blue-500 transition-all duration-500" style={{ width: `${Math.round((Object.keys(result.answers).length / displayExam.questions.filter(q => q.questionType !== 'INFO').length) * 100)}%` }}></div>
                                                          </div>
                                                      )}
                                                 </div>
