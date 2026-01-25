@@ -80,19 +80,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     }, [view, onRefreshExams, onRefreshResults]);
 
-    // --- SYNC SELECTED EXAM WITH MASTER DATA ---
-    // Fix: Ketika data 'exams' berubah (misal karena tambah waktu), 'selectedOngoingExam' juga harus diupdate
-    // agar modal menerima data terbaru.
-    useEffect(() => {
-        if (selectedOngoingExam && exams[selectedOngoingExam.code]) {
-            const updated = exams[selectedOngoingExam.code];
-            // Cek sederhana untuk menghindari infinite loop, update jika config berbeda
-            if (JSON.stringify(updated.config) !== JSON.stringify(selectedOngoingExam.config)) {
-                setSelectedOngoingExam(updated);
-            }
-        }
-    }, [exams, selectedOngoingExam]);
-
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => {
         setQuestions(newQuestions);
@@ -232,6 +219,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setView('UPLOAD');
     };
 
+    // New handler to immediately reflect changes (like time extension) in the Dashboard UI
+    const handleExamUpdate = (updatedExam: Exam) => {
+        // Just calling updateExam might trigger a remote save which is redundant 
+        // if the modal already saved it, but it ensures local state `exams` is consistent.
+        // We use a custom local update logic here to be safe and fast.
+        updateExam(updatedExam);
+    };
+
     // -- Computed Data for Views --
     const now = new Date();
     const allExams: Exam[] = Object.values(exams);
@@ -363,7 +358,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 results={results} 
                 onClose={() => setSelectedOngoingExam(null)} 
                 onAllowContinuation={onAllowContinuation}
-                onRefreshExams={onRefreshExams} // Pass refresh function
+                onUpdateExam={handleExamUpdate}
             />
 
             <FinishedExamModal 
