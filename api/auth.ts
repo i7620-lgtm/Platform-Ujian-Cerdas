@@ -15,7 +15,7 @@ const ensureAuthSchema = async () => {
                 full_name TEXT,
                 auth_provider TEXT DEFAULT 'local',
                 avatar_url TEXT,
-                account_type TEXT DEFAULT 'normal',
+                account_type TEXT DEFAULT 'guru',
                 school TEXT DEFAULT '',
                 created_at BIGINT
             );
@@ -23,7 +23,7 @@ const ensureAuthSchema = async () => {
 
         // Migration for existing tables
         try {
-            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT DEFAULT 'normal';`);
+            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT DEFAULT 'guru';`);
             await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS school TEXT DEFAULT '';`);
         } catch (e) { /* ignore if exists */ }
 
@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     success: true, 
                     username: user.username,
                     fullName: user.full_name,
-                    accountType: user.account_type || 'normal',
+                    accountType: user.account_type || 'guru',
                     school: user.school || ''
                 });
             } else {
@@ -104,16 +104,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let userData;
 
             if (userCheck.rows.length === 0) {
-                // Buat User Baru (Default: normal, school: empty)
+                // Buat User Baru (Default: guru, school: empty)
                 await db.query(`
                     INSERT INTO users (username, password, full_name, auth_provider, avatar_url, account_type, school, created_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                `, [email, '', name, 'google', picture, 'normal', '', Date.now()]);
+                `, [email, '', name, 'google', picture, 'guru', '', Date.now()]);
                 
                 userData = {
                     username: email,
                     full_name: name,
-                    account_type: 'normal',
+                    account_type: 'guru',
                     school: '',
                     avatar_url: picture
                 };
@@ -126,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 username: userData.username,
                 fullName: userData.full_name,
                 avatar: userData.avatar_url,
-                accountType: userData.account_type || 'normal',
+                accountType: userData.account_type || 'guru',
                 school: userData.school || ''
             });
         }
