@@ -127,7 +127,13 @@ interface OngoingExamModalProps {
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
     const [filterClass, setFilterClass] = useState<string>('ALL');
-    const [localResults, setLocalResults] = useState<Result[]>(initialResults);
+    
+    // Initialize with filtered data immediately to prevent flash of wrong data
+    const [localResults, setLocalResults] = useState<Result[]>(() => {
+        if (!exam) return [];
+        return initialResults.filter(r => r.examCode === exam.code);
+    });
+
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
@@ -135,22 +141,24 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const processingIdsRef = useRef<Set<string>>(new Set());
     const [, setTick] = useState(0);
 
-    // Sync results when prop changes
+    // Sync results when prop changes (for non-monitoring updates)
     useEffect(() => {
         if(exam) {
             setLocalResults(initialResults.filter(r => r.examCode === exam.code));
         }
     }, [initialResults, exam]);
 
-    // Auto-refresh logic
+    // Auto-refresh logic (Optimized)
     useEffect(() => {
         if (!exam) return;
         
         const fetchLatest = async () => {
             setIsRefreshing(true);
             try {
-                const latest = await storageService.getResults(); 
-                const updatedForThisExam = latest.filter(r => r.examCode === exam.code);
+                // Fetch ONLY results for this exam code
+                const latest = await storageService.getResults(exam.code); 
+                // Since getResults(code) returns filtered results, we use them directly
+                const updatedForThisExam = latest;
                 
                 setLocalResults(currentResults => {
                     const currentMap = new Map(currentResults.map(r => [r.student.studentId, r]));
