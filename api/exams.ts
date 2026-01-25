@@ -132,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 // We expect context headers from the client to identify the user role
                 // Note: In a production app, this should be validated via JWT/Session.
                 // Here we trust the headers sent by our frontend App logic for the requirement context.
-                const requesterRole = (req.headers['x-role'] as string) || 'normal';
+                const requesterRole = (req.headers['x-role'] as string) || 'guru';
                 const requesterId = (req.headers['x-user-id'] as string) || '';
                 const requesterSchool = (req.headers['x-school'] as string) || '';
 
@@ -147,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     query += ' WHERE author_school = $1 ORDER BY created_at DESC LIMIT 100';
                     params.push(requesterSchool);
                 } else {
-                    // Normal sees ONLY OWN exams
+                    // Guru sees ONLY OWN exams
                     query += ' WHERE author_id = $1 ORDER BY created_at DESC LIMIT 100';
                     params.push(requesterId);
                 }
