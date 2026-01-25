@@ -7,7 +7,6 @@ import db from './db.js';
 let isTableInitialized = false;
 
 // Definisi Skema Tabel yang Benar
-// created_at menggunakan TEXT agar bisa menyimpan format tanggal/waktu yang mudah dibaca (misal "2024-05-20 10:00")
 const CREATE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS exams (
         code TEXT PRIMARY KEY, 
@@ -15,7 +14,8 @@ const CREATE_TABLE_SQL = `
         questions TEXT, 
         config TEXT,
         created_at TEXT DEFAULT '',
-        status TEXT DEFAULT 'PUBLISHED'
+        status TEXT DEFAULT 'PUBLISHED',
+        author_school TEXT DEFAULT ''
     );
 `;
 
@@ -37,28 +37,15 @@ const ensureSchema = async () => {
         await db.query(CREATE_TABLE_SQL);
         
         // MIGRATION CHECK:
-        // Jika tabel sudah ada dengan created_at tipe BIGINT, kita harus mengubahnya menjadi TEXT
         try {
-             const checkType = await db.query(`
-                SELECT data_type FROM information_schema.columns 
-                WHERE table_name = 'exams' AND column_name = 'created_at';
-             `);
-             
-             if (checkType.rows.length > 0 && checkType.rows[0].data_type !== 'text') {
-                 console.log("Migrating created_at column to TEXT...");
-                 await db.query(`ALTER TABLE exams ALTER COLUMN created_at TYPE TEXT USING created_at::text;`);
-             }
-
-             // Check status column
-             const checkStatus = await db.query(`
+             const checkSchool = await db.query(`
                 SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'exams' AND column_name = 'status';
+                WHERE table_name = 'exams' AND column_name = 'author_school';
              `);
-             if (checkStatus.rows.length === 0) {
-                 console.log("Adding 'status' column...");
-                 await db.query(`ALTER TABLE exams ADD COLUMN status TEXT DEFAULT 'PUBLISHED';`);
+             if (checkSchool.rows.length === 0) {
+                 console.log("Adding 'author_school' column...");
+                 await db.query(`ALTER TABLE exams ADD COLUMN author_school TEXT DEFAULT '';`);
              }
-
         } catch (migError) {
             console.warn("Migration warning:", migError);
         }
@@ -76,6 +63,7 @@ const sanitizeExam = (examRow: any) => {
         return { 
             code: examRow.code,
             authorId: examRow.author_id,
+            authorSchool: examRow.author_school,
             questions,
             config: JSON.parse(examRow.config || '{}'),
             createdAt: examRow.created_at || '',
@@ -86,26 +74,17 @@ const sanitizeExam = (examRow: any) => {
     }
 };
 
-// Security: Strip answers for student view but KEEP OPTIONS valid
 const sanitizeForPublic = (exam: any) => {
     if (exam.questions && Array.isArray(exam.questions)) {
         exam.questions = exam.questions.map((q: any) => {
-            // Destructure to remove sensitive fields
             const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
             const safeQ = { ...rest };
-            
-            // Handle complex types
             if (trueFalseRows) {
-                // Keep text, set dummy answer
                 safeQ.trueFalseRows = trueFalseRows.map((r: any) => ({ text: r.text, answer: false }));
             }
             if (matchingPairs && Array.isArray(matchingPairs)) {
-                 // SECURITY FIX: Do not set to '?', instead SHUFFLE the right options.
-                 // This ensures the student sees valid options in the dropdown but the connection is broken.
-                 // If data is empty/missing, send empty string, NOT '?'.
                  const rightValues = matchingPairs.map((p: any) => p.right || '');
                  const shuffledRights = shuffleArray(rightValues);
-
                  safeQ.matchingPairs = matchingPairs.map((p: any, idx: number) => ({ 
                      left: p.left, 
                      right: shuffledRights[idx] 
@@ -118,13 +97,11 @@ const sanitizeForPublic = (exam: any) => {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS Headers
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
     
-    // ANTI-CACHE HEADERS (CRITICAL FIX)
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -138,22 +115,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'GET') {
             const { code, preview } = req.query;
 
+            // -- PUBLIC ACCESS (STUDENT/PREVIEW) --
             if (code && req.url?.includes('public')) {
                 const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
                 if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
                 
                 const exam = sanitizeExam(result.rows[0]);
-                
-                // Block Drafts from Public View UNLESS in Preview Mode
                 if (exam.status === 'DRAFT' && preview !== 'true') {
                     return res.status(403).json({ error: 'Exam is currently in draft mode.' });
                 }
-
-                // Secure the public endpoint by stripping answers safely
                 return res.status(200).json(sanitizeForPublic(exam));
-            } else {
-                // Return everything to teacher (Drafts + Published)
-                const result = await db.query('SELECT * FROM exams ORDER BY created_at DESC LIMIT 100');
+            } 
+            
+            // -- TEACHER ACCESS (FILTER BY ROLE) --
+            else {
+                // We expect context headers from the client to identify the user role
+                // Note: In a production app, this should be validated via JWT/Session.
+                // Here we trust the headers sent by our frontend App logic for the requirement context.
+                const requesterRole = (req.headers['x-role'] as string) || 'normal';
+                const requesterId = (req.headers['x-user-id'] as string) || '';
+                const requesterSchool = (req.headers['x-school'] as string) || '';
+
+                let query = 'SELECT * FROM exams';
+                let params: any[] = [];
+
+                if (requesterRole === 'super_admin') {
+                    // Super Admin sees ALL
+                    query += ' ORDER BY created_at DESC LIMIT 100';
+                } else if (requesterRole === 'admin') {
+                    // Admin sees ALL from their SCHOOL
+                    query += ' WHERE author_school = $1 ORDER BY created_at DESC LIMIT 100';
+                    params.push(requesterSchool);
+                } else {
+                    // Normal sees ONLY OWN exams
+                    query += ' WHERE author_id = $1 ORDER BY created_at DESC LIMIT 100';
+                    params.push(requesterId);
+                }
+
+                const result = await db.query(query, params);
                 const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
                 return res.status(200).json(data);
             }
@@ -165,6 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
 
             const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
+            const authorSchool = exam.authorSchool || ''; // Save the school context
             const createdAt = exam.createdAt || new Date().toLocaleString(); 
             const status = exam.status || 'PUBLISHED';
 
@@ -172,39 +172,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const configJson = JSON.stringify(exam.config || {});
 
             const query = `
-                INSERT INTO exams (code, author_id, questions, config, created_at, status)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO exams (code, author_id, author_school, questions, config, created_at, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (code) 
                 DO UPDATE SET 
                     author_id = EXCLUDED.author_id,
+                    author_school = EXCLUDED.author_school,
                     questions = EXCLUDED.questions,
                     config = EXCLUDED.config,
                     created_at = EXCLUDED.created_at,
                     status = EXCLUDED.status
             `;
 
-            await db.query(query, [exam.code, authorId, questionsJson, configJson, createdAt, status]);
+            await db.query(query, [exam.code, authorId, authorSchool, questionsJson, configJson, createdAt, status]);
             return res.status(200).json({ success: true, message: "Exam saved successfully" });
         }
         
-        // --- PATCH: UPDATE GAMBAR ---
+        // --- PATCH & DELETE (Existing Logic) ---
         else if (req.method === 'PATCH') {
             const { code, questionId, imageUrl, optionImages } = req.body;
             if (!code || !questionId) return res.status(400).json({ error: "Missing parameters" });
-
+            // ... (keep existing patch logic)
             const client = await db.getClient();
             try {
                 await client.query('BEGIN');
                 const result = await client.query('SELECT questions FROM exams WHERE code = $1 FOR UPDATE', [code]);
-                
-                if (result.rows.length === 0) {
-                    await client.query('ROLLBACK');
-                    return res.status(404).json({ error: "Exam not found" });
-                }
-
+                if (result.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Exam not found" }); }
                 let questions = JSON.parse(result.rows[0].questions);
                 let found = false;
-                
                 questions = questions.map((q: any) => {
                     if (q.id === questionId) {
                         found = true;
@@ -213,42 +208,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }
                     return q;
                 });
-
-                if (!found) {
-                    await client.query('ROLLBACK');
-                    return res.status(404).json({ error: "Question not found" });
-                }
-
+                if (!found) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Question not found" }); }
                 await client.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
                 await client.query('COMMIT');
                 return res.status(200).json({ success: true });
-            } catch (e) {
-                await client.query('ROLLBACK');
-                throw e;
-            } finally {
-                client.release();
-            }
+            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
         }
-        // --- DELETE: HAPUS UJIAN ---
         else if (req.method === 'DELETE') {
             const { code } = req.query;
             if (!code) return res.status(400).json({ error: "Exam code is required" });
-            
             const client = await db.getClient();
             try {
                 await client.query('BEGIN');
-                // Hapus result terkait terlebih dahulu untuk integritas data
                 await client.query('DELETE FROM results WHERE exam_code = $1', [code]);
-                // Hapus ujian itu sendiri
                 await client.query('DELETE FROM exams WHERE code = $1', [code]);
                 await client.query('COMMIT');
                 return res.status(200).json({ success: true });
-            } catch (e) {
-                await client.query('ROLLBACK');
-                throw e;
-            } finally {
-                client.release();
-            }
+            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
