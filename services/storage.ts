@@ -126,21 +126,22 @@ class StorageService {
 
       if (this.isOnline) {
           // Jika tidak ada di lokal ATAU data lokal rusak (isPoisoned) ATAU ini mode preview, ambil dari cloud
-          if (!exam || isPoisoned || isPreview) {
-              if (isPoisoned) console.log(`[Storage] Detected poisoned cache for exam ${code}. Forcing refresh from cloud.`);
-              
+          // Force fetch if we want to ensure latest timeLimit etc
+          if (!exam || isPoisoned || isPreview || true) { // Added 'true' to force refresh config for students often
               try {
                   const previewParam = isPreview ? '&preview=true' : '';
                   // Tambahkan timestamp (_t) untuk bypass cache Vercel Edge / Browser
                   const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`));
                   if (res.ok) {
-                      exam = await res.json();
-                      if (exam) { 
+                      const cloudExam = await res.json();
+                      if (cloudExam) { 
                           // Jika preview, jangan simpan di local storage siswa biasa agar tidak mengotori cache
                           if (!isPreview) {
-                              allExams[exam.code] = exam; 
+                              // Preserve questions if possible to save bandwidth, but ensure config is updated
+                              allExams[cloudExam.code] = cloudExam; 
                               this.saveLocal(KEYS.EXAMS, allExams); 
                           }
+                          exam = cloudExam;
                       }
                   }
               } catch(e) { console.warn("Failed to fetch exam from cloud, checking local..."); }
@@ -195,13 +196,6 @@ class StorageService {
             
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
-                
-                // Merge Strategy:
-                // We merge fetched results into the local cache. 
-                // Since partial fetching (by examCode) only returns specific results,
-                // we iterate through them and update/insert into localResults.
-                // We do NOT replace the entire localResults with cloudResults if examCode is present,
-                // because localResults might contain data for other exams needed elsewhere.
                 
                 const combined = [...localResults];
                 
@@ -290,7 +284,6 @@ class StorageService {
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
       if (index !== -1) {
-          // Optimistik Update di Client
           const updatedResult: Result = {
               ...results[index],
               status: 'in_progress', 
@@ -303,7 +296,6 @@ class StorageService {
 
           if (this.isOnline) {
              try { 
-                 // MENGGUNAKAN API BARU KHUSUS GURU
                  const response = await retryOperation(() => fetch(`${API_URL}/teacher-action`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -320,6 +312,23 @@ class StorageService {
                  }
              } catch (e) { console.error("Unlock sync failed", e); }
           }
+      }
+  }
+
+  async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
+      if (!this.isOnline) throw new Error("Fitur ini membutuhkan koneksi internet.");
+      
+      await retryOperation(() => fetch(`${API_URL}/extend-time`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ examCode, additionalMinutes })
+      }));
+      
+      // Update local cache optimistically
+      const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
+      if (exams[examCode]) {
+          exams[examCode].config.timeLimit += additionalMinutes;
+          this.saveLocal(KEYS.EXAMS, exams);
       }
   }
 
