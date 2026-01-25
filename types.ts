@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -46,7 +46,8 @@ export interface ExamConfig {
 
 export interface Exam {
   code: string;
-  authorId?: string; // New: Track teacher/author
+  authorId?: string; // Track teacher/author
+  authorSchool?: string; // New: Track school context
   questions: Question[];
   config: ExamConfig;
   isSynced?: boolean; 
@@ -77,4 +78,15 @@ export interface Result {
     isSynced?: boolean; 
     timestamp?: number;
     location?: string; // GPS Coordinates
+}
+
+// --- NEW TYPES FOR USER MANAGEMENT ---
+export type AccountType = 'super_admin' | 'admin' | 'normal';
+
+export interface TeacherProfile {
+    id: string; // username
+    fullName: string;
+    accountType: AccountType;
+    school: string;
+    avatarUrl?: string;
 }
