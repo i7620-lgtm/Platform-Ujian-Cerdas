@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -57,7 +57,8 @@ export interface Exam {
 export interface Student {
   fullName: string;
   class: string;
-  studentId: string;
+  absentNumber: string; // New: Nomor Absen/Urut
+  studentId: string; // Now Composite: Name-Class-AbsentNumber
 }
 
 // Added 'in_progress' explicitly to support live monitoring
