@@ -47,24 +47,6 @@ const App: React.FC = () => {
   const refreshExams = useCallback(async () => {
     setIsSyncing(true);
     try {
-        // Pass context headers manually to fetch custom logic in storage service
-        // Since storageService is a class instance, we might need to modify it or pass params
-        // For simplicity in this architecture, we will append query params or rely on the service to use a global config if implemented.
-        // However, `storageService.getExams()` logic is generic. 
-        // We will modify `storageService` call here to pass the logic if possible, or just fetch.
-        // *Correction*: We need to send headers. storageService.getExams needs to handle custom headers.
-        // Since we cannot easily modify the method signature of getExams without breaking it everywhere,
-        // we will fetch directly here OR update storageService to accept headers. 
-        // Let's assume we update storageService.getExams to accept optional headers.
-        
-        // Quick Hack: Direct fetch to update state, ignoring storageService cache for now to ensure role-based filtering works
-        // But better to stick to pattern. We will assume storageService uses the /api/exams endpoint.
-        // We will update storageService later or just use fetch here?
-        // Let's modify storageService.getExams to take an optional config object.
-        
-        // Actually, let's redefine getExams in storageService to accept headers or context.
-        // But for now, let's do a direct fetch for the dashboard to respect roles.
-        
         const headers = getHeaders();
         const res = await fetch('/api/exams', { headers: headers as any });
         if (res.ok) {
