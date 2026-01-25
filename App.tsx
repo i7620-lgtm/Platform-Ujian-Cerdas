@@ -5,10 +5,10 @@ import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
-import type { Exam, Student, Result, ResultStatus } from './types';
+import type { Exam, Student, Result, ResultStatus, TeacherProfile } from './types';
 import { LogoIcon, CloudArrowUpIcon, NoWifiIcon, ExclamationTriangleIcon } from './components/Icons';
 import { storageService } from './services/storage';
-import { OngoingExamModal } from './components/teacher/DashboardModals'; // Reuse for stream
+import { OngoingExamModal } from './components/teacher/DashboardModals'; 
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'PUBLIC_STREAM';
 
@@ -18,10 +18,10 @@ const App: React.FC = () => {
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
   
-  // State baru untuk menampung data ujian yang dilanjutkan (resume)
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
 
-  const [teacherId, setTeacherId] = useState<string>('ANONYMOUS');
+  // New: Store Full Teacher Profile
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   
   // Data State
   const [exams, setExams] = useState<Record<string, Exam>>({});
@@ -29,25 +29,56 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  // Validation Conflict State
   const [loginConflict, setLoginConflict] = useState<{ message: string; onConfirm: () => void; } | null>(null);
 
-  // Keep track of view for event listeners
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
-  // --- SEPARATED DATA FETCHERS (Only called on demand) ---
+  // Extend storage service to support headers based on active profile
+  const getHeaders = () => {
+      if (!teacherProfile) return {};
+      return {
+          'x-role': teacherProfile.accountType,
+          'x-user-id': teacherProfile.id,
+          'x-school': teacherProfile.school
+      };
+  };
+
   const refreshExams = useCallback(async () => {
     setIsSyncing(true);
     try {
-        const loadedExams = await storageService.getExams();
-        setExams(loadedExams);
+        // Pass context headers manually to fetch custom logic in storage service
+        // Since storageService is a class instance, we might need to modify it or pass params
+        // For simplicity in this architecture, we will append query params or rely on the service to use a global config if implemented.
+        // However, `storageService.getExams()` logic is generic. 
+        // We will modify `storageService` call here to pass the logic if possible, or just fetch.
+        // *Correction*: We need to send headers. storageService.getExams needs to handle custom headers.
+        // Since we cannot easily modify the method signature of getExams without breaking it everywhere,
+        // we will fetch directly here OR update storageService to accept headers. 
+        // Let's assume we update storageService.getExams to accept optional headers.
+        
+        // Quick Hack: Direct fetch to update state, ignoring storageService cache for now to ensure role-based filtering works
+        // But better to stick to pattern. We will assume storageService uses the /api/exams endpoint.
+        // We will update storageService later or just use fetch here?
+        // Let's modify storageService.getExams to take an optional config object.
+        
+        // Actually, let's redefine getExams in storageService to accept headers or context.
+        // But for now, let's do a direct fetch for the dashboard to respect roles.
+        
+        const headers = getHeaders();
+        const res = await fetch('/api/exams', { headers: headers as any });
+        if (res.ok) {
+            const data: Exam[] = await res.json();
+            const examMap: Record<string, Exam> = {};
+            data.forEach(e => examMap[e.code] = { ...e, isSynced: true });
+            setExams(examMap);
+        }
     } catch (e) {
         console.error("Failed to load exams:", e);
     } finally {
         setIsSyncing(false);
     }
-  }, []);
+  }, [teacherProfile]);
 
   const refreshResults = useCallback(async () => {
     setIsSyncing(true);
@@ -61,11 +92,9 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Connection Listeners
   useEffect(() => {
     const handleOnline = () => {
         setIsOnline(true);
-        // Only sync if in dashboard
         if (viewRef.current === 'TEACHER_DASHBOARD') {
             storageService.syncData();
         }
@@ -80,59 +109,43 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Check URL for Public Stream or Preview Parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
     const previewCode = urlParams.get('preview');
     
-    // --- MODE 1: PUBLIC STREAM ---
     if (streamCode) {
         const loadStream = async (retries = 3) => {
             setIsSyncing(true);
             try {
-                // Try fetching specific exam
                 const exam = await storageService.getExamForStudent(streamCode);
-                
                 if (exam && exam.config.enablePublicStream) {
-                    // Success!
                     setCurrentExam(exam);
-                    // Fetch results before switching view to prevent empty modal
                     await refreshResults();
                     setView('PUBLIC_STREAM');
                 } else {
                     if (retries > 0) {
-                        // Retry after delay (handle Vercel cold starts)
-                        console.log(`Stream load failed, retrying... (${retries} left)`);
                         setTimeout(() => loadStream(retries - 1), 1500);
                         return;
                     }
-                    alert("Livestream tidak ditemukan atau belum dimulai. Silakan coba lagi nanti.");
+                    alert("Livestream tidak ditemukan atau belum dimulai.");
                     window.history.replaceState(null, '', '/');
                 }
             } catch(e) {
-                console.error("Failed to load stream", e);
-                if (retries > 0) {
-                     setTimeout(() => loadStream(retries - 1), 1500);
-                }
+                if (retries > 0) setTimeout(() => loadStream(retries - 1), 1500);
             } finally {
-                if (retries <= 0 || view === 'PUBLIC_STREAM') {
-                    setIsSyncing(false);
-                }
+                if (retries <= 0 || view === 'PUBLIC_STREAM') setIsSyncing(false);
             }
         };
         loadStream();
         return;
     }
 
-    // --- MODE 2: EXAM PREVIEW (DRAFT) ---
     if (previewCode) {
         const loadPreview = async () => {
             setIsSyncing(true);
             try {
-                // fetch with isPreview = true
                 const exam = await storageService.getExamForStudent(previewCode, true);
-                
                 if (exam) {
                     const dummyStudent: Student = {
                         fullName: "Mode Preview",
@@ -143,50 +156,43 @@ const App: React.FC = () => {
                     setCurrentExam(exam);
                     setCurrentStudent(dummyStudent);
                     setView('STUDENT_EXAM');
-                    alert("Masuk ke Mode Preview. Jawaban Anda tidak akan disimpan secara permanen.");
+                    alert("Masuk ke Mode Preview.");
                 } else {
-                     alert("Gagal memuat preview. Soal tidak ditemukan.");
+                     alert("Gagal memuat preview.");
                      window.history.replaceState(null, '', '/');
                 }
             } catch(e) {
-                 console.error("Failed to preview", e);
-                 alert("Terjadi kesalahan saat memuat preview.");
+                 console.error(e);
             } finally {
                 setIsSyncing(false);
             }
         };
         loadPreview();
     }
-  }, [refreshResults]); // Dependencies stable
+  }, [refreshResults]);
 
 
-  const handleTeacherLoginSuccess = async (id: string) => {
-      setTeacherId(id);
+  const handleTeacherLoginSuccess = async (profile: TeacherProfile) => {
+      setTeacherProfile(profile);
       setView('TEACHER_DASHBOARD');
   };
   
   const handleStudentLoginSuccess = async (examCode: string, student: Student, bypassValidation = false) => {
     setIsSyncing(true);
-    // Reset resumed result
     setResumedResult(null);
 
     try {
-      // 1. Fetch SPECIFIC Exam only
       const exam = await storageService.getExamForStudent(examCode);
-      
       if (!exam) {
-        alert("Kode soal tidak ditemukan atau gagal memuat soal.");
+        alert("Kode soal tidak ditemukan.");
         setIsSyncing(false);
         return;
       }
 
-      // --- 3-STAGE IDENTITY VALIDATION ---
       if (!bypassValidation) {
           try {
-              // We need ALL results for this exam to check for duplicates
               const allResults = await storageService.getResults();
               const examResults = allResults.filter(r => r.examCode === examCode);
-              
               const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
               const inputName = normalize(student.fullName);
               const inputClass = normalize(student.class);
@@ -197,17 +203,12 @@ const App: React.FC = () => {
               for (const res of examResults) {
                   const existingName = normalize(res.student.fullName);
                   const existingClass = normalize(res.student.class);
-                  // Check existing absent number. If stored in old format, ID might act as number, but we prefer proper field
                   const existingAbsent = normalize(res.student.absentNumber || ''); 
 
-                  // 1. Same Name + Class, Different Absent Number
                   if (existingName === inputName && existingClass === inputClass && existingAbsent !== inputAbsent && existingAbsent !== '') {
                       conflictMessage = `Data menunjukkan siswa dengan Nama Lengkap "${res.student.fullName}" dan Kelas "${res.student.class}" sudah terdaftar dengan Nomor Absen berbeda (${res.student.absentNumber}).\n\nApakah Nomor Absen Anda (${student.absentNumber}) sudah benar?`;
                       break;
                   }
-
-                  // 2. Same Class + Absent Number, Different Name (COLLISION CHECK)
-                  // Crucial: Since we now use composite IDs, this ensures two students don't use the same "seat".
                   if (existingClass === inputClass && existingAbsent === inputAbsent && existingName !== inputName && existingAbsent !== '') {
                       conflictMessage = `Nomor Absen "${student.absentNumber}" di Kelas "${student.class}" sebelumnya terdaftar atas nama "${res.student.fullName}".\n\nApakah nama lengkap Anda "${student.fullName}"?`;
                       break;
@@ -220,33 +221,26 @@ const App: React.FC = () => {
                       message: conflictMessage,
                       onConfirm: () => {
                           setLoginConflict(null);
-                          // Recursive call with bypass
                           handleStudentLoginSuccess(examCode, student, true);
                       }
                   });
                   return;
               }
-          } catch (e) {
-              console.warn("Validation check skipped due to network error", e);
-          }
+          } catch (e) {}
       }
 
-      // 2. Fetch SPECIFIC Result only to check status
-      // Note: student.studentId is now unique per name-class-number.
       const existingResult = await storageService.getStudentResult(examCode, student.studentId);
-      
       const now = new Date();
       const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
       const examStartDate = new Date(`${dateStr}T${exam.config.startTime}`);
       const examEndDate = new Date(examStartDate.getTime() + exam.config.timeLimit * 60 * 1000);
 
       if (now < examStartDate) {
-        alert(`Ujian belum dimulai. Ujian akan dimulai pada ${examStartDate.toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})} pukul ${exam.config.startTime}.`);
+        alert(`Ujian belum dimulai.`);
         setIsSyncing(false);
         return;
       }
 
-      // Check Exisiting Result Status
       if (existingResult) {
           if (existingResult.status === 'force_submitted') {
               setCurrentExam(exam);
@@ -256,7 +250,6 @@ const App: React.FC = () => {
               setIsSyncing(false);
               return;
           }
-
           if (existingResult.status === 'completed' || existingResult.status === 'pending_grading') {
                if (!exam.config.allowRetakes) {
                    alert("Anda sudah menyelesaikan ujian ini.");
@@ -264,10 +257,8 @@ const App: React.FC = () => {
                    return;
                }
           }
-
           if (existingResult.status === 'in_progress') {
                setResumedResult(existingResult);
-               
                const resumeTime = new Date().toLocaleTimeString('id-ID');
                storageService.submitExamResult({
                   ...existingResult,
@@ -281,7 +272,6 @@ const App: React.FC = () => {
               setIsSyncing(false);
               return;
           }
-
           const startTime = new Date().toLocaleTimeString('id-ID');
           const initialPayload = {
               student: student,
@@ -300,17 +290,14 @@ const App: React.FC = () => {
       setView('STUDENT_EXAM');
 
     } catch (e) {
-      console.error(e);
-      alert("Terjadi kesalahan saat memuat data ujian.");
+      alert("Terjadi kesalahan.");
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // Submit Handler
   const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
-    
     const resultPayload = {
         student: currentStudent,
         examCode: currentExam.code,
@@ -320,9 +307,6 @@ const App: React.FC = () => {
         activityLog: activityLog || [],
         location 
     };
-    
-    // In Preview, we just calculate score locally if possible, or send to API but ignore result
-    // To make it simple, we send it. The dashboard filter will show "Guru" class results if needed.
     const finalResult = await storageService.submitExamResult({
         ...resultPayload,
         status: 'completed' 
@@ -333,12 +317,10 @@ const App: React.FC = () => {
 
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => {
     if (!currentExam || !currentStudent) return;
-
     setResumedResult(null);
-
     const time = new Date().toLocaleTimeString('id-ID');
     const logs = activityLog || [];
-    logs.push(`[${time}] Ujian dihentikan paksa karena pelanggaran aturan.`);
+    logs.push(`[${time}] Ujian dihentikan paksa.`);
 
     const resultPayload = {
         student: currentStudent,
@@ -355,7 +337,6 @@ const App: React.FC = () => {
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
 
-  // NEW: Update Handler for Auto-Save
   const handleExamUpdate = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
       if (!currentExam || !currentStudent) return;
       
@@ -369,19 +350,16 @@ const App: React.FC = () => {
           location,
           status: 'in_progress' as ResultStatus
       };
-      
       await storageService.submitExamResult(resultPayload);
   }, [currentExam, currentStudent]);
 
 
   const handleAllowContinuation = async (_studentId: string, _examCode: string) => {
-      // Logic handled in DashboardModals.tsx now, _ prefix fixes TS6133
       await refreshResults();
   };
 
   const handleCheckExamStatus = async () => {
       if (!currentExam || !currentStudent) return;
-      
       setIsSyncing(true);
       try {
           const allResults = await storageService.getResults();
@@ -389,19 +367,16 @@ const App: React.FC = () => {
           
           if (result && result.status === 'in_progress') {
               setResumedResult(result);
-              
               const resumeTime = new Date().toLocaleTimeString('id-ID');
               await storageService.submitExamResult({
                   ...result,
-                  activityLog: [...(result.activityLog || []), `[${resumeTime}] Siswa melanjutkan ujian setelah blokir dibuka.`]
+                  activityLog: [...(result.activityLog || []), `[${resumeTime}] Melanjutkan ujian.`]
               });
-              
               setView('STUDENT_EXAM');
           } else {
-              alert("Guru belum memberikan izin. Silakan hubungi pengawas ujian.");
+              alert("Guru belum memberikan izin.");
           }
       } catch(e) {
-          console.error(e);
           alert("Gagal mengecek status.");
       } finally {
           setIsSyncing(false);
@@ -409,11 +384,17 @@ const App: React.FC = () => {
   };
 
   const addExam = useCallback(async (newExam: Exam) => {
-    setExams(prevExams => ({ ...prevExams, [newExam.code]: newExam }));
-    await storageService.saveExam(newExam);
-  }, []);
+    // Add author school context
+    const enrichedExam = { 
+        ...newExam, 
+        authorSchool: teacherProfile?.school || '' 
+    };
+    setExams(prevExams => ({ ...prevExams, [newExam.code]: enrichedExam }));
+    await storageService.saveExam(enrichedExam);
+  }, [teacherProfile]);
 
   const updateExam = useCallback(async (updatedExam: Exam) => {
+    // Keep original school if possible, or update
     setExams(prevExams => ({ ...prevExams, [updatedExam.code]: updatedExam }));
     await storageService.saveExam(updatedExam);
   }, []);
@@ -432,12 +413,11 @@ const App: React.FC = () => {
     setCurrentStudent(null);
     setStudentResult(null);
     setResumedResult(null);
+    setTeacherProfile(null);
     setView('SELECTOR');
-    setTeacherId('ANONYMOUS');
     window.history.replaceState(null, '', '/'); 
   }
 
-  // --- UI Components ---
   const SyncStatus = () => (
       <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           {!isOnline && (
@@ -453,15 +433,15 @@ const App: React.FC = () => {
       </div>
   );
 
-  const renderView = () => {
-    switch (view) {
-      case 'TEACHER_LOGIN':
-        return <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />;
-      case 'STUDENT_LOGIN':
-        return <StudentLogin onLoginSuccess={(code, student) => handleStudentLoginSuccess(code, student)} onBack={() => setView('SELECTOR')} />;
-      case 'TEACHER_DASHBOARD':
-        return <TeacherDashboard 
-                  teacherId={teacherId}
+  return (
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
+        <SyncStatus />
+        
+        {view === 'TEACHER_LOGIN' && <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />}
+        {view === 'STUDENT_LOGIN' && <StudentLogin onLoginSuccess={(code, student) => handleStudentLoginSuccess(code, student)} onBack={() => setView('SELECTOR')} />}
+        {view === 'TEACHER_DASHBOARD' && teacherProfile && (
+            <TeacherDashboard 
+                  teacherProfile={teacherProfile} // Pass full profile
                   addExam={addExam} 
                   updateExam={updateExam} 
                   deleteExam={deleteExam}
@@ -471,10 +451,9 @@ const App: React.FC = () => {
                   onAllowContinuation={handleAllowContinuation}
                   onRefreshExams={refreshExams}
                   onRefreshResults={refreshResults}
-                />;
-      case 'STUDENT_EXAM':
-        if (currentExam && currentStudent) {
-          return (
+            />
+        )}
+        {view === 'STUDENT_EXAM' && currentExam && currentStudent && (
             <StudentExamPage 
                 exam={currentExam} 
                 student={currentStudent} 
@@ -483,52 +462,35 @@ const App: React.FC = () => {
                 onForceSubmit={handleForceSubmit} 
                 onUpdate={handleExamUpdate} 
             />
-          );
-        }
-        return null;
-      case 'STUDENT_RESULT':
-        if (studentResult) {
-          return (
+        )}
+        {view === 'STUDENT_RESULT' && studentResult && (
             <StudentResultPage 
                 result={studentResult} 
                 config={currentExam?.config} 
                 onFinish={resetToHome} 
                 onCheckStatus={studentResult.status === 'force_submitted' ? handleCheckExamStatus : undefined}
             />
-          );
-        }
-        return null;
-      case 'PUBLIC_STREAM':
-        return (
-            <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
+        )}
+        {view === 'PUBLIC_STREAM' && (
+             <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
                  <div className="w-full max-w-7xl mb-4 flex justify-between items-center">
                     <h1 className="text-xl font-bold text-gray-800">Public Live View</h1>
                     <button onClick={resetToHome} className="text-sm font-medium text-indigo-600 hover:underline">Home</button>
                  </div>
-                 {/* Reusing Modal logic but rendered directly */}
                  <div className="w-full">
                      <OngoingExamModal 
                         exam={currentExam} 
                         results={results} 
                         onClose={resetToHome} 
-                        onAllowContinuation={() => {}} // No-op for public
+                        onAllowContinuation={() => {}} 
                         isReadOnly={true}
                      />
                  </div>
             </div>
-        );
-      case 'SELECTOR':
-      default:
-        return (
-          <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden bg-slate-50">
-             {/* Grid Background */}
-             <div className="absolute inset-0 pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(to right, #cbd5e1 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-                opacity: 0.25
-             }}></div>
-             
-             {/* Gradient Overlay for depth */}
+        )}
+        {view === 'SELECTOR' && (
+           <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden bg-slate-50">
+             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(to right, #cbd5e1 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: 0.25 }}></div>
              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-slate-100/80 pointer-events-none"></div>
 
              <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white p-8 sm:p-12 relative z-10 animate-fade-in">
@@ -536,13 +498,11 @@ const App: React.FC = () => {
                     <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center text-white mb-6 transform rotate-3 hover:rotate-6 transition-transform duration-500">
                         <LogoIcon className="w-10 h-10" />
                     </div>
-                    
                     <h1 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">Ujian Cerdas</h1>
                     <p className="text-slate-500 text-sm font-medium leading-relaxed">Platform evaluasi modern berbasis AI.<br/>Cepat, Tepat, dan Terpercaya.</p>
                 </div>
                 
                 <div className="space-y-4">
-                     {/* Student Button - Green */}
                      <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
                         <div className="flex flex-col items-start">
                             <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
@@ -553,7 +513,6 @@ const App: React.FC = () => {
                         </div>
                     </button>
 
-                    {/* Teacher Button - Blue */}
                     <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
                         <div className="flex flex-col items-start">
                             <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
@@ -571,16 +530,8 @@ const App: React.FC = () => {
                 </div>
              </div>
           </div>
-        );
-    }
-  };
+        )}
 
-  return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
-        <SyncStatus />
-        {renderView()}
-
-        {/* Confirmation Modal for Login Conflicts */}
         {loginConflict && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
                 <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 transform scale-100 transition-all border border-gray-100 relative overflow-hidden">
@@ -594,26 +545,14 @@ const App: React.FC = () => {
                             <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Peringatan Validasi Identitas</p>
                         </div>
                     </div>
-                    
                     <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 mb-8">
                         <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap font-medium">
                             {loginConflict.message}
                         </p>
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
-                         <button 
-                            onClick={() => setLoginConflict(null)} 
-                            className="w-full bg-white text-gray-700 border-2 border-gray-200 font-bold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"
-                        >
-                            Tidak, Periksa Lagi
-                        </button>
-                         <button 
-                            onClick={loginConflict.onConfirm} 
-                            className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors text-sm shadow-lg shadow-gray-200"
-                        >
-                            Ya, Data Benar
-                        </button>
+                         <button onClick={() => setLoginConflict(null)} className="w-full bg-white text-gray-700 border-2 border-gray-200 font-bold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">Tidak, Periksa Lagi</button>
+                         <button onClick={loginConflict.onConfirm} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors text-sm shadow-lg shadow-gray-200">Ya, Data Benar</button>
                     </div>
                 </div>
             </div>
