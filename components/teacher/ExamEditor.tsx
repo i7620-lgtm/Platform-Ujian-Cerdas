@@ -41,6 +41,7 @@ const SUBJECTS = [
     "KKA",
     "Lainnya",
     "Matematika",
+    "Matematika Lanjut",
     "Muatan Lokal",
     "Pendidikan Pancasila",
     "PJOK",
