@@ -9,7 +9,6 @@ import {
     CalendarDaysIcon,
     XMarkIcon,
     PencilIcon,
-    CogIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
