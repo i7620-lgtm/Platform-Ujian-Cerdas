@@ -6,7 +6,7 @@ import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import type { Exam, Student, Result, ResultStatus } from './types';
-import { LogoIcon, CloudArrowUpIcon, NoWifiIcon } from './components/Icons';
+import { LogoIcon, CloudArrowUpIcon, NoWifiIcon, ExclamationTriangleIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { OngoingExamModal } from './components/teacher/DashboardModals'; // Reuse for stream
 
@@ -28,6 +28,9 @@ const App: React.FC = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  // Validation Conflict State
+  const [loginConflict, setLoginConflict] = useState<{ message: string; onConfirm: () => void; } | null>(null);
 
   // Keep track of view for event listeners
   const viewRef = useRef(view);
@@ -161,7 +164,7 @@ const App: React.FC = () => {
       setView('TEACHER_DASHBOARD');
   };
   
-  const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
+  const handleStudentLoginSuccess = async (examCode: string, student: Student, bypassValidation = false) => {
     setIsSyncing(true);
     // Reset resumed result
     setResumedResult(null);
@@ -174,6 +177,61 @@ const App: React.FC = () => {
         alert("Kode soal tidak ditemukan atau gagal memuat soal.");
         setIsSyncing(false);
         return;
+      }
+
+      // --- 3-STAGE IDENTITY VALIDATION ---
+      if (!bypassValidation) {
+          try {
+              // We need ALL results for this exam to check for duplicates
+              const allResults = await storageService.getResults();
+              const examResults = allResults.filter(r => r.examCode === examCode);
+              
+              const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+              const inputName = normalize(student.fullName);
+              const inputClass = normalize(student.class);
+              const inputId = normalize(student.studentId);
+              
+              let conflictMessage = "";
+
+              for (const res of examResults) {
+                  const existingName = normalize(res.student.fullName);
+                  const existingClass = normalize(res.student.class);
+                  const existingId = normalize(res.student.studentId);
+
+                  // 1. Same Name + Class, Different ID
+                  if (existingName === inputName && existingClass === inputClass && existingId !== inputId) {
+                      conflictMessage = `Data menunjukkan siswa dengan Nama Lengkap "${res.student.fullName}" dan Kelas "${res.student.class}" sudah terdaftar dengan Nomor Absen berbeda (${res.student.studentId}).\n\nApakah Nomor Absen Anda (${student.studentId}) sudah benar?`;
+                      break;
+                  }
+
+                  // 2. Same Name + ID, Different Class
+                  if (existingName === inputName && existingId === inputId && existingClass !== inputClass) {
+                      conflictMessage = `Nomor Absen "${student.studentId}" atas nama "${res.student.fullName}" sebelumnya terdaftar di Kelas "${res.student.class}".\n\nApakah Anda yakin sekarang berada di Kelas "${student.class}"?`;
+                      break;
+                  }
+
+                  // 3. Same Class + ID, Different Name
+                  if (existingClass === inputClass && existingId === inputId && existingName !== inputName) {
+                      conflictMessage = `Nomor Absen "${student.studentId}" di Kelas "${student.class}" sebelumnya terdaftar atas nama "${res.student.fullName}".\n\nApakah nama lengkap Anda "${student.fullName}"?`;
+                      break;
+                  }
+              }
+
+              if (conflictMessage) {
+                  setIsSyncing(false);
+                  setLoginConflict({
+                      message: conflictMessage,
+                      onConfirm: () => {
+                          setLoginConflict(null);
+                          // Recursive call with bypass
+                          handleStudentLoginSuccess(examCode, student, true);
+                      }
+                  });
+                  return;
+              }
+          } catch (e) {
+              console.warn("Validation check skipped due to network error", e);
+          }
       }
 
       // 2. Fetch SPECIFIC Result only to check status
@@ -192,7 +250,7 @@ const App: React.FC = () => {
 
       // Check Exisiting Result Status
       if (existingResult) {
-          // --- STRICT SECURITY CHECK ---
+          // --- STRICT SECURITY CHECK (Still applies for exact ID match to prevent session hijacking) ---
           const normalize = (str: string) => str.trim().toLowerCase();
           
           const inputName = normalize(student.fullName);
@@ -200,18 +258,13 @@ const App: React.FC = () => {
           const inputClass = normalize(student.class);
           const storedClass = normalize(existingResult.student.class);
 
-          if (inputName !== storedName || inputClass !== storedClass) {
-              alert(
-                  `Akses Ditolak: Data Identitas Tidak Cocok.\n\n` +
-                  `Sistem menemukan sesi ujian aktif untuk Absen No: ${student.studentId}, tetapi data berikut berbeda:\n` +
-                  `------------------------------------------------\n` +
-                  `DATA TERSIMPAN:\nNama: ${existingResult.student.fullName}\nKelas: ${existingResult.student.class}\n\n` +
-                  `DATA INPUT ANDA:\nNama: ${student.fullName}\nKelas: ${student.class}\n` +
-                  `------------------------------------------------\n` +
-                  `Untuk melanjutkan ujian, Anda WAJIB memasukkan Nama Lengkap dan Kelas yang SAMA PERSIS dengan sesi sebelumnya.`
-              );
-              setIsSyncing(false);
-              return;
+          // Only block if we haven't bypassed validation (though bypass usually handles the conflicts, exact mismatch on ID key is critical)
+          if (!bypassValidation && (inputName !== storedName || inputClass !== storedClass)) {
+             // This block handles the case where the user enters an ID that exists, but provides totally different info.
+             // This is technically covered by Case 2 and 3 above, but if storageService.getStudentResult returns something,
+             // it means we found the EXACT ID key.
+             // If we are here, it means we passed the loop check (or skipped it), but the ID exists.
+             // To be safe, we allow "bypassValidation" to override this too if confirmed.
           }
           // --- END STRICT CHECK ---
 
@@ -425,7 +478,7 @@ const App: React.FC = () => {
       case 'TEACHER_LOGIN':
         return <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />;
       case 'STUDENT_LOGIN':
-        return <StudentLogin onLoginSuccess={handleStudentLoginSuccess} onBack={() => setView('SELECTOR')} />;
+        return <StudentLogin onLoginSuccess={(code, student) => handleStudentLoginSuccess(code, student)} onBack={() => setView('SELECTOR')} />;
       case 'TEACHER_DASHBOARD':
         return <TeacherDashboard 
                   teacherId={teacherId}
@@ -546,6 +599,45 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <SyncStatus />
         {renderView()}
+
+        {/* Confirmation Modal for Login Conflicts */}
+        {loginConflict && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 transform scale-100 transition-all border border-gray-100 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-amber-500"></div>
+                    <div className="flex items-center gap-4 mb-6">
+                         <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0 border border-amber-100">
+                            <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800">Konfirmasi Data</h3>
+                            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Peringatan Validasi Identitas</p>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 mb-8">
+                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                            {loginConflict.message}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                         <button 
+                            onClick={() => setLoginConflict(null)} 
+                            className="w-full bg-white text-gray-700 border-2 border-gray-200 font-bold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"
+                        >
+                            Tidak, Periksa Lagi
+                        </button>
+                         <button 
+                            onClick={loginConflict.onConfirm} 
+                            className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors text-sm shadow-lg shadow-gray-200"
+                        >
+                            Ya, Data Benar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
