@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
+import type { TeacherProfile } from '../types';
 
 declare global {
     interface Window {
@@ -9,7 +10,7 @@ declare global {
 }
 
 interface TeacherLoginProps {
-  onLoginSuccess: (teacherId: string) => void;
+  onLoginSuccess: (profile: TeacherProfile) => void;
   onBack: () => void;
 }
 
@@ -80,7 +81,13 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
 
           const data = await res.json();
           if (res.ok && data.success) {
-              onLoginSuccess(data.username);
+              onLoginSuccess({
+                  id: data.username,
+                  fullName: data.fullName,
+                  accountType: data.accountType,
+                  school: data.school,
+                  avatarUrl: data.avatar
+              });
           } else {
               setError(data.error || 'Gagal login dengan Google.');
           }
@@ -110,7 +117,12 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
         const data = await res.json();
 
         if (res.ok && data.success) {
-            onLoginSuccess(data.username);
+            onLoginSuccess({
+                id: data.username,
+                fullName: data.fullName,
+                accountType: data.accountType,
+                school: data.school
+            });
         } else {
             setError(data.error || 'ID Guru atau Password salah.');
         }
