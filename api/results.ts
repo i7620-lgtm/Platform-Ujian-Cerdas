@@ -54,8 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (req.method === 'GET') {
             try {
-                // Using 'results' table
-                const result = await db.query(`
+                // Using 'results' table with optional filtering
+                const { code } = req.query;
+                
+                let query = `
                     SELECT 
                         exam_code,
                         student_id,
@@ -71,8 +73,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         timestamp,
                         location
                     FROM results 
-                    ORDER BY timestamp DESC
-                `);
+                `;
+
+                const params: any[] = [];
+                
+                if (code) {
+                    query += ` WHERE exam_code = $1`;
+                    params.push(code);
+                }
+
+                query += ` ORDER BY timestamp DESC`;
+
+                const result = await db.query(query, params);
 
                 const formatted = result?.rows.map((row: any) => ({
                     examCode: row.exam_code,
