@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
 import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, PlusCircleIcon } from '../Icons';
 import { storageService } from '../../services/storage';
+import { RemainingTime } from './DashboardViews';
 
 // --- UTILITY GLOBAL ---
 const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -347,8 +348,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                         <span className="font-mono text-slate-400">Kode:</span>
                                         <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border border-slate-200 font-bold font-mono tracking-wide">{exam.code}</span>
                                         <span className="hidden sm:inline text-slate-300">•</span>
+                                        {/* Added Timer Here */}
+                                        <RemainingTime exam={exam} minimal={false} />
+                                        
+                                        <span className="hidden sm:inline text-slate-300 ml-1">•</span>
                                         <span className="flex items-center gap-1">
-                                            <ClockIcon className="w-3.5 h-3.5 text-slate-400"/> {lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                            Sync: {lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
                                         </span>
                                         {isRefreshing && <span className="text-blue-600 animate-pulse font-bold ml-1 text-[10px] bg-blue-50 px-2 py-0.5 rounded-full">Syncing...</span>}
                                     </div>
