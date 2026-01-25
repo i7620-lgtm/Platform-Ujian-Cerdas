@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Exam, Question, ExamConfig, Result } from '../types';
+import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
     CheckCircleIcon, 
     ChartBarIcon, 
@@ -8,7 +8,8 @@ import {
     ClockIcon,
     CalendarDaysIcon,
     XMarkIcon,
-    PencilIcon
+    PencilIcon,
+    CogIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
@@ -16,7 +17,7 @@ import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, D
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 
 interface TeacherDashboardProps {
-    teacherId: string;
+    teacherProfile: TeacherProfile; // Updated from teacherId string
     addExam: (newExam: Exam) => void;
     updateExam: (updatedExam: Exam) => void;
     deleteExam: (code: string) => Promise<void>;
@@ -31,7 +32,7 @@ interface TeacherDashboardProps {
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    teacherId, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
+    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     
@@ -68,13 +69,22 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
 
+    // School Profile State
+    const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
+    const [schoolNameInput, setSchoolNameInput] = useState(teacherProfile.school || '');
+
+    // Force School Modal on first login if empty
+    useEffect(() => {
+        if (!teacherProfile.school) {
+            setIsSchoolModalOpen(true);
+        }
+    }, [teacherProfile.school]);
+
     // --- LAZY FETCHING LOGIC ---
     useEffect(() => {
-        // Always fetch exams when dashboard mounts or view changes to a list view
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
             onRefreshExams();
         }
-        
         if (view === 'ONGOING' || view === 'FINISHED_EXAMS') {
             onRefreshResults();
         }
@@ -87,13 +97,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     };
 
     const handleSaveExam = (status: 'PUBLISHED' | 'DRAFT') => {
-        // Validasi hanya jika PUBLISH. Kalau Draft, boleh longgar.
         if (status === 'PUBLISHED' && questions.length === 0) {
-            alert("Tidak ada soal. Silakan buat atau unggah soal terlebih dahulu sebelum mempublikasikan.");
+            alert("Tidak ada soal. Silakan buat atau unggah soal terlebih dahulu.");
             return;
         }
         
-        // LOGIC REVISI: Kode hanya digenerate saat KLIK SIMPAN pertama kali
+        // Ensure School is set before saving
+        if (!teacherProfile.school) {
+            setIsSchoolModalOpen(true);
+            return;
+        }
+
         const code = editingExam ? editingExam.code : generateExamCode();
         
         const now = new Date();
@@ -104,7 +118,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         const examData: Exam = {
             code,
-            authorId: teacherId || 'ANONYMOUS_TEACHER',
+            authorId: teacherProfile.id || 'ANONYMOUS_TEACHER',
+            authorSchool: teacherProfile.school, // Save School Context
             questions, 
             config,
             createdAt: editingExam?.createdAt || String(readableDate),
@@ -122,10 +137,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             }
         } else {
             addExam(examData); 
-            // PENTING: Set editingExam ke data baru agar jika user klik simpan lagi,
-            // dia tidak membuat draf baru dengan kode berbeda, tapi mengupdate yang ini.
             setEditingExam(examData); 
-            
             if (status === 'DRAFT') {
                 alert("Disimpan ke Draf.");
             } else {
@@ -141,37 +153,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             : `Apakah Anda yakin ingin menghapus ujian "${exam.code}"? Seluruh data hasil pengerjaan siswa untuk ujian ini juga akan terhapus secara permanen.`;
 
         if(confirm(confirmMsg)) {
-            // Kita bungkus pemanggilan deleteExam (string) di dalam fungsi yang menerima Exam
             deleteExam(exam.code);
         }
     };
 
     const handleDuplicateExam = (exam: Exam) => {
         if (!confirm(`Gunakan kembali soal dari ujian "${exam.code}" untuk sesi baru?`)) return;
-
-        // Reset state editor dengan data dari exam yang dipilih
         setQuestions(exam.questions);
-        
-        // Reset konfigurasi waktu ke default "Sekarang/Besok" agar valid
         setConfig({
             ...exam.config,
             date: new Date().toISOString().split('T')[0],
             startTime: '08:00',
         });
-
-        // Set mode ke manual agar editor muncul
         setManualMode(true);
-        // Pastikan editingExam NULL agar saat disimpan membuat entri BARU dengan kode unik
         setEditingExam(null);
         setGeneratedCode('');
-        
-        // Pindah view
         setView('UPLOAD');
-        // Trigger reset key untuk refresh komponen CreationView (opsional)
         setResetKey(prev => prev + 1);
-
-        // Feedback
-        alert('Soal berhasil disalin ke editor! Silakan sesuaikan tanggal dan pengaturan lainnya sebelum menyimpan.');
+        alert('Soal berhasil disalin ke editor!');
     };
 
     const resetForm = () => {
@@ -214,17 +213,37 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setEditingExam(exam);
         setQuestions(exam.questions);
         setConfig(exam.config);
-        // Switch to Upload/Editor view but in "editing" mode (essentially manual mode populated)
         setManualMode(true); 
         setView('UPLOAD');
     };
 
-    // New handler to immediately reflect changes (like time extension) in the Dashboard UI
     const handleExamUpdate = (updatedExam: Exam) => {
-        // Just calling updateExam might trigger a remote save which is redundant 
-        // if the modal already saved it, but it ensures local state `exams` is consistent.
-        // We use a custom local update logic here to be safe and fast.
         updateExam(updatedExam);
+    };
+
+    const handleSaveSchool = async () => {
+        if (!schoolNameInput.trim()) return alert("Nama sekolah tidak boleh kosong");
+        
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    action: 'update-profile',
+                    username: teacherProfile.id,
+                    school: schoolNameInput
+                })
+            });
+            if (res.ok) {
+                // Force page reload or update context (simplest is reload to refetch context)
+                // Ideally update parent state, but a reload ensures strict consistency
+                window.location.reload(); 
+            } else {
+                alert("Gagal menyimpan profil.");
+            }
+        } catch(e) {
+            alert("Terjadi kesalahan koneksi.");
+        }
     };
 
     // -- Computed Data for Views --
@@ -264,16 +283,41 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         <div className="min-h-screen bg-base-200">
             <header className="bg-base-100 shadow-sm sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="py-4 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-neutral">Dashboard Guru <span className="text-sm font-normal text-gray-500 ml-2">({teacherId})</span></h1>
-                        <div className="flex items-center gap-4">
+                    <div className="py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-bold text-neutral">Dashboard Guru</h1>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                                    teacherProfile.accountType === 'super_admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                    teacherProfile.accountType === 'admin' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                    'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}>
+                                    {teacherProfile.accountType.replace('_', ' ')}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm font-medium text-gray-500">{teacherProfile.fullName}</span>
+                                {teacherProfile.school && (
+                                    <>
+                                        <span className="text-gray-300">•</span>
+                                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                            {teacherProfile.school}
+                                        </span>
+                                    </>
+                                )}
+                                <button onClick={() => setIsSchoolModalOpen(true)} className="text-gray-400 hover:text-indigo-600" title="Edit Sekolah">
+                                    <PencilIcon className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 self-end md:self-auto">
                             <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary font-semibold">
                                 <LogoutIcon className="w-5 h-5"/>
                                 Logout
                             </button>
                         </div>
                     </div>
-                    <nav className="flex border-b -mb-px overflow-x-auto whitespace-nowrap">
+                    <nav className="flex border-b -mb-px overflow-x-auto whitespace-nowrap mt-2">
                          <button onClick={() => setView('UPLOAD')} className={`px-4 sm:px-6 py-3 text-sm font-medium flex items-center gap-2 transition-colors border-b-2 flex-shrink-0 ${view === 'UPLOAD' ? 'border-primary text-primary' : 'text-gray-500 hover:text-gray-700 border-transparent'}`}>
                             <CheckCircleIcon className="w-5 h-5"/> Buat Ujian
                         </button>
@@ -302,7 +346,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 setQuestions={setQuestions}
                                 config={config}
                                 setConfig={setConfig}
-                                isEditing={!!editingExam && editingExam.status !== 'DRAFT'} // Jika draft, anggap seperti buat baru tapi pre-filled
+                                isEditing={!!editingExam && editingExam.status !== 'DRAFT'} 
                                 onSave={() => handleSaveExam('PUBLISHED')}
                                 onSaveDraft={() => handleSaveExam('DRAFT')}
                                 onCancel={() => {
@@ -367,7 +411,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 onClose={() => setSelectedFinishedExam(null)}
             />
 
-            {/* EDIT EXAM MODAL (FOR PUBLISHED EXAMS) */}
+            {/* EDIT EXAM MODAL */}
             {isEditModalOpen && editingExam && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in">
                     <div className="bg-base-200 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -393,6 +437,50 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* SCHOOL PROFILE MODAL (FORCED IF EMPTY) */}
+            {isSchoolModalOpen && (
+                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in">
+                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-purple-600"></div>
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <PencilIcon className="w-8 h-8 text-indigo-600" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-800">Lengkapi Profil</h2>
+                            <p className="text-sm text-slate-500 mt-2">
+                                Masukkan nama sekolah Anda untuk memulai. Data ini digunakan untuk mengelola akses ujian.
+                            </p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Nama Sekolah</label>
+                                <input 
+                                    type="text" 
+                                    value={schoolNameInput}
+                                    onChange={(e) => setSchoolNameInput(e.target.value)}
+                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800 placeholder-slate-300"
+                                    placeholder="Contoh: SMA Negeri 1 Jakarta"
+                                    autoFocus
+                                />
+                            </div>
+                            <button 
+                                onClick={handleSaveSchool}
+                                className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-black transition-all shadow-lg active:scale-95"
+                            >
+                                Simpan & Lanjutkan
+                            </button>
+                            {/* Only allow close if profile already has school (editing mode) */}
+                            {teacherProfile.school && (
+                                <button onClick={() => setIsSchoolModalOpen(false)} className="w-full text-slate-400 font-bold text-xs hover:text-slate-600 py-2">
+                                    Batal
+                                </button>
+                            )}
+                        </div>
+                     </div>
+                 </div>
             )}
         </div>
     );
