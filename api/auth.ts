@@ -15,18 +15,26 @@ const ensureAuthSchema = async () => {
                 full_name TEXT,
                 auth_provider TEXT DEFAULT 'local',
                 avatar_url TEXT,
+                account_type TEXT DEFAULT 'normal',
+                school TEXT DEFAULT '',
                 created_at BIGINT
             );
         `);
 
-        // Seed Default Guru jika belum ada
+        // Migration for existing tables
+        try {
+            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT DEFAULT 'normal';`);
+            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS school TEXT DEFAULT '';`);
+        } catch (e) { /* ignore if exists */ }
+
+        // Seed Default Guru jika belum ada (Super Admin)
         const seedCheck = await db.query("SELECT username FROM users WHERE username = 'guru'");
         if (seedCheck.rows.length === 0) {
             console.log("Seeding default guru user...");
             await db.query(`
-                INSERT INTO users (username, password, full_name, auth_provider, created_at)
-                VALUES ($1, $2, $3, $4, $5)
-            `, ['guru', 'guru123', 'Guru Utama', 'local', Date.now()]);
+                INSERT INTO users (username, password, full_name, auth_provider, account_type, school, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `, ['guru', 'guru123', 'Guru Utama', 'local', 'super_admin', 'Sekolah Pusat', Date.now()]);
         }
         
         isTableInitialized = true;
@@ -54,15 +62,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!username || !password) return res.status(400).json({ error: 'Data tidak lengkap' });
 
             const result = await db.query(
-                "SELECT username, full_name FROM users WHERE username = $1 AND password = $2 AND auth_provider = 'local'",
+                "SELECT username, full_name, account_type, school, avatar_url FROM users WHERE username = $1 AND password = $2 AND auth_provider = 'local'",
                 [username, password]
             );
 
             if (result.rows.length > 0) {
+                const user = result.rows[0];
                 return res.status(200).json({ 
                     success: true, 
-                    username: result.rows[0].username,
-                    fullName: result.rows[0].full_name 
+                    username: user.username,
+                    fullName: user.full_name,
+                    accountType: user.account_type || 'normal',
+                    school: user.school || ''
                 });
             } else {
                 return res.status(401).json({ success: false, error: 'Username atau Password salah.' });
@@ -74,8 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { token } = req.body;
             if (!token) return res.status(400).json({ error: 'Token Google diperlukan' });
 
-            // Verifikasi Token ke Google (Server-side Validation)
-            // Menggunakan endpoint publik Google untuk validasi JWT tanpa library berat
+            // Verifikasi Token ke Google
             const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
             
             if (!googleRes.ok) {
@@ -91,26 +101,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // Cek apakah user sudah ada
             const userCheck = await db.query("SELECT * FROM users WHERE username = $1", [email]);
+            let userData;
 
             if (userCheck.rows.length === 0) {
-                // Buat User Baru dari Data Google
+                // Buat User Baru (Default: normal, school: empty)
                 await db.query(`
-                    INSERT INTO users (username, password, full_name, auth_provider, avatar_url, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                `, [email, '', name, 'google', picture, Date.now()]);
+                    INSERT INTO users (username, password, full_name, auth_provider, avatar_url, account_type, school, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `, [email, '', name, 'google', picture, 'normal', '', Date.now()]);
                 
-                console.log(`Created new Google user: ${email}`);
+                userData = {
+                    username: email,
+                    full_name: name,
+                    account_type: 'normal',
+                    school: '',
+                    avatar_url: picture
+                };
             } else {
-                // Update avatar/nama jika perlu (opsional)
-                // Disini kita biarkan saja, hanya login
+                userData = userCheck.rows[0];
             }
 
             return res.status(200).json({ 
                 success: true, 
-                username: email,
-                fullName: name,
-                avatar: picture
+                username: userData.username,
+                fullName: userData.full_name,
+                avatar: userData.avatar_url,
+                accountType: userData.account_type || 'normal',
+                school: userData.school || ''
             });
+        }
+
+        // --- UPDATE PROFILE (SCHOOL) ---
+        else if (action === 'update-profile') {
+            const { username, school } = req.body;
+            if (!username || !school) return res.status(400).json({ error: 'Data tidak lengkap' });
+
+            await db.query(
+                "UPDATE users SET school = $1 WHERE username = $2",
+                [school, username]
+            );
+
+            return res.status(200).json({ success: true, school });
         }
 
         return res.status(400).json({ error: 'Action not recognized' });
