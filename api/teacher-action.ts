@@ -86,7 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             student: {
                 studentId: row.student_id,
                 fullName: row.student_name,
-                class: row.student_class
+                class: row.student_class,
+                absentNumber: row.student_absent_number || ''
             },
             answers: JSON.parse(row.answers || '{}'),
             score: row.score,
