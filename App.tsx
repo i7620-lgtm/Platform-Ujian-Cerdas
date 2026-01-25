@@ -137,6 +137,7 @@ const App: React.FC = () => {
                     const dummyStudent: Student = {
                         fullName: "Mode Preview",
                         class: "Guru",
+                        absentNumber: "00",
                         studentId: "PREVIEW-" + Date.now().toString().slice(-4)
                     };
                     setCurrentExam(exam);
@@ -189,30 +190,26 @@ const App: React.FC = () => {
               const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
               const inputName = normalize(student.fullName);
               const inputClass = normalize(student.class);
-              const inputId = normalize(student.studentId);
+              const inputAbsent = normalize(student.absentNumber);
               
               let conflictMessage = "";
 
               for (const res of examResults) {
                   const existingName = normalize(res.student.fullName);
                   const existingClass = normalize(res.student.class);
-                  const existingId = normalize(res.student.studentId);
+                  // Check existing absent number. If stored in old format, ID might act as number, but we prefer proper field
+                  const existingAbsent = normalize(res.student.absentNumber || ''); 
 
-                  // 1. Same Name + Class, Different ID
-                  if (existingName === inputName && existingClass === inputClass && existingId !== inputId) {
-                      conflictMessage = `Data menunjukkan siswa dengan Nama Lengkap "${res.student.fullName}" dan Kelas "${res.student.class}" sudah terdaftar dengan Nomor Absen berbeda (${res.student.studentId}).\n\nApakah Nomor Absen Anda (${student.studentId}) sudah benar?`;
+                  // 1. Same Name + Class, Different Absent Number
+                  if (existingName === inputName && existingClass === inputClass && existingAbsent !== inputAbsent && existingAbsent !== '') {
+                      conflictMessage = `Data menunjukkan siswa dengan Nama Lengkap "${res.student.fullName}" dan Kelas "${res.student.class}" sudah terdaftar dengan Nomor Absen berbeda (${res.student.absentNumber}).\n\nApakah Nomor Absen Anda (${student.absentNumber}) sudah benar?`;
                       break;
                   }
 
-                  // 2. Same Name + ID, Different Class
-                  if (existingName === inputName && existingId === inputId && existingClass !== inputClass) {
-                      conflictMessage = `Nomor Absen "${student.studentId}" atas nama "${res.student.fullName}" sebelumnya terdaftar di Kelas "${res.student.class}".\n\nApakah Anda yakin sekarang berada di Kelas "${student.class}"?`;
-                      break;
-                  }
-
-                  // 3. Same Class + ID, Different Name
-                  if (existingClass === inputClass && existingId === inputId && existingName !== inputName) {
-                      conflictMessage = `Nomor Absen "${student.studentId}" di Kelas "${student.class}" sebelumnya terdaftar atas nama "${res.student.fullName}".\n\nApakah nama lengkap Anda "${student.fullName}"?`;
+                  // 2. Same Class + Absent Number, Different Name (COLLISION CHECK)
+                  // Crucial: Since we now use composite IDs, this ensures two students don't use the same "seat".
+                  if (existingClass === inputClass && existingAbsent === inputAbsent && existingName !== inputName && existingAbsent !== '') {
+                      conflictMessage = `Nomor Absen "${student.absentNumber}" di Kelas "${student.class}" sebelumnya terdaftar atas nama "${res.student.fullName}".\n\nApakah nama lengkap Anda "${student.fullName}"?`;
                       break;
                   }
               }
@@ -235,6 +232,7 @@ const App: React.FC = () => {
       }
 
       // 2. Fetch SPECIFIC Result only to check status
+      // Note: student.studentId is now unique per name-class-number.
       const existingResult = await storageService.getStudentResult(examCode, student.studentId);
       
       const now = new Date();
@@ -250,24 +248,6 @@ const App: React.FC = () => {
 
       // Check Exisiting Result Status
       if (existingResult) {
-          // --- STRICT SECURITY CHECK (Still applies for exact ID match to prevent session hijacking) ---
-          const normalize = (str: string) => str.trim().toLowerCase();
-          
-          const inputName = normalize(student.fullName);
-          const storedName = normalize(existingResult.student.fullName);
-          const inputClass = normalize(student.class);
-          const storedClass = normalize(existingResult.student.class);
-
-          // Only block if we haven't bypassed validation (though bypass usually handles the conflicts, exact mismatch on ID key is critical)
-          if (!bypassValidation && (inputName !== storedName || inputClass !== storedClass)) {
-             // This block handles the case where the user enters an ID that exists, but provides totally different info.
-             // This is technically covered by Case 2 and 3 above, but if storageService.getStudentResult returns something,
-             // it means we found the EXACT ID key.
-             // If we are here, it means we passed the loop check (or skipped it), but the ID exists.
-             // To be safe, we allow "bypassValidation" to override this too if confirmed.
-          }
-          // --- END STRICT CHECK ---
-
           if (existingResult.status === 'force_submitted') {
               setCurrentExam(exam);
               setCurrentStudent(student);
