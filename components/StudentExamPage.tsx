@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
 import { ClockIcon, CheckCircleIcon, ListBulletIcon, ArrowLeftIcon, ArrowPathIcon } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -79,59 +80,21 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
-        // 1. Process Alignment Blocks
+        // 1. Process Rich Text (Bold, Italic, Del, Underline)
         let processedText = content
-            .replace(/:::left([\s\S]+?):::/g, '<div class="text-left">$1</div>')
-            .replace(/:::center([\s\S]+?):::/g, '<div class="text-center">$1</div>')
-            .replace(/:::right([\s\S]+?):::/g, '<div class="text-right">$1</div>')
-            .replace(/:::justify([\s\S]+?):::/g, '<div class="text-justify">$1</div>');
-
-        // 2. Process Rich Text (Bold, Italic, Del, Underline)
-        processedText = processedText
             .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
             .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
             .replace(/<u>([\s\S]+?)<\/u>/g, '<u>$1</u>');
 
-        // 3. Process Tables
+        // 2. Accurate List Parsing (Line by line)
         const lines = processedText.split('\n');
         let finalHtmlChunks = [];
         let inUl = false;
         let inOl = false;
-        let inTable = false;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            
-            // Check for Table Row
-            if (line.startsWith('|') && line.endsWith('|')) {
-                if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
-                if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                
-                if (!inTable) {
-                    finalHtmlChunks.push('<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-slate-200 text-sm">');
-                    inTable = true;
-                }
-                
-                // Detection for separator row |---|---|
-                if (line.match(/^\|[\s\-\|:]+\|$/)) {
-                    continue; 
-                }
-
-                const cells = line.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-                const isHeader = i === 0 || (lines[i+1] && lines[i+1].trim().match(/^\|[\s\-\|:]+\|$/));
-                
-                finalHtmlChunks.push(`<tr class="${isHeader ? 'bg-slate-50 font-bold' : 'hover:bg-slate-50'}">`);
-                cells.forEach(cell => {
-                    finalHtmlChunks.push(`<${isHeader ? 'th' : 'td'} class="border border-slate-200 px-4 py-2">${cell.trim()}</${isHeader ? 'th' : 'td'}>`);
-                });
-                finalHtmlChunks.push('</tr>');
-                continue;
-            } else if (inTable) {
-                finalHtmlChunks.push('</table></div>');
-                inTable = false;
-            }
-
+            const line = lines[i];
             const bulletMatch = line.match(/^\s*-\s+(.*)/);
             const numberedMatch = line.match(/^\s*\d+[\.\)]\s+(.*)/);
 
@@ -146,16 +109,15 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
             } else {
                 if (inUl) { finalHtmlChunks.push('</ul>'); inUl = false; }
                 if (inOl) { finalHtmlChunks.push('</ol>'); inOl = false; }
-                finalHtmlChunks.push(line === '' ? '<div class="h-2"></div>' : line + '<br/>');
+                finalHtmlChunks.push(line.trim() === '' ? '<div class="h-2"></div>' : line + '<br/>');
             }
         }
         if (inUl) finalHtmlChunks.push('</ul>');
         if (inOl) finalHtmlChunks.push('</ol>');
-        if (inTable) finalHtmlChunks.push('</table></div>');
 
         let html = finalHtmlChunks.join('');
 
-        // 4. KaTeX Rendering
+        // 3. KaTeX Rendering
         if (html.includes('$') && (window as any).katex) {
             html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
                 return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
@@ -448,6 +410,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set());
+    const [isTimeExtended, setIsTimeExtended] = useState(false); // New state for notification
+
+    // Use state for config to allow dynamic updates
+    const [currentConfig, setCurrentConfig] = useState(exam.config);
 
     const endTimeRef = useRef<number>(0);
     const [timeLeft, setTimeLeft] = useState(0);
@@ -466,7 +432,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
     useEffect(() => {
-        if (!onUpdate || exam.config.autoSaveInterval <= 0) return;
+        if (!onUpdate || currentConfig.autoSaveInterval <= 0) return;
 
         const intervalId = setInterval(() => {
             if (!isSubmitting) {
@@ -474,39 +440,43 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 activityQueueRef.current = [];
                 onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
             }
-        }, exam.config.autoSaveInterval * 1000);
+        }, currentConfig.autoSaveInterval * 1000);
 
         return () => clearInterval(intervalId);
-    }, [exam.config.autoSaveInterval, isSubmitting, onUpdate]);
+    }, [currentConfig.autoSaveInterval, isSubmitting, onUpdate]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden) {
-                if (exam.config.detectBehavior && !isSubmitting) {
+                if (currentConfig.detectBehavior && !isSubmitting) {
                     logActivity("Meninggalkan halaman ujian (Tab/Aplikasi disembunyikan).");
                     const logsToSend = [...activityQueueRef.current];
                     activityQueueRef.current = []; 
-                    if (exam.config.continueWithPermission) {
+                    if (currentConfig.continueWithPermission) {
                         setIsSubmitting(true);
                         onForceSubmit(answersRef.current, timeLeftRef.current, logsToSend);
                     } else if (onUpdate) {
                         onUpdate(answersRef.current, timeLeftRef.current, undefined, logsToSend);
                     }
                 }
-            } else if (exam.config.detectBehavior && !isSubmitting) {
+            } else if (currentConfig.detectBehavior && !isSubmitting) {
                 logActivity("Kembali ke halaman ujian.");
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [exam.config.detectBehavior, exam.config.continueWithPermission, onForceSubmit, onUpdate, isSubmitting]);
+    }, [currentConfig.detectBehavior, currentConfig.continueWithPermission, onForceSubmit, onUpdate, isSubmitting]);
+
+    // TIMER LOGIC & INITIAL CALC
+    const calculateEndTime = useCallback((config: typeof currentConfig) => {
+        const dateStr = config.date.includes('T') ? config.date.split('T')[0] : config.date;
+        const startObj = new Date(`${dateStr}T${config.startTime}`);
+        return startObj.getTime() + (config.timeLimit * 60 * 1000);
+    }, []);
 
     useEffect(() => {
-        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const startObj = new Date(`${dateStr}T${exam.config.startTime}`);
-        const endObj = new Date(startObj.getTime() + (exam.config.timeLimit * 60 * 1000));
-        endTimeRef.current = endObj.getTime();
+        endTimeRef.current = calculateEndTime(currentConfig);
 
         const tick = () => {
             if (isSubmitting) return;
@@ -522,7 +492,33 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         };
         const timer = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(timer);
-    }, [exam, isSubmitting]);
+    }, [isSubmitting, currentConfig, calculateEndTime]); // Re-run if config changes
+
+    // --- POLLING FOR CONFIG UPDATES (TIME EXTENSION) ---
+    useEffect(() => {
+        // Poll every 30 seconds to check if config.timeLimit has changed
+        const pollInterval = setInterval(async () => {
+            if (isSubmitting || !isOnline) return;
+            
+            try {
+                // Fetch public exam data to get potentially updated config
+                const updatedExam = await storageService.getExamForStudent(exam.code, false);
+                
+                if (updatedExam && updatedExam.config.timeLimit !== currentConfig.timeLimit) {
+                    // Time limit changed!
+                    logActivity(`Waktu ujian diperbarui oleh guru menjadi ${updatedExam.config.timeLimit} menit.`);
+                    setCurrentConfig(prev => ({ ...prev, timeLimit: updatedExam.config.timeLimit }));
+                    setIsTimeExtended(true);
+                    setTimeout(() => setIsTimeExtended(false), 5000); // Hide notification after 5s
+                }
+            } catch (e) {
+                console.warn("Failed to check for time updates", e);
+            }
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [exam.code, currentConfig.timeLimit, isSubmitting, isOnline]);
+
 
     useEffect(() => {
         const setOn = () => { setIsOnline(true); logActivity("Koneksi internet pulih."); };
@@ -539,7 +535,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const key = `exam_order_${exam.code}_${student.studentId}`;
         const storedOrder = localStorage.getItem(key);
         let qList = [...exam.questions];
-        if (exam.config.shuffleQuestions) {
+        if (currentConfig.shuffleQuestions) {
             if (storedOrder) {
                 try {
                     const ids = JSON.parse(storedOrder) as string[];
@@ -554,7 +550,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
         }
         return qList;
-    }, [exam]);
+    }, [exam, currentConfig.shuffleQuestions]);
 
     const handleAnswerChange = useCallback((id: string, val: string) => {
         if (isSubmitting) return;
@@ -617,7 +613,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setIsSubmitting(true);
         logActivity(isAuto ? "Waktu habis, sistem mengumpulkan jawaban otomatis." : "Siswa menekan tombol Selesai.");
         let location = "";
-        if (exam.config.trackLocation) {
+        if (currentConfig.trackLocation) {
              try {
                  const pos = await new Promise<GeolocationPosition>((res, rej) => 
                      navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000}));
@@ -635,6 +631,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-32">
+            
+            {/* Extended Time Notification Toast */}
+            {isTimeExtended && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-slide-in-up">
+                    <div className="bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3">
+                        <ClockIcon className="w-5 h-5 animate-pulse" />
+                        <span className="font-bold text-sm">Waktu Ujian Diperpanjang oleh Guru!</span>
+                    </div>
+                </div>
+            )}
+
             {/* Minimalist Header */}
             <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -644,7 +651,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                              {unansweredIds.size > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>}
                         </button>
                         <div className="hidden sm:block">
-                            <h1 className="text-sm font-bold text-slate-900 tracking-tight">{exam.config.subject || exam.code}</h1>
+                            <h1 className="text-sm font-bold text-slate-900 tracking-tight">{currentConfig.subject || exam.code}</h1>
                         </div>
                     </div>
                     
@@ -675,7 +682,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             question={q}
                             index={questions.slice(0, idx).filter(x => x.questionType !== 'INFO').length}
                             answer={answers[q.id] || ''}
-                            shuffleAnswers={exam.config.shuffleAnswers}
+                            shuffleAnswers={currentConfig.shuffleAnswers}
                             onAnswerChange={handleAnswerChange}
                             isError={unansweredIds.has(q.id)}
                         />
