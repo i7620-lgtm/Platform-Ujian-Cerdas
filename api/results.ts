@@ -20,6 +20,7 @@ const ensureSchema = async () => {
         const alterQueries = [
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_name TEXT;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_class TEXT;",
+            "ALTER TABLE results ADD COLUMN IF NOT EXISTS student_absent_number TEXT;", // New Column
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS correct_answers INTEGER;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS total_questions INTEGER;",
             "ALTER TABLE results ADD COLUMN IF NOT EXISTS status TEXT;",
@@ -60,6 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         student_id,
                         student_name,
                         student_class,
+                        student_absent_number,
                         answers,
                         score,
                         correct_answers,
@@ -77,7 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     student: {
                         studentId: row.student_id,
                         fullName: row.student_name,
-                        class: row.student_class
+                        class: row.student_class,
+                        absentNumber: row.student_absent_number || ''
                     },
                     answers: JSON.parse(row.answers || '{}'),
                     score: row.score,
