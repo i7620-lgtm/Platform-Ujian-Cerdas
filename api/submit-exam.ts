@@ -70,7 +70,8 @@ const ensureSchema = async () => {
             );
         `);
         const cols = [
-            "student_name TEXT", "student_class TEXT", "correct_answers INTEGER", 
+            "student_name TEXT", "student_class TEXT", "student_absent_number TEXT",
+            "correct_answers INTEGER", 
             "total_questions INTEGER", "status TEXT", "status_code INTEGER", 
             "activity_log TEXT", "timestamp BIGINT", "location TEXT"
         ];
@@ -153,11 +154,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const query = `
             INSERT INTO results (
-                exam_code, student_id, student_name, student_class, 
+                exam_code, student_id, student_name, student_class, student_absent_number,
                 answers, score, correct_answers, total_questions, 
                 status, status_code, activity_log, timestamp, location
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             ON CONFLICT (exam_code, student_id)
             DO UPDATE SET
                 answers = EXCLUDED.answers,
@@ -167,11 +168,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 status_code = EXCLUDED.status_code,
                 activity_log = EXCLUDED.activity_log, 
                 timestamp = EXCLUDED.timestamp, 
-                location = EXCLUDED.location;
+                location = EXCLUDED.location,
+                student_absent_number = EXCLUDED.student_absent_number;
         `;
 
         await db.query(query, [
-            examCode, student.studentId, student.fullName, student.class,
+            examCode, student.studentId, student.fullName, student.class, student.absentNumber || '',
             JSON.stringify(answers), grading.score, grading.correctCount, grading.totalQuestions,
             finalStatus, statusCode, JSON.stringify(finalActivityLog), 
             serverTimestamp, location || ''
