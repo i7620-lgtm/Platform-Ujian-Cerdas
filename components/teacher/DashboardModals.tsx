@@ -377,7 +377,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                                     <span className="text-xs text-slate-500 font-medium mt-0.5 inline-flex items-center gap-1.5">
                                                                         <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{result.student.class}</span> 
                                                                         <span className="text-slate-300">|</span> 
-                                                                        <span className="font-mono text-slate-400">Absen: {result.student.studentId}</span>
+                                                                        <span className="font-mono text-slate-400">Absen: {result.student.absentNumber || '-'}</span>
                                                                     </span>
                                                                 </div>
                                                             </td>
@@ -431,7 +431,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                                                         <h4 className="font-bold text-slate-800 text-base">{result.student.fullName}</h4>
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{result.student.class}</span>
-                                                            <span className="text-[10px] text-slate-400 font-mono">Absen: {result.student.studentId}</span>
+                                                            <span className="text-[10px] text-slate-400 font-mono">Absen: {result.student.absentNumber || '-'}</span>
                                                         </div>
                                                     </div>
                                                     <div>{renderStatusBadge(result.status || '')}</div>
@@ -598,7 +598,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, resu
                                             <td className="px-6 py-4">
                                                 <div className="font-bold text-slate-800">{r.student.fullName}</div>
                                             </td>
-                                            <td className="px-6 py-4 text-center font-mono text-xs text-slate-500">{r.student.studentId}</td>
+                                            <td className="px-6 py-4 text-center font-mono text-xs text-slate-500">{r.student.absentNumber || '-'}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{r.student.class}</span>
                                             </td>
