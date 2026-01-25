@@ -81,7 +81,7 @@ export interface Result {
 }
 
 // --- NEW TYPES FOR USER MANAGEMENT ---
-export type AccountType = 'super_admin' | 'admin' | 'normal';
+export type AccountType = 'super_admin' | 'admin' | 'guru';
 
 export interface TeacherProfile {
     id: string; // username
