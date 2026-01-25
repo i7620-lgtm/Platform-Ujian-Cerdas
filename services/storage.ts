@@ -184,14 +184,25 @@ class StorageService {
   }
 
   // --- RESULTS ---
-  async getResults(): Promise<Result[]> {
+  async getResults(examCode?: string): Promise<Result[]> {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
+    
     if (this.isOnline) {
         try {
-            // cache: no-store added
-            const response = await retryOperation(() => fetch(`${API_URL}/results`, { cache: 'no-store' }));
+            // Support filtering by code to reduce bandwidth for monitoring
+            const query = examCode ? `?code=${examCode}` : '';
+            const response = await retryOperation(() => fetch(`${API_URL}/results${query}`, { cache: 'no-store' }));
+            
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
+                
+                // Merge Strategy:
+                // We merge fetched results into the local cache. 
+                // Since partial fetching (by examCode) only returns specific results,
+                // we iterate through them and update/insert into localResults.
+                // We do NOT replace the entire localResults with cloudResults if examCode is present,
+                // because localResults might contain data for other exams needed elsewhere.
+                
                 const combined = [...localResults];
                 
                 cloudResults.forEach(cRes => {
@@ -200,7 +211,7 @@ class StorageService {
                         combined.push({ ...cRes, isSynced: true });
                     } else {
                         const local = combined[idx];
-                        // Prioritaskan status server jika timestamp lebih baru
+                        // Prioritize server status if timestamp is newer
                         if ((cRes.timestamp || 0) > (local.timestamp || 0)) {
                             combined[idx] = { ...cRes, isSynced: true };
                         }
@@ -208,9 +219,19 @@ class StorageService {
                 });
                 
                 this.saveLocal(KEYS.RESULTS, combined);
+                
+                // If specific exam requested, return filtered list from the updated cache
+                if (examCode) {
+                    return combined.filter(r => r.examCode === examCode);
+                }
                 return combined;
             }
         } catch (e) { console.warn("Offline fetching results"); }
+    }
+    
+    // Offline Fallback
+    if (examCode) {
+        return localResults.filter(r => r.examCode === examCode);
     }
     return localResults;
   }
@@ -220,7 +241,8 @@ class StorageService {
     let result = localResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
     if ((!result || result.status === 'force_submitted') && this.isOnline) {
         try {
-            const all = await this.getResults(); 
+            // Try fetching specific result (using getResults with code)
+            const all = await this.getResults(examCode); 
             result = all.find(r => r.examCode === examCode && r.student.studentId === studentId);
         } catch (e) {}
     }
