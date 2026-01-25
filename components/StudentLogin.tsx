@@ -13,7 +13,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const STORAGE_KEYS = {
       NAME: 'saved_student_fullname',
       CLASS: 'saved_student_class',
-      ID: 'saved_student_id'
+      ABSENT: 'saved_student_absent' // Changed key
   };
 
   const [examCode, setExamCode] = useState('');
@@ -21,7 +21,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // Inisialisasi state langsung dari LocalStorage (Lazy Initialization)
   const [fullName, setFullName] = useState(() => localStorage.getItem(STORAGE_KEYS.NAME) || '');
   const [studentClass, setStudentClass] = useState(() => localStorage.getItem(STORAGE_KEYS.CLASS) || '');
-  const [studentId, setStudentId] = useState(() => localStorage.getItem(STORAGE_KEYS.ID) || '');
+  const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem(STORAGE_KEYS.ABSENT) || '');
   
   const [error, setError] = useState('');
   const examCodeInputRef = useRef<HTMLInputElement>(null);
@@ -29,28 +29,41 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // Efek untuk Autofokus
   useEffect(() => {
       // Jika data diri sudah terisi lengkap dari cache, langsung fokus ke Kode Soal
-      if (fullName && studentClass && studentId && examCodeInputRef.current) {
+      if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
           examCodeInputRef.current.focus();
       }
   }, []); // Hanya jalan sekali saat mount
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!examCode || !fullName || !studentClass || !studentId) {
+    if (!examCode || !fullName || !studentClass || !absentNumber) {
       setError('Semua field harus diisi.');
       return;
     }
     setError('');
 
+    // Normalize Data
+    const cleanName = fullName.trim();
+    const cleanClass = studentClass.trim();
+    const cleanAbsent = absentNumber.trim();
+
     // SIMPAN DATA KE STORAGE
-    localStorage.setItem(STORAGE_KEYS.NAME, fullName);
-    localStorage.setItem(STORAGE_KEYS.CLASS, studentClass);
-    localStorage.setItem(STORAGE_KEYS.ID, studentId);
+    localStorage.setItem(STORAGE_KEYS.NAME, cleanName);
+    localStorage.setItem(STORAGE_KEYS.CLASS, cleanClass);
+    localStorage.setItem(STORAGE_KEYS.ABSENT, cleanAbsent);
+
+    // GENERATE UNIQUE COMPOSITE ID
+    // Format: name-class-number (lowercased, spaces replaced by underscore)
+    // Example: budi_santoso-12_ipa_1-05
+    const compositeId = `${cleanName}-${cleanClass}-${cleanAbsent}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '_'); // Replace special chars/spaces with underscore
 
     const student: Student = {
-      fullName,
-      class: studentClass,
-      studentId,
+      fullName: cleanName,
+      class: cleanClass,
+      absentNumber: cleanAbsent,
+      studentId: compositeId, // Unique ID based on identity
     };
     onLoginSuccess(examCode.toUpperCase(), student);
   };
@@ -59,10 +72,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       if(confirm("Apakah Anda ingin menghapus data tersimpan?")) {
           setFullName('');
           setStudentClass('');
-          setStudentId('');
+          setAbsentNumber('');
           localStorage.removeItem(STORAGE_KEYS.NAME);
           localStorage.removeItem(STORAGE_KEYS.CLASS);
-          localStorage.removeItem(STORAGE_KEYS.ID);
+          localStorage.removeItem(STORAGE_KEYS.ABSENT);
       }
   };
 
@@ -141,10 +154,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                              <div>
                                 <input
                                     type="text"
-                                    value={studentId}
-                                    onChange={(e) => setStudentId(e.target.value)}
+                                    value={absentNumber}
+                                    onChange={(e) => setAbsentNumber(e.target.value)}
                                     className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all text-sm"
-                                    placeholder="No. Absen"
+                                    placeholder="No. Absen (Ex: 05)"
                                     required
                                 />
                             </div>
