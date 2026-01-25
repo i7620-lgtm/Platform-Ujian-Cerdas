@@ -1,4 +1,4 @@
- 
+
 import type { Exam, Result, Question, ResultStatus } from '../types';
 
 const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
