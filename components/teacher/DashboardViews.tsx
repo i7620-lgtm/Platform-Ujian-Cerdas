@@ -18,37 +18,85 @@ import {
     XMarkIcon
 } from '../Icons';
 
-// --- REMAINING TIME COMPONENT ---
-export const RemainingTime: React.FC<{ exam: Exam }> = ({ exam }) => {
+// --- REMAINING TIME COMPONENT (MODERN & ELEGANT) ---
+export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
     const calculateTimeLeft = () => {
-        const examStartDateTime = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
+        // Gabungkan tanggal dan jam mulai dari config
+        // Asumsi format date: YYYY-MM-DD, startTime: HH:mm
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
         const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
-        const timeLeft = Math.max(0, examEndTime - Date.now());
-        return timeLeft;
+        const now = Date.now();
+        
+        // Jika belum mulai
+        if (now < examStartDateTime.getTime()) {
+             return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now };
+        }
+        
+        // Jika sedang berjalan
+        const timeLeft = Math.max(0, examEndTime - now);
+        return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
     };
 
-    const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+    const [timeState, setTimeState] = useState(calculateTimeLeft());
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setTimeLeft(calculateTimeLeft());
+            setTimeState(calculateTimeLeft());
         }, 1000);
-
         return () => clearInterval(timer);
     }, [exam]);
 
-    if (timeLeft === 0) {
-        return <span className="text-rose-600 font-bold">Waktu Habis</span>;
+    if (timeState.status === 'FINISHED') {
+        return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200`}>
+                Selesai
+            </span>
+        );
     }
 
-    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+    if (timeState.status === 'UPCOMING') {
+         return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100`}>
+                Belum Dimulai
+            </span>
+        );
+    }
+
+    // Format HH:MM:SS
+    const hours = Math.floor(timeState.diff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeState.diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeState.diff % (1000 * 60)) / 1000);
+    
+    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    // Color Logic
+    const totalMinutesLeft = timeState.diff / (1000 * 60);
+    let colorClass = "bg-emerald-50 text-emerald-700 border-emerald-100"; // Aman (> 10 menit)
+    let dotClass = "bg-emerald-500";
+    
+    if (totalMinutesLeft < 5) {
+        colorClass = "bg-rose-50 text-rose-600 border-rose-100 animate-pulse"; // Kritis (< 5 menit)
+        dotClass = "bg-rose-500";
+    } else if (totalMinutesLeft < 15) {
+        colorClass = "bg-amber-50 text-amber-600 border-amber-100"; // Warning (< 15 menit)
+        dotClass = "bg-amber-500";
+    }
+
+    if (minimal) {
+        return <span className="font-mono font-bold tracking-tight">{timeString}</span>;
+    }
 
     return (
-        <span className="font-mono tracking-wider tabular-nums">
-            {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
-        </span>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colorClass} transition-colors duration-500`}>
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}></span>
+            </span>
+            <span className="font-mono text-sm font-bold tracking-widest tabular-nums">
+                {timeString}
+            </span>
+        </div>
     );
 };
 
@@ -555,7 +603,7 @@ export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, 
                                 </div>
                                 <div className="text-right">
                                     <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Sisa Waktu</span>
-                                    <div className="text-lg font-bold text-rose-500 mt-0.5">
+                                    <div className="mt-1">
                                         <RemainingTime exam={exam} />
                                     </div>
                                 </div>
@@ -735,4 +783,3 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
         </div>
     );
 };
- 
