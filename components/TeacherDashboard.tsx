@@ -80,6 +80,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     }, [view, onRefreshExams, onRefreshResults]);
 
+    // --- SYNC SELECTED EXAM WITH MASTER DATA ---
+    // Fix: Ketika data 'exams' berubah (misal karena tambah waktu), 'selectedOngoingExam' juga harus diupdate
+    // agar modal menerima data terbaru.
+    useEffect(() => {
+        if (selectedOngoingExam && exams[selectedOngoingExam.code]) {
+            const updated = exams[selectedOngoingExam.code];
+            // Cek sederhana untuk menghindari infinite loop, update jika config berbeda
+            if (JSON.stringify(updated.config) !== JSON.stringify(selectedOngoingExam.config)) {
+                setSelectedOngoingExam(updated);
+            }
+        }
+    }, [exams, selectedOngoingExam]);
+
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => {
         setQuestions(newQuestions);
@@ -350,6 +363,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 results={results} 
                 onClose={() => setSelectedOngoingExam(null)} 
                 onAllowContinuation={onAllowContinuation}
+                onRefreshExams={onRefreshExams} // Pass refresh function
             />
 
             <FinishedExamModal 
