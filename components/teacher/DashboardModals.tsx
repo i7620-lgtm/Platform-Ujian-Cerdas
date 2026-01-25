@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, PlusCircleIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 
 // --- UTILITY GLOBAL ---
@@ -128,7 +128,6 @@ interface OngoingExamModalProps {
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, results: initialResults, onClose, onAllowContinuation, isReadOnly = false }) => {
     const [filterClass, setFilterClass] = useState<string>('ALL');
     
-    // Initialize with filtered data immediately to prevent flash of wrong data
     const [localResults, setLocalResults] = useState<Result[]>(() => {
         if (!exam) return [];
         return initialResults.filter(r => r.examCode === exam.code);
@@ -138,10 +137,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'STREAM_INFO'>('MONITOR');
     
+    // Time Extension State
+    const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
+    const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
+    const [isSubmittingTime, setIsSubmittingTime] = useState(false);
+
     const processingIdsRef = useRef<Set<string>>(new Set());
     const [, setTick] = useState(0);
 
-    // Sync results when prop changes (for non-monitoring updates)
+    // Sync results when prop changes
     useEffect(() => {
         if(exam) {
             setLocalResults(initialResults.filter(r => r.examCode === exam.code));
@@ -155,9 +159,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         const fetchLatest = async () => {
             setIsRefreshing(true);
             try {
-                // Fetch ONLY results for this exam code
                 const latest = await storageService.getResults(exam.code); 
-                // Since getResults(code) returns filtered results, we use them directly
                 const updatedForThisExam = latest;
                 
                 setLocalResults(currentResults => {
@@ -189,7 +191,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
     }, [localResults]);
 
     const filteredResults = useMemo(() => {
-        let res = [...localResults]; // Use spread to avoid direct state mutation
+        let res = [...localResults];
         if (filterClass !== 'ALL') {
             res = res.filter(r => r.student.class === filterClass);
         }
@@ -235,6 +237,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
         }
     };
 
+    const handleAddTimeSubmit = async () => {
+        if (!addTimeValue || typeof addTimeValue !== 'number' || addTimeValue <= 0) return;
+        if (!confirm(`Tambahkan ${addTimeValue} menit untuk SEMUA siswa?`)) return;
+
+        setIsSubmittingTime(true);
+        try {
+            await storageService.extendExamTime(exam.code, addTimeValue);
+            alert(`Berhasil menambahkan ${addTimeValue} menit.`);
+            setIsAddTimeOpen(false);
+            setAddTimeValue('');
+        } catch (e) {
+            alert("Gagal menambahkan waktu. Periksa koneksi internet.");
+        } finally {
+            setIsSubmittingTime(false);
+        }
+    };
+
     const renderStatusBadge = (status: string) => {
         if (status === 'in_progress') {
             return (
@@ -270,7 +289,51 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-            <div className="bg-[#F8FAFC] sm:rounded-2xl shadow-2xl w-full max-w-[95vw] h-full sm:h-[92vh] flex flex-col overflow-hidden border-0 sm:border border-white/20">
+            <div className="bg-[#F8FAFC] sm:rounded-2xl shadow-2xl w-full max-w-[95vw] h-full sm:h-[92vh] flex flex-col overflow-hidden border-0 sm:border border-white/20 relative">
+                
+                {/* Time Extension Popover */}
+                {isAddTimeOpen && (
+                    <div className="absolute top-20 right-4 sm:right-20 z-[60] bg-white rounded-xl shadow-2xl border border-indigo-100 p-4 w-72 animate-fade-in">
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <ClockIcon className="w-4 h-4 text-indigo-500" />
+                                Perpanjang Waktu
+                            </h4>
+                            <button onClick={() => setIsAddTimeOpen(false)}><XMarkIcon className="w-4 h-4 text-slate-400 hover:text-slate-600" /></button>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex gap-2">
+                                {[5, 10, 15].map(min => (
+                                    <button 
+                                        key={min}
+                                        onClick={() => setAddTimeValue(min)}
+                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-all ${addTimeValue === min ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                                    >
+                                        +{min}m
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="relative">
+                                <input 
+                                    type="number" 
+                                    placeholder="Input Manual (Menit)" 
+                                    value={addTimeValue}
+                                    onChange={(e) => setAddTimeValue(parseInt(e.target.value) || '')}
+                                    className="w-full pl-3 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">MNT</span>
+                            </div>
+                            <button 
+                                onClick={handleAddTimeSubmit}
+                                disabled={isSubmittingTime || !addTimeValue}
+                                className="w-full bg-slate-900 text-white font-bold py-2 rounded-lg hover:bg-black transition-all disabled:opacity-50 text-xs shadow-lg"
+                            >
+                                {isSubmittingTime ? 'Menyimpan...' : 'Simpan & Update ke Siswa'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex-shrink-0 z-20 shadow-sm">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
                         <div className="flex-1 min-w-0">
@@ -293,6 +356,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, result
                              </div>
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto w-full sm:w-auto justify-end">
+                            {/* Add Time Button */}
+                            {!isReadOnly && (
+                                <button 
+                                    onClick={() => setIsAddTimeOpen(!isAddTimeOpen)}
+                                    className={`p-2 sm:px-3 sm:py-2 rounded-xl border flex items-center gap-2 transition-all shadow-sm ${isAddTimeOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-slate-600 hover:bg-slate-50'}`}
+                                    title="Tambah Waktu Ujian"
+                                >
+                                    <PlusCircleIcon className="w-5 h-5" />
+                                    <span className="hidden sm:inline text-xs font-bold">Tambah Waktu</span>
+                                </button>
+                            )}
+
                             <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
                                 <button onClick={() => setActiveTab('MONITOR')} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${activeTab === 'MONITOR' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}>Monitor</button>
                                 {exam.config.enablePublicStream && !isReadOnly && (
