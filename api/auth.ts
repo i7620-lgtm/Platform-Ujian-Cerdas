@@ -4,7 +4,7 @@ import db from './db.js';
 
 let isTableInitialized = false;
 
-// 1. Inisialisasi Tabel Users & Seeding Data Guru
+// 1. Inisialisasi Tabel Users
 const ensureAuthSchema = async () => {
     if (isTableInitialized) return;
     try {
@@ -27,15 +27,7 @@ const ensureAuthSchema = async () => {
             await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS school TEXT DEFAULT '';`);
         } catch (e) { /* ignore if exists */ }
 
-        // Seed Default Guru jika belum ada (Super Admin)
-        const seedCheck = await db.query("SELECT username FROM users WHERE username = 'guru'");
-        if (seedCheck.rows.length === 0) {
-            console.log("Seeding default guru user...");
-            await db.query(`
-                INSERT INTO users (username, password, full_name, auth_provider, account_type, school, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-            `, ['guru', 'guru123', 'Guru Utama', 'local', 'super_admin', 'Sekolah Pusat', Date.now()]);
-        }
+        // Logika seeding default guru telah dihapus sesuai permintaan
         
         isTableInitialized = true;
     } catch (e) {
