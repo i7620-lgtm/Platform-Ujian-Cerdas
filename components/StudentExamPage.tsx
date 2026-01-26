@@ -80,8 +80,10 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
-        // 0. Fix Legacy Styles (e.g. font-size: 1rem from editor impacting prose scaling)
-        let processedText = content.replace(/font-size:\s*1rem/gi, 'font-size: 100%');
+        // 0. Fix Legacy Styles
+        // Handles cases where editor injected explicit font sizes (1rem, 16px, 12pt) which conflict with prose-lg (1.125rem)
+        // Uses a robust regex to catch variations in spacing and units
+        let processedText = content.replace(/font-size:\s*(1rem|16px|12pt)/gi, 'font-size: 100%');
 
         // 1. Process Rich Text (Bold, Italic, Del, Underline)
         processedText = processedText
