@@ -532,8 +532,8 @@ const WysiwygEditor: React.FC<{
         if ((window as any).katex) {
             const html = (window as any).katex.renderToString(latex, { throwOnError: false });
             // contenteditable="false" prevents cursor from entering the span easily, making it treated as a block
-            // FIXED: Removed mx-1 to fix wide spacing, added &nbsp; buffer, and reset span style for subsequent text.
-            const wrapper = `&nbsp;<span class="math-visual inline-block px-0.5 rounded select-none cursor-pointer hover:bg-indigo-50 align-middle" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 1rem; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`;
+            // FIXED: Removed mx-1 to fix wide spacing, added &nbsp; buffer, and reset span style for subsequent text (using 100% to inherit).
+            const wrapper = `&nbsp;<span class="math-visual inline-block px-0.5 rounded select-none cursor-pointer hover:bg-indigo-50 align-middle" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 100%; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`;
             runCmd('insertHTML', wrapper); // runCmd already handles restoreSelection
             handleInput();
         }
@@ -1456,4 +1456,3 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         </div>
     );
 };
- 
