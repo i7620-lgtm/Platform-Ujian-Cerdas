@@ -80,8 +80,11 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
+        // 0. Fix Legacy Styles (e.g. font-size: 1rem from editor impacting prose scaling)
+        let processedText = content.replace(/font-size:\s*1rem/gi, 'font-size: 100%');
+
         // 1. Process Rich Text (Bold, Italic, Del, Underline)
-        let processedText = content
+        processedText = processedText
             .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*([\s\S]+?)\*/g, '<em>$1</em>')
             .replace(/~~([\s\S]+?)~~/g, '<del>$1</del>')
