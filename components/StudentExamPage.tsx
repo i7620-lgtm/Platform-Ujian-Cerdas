@@ -80,10 +80,15 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
     }
 
     try {
-        // 0. Fix Legacy Styles
-        // Handles cases where editor injected explicit font sizes (1rem, 16px, 12pt) which conflict with prose-lg (1.125rem)
-        // Uses a robust regex to catch variations in spacing and units
-        let processedText = content.replace(/font-size:\s*(1rem|16px|12pt)/gi, 'font-size: 100%');
+        // 0. AGGRESSIVE STYLE SANITIZER
+        // Remove font-family, font-size, line-height, and background-color to force inheritance from .prose-lg
+        // This fixes the issue where pasted text or editor artifacts cause different text sizes.
+        let processedText = content
+            .replace(/font-family:[^;"]*(?:;)?/gi, '')
+            .replace(/font-size:[^;"]*(?:;)?/gi, '')
+            .replace(/line-height:[^;"]*(?:;)?/gi, '')
+            .replace(/background-color:[^;"]*(?:;)?/gi, '') // Removes white background from copy-paste
+            .replace(/style="\s*"/gi, ''); // Clean empty style attributes
 
         // 1. Process Rich Text (Bold, Italic, Del, Underline)
         processedText = processedText
@@ -133,7 +138,7 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
         
         return (
             <div 
-                className="prose prose-slate prose-lg max-w-none text-slate-800 leading-relaxed font-normal break-words whitespace-pre-wrap selection:bg-indigo-100 selection:text-indigo-900"
+                className="prose prose-slate prose-lg max-w-none text-slate-800 leading-relaxed font-normal break-words whitespace-pre-wrap selection:bg-indigo-100 selection:text-indigo-900 [&_.katex]:text-[1.1em] [&_.katex]:leading-normal"
                 dangerouslySetInnerHTML={{ __html: html }}
             />
         );
