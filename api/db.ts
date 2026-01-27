@@ -92,7 +92,7 @@ const getAccessToken = async () => {
 };
 
 // --- HELPER FETCH ---
-const gFetch = async (url: string, options: any = {}) => {
+const gFetch = async (url: string, options: any = {}): Promise<any> => {
     try {
         const token = await getAccessToken();
         options.headers = { ...options.headers, Authorization: `Bearer ${token}` };
