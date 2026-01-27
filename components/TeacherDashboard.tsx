@@ -8,8 +8,7 @@ import {
     ClockIcon,
     CalendarDaysIcon,
     XMarkIcon,
-    PencilIcon,
-    CheckIcon
+    PencilIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
