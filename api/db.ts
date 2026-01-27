@@ -5,40 +5,29 @@ import { Buffer } from 'buffer';
 
 // --- CONFIGURATION ---
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || process.env.CLIENT_EMAIL;
-const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID;
-const TEMPLATE_SHEET_ID = process.env.TEMPLATE_SHEET_ID;
+
+// HELPER: Bersihkan ID dari spasi atau tanda kutip yang tidak sengaja terikut
+const cleanId = (id: string | undefined) => {
+    if (!id) return undefined;
+    // Hapus spasi di awal/akhir dan tanda kutip ganda/tunggal jika ada
+    return id.trim().replace(/^["']|["']$/g, '');
+};
+
+const MASTER_SHEET_ID = cleanId(process.env.MASTER_SHEET_ID);
+const TEMPLATE_SHEET_ID = cleanId(process.env.TEMPLATE_SHEET_ID);
 
 // --- SMART KEY FORMATTER ---
 const formatPrivateKey = (key: string | undefined): string | null => {
     if (!key) return null;
-
-    // 1. Hapus tanda kutip di awal/akhir jika ada (copy-paste dari JSON sering membawa ini)
     let cleanKey = key.replace(/^["']|["']$/g, '');
-
-    // 2. Ganti literal string "\n" menjadi karakter newline asli
     cleanKey = cleanKey.replace(/\\n/g, '\n');
-
-    // 3. Pastikan Header dan Footer ada
     const header = "-----BEGIN PRIVATE KEY-----";
     const footer = "-----END PRIVATE KEY-----";
-
-    if (!cleanKey.includes(header)) {
-        // Jika user hanya copy isi key-nya saja tanpa header
-        cleanKey = `${header}\n${cleanKey}`;
-    }
-    if (!cleanKey.includes(footer)) {
-        cleanKey = `${cleanKey}\n${footer}`;
-    }
-
-    // 4. Perbaikan spasi jika key menjadi satu baris panjang (common issue)
-    // Logika: Header dan footer harus di baris sendiri. Isi key base64 biasanya tidak ada spasi.
+    if (!cleanKey.includes(header)) cleanKey = `${header}\n${cleanKey}`;
+    if (!cleanKey.includes(footer)) cleanKey = `${cleanKey}\n${footer}`;
     if (!cleanKey.includes('\n')) {
-       cleanKey = cleanKey
-           .replace(header, `${header}\n`)
-           .replace(footer, `\n${footer}`)
-           .replace(/ /g, '\n'); // Asumsi spasi adalah pengganti newline yang hilang
+       cleanKey = cleanKey.replace(header, `${header}\n`).replace(footer, `\n${footer}`).replace(/ /g, '\n');
     }
-
     return cleanKey;
 };
 
@@ -47,6 +36,7 @@ const PRIVATE_KEY = formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY || process.e
 // --- DIAGNOSTIC LOGGING ---
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY || !MASTER_SHEET_ID) {
     console.error("CRITICAL CONFIG ERROR: Missing Google Sheets Credentials.");
+    console.error("Master ID:", MASTER_SHEET_ID ? "Set (Length: " + MASTER_SHEET_ID.length + ")" : "MISSING");
 } else {
     console.log(`DB Init: Service Account '${SERVICE_ACCOUNT_EMAIL}' is ready.`);
 }
@@ -99,9 +89,8 @@ const getAccessToken = async () => {
         }
         throw new Error('Google Access Token kosong.');
     } catch (e: any) {
-        // Tampilkan pesan error yang sangat jelas untuk debugging user
         if (e.message.includes('error:04075070') || e.message.includes('pem')) {
-             throw new Error(`FORMAT KEY SALAH: Private Key tidak valid. Pastikan variabel lingkungan tidak mengandung karakter aneh.`);
+             throw new Error(`FORMAT KEY SALAH: Private Key tidak valid.`);
         }
         throw e;
     }
@@ -117,12 +106,22 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
         if (!res.ok) {
             const err = await res.text();
             
-            // Error Handling Spesifik
+            // Error Handling Spesifik dengan Diagnostik ID
             if (res.status === 403) {
-                throw new Error(`IZIN DITOLAK (403): Email '${SERVICE_ACCOUNT_EMAIL}' belum dijadikan Editor di Spreadsheet ID '${MASTER_SHEET_ID}' atau '${TEMPLATE_SHEET_ID}'.`);
+                // Coba ekstrak ID spreadsheet dari URL untuk memberitahu user mana yang salah
+                const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
+                const failedId = match ? match[1] : 'Unknown ID';
+                
+                let idName = 'Spreadsheet Tidak Dikenal';
+                if (failedId === MASTER_SHEET_ID) idName = 'MASTER_SHEET_ID';
+                else if (failedId === TEMPLATE_SHEET_ID) idName = 'TEMPLATE_SHEET_ID';
+
+                throw new Error(`AKSES DITOLAK (403) ke ${idName}. \nID: ${failedId}\nPastikan Service Account '${SERVICE_ACCOUNT_EMAIL}' adalah Editor di file ini.`);
             }
             if (res.status === 404) {
-                throw new Error(`SPREADSHEET TIDAK DITEMUKAN (404): Periksa ID Spreadsheet di file .env.`);
+                const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
+                const failedId = match ? match[1] : 'Unknown ID';
+                throw new Error(`SPREADSHEET TIDAK DITEMUKAN (404). \nID: ${failedId}\nCek konfigurasi .env Anda. ID mungkin salah ketik.`);
             }
             
             throw new Error(`Google API Error [${res.status}]: ${err}`);
