@@ -110,14 +110,14 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
         if (!res.ok) {
             const err = await res.text();
             if (res.status === 403) {
-                const match = url.match(/spreadsheets\/([^/]+)/);
+                const match = url.match(/(?:spreadsheets|files)\/([a-zA-Z0-9-_]+)/);
                 const failedId = match ? match[1] : 'Unknown';
-                let targetName = 'SHEET TIDAK DIKENAL';
+                let targetName = 'FILE/SHEET TIDAK DIKENAL';
                 if (failedId === MASTER_SHEET_ID) targetName = 'DATABASE_MASTER_UJIAN';
                 else if (failedId === TEMPLATE_SHEET_ID) targetName = 'TEMPLATE_DB_GURU';
 
                 console.error(`[403] Access denied to ${targetName} (${failedId})`);
-                throw new Error(`IZIN DITOLAK (403) ke ${targetName}.\nID: '${failedId}'\nSolusi: Pastikan email Service Account adalah EDITOR.`);
+                throw new Error(`IZIN DITOLAK (403) ke ${targetName}.\nID: '${failedId}'\nSolusi: Pastikan email Service Account adalah EDITOR/VIEWER yang sesuai.`);
             }
             if (res.status === 404) {
                 throw new Error(`SHEET TIDAK DITEMUKAN (404). Cek ID di .env.`);
