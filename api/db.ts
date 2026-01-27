@@ -6,11 +6,18 @@ import { Buffer } from 'buffer';
 // --- CONFIGURATION ---
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || process.env.CLIENT_EMAIL;
 
-// HELPER: Bersihkan ID dari spasi atau tanda kutip yang tidak sengaja terikut
-const cleanId = (id: string | undefined) => {
-    if (!id) return undefined;
-    // Hapus spasi di awal/akhir dan tanda kutip ganda/tunggal jika ada
-    return id.trim().replace(/^["']|["']$/g, '');
+// HELPER: Cerdas mengekstrak ID baik dari string murni maupun URL lengkap
+const cleanId = (input: string | undefined) => {
+    if (!input) return undefined;
+    const cleanInput = input.trim().replace(/^["']|["']$/g, ''); // Hapus spasi & kutip
+    
+    // Cek apakah input adalah URL (misal: https://docs.google.com/spreadsheets/d/ID_DISINI/edit...)
+    const urlMatch = cleanInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (urlMatch && urlMatch[1]) {
+        return urlMatch[1]; // Kembalikan ID hasil ekstrak
+    }
+    
+    return cleanInput; // Kembalikan input as-is (asumsi sudah ID)
 };
 
 const MASTER_SHEET_ID = cleanId(process.env.MASTER_SHEET_ID);
@@ -34,11 +41,13 @@ const formatPrivateKey = (key: string | undefined): string | null => {
 const PRIVATE_KEY = formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY || process.env.PRIVATE_KEY);
 
 // --- DIAGNOSTIC LOGGING ---
+// Ini akan muncul di Function Logs Vercel untuk membantu debugging
+console.log(`[DB INIT] Service Account: ${SERVICE_ACCOUNT_EMAIL ? 'Set' : 'MISSING'}`);
+console.log(`[DB INIT] Master Sheet ID: ${MASTER_SHEET_ID ? MASTER_SHEET_ID.substring(0, 5) + '...' : 'MISSING'}`);
+console.log(`[DB INIT] Template Sheet ID: ${TEMPLATE_SHEET_ID ? TEMPLATE_SHEET_ID.substring(0, 5) + '...' : 'MISSING'}`);
+
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY || !MASTER_SHEET_ID) {
     console.error("CRITICAL CONFIG ERROR: Missing Google Sheets Credentials.");
-    console.error("Master ID:", MASTER_SHEET_ID ? "Set (Length: " + MASTER_SHEET_ID.length + ")" : "MISSING");
-} else {
-    console.log(`DB Init: Service Account '${SERVICE_ACCOUNT_EMAIL}' is ready.`);
 }
 
 // --- TOKEN CACHE ---
@@ -48,7 +57,7 @@ let tokenExpiry = 0;
 // --- JWT GENERATOR ---
 const getAccessToken = async () => {
     if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
-    if (!PRIVATE_KEY || !SERVICE_ACCOUNT_EMAIL) throw new Error("Credentials missing.");
+    if (!PRIVATE_KEY || !SERVICE_ACCOUNT_EMAIL) throw new Error("Credentials missing check .env");
 
     try {
         const header = { alg: 'RS256', typ: 'JWT' };
@@ -90,7 +99,7 @@ const getAccessToken = async () => {
         throw new Error('Google Access Token kosong.');
     } catch (e: any) {
         if (e.message.includes('error:04075070') || e.message.includes('pem')) {
-             throw new Error(`FORMAT KEY SALAH: Private Key tidak valid.`);
+             throw new Error(`FORMAT KEY SALAH: Private Key rusak. Cek env var.`);
         }
         throw e;
     }
@@ -106,22 +115,23 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
         if (!res.ok) {
             const err = await res.text();
             
-            // Error Handling Spesifik dengan Diagnostik ID
+            // DIAGNOSTIK ERROR YANG LEBIH DETAIL
             if (res.status === 403) {
-                // Coba ekstrak ID spreadsheet dari URL untuk memberitahu user mana yang salah
+                // Cek ID mana yang ditolak
                 const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
-                const failedId = match ? match[1] : 'Unknown ID';
+                const failedId = match ? match[1] : 'Unknown';
                 
-                let idName = 'Spreadsheet Tidak Dikenal';
-                if (failedId === MASTER_SHEET_ID) idName = 'MASTER_SHEET_ID';
-                else if (failedId === TEMPLATE_SHEET_ID) idName = 'TEMPLATE_SHEET_ID';
+                let targetName = 'SHEET TIDAK DIKENAL';
+                if (failedId === MASTER_SHEET_ID) targetName = 'DATABASE_MASTER_UJIAN';
+                else if (failedId === TEMPLATE_SHEET_ID) targetName = 'TEMPLATE_DB_GURU';
 
-                throw new Error(`AKSES DITOLAK (403) ke ${idName}. \nID: ${failedId}\nPastikan Service Account '${SERVICE_ACCOUNT_EMAIL}' adalah Editor di file ini.`);
+                console.error(`[403 ERROR] Access denied for ${targetName} (${failedId})`);
+                throw new Error(`IZIN DITOLAK (403) ke ${targetName}.\nID: ${failedId}\nSolusi: Pastikan email '${SERVICE_ACCOUNT_EMAIL}' adalah EDITOR di file tersebut.`);
             }
             if (res.status === 404) {
                 const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
-                const failedId = match ? match[1] : 'Unknown ID';
-                throw new Error(`SPREADSHEET TIDAK DITEMUKAN (404). \nID: ${failedId}\nCek konfigurasi .env Anda. ID mungkin salah ketik.`);
+                const failedId = match ? match[1] : 'Unknown';
+                throw new Error(`SHEET TIDAK DITEMUKAN (404).\nID: ${failedId}\nSolusi: Cek apakah ID Spreadsheet di .env sudah benar (bukan link lengkap).`);
             }
             
             throw new Error(`Google API Error [${res.status}]: ${err}`);
@@ -142,6 +152,7 @@ class GoogleSheetsDB {
         if (this.directoryCache[userKey]) return this.directoryCache[userKey];
 
         const range = 'DIRECTORY!A:B';
+        // Menggunakan MASTER_SHEET_ID yang sudah dibersihkan
         const data = await this.readSheet(MASTER_SHEET_ID!, range);
         const rows = data.values || [];
         
@@ -171,7 +182,7 @@ class GoogleSheetsDB {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role: 'writer', type: 'user', emailAddress: userKey })
-            }).catch(e => console.warn("Share warning:", e));
+            }).catch(e => console.warn("Share warning (non-fatal):", e));
         }
 
         await this.appendRow(MASTER_SHEET_ID!, 'DIRECTORY!A:B', [userKey, newSheetId]);
