@@ -16,85 +16,15 @@ interface TeacherLoginProps {
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
-const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => void; }> = ({ errorMessage, onRetry }) => {
-    const isTemplateError = errorMessage.includes('TEMPLATE_DB_GURU');
-    const isMasterError = errorMessage.includes('DATABASE_MASTER_UJIAN');
-    
-    const sheetIdMatch = errorMessage.match(/ID: '([a-zA-Z0-9-_]+)'/);
-    const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
-
-    const emailMatch = errorMessage.match(/EMAIL AKUN: '([^']+)'/);
-    const serviceAccountEmail = emailMatch ? emailMatch[1] : null;
-
-    const sheetName = isTemplateError ? "Template Ujian Guru" : isMasterError ? "Database Master Ujian" : "File Google Sheet";
-    const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null;
-
-    return (
-        <div className="text-left text-sm bg-rose-50 p-4 rounded-xl border-2 border-dashed border-rose-200 mt-4 space-y-4 animate-fade-in">
-            <h3 className="font-bold text-rose-700 flex items-center gap-2"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> Kesalahan Konfigurasi Google</h3>
-            
-            {(isTemplateError || isMasterError) && (
-                <div className="bg-amber-50 border-2 border-dashed border-amber-200 p-3 rounded-lg text-xs">
-                    <p className="font-bold text-amber-800 mb-1">Penyebab Paling Umum:</p>
-                    <p className="text-amber-700 leading-relaxed">
-                        Error ini terjadi karena file <strong className="font-mono bg-amber-100 px-1 rounded">{sheetName}</strong> belum dibagikan ke Service Account, atau belum diberi akses <strong className="font-bold">Editor</strong>.
-                    </p>
-                </div>
-            )}
-            
-            <div className="space-y-4 text-xs">
-                <p className="font-bold text-rose-800">CHECKLIST PERBAIKAN WAJIB:</p>
-                
-                <div className="flex gap-3 items-start">
-                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">1</span>
-                    <div>
-                        <p className="font-semibold text-rose-800">Aktifkan Google Drive API</p>
-                        <p className="text-rose-600/90 leading-relaxed">Pastikan API ini <strong className="font-bold">AKTIF</strong>. Aplikasi perlu izin untuk <strong className="font-bold">menyalin file</strong>.</p>
-                        <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-[11px]">Buka Laman Google Drive API ↗</a>
-                    </div>
-                </div>
-
-                <div className="flex gap-3 items-start">
-                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">2</span>
-                    <div>
-                        <p className="font-semibold text-rose-800">Bagikan 2 File Wajib</p>
-                        <p className="text-rose-600/90 leading-relaxed mb-2">Ada <strong>dua file</strong> Google Sheet yang perlu dibagikan dengan akses <strong className="font-bold">Editor</strong>:</p>
-                        <ul className="list-disc list-inside space-y-2 text-rose-700/90 pl-1">
-                            <li><strong>DATABASE_MASTER_UJIAN:</strong> Untuk menyimpan daftar guru.</li>
-                            <li><strong>TEMPLATE_DB_GURU:</strong> Untuk disalin saat ada guru baru. <strong className="text-rose-800 font-bold">{isTemplateError && "(INI PENYEBAB ERROR ANDA)"}</strong></li>
-                        </ul>
-                        {sheetUrl && (
-                            <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all block mt-2 text-[11px]">Buka File Bermasalah: {sheetName} ↗</a>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex gap-3 items-start">
-                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">3</span>
-                    <div>
-                        <p className="font-semibold text-rose-800">Verifikasi Email Service Account</p>
-                        <p className="text-rose-600/90 leading-relaxed">Bagikan <strong className="font-bold">kedua file</strong> di atas ke email service account di bawah ini.</p>
-                        <div className="bg-rose-100 p-2 rounded-lg my-2 flex items-center justify-between gap-2 border border-rose-200">
-                           <code className="text-[10px] text-rose-800 font-semibold break-all">{serviceAccountEmail || "Gagal mendeteksi email..."}</code>
-                           {serviceAccountEmail && (
-                               <button onClick={() => navigator.clipboard.writeText(serviceAccountEmail)} className="text-rose-600 hover:text-rose-900 bg-white px-2 py-1 text-[9px] font-bold rounded shadow-sm border border-rose-200">SALIN</button>
-                           )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <button onClick={onRetry} className="w-full bg-rose-600 text-white font-bold text-xs py-2.5 rounded-lg hover:bg-rose-700 transition-all mt-2 shadow-lg shadow-rose-200">
-                Saya Sudah Memperbaiki, Coba Login Lagi
-            </button>
-        </div>
-    );
-};
-
-
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  // Form State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [school, setSchool] = useState('');
+  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -123,37 +53,70 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     };
     const timer = setInterval(() => { if (window.google) { initGoogle(); clearInterval(timer); } }, 500);
     return () => clearInterval(timer);
-  }, []);
+  }, [isRegistering]); // Re-render button when mode changes
 
-  const handleLoginAttempt = async (body: any) => {
+  const handleAuthAction = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(''); 
+    
+    if (isRegistering && (!fullName || !school)) {
+        setError("Nama Lengkap dan Sekolah wajib diisi.");
+        return;
+    }
+
     setIsLoading(true);
+    
+    const action = isRegistering ? 'register' : 'login';
+    const payload = isRegistering 
+        ? { action, username, password, fullName, school }
+        : { action, username, password };
+
     try {
         const res = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
+        
         if (res.ok && data.success) {
-            onLoginSuccess({ id: data.username, fullName: data.fullName, accountType: data.accountType, school: data.school, avatarUrl: data.avatar });
+            onLoginSuccess({ 
+                id: data.username, 
+                fullName: data.fullName, 
+                accountType: data.accountType, 
+                school: data.school || school, 
+                avatarUrl: data.avatar 
+            });
         } else { 
-            setError(data.error || 'Gagal login.'); 
+            setError(data.error || 'Autentikasi gagal.'); 
         }
     } catch (e) { 
-        setError('Kesalahan koneksi.'); 
+        setError('Kesalahan koneksi ke server.'); 
     } finally { 
         setIsLoading(false); 
     }
   };
 
   const handleGoogleCallback = (response: any) => {
-      handleLoginAttempt({ action: 'google-login', token: response.credential });
-  };
-
-  const handleManualLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleLoginAttempt({ action: 'login', username, password });
+      // Logic login google
+      const performGoogleLogin = async () => {
+          setIsLoading(true);
+          try {
+              const res = await fetch('/api/auth', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'google-login', token: response.credential })
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                  onLoginSuccess({ id: data.username, fullName: data.fullName, accountType: data.accountType, school: data.school, avatarUrl: data.avatar });
+              } else {
+                  setError(data.error || "Gagal login Google");
+              }
+          } catch(e) { setError("Error koneksi"); }
+          finally { setIsLoading(false); }
+      };
+      performGoogleLogin();
   };
 
   return (
@@ -163,19 +126,54 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
             
             <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center relative z-10">
                 <div className="flex justify-center mb-6"><div className="bg-primary/10 p-3 rounded-full"><LogoIcon className="w-12 h-12 text-primary" /></div></div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Login Guru</h2>
-                <p className="text-gray-500 text-sm mb-8">Masuk untuk mengelola ujian dan data siswa.</p>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    {isRegistering ? 'Daftar Akun Guru' : 'Login Guru'}
+                </h2>
+                <p className="text-gray-500 text-sm mb-8">
+                    {isRegistering ? 'Lengkapi data diri dan sekolah Anda.' : 'Masuk untuk mengelola ujian dan data siswa.'}
+                </p>
                 
-                <div className="flex justify-center w-full mb-6">
-                    <div id="googleSignInBtn" className="min-h-[44px]"></div>
-                </div>
-                
-                <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="px-2 bg-white text-gray-400 font-bold">Atau Manual</span></div>
-                </div>
+                {/* Google Button - Only show on Login mode to keep register form clean, or both if preferred. */}
+                {!isRegistering && (
+                    <>
+                        <div className="flex justify-center w-full mb-6">
+                            <div id="googleSignInBtn" className="min-h-[44px]"></div>
+                        </div>
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="px-2 bg-white text-gray-400 font-bold">Atau Manual</span></div>
+                        </div>
+                    </>
+                )}
 
-                <form onSubmit={handleManualLogin} className="space-y-4 text-left">
+                <form onSubmit={handleAuthAction} className="space-y-4 text-left">
+                    {isRegistering && (
+                        <>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Nama Lengkap</label>
+                                <input 
+                                    type="text" 
+                                    value={fullName} 
+                                    onChange={(e) => setFullName(e.target.value)} 
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                                    placeholder="Contoh: Budi Santoso, S.Pd"
+                                    required 
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Nama Sekolah</label>
+                                <input 
+                                    type="text" 
+                                    value={school} 
+                                    onChange={(e) => setSchool(e.target.value)} 
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                                    placeholder="Contoh: SMA Negeri 1 Jakarta"
+                                    required 
+                                />
+                            </div>
+                        </>
+                    )}
+
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase">Username / ID</label>
                         <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" required disabled={isLoading} />
@@ -184,41 +182,27 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                         <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" required disabled={isLoading} />
                     </div>
+                    
                     {error && (
-                        error.includes('IZIN DITOLAK') ? (
-                            <ConfigurationErrorGuide errorMessage={error} onRetry={() => setError('')} />
-                        ) : (
-                            <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center">
-                                <p className="font-bold">{error}</p>
-                                {error.includes('Key') && <p className="text-[10px] mt-1 text-rose-400">Cek format Private Key di Vercel.</p>}
-                            </div>
-                        )
+                        <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center font-bold animate-pulse">
+                            {error}
+                        </div>
                     )}
-                    <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg">
-                        {isLoading ? 'Memproses...' : 'Masuk Manual'}
+                    
+                    <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg mt-2">
+                        {isLoading ? 'Memproses...' : (isRegistering ? 'Daftar Sekarang' : 'Masuk')}
                     </button>
                 </form>
-            </div>
 
-            <div className="mt-8 text-center opacity-80 hover:opacity-100 transition-opacity">
-                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">
-                    Debug Info: Origin URL
-                </p>
-                <div 
-                    className="bg-white/50 border-2 border-dashed border-gray-400/30 rounded-lg p-3 text-xs font-mono text-gray-600 break-all cursor-pointer hover:bg-white hover:border-primary/50 hover:text-primary transition-all flex items-center justify-center gap-2 group"
-                    onClick={() => {
-                        navigator.clipboard.writeText(currentOrigin);
-                        alert(`URL disalin:\n${currentOrigin}\n\nMasukkan ini ke Google Cloud Console > Authorized JavaScript origins`);
-                    }}
-                    title="Klik untuk menyalin URL ini"
-                >
-                    <span>{currentOrigin}</span>
-                    <svg className="w-3 h-3 opacity-50 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                    <button 
+                        type="button"
+                        onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
+                        className="text-sm font-medium text-primary hover:underline"
+                    >
+                        {isRegistering ? 'Sudah punya akun? Login di sini' : 'Belum punya akun? Daftar Guru Baru'}
+                    </button>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2 max-w-xs mx-auto leading-relaxed">
-                    Jika muncul <strong>Error 400: origin_mismatch</strong>, salin URL di atas dan tambahkan ke 
-                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline ml-1">Google Cloud Console</a>.
-                </p>
             </div>
         </div>
     </div>
