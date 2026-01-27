@@ -25,7 +25,7 @@ const callScript = async (action: string, data: any = {}) => {
         return result;
     } catch (e: any) {
         console.error(`DB Error [${action}]:`, e);
-        throw new Error("Gagal menghubungi database: " + e.message);
+        throw new Error(e.message || "Gagal menghubungi database");
     }
 };
 
@@ -33,10 +33,7 @@ const callScript = async (action: string, data: any = {}) => {
 
 export default {
     async getManualUser(username: string) {
-        // Kita gunakan endpoint auth sederhana di Apps Script
-        // Untuk login manual, password dikirim di frontend logic auth.ts, tapi disini kita simulasi fetch user
-        // Karena Apps Script logic 'auth' mengecek user & pass, kita sesuaikan nanti.
-        // Untuk sekarang, kita kembalikan null agar login via API Auth berjalan
+        // Legacy support
         return null; 
     },
     
@@ -46,19 +43,20 @@ export default {
         return res.user;
     },
 
-    async getAllTeacherKeys() {
-        // Dalam mode simple ini, kita anggap semua ujian ada di satu sheet
-        // Jadi kita return dummy ID
-        return ['GLOBAL_TEACHER']; 
+    // Register User Baru (NEW)
+    async registerUser(userData: any) {
+        // userData: { username, password, fullName, school }
+        const res = await callScript('register', { data: userData });
+        return res.user;
     },
 
-    // Karena Apps Script menangani semua data di satu sheet (atau split internal), 
-    // userId tidak lagi menjadi pemisah sheet ID, tapi filter data.
+    async getAllTeacherKeys() {
+        // Dalam mode simple ini, kita anggap semua ujian ada di satu sheet
+        return ['GLOBAL_TEACHER']; 
+    },
     
     async getExams(userId: string) {
         const res = await callScript('getExams', {});
-        // Filter di sisi serverless function jika perlu, atau ambil semua
-        // Apps Script mengembalikan semua yang aktif
         return res.data || [];
     },
 
@@ -67,9 +65,6 @@ export default {
     },
 
     async deleteExam(userId: string, code: string) {
-        // Logic delete di Apps Script bisa diimplementasikan dengan set status 'DELETED'
-        // Untuk sekarang kita reuse saveExam dengan status DELETED jika object exam dikirim
-        // Atau buat action khusus di script
         // Simplifikasi: Kita skip delete fisik, set status saja via frontend logic saveExam
         return { success: true };
     },
@@ -87,7 +82,6 @@ export default {
         return callScript('saveResult', { data: result });
     },
 
-    // Stub function agar tidak error di auth.ts (tidak dipakai lagi di mode simple)
     async getUserSpreadsheetId(id: string) { return id; },
     async getUserRole(email: string) { return { role: 'guru', school: 'Sekolah' }; },
     async updateUserRole() { return true; },
