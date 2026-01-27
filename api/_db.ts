@@ -1,6 +1,5 @@
 
 // api/_db.ts - Jembatan Stabil ke Google Apps Script
-// Tidak lagi menggunakan Service Account yang ribet.
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
 
@@ -19,7 +18,6 @@ const callScript = async (action: string, data: any = {}) => {
         });
         
         const result = await response.json();
-        // Relaxed error checking for findUser which expects success:false when not found
         if (!result.success && !result.data && !result.user && !result.users && action !== 'findUser') {
             throw new Error(result.error || "Database operation failed");
         }
@@ -30,49 +28,35 @@ const callScript = async (action: string, data: any = {}) => {
     }
 };
 
-// --- ADAPTER METHODS (Agar kompatibel dengan kode API yang sudah ada) ---
-
 export default {
-    async getManualUser(username: string) {
-        // Legacy support
-        return null; 
-    },
+    async getManualUser(username: string) { return null; },
     
-    // Login via Script
     async loginUser(username: string, password: string) {
         const res = await callScript('auth', { username, password });
         return res.user;
     },
 
-    // Find User (Check existence)
     async findUser(username: string) {
         const res = await callScript('findUser', { username });
         return res.success ? res.user : null;
     },
 
-    // Register User Baru
     async registerUser(userData: any) {
-        // userData: { username, password, fullName, school }
         const res = await callScript('register', { data: userData });
         return res.user;
     },
 
-    // NEW: Get All Users for Admin Dashboard
     async getAllUsers() {
         const res = await callScript('getUsers');
         return res.users || [];
     },
 
-    // NEW: Update User Role
     async updateUserRole(email: string, role: string, school: string) {
         const res = await callScript('updateRole', { email, role, school });
         return res.success;
     },
 
-    async getAllTeacherKeys() {
-        // Dalam mode simple ini, kita anggap semua ujian ada di satu sheet
-        return ['GLOBAL_TEACHER']; 
-    },
+    async getAllTeacherKeys() { return ['GLOBAL_TEACHER']; },
     
     async getExams(userId: string) {
         const res = await callScript('getExams', {});
@@ -84,20 +68,22 @@ export default {
     },
 
     async deleteExam(userId: string, code: string) {
-        // Simplifikasi: Kita skip delete fisik, set status saja via frontend logic saveExam
         return { success: true };
     },
 
-    async getResults(userId: string, examCode?: string) {
-        const res = await callScript('getResults', {});
+    // UPDATE: Support Sharding Params
+    async getResults(userId: string, examCode?: string, className?: string) {
+        // Kirim examCode dan className ke GAS agar GAS bisa memilih sheet yang tepat
+        const res = await callScript('getResults', { examCode, className });
         let data = res.data || [];
-        if (examCode) {
-            data = data.filter((r: any) => r.examCode === examCode);
-        }
+        // Fallback client-side filter jika GAS mengembalikan semua data
+        if (examCode) data = data.filter((r: any) => r.examCode === examCode);
+        if (className && className !== 'ALL') data = data.filter((r: any) => r.student.class === className);
         return data;
     },
 
     async saveResult(userId: string, result: any) {
+        // Kirim data lengkap termasuk className agar GAS bisa routing ke sheet yang benar
         return callScript('saveResult', { data: result });
     },
 
