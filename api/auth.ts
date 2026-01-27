@@ -16,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (action === 'login') {
             const { username, password } = req.body;
-            // Gunakan metode login langsung ke Script
             const user = await db.loginUser(username, password);
             
             if (user) {
@@ -28,11 +27,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(401).json({ success: false, error: 'Username atau Password salah.' });
             }
         }
+
+        if (action === 'register') {
+            const { username, password, fullName, school } = req.body;
+            
+            if (!username || !password || !fullName || !school) {
+                return res.status(400).json({ success: false, error: 'Semua data wajib diisi.' });
+            }
+
+            try {
+                const user = await db.registerUser({ username, password, fullName, school });
+                return res.status(200).json({ success: true, ...user });
+            } catch (e: any) {
+                return res.status(400).json({ success: false, error: e.message || 'Gagal mendaftar.' });
+            }
+        }
         
         // Google Login Support (Simplified)
         if (action === 'google-login') {
-             // Untuk mode simple ini, kita izinkan semua Google Login sebagai Guru
-             // Anda bisa filter email di sini jika mau
              const { token } = req.body;
              const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
              const payload = await googleRes.json() as any;
@@ -44,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                      fullName: payload.name,
                      avatar: payload.picture,
                      accountType: 'guru',
-                     school: 'Google Account'
+                     school: 'Google Account' // Bisa diupdate nanti jika ada endpoint 'update-profile'
                  });
              }
         }
