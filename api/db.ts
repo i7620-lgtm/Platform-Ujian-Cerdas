@@ -9,13 +9,22 @@ const TEMPLATE_SHEET_ID = process.env.TEMPLATE_SHEET_ID;
 
 // Robust Private Key Parsing
 const getPrivateKey = () => {
-    const key = process.env.GOOGLE_PRIVATE_KEY;
+    let key = process.env.GOOGLE_PRIVATE_KEY;
     if (!key) return null;
+    
+    // Sanitize: Remove surrounding double quotes if present (common Vercel env var paste error)
+    if (key.startsWith('"') && key.endsWith('"')) {
+        key = key.substring(1, key.length - 1);
+    }
+    // Sanitize: Remove surrounding single quotes if present
+    if (key.startsWith("'") && key.endsWith("'")) {
+        key = key.substring(1, key.length - 1);
+    }
+
     // Handle both literal string "\n" (from JSON copy-paste) and actual newlines
     if (key.includes('\\n')) {
         return key.replace(/\\n/g, '\n');
     }
-    // If user pasted multiline key directly into Vercel
     return key;
 };
 
@@ -287,10 +296,6 @@ class GoogleSheetsDB {
         const rowIndex = rows.findIndex((r: string[]) => r[0] === code);
         
         if (rowIndex !== -1) {
-            // Sheets delete row is complex via Values API (Can only clear).
-            // For MVP, we just clear the content. A proper implementation would use batchUpdate deleteDimension.
-            // Using "Soft Delete" by marking status as DELETED is better for history.
-            // But user asked to delete. We will clear cells.
             await this.updateRow(sheetId, `BANK_SOAL!A${rowIndex + 1}:G${rowIndex + 1}`, ['', '', '', '', 'DELETED', '', '']);
         }
     }
