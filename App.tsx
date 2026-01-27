@@ -133,7 +133,7 @@ const App: React.FC = () => {
       setView('TEACHER_DASHBOARD');
   };
 
-  const handleStudentLoginSuccess = async (examCode: string, student: Student, bypassValidation = false) => {
+  const handleStudentLoginSuccess = async (examCode: string, student: Student, _bypassValidation = false) => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode);
@@ -185,7 +185,7 @@ const App: React.FC = () => {
     setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
   
-  const handleForceSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => {
+  const handleForceSubmit = useCallback(async (answers: Record<string, string>, _timeLeft: number, activityLog?: string[]) => {
      // Implementation same as before
      if (!currentExam || !currentStudent) return;
      const result = await storageService.submitExamResult({
@@ -195,7 +195,7 @@ const App: React.FC = () => {
      setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
   
-  const handleExamUpdate = useCallback(async (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => {
+  const handleExamUpdate = useCallback(async (answers: Record<string, string>, _timeLeft: number, location?: string, activityLog?: string[]) => {
       if(currentExam && currentStudent) {
           storageService.submitExamResult({
              student: currentStudent, examCode: currentExam.code, answers, totalQuestions: 0, completionTime: 0, activityLog: activityLog||[], location, status: 'in_progress'
