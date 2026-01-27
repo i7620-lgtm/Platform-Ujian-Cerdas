@@ -19,7 +19,8 @@ const callScript = async (action: string, data: any = {}) => {
         });
         
         const result = await response.json();
-        if (!result.success && !result.data && !result.user) {
+        // Relaxed error checking for findUser which expects success:false when not found
+        if (!result.success && !result.data && !result.user && action !== 'findUser') {
             throw new Error(result.error || "Database operation failed");
         }
         return result;
@@ -41,6 +42,12 @@ export default {
     async loginUser(username: string, password: string) {
         const res = await callScript('auth', { username, password });
         return res.user;
+    },
+
+    // Find User (Check existence)
+    async findUser(username: string) {
+        const res = await callScript('findUser', { username });
+        return res.success ? res.user : null;
     },
 
     // Register User Baru (NEW)
