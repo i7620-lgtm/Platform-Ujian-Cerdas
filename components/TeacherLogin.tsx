@@ -28,8 +28,6 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
     const initGoogle = () => {
