@@ -78,6 +78,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              }
         }
 
+        // --- NEW: User Management Features ---
+        
+        if (action === 'get-users') {
+            try {
+                const allUsers = await db.getAllUsers();
+                // FILTER: Hapus akun super_admin dari daftar yang dikembalikan
+                const filteredUsers = allUsers
+                    .filter((u: any) => u.accountType !== 'super_admin')
+                    .map((u: any) => ({
+                        email: u.username,
+                        fullName: u.fullName,
+                        role: u.accountType,
+                        school: u.school
+                    }));
+                return res.status(200).json(filteredUsers);
+            } catch (e: any) {
+                return res.status(500).json({ error: e.message });
+            }
+        }
+
+        if (action === 'update-role') {
+            const { email, role, school } = req.body;
+            if (!email || !role) return res.status(400).json({ error: 'Data tidak lengkap' });
+            
+            try {
+                const success = await db.updateUserRole(email, role, school || '');
+                return res.status(200).json({ success });
+            } catch (e: any) {
+                return res.status(500).json({ error: e.message });
+            }
+        }
+
         return res.status(400).json({ error: 'Action not supported' });
 
     } catch (error: any) {
