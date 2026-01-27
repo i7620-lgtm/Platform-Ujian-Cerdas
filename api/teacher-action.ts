@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
+import db from './_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,10 +11,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const { examCode, studentId, action } = req.body;
-        // In this architecture, we need to know WHICH teacher owns the sheet to update it.
-        // We can scan or pass the owner ID from frontend if available.
-        // Scanning is safer.
-        
         const teachers = await db.getAllTeacherKeys();
         let targetTeacher = null;
         let targetResult = null;
