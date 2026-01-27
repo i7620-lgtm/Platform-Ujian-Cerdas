@@ -1,23 +1,30 @@
 
-
 import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
 // --- CONFIGURATION ---
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || process.env.CLIENT_EMAIL;
 
-// HELPER: Cerdas mengekstrak ID baik dari string murni maupun URL lengkap
+// HELPER: PEMBERSIH ID YANG AGRESIF (ULTRA-ROBUST)
 const cleanId = (input: string | undefined) => {
     if (!input) return undefined;
-    const cleanInput = input.trim().replace(/^["']|["']$/g, ''); // Hapus spasi & kutip
     
-    // Cek apakah input adalah URL (misal: https://docs.google.com/spreadsheets/d/ID_DISINI/edit...)
-    const urlMatch = cleanInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    // 1. Hapus semua spasi, tanda kutip ganda, tanda kutip tunggal, dan backtick secara paksa
+    let clean = input.replace(/[\s"'`]/g, '');
+    
+    // 2. Cek apakah ini URL lengkap (mengandung /d/)
+    const urlMatch = clean.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (urlMatch && urlMatch[1]) {
-        return urlMatch[1]; // Kembalikan ID hasil ekstrak
+        return urlMatch[1];
     }
     
-    return cleanInput; // Kembalikan input as-is (asumsi sudah ID)
+    // 3. Jika user mengkopi ID tapi ada sisa path (misal: ID_DISINI/edit#gid=0)
+    // Hapus apa pun setelah tanda slash '/' atau tanda tanya '?' atau pagar '#'
+    clean = clean.split('/')[0];
+    clean = clean.split('?')[0];
+    clean = clean.split('#')[0];
+
+    return clean;
 };
 
 const MASTER_SHEET_ID = cleanId(process.env.MASTER_SHEET_ID);
@@ -26,28 +33,46 @@ const TEMPLATE_SHEET_ID = cleanId(process.env.TEMPLATE_SHEET_ID);
 // --- SMART KEY FORMATTER ---
 const formatPrivateKey = (key: string | undefined): string | null => {
     if (!key) return null;
+    // Hapus kutip di awal/akhir
     let cleanKey = key.replace(/^["']|["']$/g, '');
-    cleanKey = cleanKey.replace(/\\n/g, '\n');
+    
+    // Ganti literal \n (dua karakter) menjadi newline asli
+    cleanKey = cleanKey.split(String.raw`\n`).join('\n');
+    
+    // Perbaikan format PEM standar
     const header = "-----BEGIN PRIVATE KEY-----";
     const footer = "-----END PRIVATE KEY-----";
-    if (!cleanKey.includes(header)) cleanKey = `${header}\n${cleanKey}`;
-    if (!cleanKey.includes(footer)) cleanKey = `${cleanKey}\n${footer}`;
-    if (!cleanKey.includes('\n')) {
-       cleanKey = cleanKey.replace(header, `${header}\n`).replace(footer, `\n${footer}`).replace(/ /g, '\n');
+    
+    if (!cleanKey.includes(header)) {
+        cleanKey = `${header}\n${cleanKey}`;
     }
+    if (!cleanKey.includes(footer)) {
+        cleanKey = `${cleanKey}\n${footer}`;
+    }
+    
+    // Jika masih satu baris panjang (selain header/footer), coba pecah spasi
+    if (!cleanKey.includes('\n', header.length + 5)) {
+         cleanKey = cleanKey
+           .replace(header, `${header}\n`)
+           .replace(footer, `\n${footer}`)
+           .replace(/ /g, '\n');
+    }
+    
     return cleanKey;
 };
 
 const PRIVATE_KEY = formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY || process.env.PRIVATE_KEY);
 
-// --- DIAGNOSTIC LOGGING ---
-// Ini akan muncul di Function Logs Vercel untuk membantu debugging
-console.log(`[DB INIT] Service Account: ${SERVICE_ACCOUNT_EMAIL ? 'Set' : 'MISSING'}`);
-console.log(`[DB INIT] Master Sheet ID: ${MASTER_SHEET_ID ? MASTER_SHEET_ID.substring(0, 5) + '...' : 'MISSING'}`);
-console.log(`[DB INIT] Template Sheet ID: ${TEMPLATE_SHEET_ID ? TEMPLATE_SHEET_ID.substring(0, 5) + '...' : 'MISSING'}`);
+// --- DIAGNOSTIC LOGGING (Akan muncul di Vercel Logs) ---
+console.log("--- DB INIT DIAGNOSTICS ---");
+console.log(`Service Account: [${SERVICE_ACCOUNT_EMAIL}]`);
+console.log(`Master ID (Cleaned): [${MASTER_SHEET_ID}]`);
+console.log(`Template ID (Cleaned): [${TEMPLATE_SHEET_ID}]`);
+// Cek apakah key terlihat valid (panjangnya cukup)
+console.log(`Private Key Loaded: ${PRIVATE_KEY && PRIVATE_KEY.length > 500 ? 'YES (Valid Length)' : 'NO (Check Variable)'}`);
 
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY || !MASTER_SHEET_ID) {
-    console.error("CRITICAL CONFIG ERROR: Missing Google Sheets Credentials.");
+    console.error("CRITICAL: Credential belum lengkap. Cek .env");
 }
 
 // --- TOKEN CACHE ---
@@ -87,6 +112,7 @@ const getAccessToken = async () => {
 
         if (!res.ok) {
             const errText = await res.text();
+            console.error("Token Error Response:", errText);
             throw new Error(`Google Token Error: ${errText}`);
         }
 
@@ -99,7 +125,7 @@ const getAccessToken = async () => {
         throw new Error('Google Access Token kosong.');
     } catch (e: any) {
         if (e.message.includes('error:04075070') || e.message.includes('pem')) {
-             throw new Error(`FORMAT KEY SALAH: Private Key rusak. Cek env var.`);
+             throw new Error(`FORMAT KEY SALAH: Private Key rusak. Hapus semua spasi/enter di Vercel dan paste ulang satu baris.`);
         }
         throw e;
     }
@@ -110,6 +136,10 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
     try {
         const token = await getAccessToken();
         options.headers = { ...options.headers, Authorization: `Bearer ${token}` };
+        
+        // LOG URL SEBELUM FETCH (Tanpa Token) untuk Debugging
+        // console.log(`[Fetching] ${url.replace(/key=[^&]+/, 'key=HIDDEN')}`); 
+
         const res = await fetch(url, options);
         
         if (!res.ok) {
@@ -117,21 +147,39 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
             
             // DIAGNOSTIK ERROR YANG LEBIH DETAIL
             if (res.status === 403) {
-                // Cek ID mana yang ditolak
-                const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
-                const failedId = match ? match[1] : 'Unknown';
+                // Cek ID mana yang ditolak berdasarkan URL
+                // Regex ini sekarang lebih longgar untuk menangkap ID meskipun ada karakter aneh
+                const match = url.match(/spreadsheets\/([^/]+)/);
+                const failedId = match ? match[1] : 'URL_FORMAT_UNKNOWN';
                 
                 let targetName = 'SHEET TIDAK DIKENAL';
                 if (failedId === MASTER_SHEET_ID) targetName = 'DATABASE_MASTER_UJIAN';
                 else if (failedId === TEMPLATE_SHEET_ID) targetName = 'TEMPLATE_DB_GURU';
 
-                console.error(`[403 ERROR] Access denied for ${targetName} (${failedId})`);
-                throw new Error(`IZIN DITOLAK (403) ke ${targetName}.\nID: ${failedId}\nSolusi: Pastikan email '${SERVICE_ACCOUNT_EMAIL}' adalah EDITOR di file tersebut.`);
+                // Log error kritis ke console server
+                console.error(`[403 ERROR DETAILS]`);
+                console.error(`Target: ${targetName}`);
+                console.error(`Requested ID: "${failedId}"`);
+                console.error(`Service Account: ${SERVICE_ACCOUNT_EMAIL}`);
+                
+                throw new Error(`
+                    AKSES DITOLAK (403).
+                    Target: ${targetName}
+                    ID yang dikirim: '${failedId}'
+                    Akun: '${SERVICE_ACCOUNT_EMAIL}'
+                    
+                    SOLUSI:
+                    1. Buka Sheet dengan ID tersebut.
+                    2. Klik tombol 'Share' (Bagikan).
+                    3. Masukkan email '${SERVICE_ACCOUNT_EMAIL}'.
+                    4. Jadikan 'Editor'.
+                    5. PENTING: Jika ID di atas mengandung tanda kutip (") atau %22, perbaiki Environment Variable Anda!
+                `);
             }
             if (res.status === 404) {
-                const match = url.match(/spreadsheets\/([a-zA-Z0-9-_]+)/);
+                const match = url.match(/spreadsheets\/([^/]+)/);
                 const failedId = match ? match[1] : 'Unknown';
-                throw new Error(`SHEET TIDAK DITEMUKAN (404).\nID: ${failedId}\nSolusi: Cek apakah ID Spreadsheet di .env sudah benar (bukan link lengkap).`);
+                throw new Error(`SHEET TIDAK DITEMUKAN (404).\nID: '${failedId}'\nCek apakah ID Spreadsheet di .env sudah benar.`);
             }
             
             throw new Error(`Google API Error [${res.status}]: ${err}`);
@@ -153,6 +201,8 @@ class GoogleSheetsDB {
 
         const range = 'DIRECTORY!A:B';
         // Menggunakan MASTER_SHEET_ID yang sudah dibersihkan
+        if (!MASTER_SHEET_ID) throw new Error("MASTER_SHEET_ID belum diset di Environment Variables.");
+        
         const data = await this.readSheet(MASTER_SHEET_ID!, range);
         const rows = data.values || [];
         
