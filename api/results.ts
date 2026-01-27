@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
+import db from './_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         if (!requesterId) return res.status(400).json({ error: 'User ID missing' });
 
-        // Same logic: Super Admin sees all, Guru sees own.
         let results: any[] = [];
 
         if (requesterRole === 'super_admin' || requesterRole === 'admin') {
