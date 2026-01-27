@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Student } from '../types';
 import { LogoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
