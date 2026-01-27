@@ -4,13 +4,15 @@ import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
 // --- CONFIGURATION ---
-const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+// Mendukung GOOGLE_CLIENT_EMAIL (standar) atau CLIENT_EMAIL (umum)
+const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || process.env.CLIENT_EMAIL;
 const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID;
 const TEMPLATE_SHEET_ID = process.env.TEMPLATE_SHEET_ID;
 
 // Robust Private Key Parsing
 const getPrivateKey = () => {
-    let key = process.env.GOOGLE_PRIVATE_KEY;
+    // Mendukung GOOGLE_PRIVATE_KEY (standar) atau PRIVATE_KEY (umum)
+    let key = process.env.GOOGLE_PRIVATE_KEY || process.env.PRIVATE_KEY;
     if (!key) return null;
     
     // Sanitize: Remove surrounding double quotes if present (common Vercel env var paste error)
