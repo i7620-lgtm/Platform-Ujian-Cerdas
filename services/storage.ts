@@ -76,8 +76,6 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
             sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
         }
         if (matchingPairs && Array.isArray(matchingPairs)) {
-            // Kita shuffle lagi di client agar urutan dropdown berbeda antar siswa (meskipun server sudah shuffle)
-            // Penting: Kita asumsikan p.right berisi TEXT, bukan '?' (karena API sudah diperbaiki).
             const rights = matchingPairs.map(p => p.right).sort(() => Math.random() - 0.5);
             sanitizedQ.matchingPairs = matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
         }
@@ -97,8 +95,6 @@ class StorageService {
   // --- EXAMS ---
   async getExams(): Promise<Record<string, Exam>> {
     let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    // Note: getExams without arguments usually implies student/public context or legacy check.
-    // Dashboard uses direct fetch to /api/exams with headers in App.tsx
     if (this.isOnline) {
       try {
         const response = await retryOperation(() => fetch(`${API_URL}/exams`));
@@ -115,8 +111,6 @@ class StorageService {
   async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
-
-      // CRITICAL FIX: Deteksi Cache "Beracun" (Old Version)
       let isPoisoned = false;
       if (exam && exam.questions) {
           isPoisoned = exam.questions.some(q => 
@@ -166,15 +160,11 @@ class StorageService {
   }
 
   async deleteExam(code: string): Promise<void> {
-      // 1. Delete Local
       const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       delete exams[code];
       this.saveLocal(KEYS.EXAMS, exams);
-
-      // 2. Delete Cloud
       if (this.isOnline) {
           try {
-              // TODO: Pass headers for permission check if called from dashboard
               await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, {
                   method: 'DELETE'
               }));
@@ -182,60 +172,68 @@ class StorageService {
       }
   }
 
-  // --- RESULTS ---
-  async getResults(examCode?: string, headers: Record<string, string> = {}): Promise<Result[]> {
+  // --- RESULTS (UPDATED FOR SHARDING) ---
+  
+  // Method ini sekarang mendukung parameter className untuk mengambil data dari shard tertentu
+  async getResults(examCode?: string, className?: string, headers: Record<string, string> = {}): Promise<Result[]> {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     
     if (this.isOnline) {
         try {
-            // Support filtering by code to reduce bandwidth for monitoring
-            const query = examCode ? `?code=${examCode}` : '';
-            const response = await retryOperation(() => fetch(`${API_URL}/results${query}`, { 
-                headers: headers as any, // Inject Auth Headers
+            // Optimization: If className is provided, backend will only read that specific sheet
+            const queryParts = [];
+            if (examCode) queryParts.push(`code=${examCode}`);
+            if (className && className !== 'ALL') queryParts.push(`class=${encodeURIComponent(className)}`);
+            
+            const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+            
+            const response = await retryOperation(() => fetch(`${API_URL}/results${queryString}`, { 
+                headers: headers as any, 
                 cache: 'no-store' 
             }));
             
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
                 
-                const combined = [...localResults];
+                // Merge logic (Simple replace for now to support streaming updates)
+                // Note: In sharding mode, local caching needs to be careful not to overwrite mixed classes incorrectly
+                // For simplicity in teacher dashboard, we might rely purely on server state for monitored class.
                 
-                cloudResults.forEach(cRes => {
-                    const idx = combined.findIndex(l => l.examCode === cRes.examCode && l.student.studentId === cRes.student.studentId);
-                    if (idx === -1) {
-                        combined.push({ ...cRes, isSynced: true });
-                    } else {
-                        const local = combined[idx];
-                        // Prioritize server status if timestamp is newer
-                        if ((cRes.timestamp || 0) > (local.timestamp || 0)) {
-                            combined[idx] = { ...cRes, isSynced: true };
-                        }
-                    }
-                });
-                
-                this.saveLocal(KEYS.RESULTS, combined);
-                
-                // If specific exam requested, return filtered list from the updated cache
-                if (examCode) {
-                    return combined.filter(r => r.examCode === examCode);
+                // Only merge to local storage if we are fetching EVERYTHING or specific student
+                // For teacher monitoring specific class, we might just return the data without polluting global cache
+                if (!className) {
+                     const combined = [...localResults];
+                     cloudResults.forEach(cRes => {
+                        const idx = combined.findIndex(l => l.examCode === cRes.examCode && l.student.studentId === cRes.student.studentId);
+                        if (idx === -1) combined.push({ ...cRes, isSynced: true });
+                        else if ((cRes.timestamp || 0) > (combined[idx].timestamp || 0)) combined[idx] = { ...cRes, isSynced: true };
+                     });
+                     this.saveLocal(KEYS.RESULTS, combined);
+                     if (examCode) return combined.filter(r => r.examCode === examCode);
+                     return combined;
                 }
-                return combined;
+                
+                return cloudResults;
             }
         } catch (e) { console.warn("Offline fetching results"); }
     }
     
     // Offline Fallback
-    if (examCode) {
-        return localResults.filter(r => r.examCode === examCode);
-    }
-    return localResults;
+    let filtered = localResults;
+    if (examCode) filtered = filtered.filter(r => r.examCode === examCode);
+    if (className && className !== 'ALL') filtered = filtered.filter(r => r.student.class === className);
+    return filtered;
   }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | undefined> {
     const localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     let result = localResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
+    // Student side fetch does not need class sharding generally, or we infer it
     if ((!result || result.status === 'force_submitted') && this.isOnline) {
         try {
+            // Student doesn't know their class shard easily here without logging in, 
+            // but usually this is called after login. 
+            // We'll fallback to global fetch for single student check which is fast enough or handled by backend logic
             const all = await this.getResults(examCode); 
             result = all.find(r => r.examCode === examCode && r.student.studentId === studentId);
         } catch (e) {}
@@ -280,6 +278,7 @@ class StorageService {
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
+      // Unlock needs to know class to be efficient, but for now we search
       const results = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
       const index = results.findIndex(r => r.examCode === examCode && r.student.studentId === studentId);
       
@@ -296,20 +295,16 @@ class StorageService {
 
           if (this.isOnline) {
              try { 
-                 const response = await retryOperation(() => fetch(`${API_URL}/teacher-action`, {
+                 await retryOperation(() => fetch(`${API_URL}/teacher-action`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         examCode, 
                         studentId, 
-                        action: 'UNLOCK' 
+                        action: 'UNLOCK',
+                        className: updatedResult.student.class // Hint for sharding
                     })
                  }));
-                 if (response.ok) {
-                     const serverRes = await response.json();
-                     results[index] = { ...serverRes, isSynced: true };
-                     this.saveLocal(KEYS.RESULTS, results);
-                 }
              } catch (e) { console.error("Unlock sync failed", e); }
           }
       }
@@ -317,13 +312,11 @@ class StorageService {
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
       if (!this.isOnline) throw new Error("Fitur ini membutuhkan koneksi internet.");
-      
       await retryOperation(() => fetch(`${API_URL}/extend-time`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ examCode, additionalMinutes })
       }));
-      
       // Update local cache optimistically
       const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       if (exams[examCode]) {
