@@ -21,6 +21,9 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Get current origin for debugging
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
@@ -83,9 +86,10 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-gray-200">
-        <div className="w-full max-w-md animate-fade-in">
-            <button onClick={onBack} className="flex items-center gap-2 text-base-content hover:text-primary mb-6 font-semibold transition-colors"><ArrowLeftIcon className="w-5 h-5" /> Kembali</button>
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center">
+        <div className="w-full max-w-md animate-fade-in flex flex-col">
+            <button onClick={onBack} className="flex items-center gap-2 text-base-content hover:text-primary mb-6 font-semibold transition-colors self-start"><ArrowLeftIcon className="w-5 h-5" /> Kembali</button>
+            
+            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center relative z-10">
                 <div className="flex justify-center mb-6"><div className="bg-primary/10 p-3 rounded-full"><LogoIcon className="w-12 h-12 text-primary" /></div></div>
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Login Guru</h2>
                 <p className="text-gray-500 text-sm mb-8">Masuk untuk mengelola ujian dan data siswa.</p>
@@ -108,11 +112,40 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                         <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" required disabled={isLoading} />
                     </div>
-                    {error && <p className="text-rose-500 text-sm font-bold bg-rose-50 p-2 rounded-lg text-center">{error}</p>}
+                    {error && (
+                        <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center">
+                            <p className="font-bold">{error}</p>
+                            {/* Show technical hint if relevant */}
+                            {error.includes('Key') && <p className="text-[10px] mt-1 text-rose-400">Cek format Private Key di Vercel.</p>}
+                            {error.includes('Izin') && <p className="text-[10px] mt-1 text-rose-400">Share Sheet ke Service Account.</p>}
+                        </div>
+                    )}
                     <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg">
                         {isLoading ? 'Memproses...' : 'Masuk Manual'}
                     </button>
                 </form>
+            </div>
+
+            {/* DEBUG SECTION: VISIBLE ORIGIN URL */}
+            <div className="mt-8 text-center opacity-80 hover:opacity-100 transition-opacity">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">
+                    Debug Info: Origin URL
+                </p>
+                <div 
+                    className="bg-white/50 border-2 border-dashed border-gray-400/30 rounded-lg p-3 text-xs font-mono text-gray-600 break-all cursor-pointer hover:bg-white hover:border-primary/50 hover:text-primary transition-all flex items-center justify-center gap-2 group"
+                    onClick={() => {
+                        navigator.clipboard.writeText(currentOrigin);
+                        alert(`URL disalin:\n${currentOrigin}\n\nMasukkan ini ke Google Cloud Console > Authorized JavaScript origins`);
+                    }}
+                    title="Klik untuk menyalin URL ini"
+                >
+                    <span>{currentOrigin}</span>
+                    <svg className="w-3 h-3 opacity-50 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2 max-w-xs mx-auto leading-relaxed">
+                    Jika muncul <strong>Error 400: origin_mismatch</strong>, salin URL di atas dan tambahkan ke 
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline ml-1">Google Cloud Console</a>.
+                </p>
             </div>
         </div>
     </div>
