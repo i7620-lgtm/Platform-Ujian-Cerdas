@@ -21,8 +21,7 @@ const App: React.FC = () => {
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [exams, setExams] = useState<Record<string, Exam>>({});
-  // Results are now fetched on demand inside dashboard to support sharding
-  const [results, setResults] = useState<Result[]>([]); 
+  
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [loginConflict, setLoginConflict] = useState<{ message: string; onConfirm: () => void; } | null>(null);
@@ -57,12 +56,6 @@ const App: React.FC = () => {
         setIsSyncing(false);
     }
   }, [getHeaders]);
-
-  // REMOVED GLOBAL RESULT REFRESH TO PREVENT BOTTLENECK
-  const refreshResults = useCallback(async () => {
-     // No-op for global refresh in sharded mode
-     // Components should fetch what they need
-  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
