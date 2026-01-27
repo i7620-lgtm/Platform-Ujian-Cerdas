@@ -18,10 +18,12 @@ const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
 const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => void; }> = ({ errorMessage, onRetry }) => {
     const isTemplateError = errorMessage.includes('TEMPLATE_DB_GURU');
-    const isMasterError = errorMessage.includes('DATABASE_MASTER_UJIAN');
     
     const sheetIdMatch = errorMessage.match(/ID: '([a-zA-Z0-9-_]+)'/);
     const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
+
+    const emailMatch = errorMessage.match(/EMAIL AKUN: '([^']+)'/);
+    const serviceAccountEmail = emailMatch ? emailMatch[1] : null;
 
     const sheetName = isTemplateError ? "Template Ujian Guru" : "Database Master Ujian";
     const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null;
@@ -34,13 +36,13 @@ const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => v
             </p>
             
             <div className="space-y-4 text-xs">
-                <p className="font-bold text-rose-800">Langkah-langkah Perbaikan Wajib:</p>
+                <p className="font-bold text-rose-800">CHECKLIST PERBAIKAN WAJIB:</p>
                 
                 <div className="flex gap-3 items-start">
                     <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">1</span>
                     <div>
                         <p className="font-semibold text-rose-800">Aktifkan Google Drive API</p>
-                        <p className="text-rose-600/90 leading-relaxed">Aplikasi perlu izin untuk <strong className="font-bold">menyalin file template</strong> saat akun baru login. Klik link di bawah & pastikan API sudah aktif (tombol "ENABLE" atau "MANAGE").</p>
+                        <p className="text-rose-600/90 leading-relaxed">Pastikan API ini <strong className="font-bold">AKTIF</strong> di Google Cloud. Aplikasi perlu izin untuk menyalin file.</p>
                         <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-[11px]">
                             Buka Laman Google Drive API ↗
                         </a>
@@ -50,18 +52,34 @@ const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => v
                 <div className="flex gap-3 items-start">
                     <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">2</span>
                     <div>
+                        <p className="font-semibold text-rose-800">Verifikasi Email Service Account</p>
+                        <p className="text-rose-600/90 leading-relaxed">Aplikasi ini mencoba login menggunakan email di bawah ini. Salin dan pastikan ini adalah email yang benar.</p>
+                        <div className="bg-rose-100 p-2 rounded-lg my-2 flex items-center justify-between gap-2 border border-rose-200">
+                           <code className="text-[10px] text-rose-800 font-semibold break-all">{serviceAccountEmail || "Gagal mendeteksi email..."}</code>
+                           {serviceAccountEmail && (
+                               <button 
+                                  onClick={() => navigator.clipboard.writeText(serviceAccountEmail)}
+                                  className="text-rose-600 hover:text-rose-900 bg-white px-2 py-1 text-[9px] font-bold rounded shadow-sm border border-rose-200"
+                                >
+                                  SALIN
+                               </button>
+                           )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 items-start">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">3</span>
+                    <div>
                         <p className="font-semibold text-rose-800">Bagikan File Google Sheet ({sheetName})</p>
                         <p className="text-rose-600/90 leading-relaxed">
-                            Pastikan Service Account Anda memiliki akses <strong className="bg-rose-100 px-1 rounded font-bold">Editor</strong> ke file Google Sheet yang bermasalah.
+                            Buka file sheet yang bermasalah dan bagikan ke email dari <strong className="font-bold">langkah 2</strong> dengan akses sebagai <strong className="bg-rose-100 px-1 rounded font-bold">Editor</strong>.
                         </p>
                         {sheetUrl && (
                             <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all block my-1 text-[11px]">
                                 Buka File {sheetName} di Google Sheets ↗
                             </a>
                         )}
-                        <p className="mt-2 text-[10px] text-rose-500 bg-rose-100 p-2 rounded-md">
-                            <strong>PENTING:</strong> Email Service Account dapat ditemukan di Vercel Environment Variables (cari variabel `GOOGLE_CLIENT_EMAIL` atau `CLIENT_EMAIL`). Pastikan Anda membagikan Sheet ke email yang benar.
-                        </p>
                     </div>
                 </div>
             </div>
