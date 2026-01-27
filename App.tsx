@@ -21,7 +21,8 @@ const App: React.FC = () => {
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [exams, setExams] = useState<Record<string, Exam>>({});
-  const [results, setResults] = useState<Result[]>([]);
+  // Results are now fetched on demand inside dashboard to support sharding
+  const [results, setResults] = useState<Result[]>([]); 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [loginConflict, setLoginConflict] = useState<{ message: string; onConfirm: () => void; } | null>(null);
@@ -57,19 +58,11 @@ const App: React.FC = () => {
     }
   }, [getHeaders]);
 
+  // REMOVED GLOBAL RESULT REFRESH TO PREVENT BOTTLENECK
   const refreshResults = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-        const headers = getHeaders();
-        // Pass auth headers to storage service which calls the API
-        const loadedResults = await storageService.getResults(undefined, headers as any);
-        setResults(loadedResults);
-    } catch (e) {
-        console.error("Failed to load results:", e);
-    } finally {
-        setIsSyncing(false);
-    }
-  }, [getHeaders]);
+     // No-op for global refresh in sharded mode
+     // Components should fetch what they need
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -88,11 +81,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // ... (Sisa logic effect untuk stream/preview/login student sama persis, disembunyikan untuk ringkas) ...
-  // Assume logic is preserved here from previous file content provided by user.
-  // Including handleStudentLoginSuccess, handleExamSubmit, etc.
-  
-  // Re-implementing key logic needed for rendering:
+  // --- LOGIC EFFECT FOR PUBLIC STREAM ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
@@ -105,12 +94,7 @@ const App: React.FC = () => {
                 const exam = await storageService.getExamForStudent(streamCode);
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
-                    // Public stream shouldn't require auth headers for reading basic stats if endpoint allows, 
-                    // but for strict mode, results might be hidden. 
-                    // For now, public stream uses cached results or requires adjustment if strict mode blocks it.
-                    // Assuming public endpoint for stream results handles this separately or we reuse local cache.
-                    // For this specific update, we keep refreshResults() generic here.
-                    await refreshResults(); 
+                    // Stream will load its own results
                     setView('PUBLIC_STREAM');
                 } else {
                     alert("Livestream tidak ditemukan.");
@@ -132,7 +116,7 @@ const App: React.FC = () => {
         };
         loadPreview();
     }
-  }, [refreshResults]);
+  }, []);
 
   const handleTeacherLoginSuccess = async (profile: TeacherProfile) => {
       setTeacherProfile(profile);
@@ -144,8 +128,6 @@ const App: React.FC = () => {
     try {
       const exam = await storageService.getExamForStudent(examCode);
       if (!exam) { alert("Kode soal tidak ditemukan."); setIsSyncing(false); return; }
-      
-      // ... Validation logic simplified for brevity in this update ...
       
       const existingResult = await storageService.getStudentResult(examCode, student.studentId);
       if (existingResult && existingResult.status === 'completed' && !exam.config.allowRetakes) {
@@ -192,7 +174,6 @@ const App: React.FC = () => {
   }, [currentExam, currentStudent]);
   
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, _timeLeft: number, activityLog?: string[]) => {
-     // Implementation same as before
      if (!currentExam || !currentStudent) return;
      const result = await storageService.submitExamResult({
          student: currentStudent, examCode: currentExam.code, answers, totalQuestions: 0, completionTime: 0, activityLog: activityLog || [], status: 'force_submitted'
@@ -210,7 +191,6 @@ const App: React.FC = () => {
   }, [currentExam, currentStudent]);
 
   const handleCheckExamStatus = async () => {
-      // Logic same as before
       if(currentExam && currentStudent) {
           const res = await storageService.getStudentResult(currentExam.code, currentStudent.studentId);
           if(res && res.status === 'in_progress') {
@@ -228,7 +208,7 @@ const App: React.FC = () => {
 
   const updateExam = useCallback(async (u: Exam) => { setExams(p => ({...p, [u.code]: u})); await storageService.saveExam(u); }, []);
   const deleteExam = useCallback(async (c: string) => { setExams(p => { const n = {...p}; delete n[c]; return n; }); await storageService.deleteExam(c); }, []);
-  const onAllowContinuation = async () => { await refreshResults(); };
+  const onAllowContinuation = async () => { /* No-op global refresh */ };
 
   const resetToHome = () => {
     setCurrentExam(null); setCurrentStudent(null); setStudentResult(null); setResumedResult(null); setTeacherProfile(null); setView('SELECTOR'); window.history.replaceState(null, '', '/'); 
@@ -246,16 +226,12 @@ const App: React.FC = () => {
       return (
         <div className="relative min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 overflow-hidden flex flex-col items-center justify-center p-6">
              <SyncStatus />
-             
-             {/* Background Elements */}
              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                  <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-gradient-to-br from-indigo-200/20 to-purple-200/20 rounded-full blur-[80px]" />
                  <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-gradient-to-tr from-cyan-200/20 to-blue-200/20 rounded-full blur-[80px]" />
              </div>
 
              <div className="relative z-10 w-full max-w-[400px] flex flex-col gap-6 animate-slide-in-up">
-                 
-                 {/* Header */}
                  <div className="text-center mb-4">
                      <div className="inline-flex p-4 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 border border-slate-50">
                         <LogoIcon className="w-12 h-12 text-indigo-600" />
@@ -264,7 +240,6 @@ const App: React.FC = () => {
                      <p className="text-slate-500 font-medium text-sm">Platform asesmen modern untuk<br/>sekolah masa depan.</p>
                  </div>
 
-                 {/* Role Cards */}
                  <div className="space-y-4">
                      <button 
                         onClick={() => setView('STUDENT_LOGIN')}
@@ -308,15 +283,12 @@ const App: React.FC = () => {
                         </div>
                      </button>
                  </div>
-
-                 {/* Footer Status */}
                  <div className="mt-8 flex justify-center">
                     <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                         {isOnline ? 'System Online' : 'Offline Mode'}
                     </div>
                  </div>
-
              </div>
         </div>
       );
@@ -335,11 +307,11 @@ const App: React.FC = () => {
                   updateExam={updateExam} 
                   deleteExam={deleteExam}
                   exams={exams} 
-                  results={results} 
+                  results={[]} // Pass empty initially, component will load on demand
                   onLogout={resetToHome} 
                   onAllowContinuation={onAllowContinuation}
                   onRefreshExams={refreshExams}
-                  onRefreshResults={refreshResults}
+                  onRefreshResults={async ()=>{}}
             />
         )}
         {view === 'STUDENT_EXAM' && currentExam && currentStudent && (
@@ -369,7 +341,7 @@ const App: React.FC = () => {
                  <div className="w-full">
                      <OngoingExamModal 
                         exam={currentExam} 
-                        results={results} 
+                        results={[]} 
                         onClose={resetToHome} 
                         onAllowContinuation={() => {}} 
                         isReadOnly={true}
