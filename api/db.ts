@@ -1,4 +1,5 @@
 
+
 import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
@@ -77,7 +78,7 @@ const getAccessToken = async () => {
             throw new Error(`Failed to get Google Token: ${errText}`);
         }
 
-        const data = await res.json();
+        const data = await res.json() as any;
         if (data.access_token) {
             cachedToken = data.access_token;
             tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
@@ -111,7 +112,7 @@ const gFetch = async (url: string, options: any = {}) => {
             
             throw new Error(`Google API Error: ${res.statusText} - ${err}`);
         }
-        return res.json();
+        return res.json() as Promise<any>;
     } catch (e: any) {
         console.error("gFetch Wrapper Error:", e.message);
         throw e;
