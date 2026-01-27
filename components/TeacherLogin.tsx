@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
@@ -35,7 +35,14 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 });
                 const btnDiv = document.getElementById("googleSignInBtn");
                 if (btnDiv) {
-                    window.google.accounts.id.renderButton(btnDiv, { theme: "outline", size: "large", text: "continue_with", shape: "pill", width: "100%" });
+                    // Fix: width must be pixels in string format (e.g. "400"), not percentage.
+                    window.google.accounts.id.renderButton(btnDiv, { 
+                        theme: "outline", 
+                        size: "large", 
+                        text: "continue_with", 
+                        shape: "pill", 
+                        width: "350" 
+                    });
                 }
             } catch (e) { console.error("Google Sign-In Error:", e); }
         }
@@ -83,7 +90,9 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Login Guru</h2>
                 <p className="text-gray-500 text-sm mb-8">Masuk untuk mengelola ujian dan data siswa.</p>
                 
-                <div id="googleSignInBtn" className="w-full flex justify-center mb-6 min-h-[44px]"></div>
+                <div className="flex justify-center w-full mb-6">
+                    <div id="googleSignInBtn" className="min-h-[44px]"></div>
+                </div>
                 
                 <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
