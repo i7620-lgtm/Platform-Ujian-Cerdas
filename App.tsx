@@ -1,4 +1,5 @@
- 
+
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -415,6 +416,56 @@ const App: React.FC = () => {
       </div>
   );
 
+  // --- REDESIGNED LANDING PAGE ---
+  if (view === 'SELECTOR') {
+      return (
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+             {/* Abstract Background */}
+             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200/20 rounded-full blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/20 rounded-full blur-[100px]"></div>
+             </div>
+
+             <div className="w-full max-w-md bg-white/70 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white p-8 sm:p-12 relative z-10 animate-slide-in-up">
+                <div className="mb-12 flex flex-col items-center text-center">
+                    <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center text-white mb-6 transform rotate-3 transition-transform duration-500 hover:rotate-6">
+                        <LogoIcon className="w-10 h-10" />
+                    </div>
+                    <h1 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">Ujian Cerdas</h1>
+                    <p className="text-slate-500 text-sm font-medium leading-relaxed max-w-[260px]">Platform evaluasi modern.<br/>Cepat, Tepat, dan Terpercaya.</p>
+                </div>
+                
+                <div className="space-y-4">
+                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-300 text-slate-700 font-bold py-4 px-6 rounded-2xl transition-all shadow-sm hover:shadow-md flex items-center justify-between">
+                        <div className="flex flex-col items-start">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Masuk Sebagai</span>
+                            <span className="text-lg text-slate-800">Siswa</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center transition-colors">
+                           <svg className="w-5 h-5 text-slate-500 group-hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        </div>
+                    </button>
+
+                    <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-slate-900 hover:bg-black text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-slate-300 flex items-center justify-between">
+                        <div className="flex flex-col items-start">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Masuk Sebagai</span>
+                            <span className="text-lg">Guru / Admin</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
+                           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+                        </div>
+                    </button>
+                </div>
+                
+                <div className="mt-10 flex justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100/50 py-2 px-4 rounded-full w-fit mx-auto backdrop-blur-sm">
+                    <span className={isOnline ? "text-emerald-500 animate-pulse" : "text-rose-500"}>●</span>
+                    <span>{isOnline ? "System Online" : "System Offline"}</span>
+                </div>
+             </div>
+          </div>
+      );
+  }
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <SyncStatus />
@@ -423,7 +474,7 @@ const App: React.FC = () => {
         {view === 'STUDENT_LOGIN' && <StudentLogin onLoginSuccess={(code, student) => handleStudentLoginSuccess(code, student)} onBack={() => setView('SELECTOR')} />}
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
             <TeacherDashboard 
-                  teacherProfile={teacherProfile} // Pass full profile
+                  teacherProfile={teacherProfile} 
                   addExam={addExam} 
                   updateExam={updateExam} 
                   deleteExam={deleteExam}
@@ -469,49 +520,6 @@ const App: React.FC = () => {
                      />
                  </div>
             </div>
-        )}
-        {view === 'SELECTOR' && (
-           <div className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden bg-slate-50">
-             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(to right, #cbd5e1 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: 0.25 }}></div>
-             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-slate-100/80 pointer-events-none"></div>
-
-             <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white p-8 sm:p-12 relative z-10 animate-fade-in">
-                <div className="mb-10 flex flex-col items-center text-center">
-                    <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center text-white mb-6 transform rotate-3 hover:rotate-6 transition-transform duration-500">
-                        <LogoIcon className="w-10 h-10" />
-                    </div>
-                    <h1 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">Ujian Cerdas</h1>
-                    <p className="text-slate-500 text-sm font-medium leading-relaxed">Platform evaluasi modern berbasis AI.<br/>Cepat, Tepat, dan Terpercaya.</p>
-                </div>
-                
-                <div className="space-y-4">
-                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
-                        <div className="flex flex-col items-start">
-                            <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
-                            <span className="text-lg">Siswa</span>
-                        </div>
-                        <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors">
-                           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                        </div>
-                    </button>
-
-                    <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-1 active:scale-95 flex items-center justify-between">
-                        <div className="flex flex-col items-start">
-                            <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Masuk Sebagai</span>
-                            <span className="text-lg">Guru</span>
-                        </div>
-                        <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors">
-                           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
-                        </div>
-                    </button>
-                </div>
-                
-                <div className="mt-12 flex justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100/50 py-2 px-4 rounded-full w-fit mx-auto">
-                    <span className={isOnline ? "text-emerald-500 animate-pulse" : "text-rose-500"}>●</span>
-                    <span>{isOnline ? "System Online" : "System Offline"}</span>
-                </div>
-             </div>
-          </div>
         )}
 
         {loginConflict && (
