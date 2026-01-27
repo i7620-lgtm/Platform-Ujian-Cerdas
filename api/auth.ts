@@ -40,6 +40,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const user = await db.registerUser({ username, password: password || '', fullName, school });
                 return res.status(200).json({ success: true, ...user });
             } catch (e: any) {
+                // LOGIKA SELF-HEALING:
+                // Jika errornya "Username sudah dipakai", artinya user sebenarnya ada tapi proses cek awal (findUser) gagal/dilewati.
+                // Kita coba ambil data user tersebut (Force Login)
+                if (e.message && (e.message.includes('Username sudah dipakai') || e.message.includes('duplicate'))) {
+                    const existingUser = await db.findUser(username);
+                    if (existingUser) {
+                        // Jika ketemu, return success seolah-olah baru register/login
+                        return res.status(200).json({ success: true, ...existingUser });
+                    }
+                }
                 return res.status(400).json({ success: false, error: e.message || 'Gagal mendaftar.' });
             }
         }
