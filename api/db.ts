@@ -1,68 +1,112 @@
+
 import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
 // --- CONFIGURATION ---
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
-const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 const MASTER_SHEET_ID = process.env.MASTER_SHEET_ID;
 const TEMPLATE_SHEET_ID = process.env.TEMPLATE_SHEET_ID;
 
+// Robust Private Key Parsing
+const getPrivateKey = () => {
+    const key = process.env.GOOGLE_PRIVATE_KEY;
+    if (!key) return null;
+    // Handle both literal string "\n" (from JSON copy-paste) and actual newlines
+    if (key.includes('\\n')) {
+        return key.replace(/\\n/g, '\n');
+    }
+    // If user pasted multiline key directly into Vercel
+    return key;
+};
+
+const PRIVATE_KEY = getPrivateKey();
+
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY || !MASTER_SHEET_ID) {
-    console.error("Missing Google Sheets Credentials in Environment Variables.");
+    console.error("CRITICAL ERROR: Missing Google Sheets Credentials.");
+    console.error("Email:", !!SERVICE_ACCOUNT_EMAIL);
+    console.error("Key:", !!PRIVATE_KEY);
+    console.error("Sheet ID:", !!MASTER_SHEET_ID);
 }
 
 // --- TOKEN CACHE ---
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
 
-// --- JWT GENERATOR (Native Node.js implementation to avoid huge deps) ---
+// --- JWT GENERATOR (Native Node.js implementation) ---
 const getAccessToken = async () => {
     if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+    if (!PRIVATE_KEY || !SERVICE_ACCOUNT_EMAIL) throw new Error("Credentials not configured");
 
-    const header = { alg: 'RS256', typ: 'JWT' };
-    const now = Math.floor(Date.now() / 1000);
-    const claim = {
-        iss: SERVICE_ACCOUNT_EMAIL,
-        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
-        aud: 'https://oauth2.googleapis.com/token',
-        exp: now + 3600,
-        iat: now,
-    };
+    try {
+        const header = { alg: 'RS256', typ: 'JWT' };
+        const now = Math.floor(Date.now() / 1000);
+        const claim = {
+            iss: SERVICE_ACCOUNT_EMAIL,
+            scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
+            aud: 'https://oauth2.googleapis.com/token',
+            exp: now + 3600,
+            iat: now,
+        };
 
-    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
-    const encodedClaim = Buffer.from(JSON.stringify(claim)).toString('base64url');
+        const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+        const encodedClaim = Buffer.from(JSON.stringify(claim)).toString('base64url');
 
-    const sign = crypto.createSign('RSA-SHA256');
-    sign.update(`${encodedHeader}.${encodedClaim}`);
-    const signature = sign.sign(PRIVATE_KEY!, 'base64url');
-    const jwt = `${encodedHeader}.${encodedClaim}.${signature}`;
+        const sign = crypto.createSign('RSA-SHA256');
+        sign.update(`${encodedHeader}.${encodedClaim}`);
+        const signature = sign.sign(PRIVATE_KEY, 'base64url');
+        const jwt = `${encodedHeader}.${encodedClaim}.${signature}`;
 
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-    });
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+        });
 
-    const data = await res.json();
-    if (data.access_token) {
-        cachedToken = data.access_token;
-        tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
-        return cachedToken;
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error('Google Token Error:', errText);
+            throw new Error(`Failed to get Google Token: ${errText}`);
+        }
+
+        const data = await res.json();
+        if (data.access_token) {
+            cachedToken = data.access_token;
+            tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
+            return cachedToken;
+        }
+        throw new Error('Failed to get Google Access Token (No token in response)');
+    } catch (e: any) {
+        console.error("JWT Generation Failed:", e.message);
+        throw e;
     }
-    throw new Error('Failed to get Google Access Token');
 };
 
 // --- HELPER FETCH ---
 const gFetch = async (url: string, options: any = {}) => {
-    const token = await getAccessToken();
-    options.headers = { ...options.headers, Authorization: `Bearer ${token}` };
-    const res = await fetch(url, options);
-    if (!res.ok) {
-        const err = await res.text();
-        console.error('Google API Error:', url, err);
-        throw new Error(`Google API Error: ${res.statusText}`);
+    try {
+        const token = await getAccessToken();
+        options.headers = { ...options.headers, Authorization: `Bearer ${token}` };
+        const res = await fetch(url, options);
+        
+        if (!res.ok) {
+            const err = await res.text();
+            // Log specific Google errors (like 403 Forbidden, 404 Not Found)
+            console.error(`Google API Error [${res.status}]:`, url, err);
+            
+            if (res.status === 403) {
+                throw new Error(`Izin Ditolak (403). Pastikan email '${SERVICE_ACCOUNT_EMAIL}' sudah ditambahkan sebagai Editor di Spreadsheet.`);
+            }
+            if (res.status === 404) {
+                throw new Error(`Spreadsheet tidak ditemukan (404). Periksa MASTER_SHEET_ID.`);
+            }
+            
+            throw new Error(`Google API Error: ${res.statusText} - ${err}`);
+        }
+        return res.json();
+    } catch (e: any) {
+        console.error("gFetch Wrapper Error:", e.message);
+        throw e;
     }
-    return res.json();
 };
 
 // --- CORE DB CLASS ---
