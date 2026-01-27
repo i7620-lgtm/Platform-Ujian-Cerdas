@@ -97,6 +97,8 @@ class StorageService {
   // --- EXAMS ---
   async getExams(): Promise<Record<string, Exam>> {
     let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
+    // Note: getExams without arguments usually implies student/public context or legacy check.
+    // Dashboard uses direct fetch to /api/exams with headers in App.tsx
     if (this.isOnline) {
       try {
         const response = await retryOperation(() => fetch(`${API_URL}/exams`));
@@ -125,19 +127,14 @@ class StorageService {
       }
 
       if (this.isOnline) {
-          // Jika tidak ada di lokal ATAU data lokal rusak (isPoisoned) ATAU ini mode preview, ambil dari cloud
-          // Force fetch if we want to ensure latest timeLimit etc
-          if (!exam || isPoisoned || isPreview || true) { // Added 'true' to force refresh config for students often
+          if (!exam || isPoisoned || isPreview || true) { 
               try {
                   const previewParam = isPreview ? '&preview=true' : '';
-                  // Tambahkan timestamp (_t) untuk bypass cache Vercel Edge / Browser
                   const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`));
                   if (res.ok) {
                       const cloudExam = await res.json();
                       if (cloudExam) { 
-                          // Jika preview, jangan simpan di local storage siswa biasa agar tidak mengotori cache
                           if (!isPreview) {
-                              // Preserve questions if possible to save bandwidth, but ensure config is updated
                               allExams[cloudExam.code] = cloudExam; 
                               this.saveLocal(KEYS.EXAMS, allExams); 
                           }
@@ -177,6 +174,7 @@ class StorageService {
       // 2. Delete Cloud
       if (this.isOnline) {
           try {
+              // TODO: Pass headers for permission check if called from dashboard
               await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, {
                   method: 'DELETE'
               }));
@@ -185,14 +183,17 @@ class StorageService {
   }
 
   // --- RESULTS ---
-  async getResults(examCode?: string): Promise<Result[]> {
+  async getResults(examCode?: string, headers: Record<string, string> = {}): Promise<Result[]> {
     let localResults = this.loadLocal<Result[]>(KEYS.RESULTS) || [];
     
     if (this.isOnline) {
         try {
             // Support filtering by code to reduce bandwidth for monitoring
             const query = examCode ? `?code=${examCode}` : '';
-            const response = await retryOperation(() => fetch(`${API_URL}/results${query}`, { cache: 'no-store' }));
+            const response = await retryOperation(() => fetch(`${API_URL}/results${query}`, { 
+                headers: headers as any, // Inject Auth Headers
+                cache: 'no-store' 
+            }));
             
             if (response.ok) {
                 const cloudResults: Result[] = await response.json();
@@ -235,7 +236,6 @@ class StorageService {
     let result = localResults.find(r => r.examCode === examCode && r.student.studentId === studentId);
     if ((!result || result.status === 'force_submitted') && this.isOnline) {
         try {
-            // Try fetching specific result (using getResults with code)
             const all = await this.getResults(examCode); 
             result = all.find(r => r.examCode === examCode && r.student.studentId === studentId);
         } catch (e) {}
