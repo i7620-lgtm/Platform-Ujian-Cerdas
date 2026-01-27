@@ -1,25 +1,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
 import db from './db.js';
 
-// Cache untuk status tabel agar tidak menjalankan CREATE TABLE setiap kali request
-let isTableInitialized = false;
-
-// Definisi Skema Tabel yang Benar
-const CREATE_TABLE_SQL = `
-    CREATE TABLE IF NOT EXISTS exams (
-        code TEXT PRIMARY KEY, 
-        author_id TEXT DEFAULT 'anonymous',
-        questions TEXT, 
-        config TEXT,
-        created_at TEXT DEFAULT '',
-        status TEXT DEFAULT 'PUBLISHED',
-        author_school TEXT DEFAULT ''
-    );
-`;
-
-// Helper Shuffle
+// Helper Shuffle (Client side mostly, but kept for public fetch safety)
 const shuffleArray = (array: any[]) => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -27,51 +10,6 @@ const shuffleArray = (array: any[]) => {
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
-};
-
-// Fungsi inisialisasi tabel yang dijalankan sekali per cold-start
-const ensureSchema = async () => {
-    if (isTableInitialized) return;
-    try {
-        console.log("Checking/Creating 'exams' table...");
-        await db.query(CREATE_TABLE_SQL);
-        
-        // MIGRATION CHECK:
-        try {
-             const checkSchool = await db.query(`
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'exams' AND column_name = 'author_school';
-             `);
-             if (checkSchool.rows.length === 0) {
-                 console.log("Adding 'author_school' column...");
-                 await db.query(`ALTER TABLE exams ADD COLUMN author_school TEXT DEFAULT '';`);
-             }
-        } catch (migError) {
-            console.warn("Migration warning:", migError);
-        }
-
-        isTableInitialized = true;
-        console.log("'exams' table verified.");
-    } catch (error) {
-        console.error("Failed to create table:", error);
-    }
-};
-
-const sanitizeExam = (examRow: any) => {
-    try {
-        const questions = JSON.parse(examRow.questions || '[]');
-        return { 
-            code: examRow.code,
-            authorId: examRow.author_id,
-            authorSchool: examRow.author_school,
-            questions,
-            config: JSON.parse(examRow.config || '{}'),
-            createdAt: examRow.created_at || '',
-            status: examRow.status || 'PUBLISHED'
-        };
-    } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: '', status: 'PUBLISHED' };
-    }
 };
 
 const sanitizeForPublic = (exam: any) => {
@@ -101,139 +39,104 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-    
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-store'); // Sheets data changes often
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        await ensureSchema();
-
-        // --- GET: AMBIL DATA ---
+        // --- GET: Fetch Exams ---
         if (req.method === 'GET') {
             const { code, preview } = req.query;
 
-            // -- PUBLIC ACCESS (STUDENT/PREVIEW) --
+            // PUBLIC ACCESS (STUDENT) - NEED TO FIND WHICH TEACHER OWNS THE EXAM
+            // Strategy: Since we don't have a central Exam Table anymore, we have to search or 
+            // the exam code should encoded, OR we assume we know the teacher?
+            // BETTER: Use Master Sheet to have a "Global Exam Index"? 
+            // OR: Iterate all teachers (expensive).
+            // COMPROMISE for Architecture: The "Global Index" is maintained in Master Sheet "EXAM_INDEX" tab?
+            // Or simpler: Student must provide "Teacher ID/Email" + "Exam Code"? No, UX bad.
+            
+            // ELEGANT SOLUTION: Iterate `DIRECTORY` keys from Master Sheet and check caches. 
+            // To make it fast, we can optimize later. For now, we will iterate registered teachers in Directory.
+            // Note: In a real massive app, we'd use a dedicated Index. For school scale (50 teachers), this loop is acceptable in Node.
+            
             if (code && req.url?.includes('public')) {
-                const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
-                if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
-                
-                const exam = sanitizeExam(result.rows[0]);
-                if (exam.status === 'DRAFT' && preview !== 'true') {
-                    return res.status(403).json({ error: 'Exam is currently in draft mode.' });
+                const teachers = await db.getAllTeacherKeys();
+                for (const tId of teachers) {
+                    const exams = await db.getExams(tId);
+                    const found = exams.find((e: any) => e.code === code);
+                    if (found) {
+                        if (found.status === 'DRAFT' && preview !== 'true') {
+                            return res.status(403).json({ error: 'Exam is draft' });
+                        }
+                        return res.status(200).json(sanitizeForPublic(found));
+                    }
                 }
-                return res.status(200).json(sanitizeForPublic(exam));
+                return res.status(404).json({ error: 'Exam not found' });
             } 
             
-            // -- TEACHER ACCESS (FILTER BY ROLE) --
+            // TEACHER ACCESS
             else {
-                // We expect context headers from the client to identify the user role
-                // Note: In a production app, this should be validated via JWT/Session.
-                // Here we trust the headers sent by our frontend App logic for the requirement context.
+                const requesterId = (req.headers['x-user-id'] as string);
                 const requesterRole = (req.headers['x-role'] as string) || 'guru';
-                const requesterId = (req.headers['x-user-id'] as string) || '';
                 const requesterSchool = (req.headers['x-school'] as string) || '';
 
-                let query = 'SELECT * FROM exams';
-                let params: any[] = [];
+                if (!requesterId) return res.status(400).json({ error: 'User ID header required' });
 
                 if (requesterRole === 'super_admin') {
-                    // Super Admin sees ALL
-                    query += ' ORDER BY created_at DESC LIMIT 100';
+                    // Super Admin sees ALL (Aggregated)
+                    const teachers = await db.getAllTeacherKeys();
+                    let allExams: any[] = [];
+                    for (const tId of teachers) {
+                        const exams = await db.getExams(tId);
+                        allExams = [...allExams, ...exams];
+                    }
+                    return res.status(200).json(allExams);
                 } else if (requesterRole === 'admin') {
-                    // Admin sees ALL from their SCHOOL
-                    query += ' WHERE author_school = $1 ORDER BY created_at DESC LIMIT 100';
-                    params.push(requesterSchool);
+                    // Admin sees School's exams
+                    // Filter teachers by school first? 
+                    // Optimization: Just get all and filter by school property in exam object.
+                    const teachers = await db.getAllTeacherKeys();
+                    let schoolExams: any[] = [];
+                    for (const tId of teachers) {
+                        // Check teacher school? Or check exam school context?
+                        // Checking exam context is safer as teachers might move.
+                        const exams = await db.getExams(tId);
+                        schoolExams = [...schoolExams, ...exams.filter((e: any) => e.authorSchool === requesterSchool)];
+                    }
+                    return res.status(200).json(schoolExams);
                 } else {
-                    // Guru sees ONLY OWN exams
-                    query += ' WHERE author_id = $1 ORDER BY created_at DESC LIMIT 100';
-                    params.push(requesterId);
+                    // Guru sees OWN exams
+                    const data = await db.getExams(requesterId);
+                    return res.status(200).json(data);
                 }
-
-                const result = await db.query(query, params);
-                const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
-                return res.status(200).json(data);
             }
         } 
         
-        // --- POST: SIMPAN DATA BARU ---
+        // --- POST: Save Exam ---
         else if (req.method === 'POST') {
             const exam = req.body;
-            if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
-
-            const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
-            const authorSchool = exam.authorSchool || ''; // Save the school context
-            const createdAt = exam.createdAt || new Date().toLocaleString(); 
-            const status = exam.status || 'PUBLISHED';
-
-            const questionsJson = JSON.stringify(exam.questions || []);
-            const configJson = JSON.stringify(exam.config || {});
-
-            const query = `
-                INSERT INTO exams (code, author_id, author_school, questions, config, created_at, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (code) 
-                DO UPDATE SET 
-                    author_id = EXCLUDED.author_id,
-                    author_school = EXCLUDED.author_school,
-                    questions = EXCLUDED.questions,
-                    config = EXCLUDED.config,
-                    created_at = EXCLUDED.created_at,
-                    status = EXCLUDED.status
-            `;
-
-            await db.query(query, [exam.code, authorId, authorSchool, questionsJson, configJson, createdAt, status]);
-            return res.status(200).json({ success: true, message: "Exam saved successfully" });
+            const authorId = exam.authorId;
+            if (!authorId) return res.status(400).json({ error: "Author ID missing" });
+            
+            await db.saveExam(authorId, exam);
+            return res.status(200).json({ success: true });
         }
         
-        // --- PATCH & DELETE (Existing Logic) ---
-        else if (req.method === 'PATCH') {
-            const { code, questionId, imageUrl, optionImages } = req.body;
-            if (!code || !questionId) return res.status(400).json({ error: "Missing parameters" });
-            // ... (keep existing patch logic)
-            const client = await db.getClient();
-            try {
-                await client.query('BEGIN');
-                const result = await client.query('SELECT questions FROM exams WHERE code = $1 FOR UPDATE', [code]);
-                if (result.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Exam not found" }); }
-                let questions = JSON.parse(result.rows[0].questions);
-                let found = false;
-                questions = questions.map((q: any) => {
-                    if (q.id === questionId) {
-                        found = true;
-                        if (imageUrl !== undefined) q.imageUrl = imageUrl;
-                        if (optionImages !== undefined) q.optionImages = optionImages;
-                    }
-                    return q;
-                });
-                if (!found) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Question not found" }); }
-                await client.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
-                await client.query('COMMIT');
-                return res.status(200).json({ success: true });
-            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
-        }
+        // --- DELETE ---
         else if (req.method === 'DELETE') {
             const { code } = req.query;
-            if (!code) return res.status(400).json({ error: "Exam code is required" });
-            const client = await db.getClient();
-            try {
-                await client.query('BEGIN');
-                await client.query('DELETE FROM results WHERE exam_code = $1', [code]);
-                await client.query('DELETE FROM exams WHERE code = $1', [code]);
-                await client.query('COMMIT');
-                return res.status(200).json({ success: true });
-            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+            const requesterId = (req.headers['x-user-id'] as string);
+            if (!code || !requesterId) return res.status(400).json({ error: "Missing params" });
+            
+            await db.deleteExam(requesterId, code as string);
+            return res.status(200).json({ success: true });
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
         
     } catch (error: any) {
-        console.error("API Fatal Error:", error);
-        return res.status(500).json({ 
-            error: "Internal Server Error", 
-            message: error.message || "Unknown error occurred"
-        });
+        console.error("API Error:", error);
+        return res.status(500).json({ error: error.message });
     }
 }
