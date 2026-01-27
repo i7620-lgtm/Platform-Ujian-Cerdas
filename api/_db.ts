@@ -20,7 +20,7 @@ const callScript = async (action: string, data: any = {}) => {
         
         const result = await response.json();
         // Relaxed error checking for findUser which expects success:false when not found
-        if (!result.success && !result.data && !result.user && action !== 'findUser') {
+        if (!result.success && !result.data && !result.user && !result.users && action !== 'findUser') {
             throw new Error(result.error || "Database operation failed");
         }
         return result;
@@ -50,11 +50,23 @@ export default {
         return res.success ? res.user : null;
     },
 
-    // Register User Baru (NEW)
+    // Register User Baru
     async registerUser(userData: any) {
         // userData: { username, password, fullName, school }
         const res = await callScript('register', { data: userData });
         return res.user;
+    },
+
+    // NEW: Get All Users for Admin Dashboard
+    async getAllUsers() {
+        const res = await callScript('getUsers');
+        return res.users || [];
+    },
+
+    // NEW: Update User Role
+    async updateUserRole(email: string, role: string, school: string) {
+        const res = await callScript('updateRole', { email, role, school });
+        return res.success;
     },
 
     async getAllTeacherKeys() {
@@ -91,6 +103,5 @@ export default {
 
     async getUserSpreadsheetId(id: string) { return id; },
     async getUserRole(email: string) { return { role: 'guru', school: 'Sekolah' }; },
-    async updateUserRole() { return true; },
     async getAllAdmins() { return []; }
 };
