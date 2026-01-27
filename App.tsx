@@ -29,16 +29,15 @@ const App: React.FC = () => {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
-  // -- LOGIC SAMA SEPERTI SEBELUMNYA, UI BERUBAH DI BAWAH --
-  // Extend storage service to support headers based on active profile
-  const getHeaders = () => {
+  // -- AUTH HEADER LOGIC --
+  const getHeaders = useCallback(() => {
       if (!teacherProfile) return {};
       return {
           'x-role': teacherProfile.accountType,
           'x-user-id': teacherProfile.id,
           'x-school': teacherProfile.school
       };
-  };
+  }, [teacherProfile]);
 
   const refreshExams = useCallback(async () => {
     setIsSyncing(true);
@@ -56,19 +55,21 @@ const App: React.FC = () => {
     } finally {
         setIsSyncing(false);
     }
-  }, [teacherProfile]);
+  }, [getHeaders]);
 
   const refreshResults = useCallback(async () => {
     setIsSyncing(true);
     try {
-        const loadedResults = await storageService.getResults();
+        const headers = getHeaders();
+        // Pass auth headers to storage service which calls the API
+        const loadedResults = await storageService.getResults(undefined, headers as any);
         setResults(loadedResults);
     } catch (e) {
         console.error("Failed to load results:", e);
     } finally {
         setIsSyncing(false);
     }
-  }, []);
+  }, [getHeaders]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -104,7 +105,12 @@ const App: React.FC = () => {
                 const exam = await storageService.getExamForStudent(streamCode);
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
-                    await refreshResults();
+                    // Public stream shouldn't require auth headers for reading basic stats if endpoint allows, 
+                    // but for strict mode, results might be hidden. 
+                    // For now, public stream uses cached results or requires adjustment if strict mode blocks it.
+                    // Assuming public endpoint for stream results handles this separately or we reuse local cache.
+                    // For this specific update, we keep refreshResults() generic here.
+                    await refreshResults(); 
                     setView('PUBLIC_STREAM');
                 } else {
                     alert("Livestream tidak ditemukan.");
