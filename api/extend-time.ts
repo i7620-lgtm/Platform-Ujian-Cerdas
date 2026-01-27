@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
+import db from './_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,7 +11,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const { examCode, additionalMinutes } = req.body;
-        
         const teachers = await db.getAllTeacherKeys();
         let found = false;
 
