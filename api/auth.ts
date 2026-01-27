@@ -31,33 +31,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (action === 'register') {
             const { username, password, fullName, school } = req.body;
             
-            if (!username || !password || !fullName || !school) {
-                return res.status(400).json({ success: false, error: 'Semua data wajib diisi.' });
+            // Password boleh kosong untuk Google Login
+            if (!username || !fullName || !school) {
+                return res.status(400).json({ success: false, error: 'Semua data (Username, Nama, Sekolah) wajib diisi.' });
             }
 
             try {
-                const user = await db.registerUser({ username, password, fullName, school });
+                const user = await db.registerUser({ username, password: password || '', fullName, school });
                 return res.status(200).json({ success: true, ...user });
             } catch (e: any) {
                 return res.status(400).json({ success: false, error: e.message || 'Gagal mendaftar.' });
             }
         }
         
-        // Google Login Support (Simplified)
+        // Google Login Support
         if (action === 'google-login') {
              const { token } = req.body;
              const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
              const payload = await googleRes.json() as any;
              
              if (payload.email) {
-                 return res.status(200).json({
-                     success: true,
-                     username: payload.email,
-                     fullName: payload.name,
-                     avatar: payload.picture,
-                     accountType: 'guru',
-                     school: 'Google Account' // Bisa diupdate nanti jika ada endpoint 'update-profile'
-                 });
+                 // Cek apakah user sudah ada di database
+                 const existingUser = await db.findUser(payload.email);
+                 
+                 if (existingUser) {
+                     // Login sukses
+                     return res.status(200).json({
+                         success: true,
+                         ...existingUser,
+                         avatar: payload.picture // Update avatar dari google jika perlu
+                     });
+                 } else {
+                     // User belum ada, minta registrasi
+                     return res.status(200).json({
+                         success: false,
+                         requireRegistration: true,
+                         googleData: {
+                             email: payload.email,
+                             name: payload.name,
+                             picture: payload.picture
+                         }
+                     });
+                 }
+             } else {
+                 return res.status(400).json({ error: 'Invalid Google Token' });
              }
         }
 
