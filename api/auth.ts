@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db.js';
 
@@ -49,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
             if (!googleRes.ok) return res.status(401).json({ success: false, error: 'Token Google tidak valid.' });
 
-            const payload = await googleRes.json();
+            const payload = await googleRes.json() as any;
             const { email, name, picture } = payload;
 
             if (!email) return res.status(400).json({ success: false, error: 'Email tidak ditemukan.' });
