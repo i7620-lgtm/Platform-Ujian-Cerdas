@@ -18,6 +18,7 @@ const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
 const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => void; }> = ({ errorMessage, onRetry }) => {
     const isTemplateError = errorMessage.includes('TEMPLATE_DB_GURU');
+    const isMasterError = errorMessage.includes('DATABASE_MASTER_UJIAN');
     
     const sheetIdMatch = errorMessage.match(/ID: '([a-zA-Z0-9-_]+)'/);
     const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
@@ -25,15 +26,21 @@ const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => v
     const emailMatch = errorMessage.match(/EMAIL AKUN: '([^']+)'/);
     const serviceAccountEmail = emailMatch ? emailMatch[1] : null;
 
-    const sheetName = isTemplateError ? "Template Ujian Guru" : "Database Master Ujian";
+    const sheetName = isTemplateError ? "Template Ujian Guru" : isMasterError ? "Database Master Ujian" : "File Google Sheet";
     const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null;
 
     return (
         <div className="text-left text-sm bg-rose-50 p-4 rounded-xl border-2 border-dashed border-rose-200 mt-4 space-y-4 animate-fade-in">
             <h3 className="font-bold text-rose-700 flex items-center gap-2"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> Kesalahan Konfigurasi Google</h3>
-            <p className="text-xs text-rose-600 bg-rose-100 p-2 rounded-lg font-mono">
-                {errorMessage.split('\n')[0]}
-            </p>
+            
+            {(isTemplateError || isMasterError) && (
+                <div className="bg-amber-50 border-2 border-dashed border-amber-200 p-3 rounded-lg text-xs">
+                    <p className="font-bold text-amber-800 mb-1">Penyebab Paling Umum:</p>
+                    <p className="text-amber-700 leading-relaxed">
+                        Error ini terjadi karena file <strong className="font-mono bg-amber-100 px-1 rounded">{sheetName}</strong> belum dibagikan ke Service Account, atau belum diberi akses <strong className="font-bold">Editor</strong>.
+                    </p>
+                </div>
+            )}
             
             <div className="space-y-4 text-xs">
                 <p className="font-bold text-rose-800">CHECKLIST PERBAIKAN WAJIB:</p>
@@ -42,44 +49,37 @@ const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => v
                     <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">1</span>
                     <div>
                         <p className="font-semibold text-rose-800">Aktifkan Google Drive API</p>
-                        <p className="text-rose-600/90 leading-relaxed">Pastikan API ini <strong className="font-bold">AKTIF</strong> di Google Cloud. Aplikasi perlu izin untuk menyalin file.</p>
-                        <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-[11px]">
-                            Buka Laman Google Drive API ↗
-                        </a>
+                        <p className="text-rose-600/90 leading-relaxed">Pastikan API ini <strong className="font-bold">AKTIF</strong>. Aplikasi perlu izin untuk <strong className="font-bold">menyalin file</strong>.</p>
+                        <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-[11px]">Buka Laman Google Drive API ↗</a>
                     </div>
                 </div>
 
                 <div className="flex gap-3 items-start">
                     <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">2</span>
                     <div>
-                        <p className="font-semibold text-rose-800">Verifikasi Email Service Account</p>
-                        <p className="text-rose-600/90 leading-relaxed">Aplikasi ini mencoba login menggunakan email di bawah ini. Salin dan pastikan ini adalah email yang benar.</p>
-                        <div className="bg-rose-100 p-2 rounded-lg my-2 flex items-center justify-between gap-2 border border-rose-200">
-                           <code className="text-[10px] text-rose-800 font-semibold break-all">{serviceAccountEmail || "Gagal mendeteksi email..."}</code>
-                           {serviceAccountEmail && (
-                               <button 
-                                  onClick={() => navigator.clipboard.writeText(serviceAccountEmail)}
-                                  className="text-rose-600 hover:text-rose-900 bg-white px-2 py-1 text-[9px] font-bold rounded shadow-sm border border-rose-200"
-                                >
-                                  SALIN
-                               </button>
-                           )}
-                        </div>
+                        <p className="font-semibold text-rose-800">Bagikan 2 File Wajib</p>
+                        <p className="text-rose-600/90 leading-relaxed mb-2">Ada <strong>dua file</strong> Google Sheet yang perlu dibagikan dengan akses <strong className="font-bold">Editor</strong>:</p>
+                        <ul className="list-disc list-inside space-y-2 text-rose-700/90 pl-1">
+                            <li><strong>DATABASE_MASTER_UJIAN:</strong> Untuk menyimpan daftar guru.</li>
+                            <li><strong>TEMPLATE_DB_GURU:</strong> Untuk disalin saat ada guru baru. <strong className="text-rose-800 font-bold">{isTemplateError && "(INI PENYEBAB ERROR ANDA)"}</strong></li>
+                        </ul>
+                        {sheetUrl && (
+                            <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all block mt-2 text-[11px]">Buka File Bermasalah: {sheetName} ↗</a>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex gap-3 items-start">
                     <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">3</span>
                     <div>
-                        <p className="font-semibold text-rose-800">Bagikan File Google Sheet ({sheetName})</p>
-                        <p className="text-rose-600/90 leading-relaxed">
-                            Buka file sheet yang bermasalah dan bagikan ke email dari <strong className="font-bold">langkah 2</strong> dengan akses sebagai <strong className="bg-rose-100 px-1 rounded font-bold">Editor</strong>.
-                        </p>
-                        {sheetUrl && (
-                            <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all block my-1 text-[11px]">
-                                Buka File {sheetName} di Google Sheets ↗
-                            </a>
-                        )}
+                        <p className="font-semibold text-rose-800">Verifikasi Email Service Account</p>
+                        <p className="text-rose-600/90 leading-relaxed">Bagikan <strong className="font-bold">kedua file</strong> di atas ke email service account di bawah ini.</p>
+                        <div className="bg-rose-100 p-2 rounded-lg my-2 flex items-center justify-between gap-2 border border-rose-200">
+                           <code className="text-[10px] text-rose-800 font-semibold break-all">{serviceAccountEmail || "Gagal mendeteksi email..."}</code>
+                           {serviceAccountEmail && (
+                               <button onClick={() => navigator.clipboard.writeText(serviceAccountEmail)} className="text-rose-600 hover:text-rose-900 bg-white px-2 py-1 text-[9px] font-bold rounded shadow-sm border border-rose-200">SALIN</button>
+                           )}
+                        </div>
                     </div>
                 </div>
             </div>
