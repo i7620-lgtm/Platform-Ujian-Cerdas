@@ -3,8 +3,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import db from './db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // FIX: Set specific origin instead of '*' when using credentials
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
@@ -86,6 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (error: any) {
         console.error("Auth Error:", error);
+        // Return 500 but with error message in body so client can display it if possible
         return res.status(500).json({ error: "Server Error", details: error.message });
     }
 }
