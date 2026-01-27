@@ -33,11 +33,15 @@ const getPrivateKey = () => {
 
 const PRIVATE_KEY = getPrivateKey();
 
+// --- DIAGNOSTIC LOGGING (To Vercel Logs) ---
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY || !MASTER_SHEET_ID) {
     console.error("CRITICAL ERROR: Missing Google Sheets Credentials.");
-    console.error("Email:", !!SERVICE_ACCOUNT_EMAIL);
-    console.error("Key:", !!PRIVATE_KEY);
-    console.error("Sheet ID:", !!MASTER_SHEET_ID);
+    console.error("Email Configured:", !!SERVICE_ACCOUNT_EMAIL);
+    console.error("Key Configured:", !!PRIVATE_KEY ? "Yes (Length: " + PRIVATE_KEY.length + ")" : "No");
+    console.error("Master Sheet ID Configured:", !!MASTER_SHEET_ID);
+} else {
+    // Log success initialization (masked)
+    console.log("DB Initialized. Service Account:", SERVICE_ACCOUNT_EMAIL);
 }
 
 // --- TOKEN CACHE ---
@@ -47,7 +51,7 @@ let tokenExpiry = 0;
 // --- JWT GENERATOR (Native Node.js implementation) ---
 const getAccessToken = async () => {
     if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
-    if (!PRIVATE_KEY || !SERVICE_ACCOUNT_EMAIL) throw new Error("Credentials not configured");
+    if (!PRIVATE_KEY || !SERVICE_ACCOUNT_EMAIL) throw new Error("Credentials not configured in Environment Variables.");
 
     try {
         const header = { alg: 'RS256', typ: 'JWT' };
@@ -65,6 +69,8 @@ const getAccessToken = async () => {
 
         const sign = crypto.createSign('RSA-SHA256');
         sign.update(`${encodedHeader}.${encodedClaim}`);
+        
+        // This line often fails if Key format is invalid (e.g. missing -----BEGIN PRIVATE KEY-----)
         const signature = sign.sign(PRIVATE_KEY, 'base64url');
         const jwt = `${encodedHeader}.${encodedClaim}.${signature}`;
 
@@ -76,8 +82,8 @@ const getAccessToken = async () => {
 
         if (!res.ok) {
             const errText = await res.text();
-            console.error('Google Token Error:', errText);
-            throw new Error(`Failed to get Google Token: ${errText}`);
+            console.error('Google Token Error Response:', errText);
+            throw new Error(`Gagal mendapatkan Token Google: ${errText}`);
         }
 
         const data = await res.json() as any;
@@ -86,9 +92,13 @@ const getAccessToken = async () => {
             tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
             return cachedToken;
         }
-        throw new Error('Failed to get Google Access Token (No token in response)');
+        throw new Error('Gagal mendapatkan Google Access Token (Response kosong)');
     } catch (e: any) {
         console.error("JWT Generation Failed:", e.message);
+        // Provide hint if key seems wrong
+        if (e.message.includes('error:04075070') || e.message.includes('pem')) {
+             throw new Error("Format Private Key salah. Pastikan menyalin lengkap dari '-----BEGIN' sampai 'END-----' dan ganti \\n dengan baris baru.");
+        }
         throw e;
     }
 };
@@ -106,10 +116,13 @@ const gFetch = async (url: string, options: any = {}): Promise<any> => {
             console.error(`Google API Error [${res.status}]:`, url, err);
             
             if (res.status === 403) {
-                throw new Error(`Izin Ditolak (403). Pastikan email '${SERVICE_ACCOUNT_EMAIL}' sudah ditambahkan sebagai Editor di Spreadsheet.`);
+                throw new Error(`Izin Ditolak (403). Pastikan email Service Account '${SERVICE_ACCOUNT_EMAIL}' sudah ditambahkan sebagai 'Editor' di Spreadsheet Master & Template.`);
             }
             if (res.status === 404) {
-                throw new Error(`Spreadsheet tidak ditemukan (404). Periksa MASTER_SHEET_ID.`);
+                throw new Error(`Spreadsheet tidak ditemukan (404). Periksa MASTER_SHEET_ID atau TEMPLATE_SHEET_ID.`);
+            }
+            if (res.status === 400) {
+                 throw new Error(`Bad Request (400). Kemungkinan struktur Sheet tidak sesuai.`);
             }
             
             throw new Error(`Google API Error: ${res.statusText} - ${err}`);
@@ -165,7 +178,7 @@ class GoogleSheetsDB {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role: 'writer', type: 'user', emailAddress: userKey })
-            }).catch(e => console.warn("Could not share sheet with user (might be service account limitation)", e));
+            }).catch(e => console.warn("Could not share sheet with user (might be service account limitation, but DB is usable)", e));
         }
 
         // Register in Directory
