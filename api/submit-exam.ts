@@ -37,6 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { examCode, student, answers, activityLog, location, status } = req.body;
         
+        // 1. Get Exam Definition
+        // Optimization: In a real sharded system, exams might be in a master DB. 
+        // Here we assume teachers are the source of truth.
         const teachers = await db.getAllTeacherKeys();
         let exam = null;
         let ownerId = null;
@@ -53,13 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!exam || !ownerId) return res.status(404).json({ error: 'Exam not found' });
 
+        // 2. Grade
         const grading = calculateGrade(exam, answers);
         const finalStatus = status || 'completed';
         const timestamp = Date.now();
 
+        // 3. Construct Payload with Class info explicitly for Sharding
         const resultPayload = {
             examCode,
-            student,
+            student, // Contains student.class
+            className: student.class, // Explicit for backend router
             answers,
             score: finalStatus === 'in_progress' ? 0 : grading.score,
             correctAnswers: grading.correctCount,
@@ -70,7 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             timestamp
         };
 
+        // 4. Save to Sharded DB
         await db.saveResult(ownerId, resultPayload);
+        
         return res.status(200).json({ ...resultPayload, isSynced: true });
 
     } catch (error: any) {
