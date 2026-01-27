@@ -1,8 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
+import db from './_db.js';
 
-// Helper
 const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const calculateGrade = (exam: any, answers: Record<string, string>) => {
@@ -16,9 +15,7 @@ const calculateGrade = (exam: any, answers: Record<string, string>) => {
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
         } 
-        // ... (Logika grading sama seperti sebelumnya, disederhanakan untuk contoh)
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             // Simplified logic
              const tArr = String(q.correctAnswer).split(',');
              if (studentAnswer.length === tArr.length) correctCount++; 
         }
@@ -35,12 +32,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'POST') return res.status(405).json({ error: `Method '${req.method}' not allowed` });
 
     try {
         const { examCode, student, answers, activityLog, location, status } = req.body;
         
-        // 1. Find the Exam to Grade it (Scan all teachers like GET)
         const teachers = await db.getAllTeacherKeys();
         let exam = null;
         let ownerId = null;
@@ -57,7 +53,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!exam || !ownerId) return res.status(404).json({ error: 'Exam not found' });
 
-        // 2. Grade
         const grading = calculateGrade(exam, answers);
         const finalStatus = status || 'completed';
         const timestamp = Date.now();
@@ -75,9 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             timestamp
         };
 
-        // 3. Save to Owner's Sheet
         await db.saveResult(ownerId, resultPayload);
-
         return res.status(200).json({ ...resultPayload, isSynced: true });
 
     } catch (error: any) {
