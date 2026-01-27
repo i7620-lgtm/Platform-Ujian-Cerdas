@@ -16,13 +16,70 @@ interface TeacherLoginProps {
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
+const ConfigurationErrorGuide: React.FC<{ errorMessage: string; onRetry: () => void; }> = ({ errorMessage, onRetry }) => {
+    const isTemplateError = errorMessage.includes('TEMPLATE_DB_GURU');
+    const isMasterError = errorMessage.includes('DATABASE_MASTER_UJIAN');
+    
+    const sheetIdMatch = errorMessage.match(/ID: '([a-zA-Z0-9-_]+)'/);
+    const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
+
+    const sheetName = isTemplateError ? "Template Ujian Guru" : "Database Master Ujian";
+    const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null;
+
+    return (
+        <div className="text-left text-sm bg-rose-50 p-4 rounded-xl border-2 border-dashed border-rose-200 mt-4 space-y-4 animate-fade-in">
+            <h3 className="font-bold text-rose-700 flex items-center gap-2"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> Kesalahan Konfigurasi Google</h3>
+            <p className="text-xs text-rose-600 bg-rose-100 p-2 rounded-lg font-mono">
+                {errorMessage.split('\n')[0]}
+            </p>
+            
+            <div className="space-y-4 text-xs">
+                <p className="font-bold text-rose-800">Langkah-langkah Perbaikan Wajib:</p>
+                
+                <div className="flex gap-3 items-start">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">1</span>
+                    <div>
+                        <p className="font-semibold text-rose-800">Aktifkan Google Drive API</p>
+                        <p className="text-rose-600/90 leading-relaxed">Aplikasi perlu izin untuk <strong className="font-bold">menyalin file template</strong> saat akun baru login. Klik link di bawah & pastikan API sudah aktif (tombol "ENABLE" atau "MANAGE").</p>
+                        <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-[11px]">
+                            Buka Laman Google Drive API ↗
+                        </a>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 items-start">
+                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white font-bold text-[10px] mt-0.5">2</span>
+                    <div>
+                        <p className="font-semibold text-rose-800">Bagikan File Google Sheet ({sheetName})</p>
+                        <p className="text-rose-600/90 leading-relaxed">
+                            Pastikan Service Account Anda memiliki akses <strong className="bg-rose-100 px-1 rounded font-bold">Editor</strong> ke file Google Sheet yang bermasalah.
+                        </p>
+                        {sheetUrl && (
+                            <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all block my-1 text-[11px]">
+                                Buka File {sheetName} di Google Sheets ↗
+                            </a>
+                        )}
+                        <p className="mt-2 text-[10px] text-rose-500 bg-rose-100 p-2 rounded-md">
+                            <strong>PENTING:</strong> Email Service Account dapat ditemukan di Vercel Environment Variables (cari variabel `GOOGLE_CLIENT_EMAIL` atau `CLIENT_EMAIL`). Pastikan Anda membagikan Sheet ke email yang benar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <button onClick={onRetry} className="w-full bg-rose-600 text-white font-bold text-xs py-2.5 rounded-lg hover:bg-rose-700 transition-all mt-2 shadow-lg shadow-rose-200">
+                Saya Sudah Memperbaiki, Coba Login Lagi
+            </button>
+        </div>
+    );
+};
+
+
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Get current origin for debugging
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
@@ -38,13 +95,9 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 });
                 const btnDiv = document.getElementById("googleSignInBtn");
                 if (btnDiv) {
-                    // Fix: width must be pixels in string format (e.g. "400"), not percentage.
                     window.google.accounts.id.renderButton(btnDiv, { 
-                        theme: "outline", 
-                        size: "large", 
-                        text: "continue_with", 
-                        shape: "pill", 
-                        width: "350" 
+                        theme: "outline", size: "large", text: "continue_with", 
+                        shape: "pill", width: "350" 
                     });
                 }
             } catch (e) { console.error("Google Sign-In Error:", e); }
@@ -54,34 +107,35 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     return () => clearInterval(timer);
   }, []);
 
-  const handleGoogleCallback = async (response: any) => {
-      setIsLoading(true); setError('');
-      try {
-          const res = await fetch('/api/auth', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'google-login', token: response.credential })
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-              onLoginSuccess({ id: data.username, fullName: data.fullName, accountType: data.accountType, school: data.school, avatarUrl: data.avatar });
-          } else { setError(data.error || 'Gagal login.'); }
-      } catch (e) { setError('Kesalahan koneksi.'); } finally { setIsLoading(false); }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setIsLoading(true);
+  const handleLoginAttempt = async (body: any) => {
+    setError(''); 
+    setIsLoading(true);
     try {
         const res = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'login', username, password })
+            body: JSON.stringify(body)
         });
         const data = await res.json();
         if (res.ok && data.success) {
-            onLoginSuccess({ id: data.username, fullName: data.fullName, accountType: data.accountType, school: data.school });
-        } else { setError(data.error || 'Login gagal.'); }
-    } catch (e) { setError('Kesalahan koneksi.'); } finally { setIsLoading(false); }
+            onLoginSuccess({ id: data.username, fullName: data.fullName, accountType: data.accountType, school: data.school, avatarUrl: data.avatar });
+        } else { 
+            setError(data.error || 'Gagal login.'); 
+        }
+    } catch (e) { 
+        setError('Kesalahan koneksi.'); 
+    } finally { 
+        setIsLoading(false); 
+    }
+  };
+
+  const handleGoogleCallback = (response: any) => {
+      handleLoginAttempt({ action: 'google-login', token: response.credential });
+  };
+
+  const handleManualLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleLoginAttempt({ action: 'login', username, password });
   };
 
   return (
@@ -103,7 +157,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                     <div className="relative flex justify-center text-xs uppercase"><span className="px-2 bg-white text-gray-400 font-bold">Atau Manual</span></div>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-4 text-left">
+                <form onSubmit={handleManualLogin} className="space-y-4 text-left">
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase">Username / ID</label>
                         <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" required disabled={isLoading} />
@@ -113,12 +167,14 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" required disabled={isLoading} />
                     </div>
                     {error && (
-                        <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center">
-                            <p className="font-bold">{error}</p>
-                            {/* Show technical hint if relevant */}
-                            {error.includes('Key') && <p className="text-[10px] mt-1 text-rose-400">Cek format Private Key di Vercel.</p>}
-                            {error.includes('Izin') && <p className="text-[10px] mt-1 text-rose-400">Share Sheet ke Service Account.</p>}
-                        </div>
+                        error.includes('IZIN DITOLAK') ? (
+                            <ConfigurationErrorGuide errorMessage={error} onRetry={() => setError('')} />
+                        ) : (
+                            <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center">
+                                <p className="font-bold">{error}</p>
+                                {error.includes('Key') && <p className="text-[10px] mt-1 text-rose-400">Cek format Private Key di Vercel.</p>}
+                            </div>
+                        )
                     )}
                     <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg">
                         {isLoading ? 'Memproses...' : 'Masuk Manual'}
@@ -126,7 +182,6 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 </form>
             </div>
 
-            {/* DEBUG SECTION: VISIBLE ORIGIN URL */}
             <div className="mt-8 text-center opacity-80 hover:opacity-100 transition-opacity">
                 <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">
                     Debug Info: Origin URL
