@@ -14,17 +14,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { action } = req.body;
 
-        // --- PUBLIC ACTIONS (Login/Register) ---
-
         if (action === 'login') {
             const { username, password } = req.body;
             const user = await db.loginUser(username, password);
-            
             if (user) {
-                return res.status(200).json({ 
-                    success: true, 
-                    ...user
-                });
+                return res.status(200).json({ success: true, ...user });
             } else {
                 return res.status(401).json({ success: false, error: 'Username atau Password salah.' });
             }
@@ -34,20 +28,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { username, password, fullName, school } = req.body;
             
             if (!username || !fullName || !school) {
-                return res.status(400).json({ success: false, error: 'Semua data (Username, Nama, Sekolah) wajib diisi.' });
+                return res.status(400).json({ success: false, error: 'Semua data wajib diisi.' });
             }
 
             try {
+                // Coba daftar user baru
                 const user = await db.registerUser({ username, password: password || '', fullName, school });
                 return res.status(200).json({ success: true, ...user });
             } catch (e: any) {
-                if (e.message && (e.message.includes('Username sudah dipakai') || e.message.includes('duplicate'))) {
+                // CERDAS: Jika error karena duplikasi, langsung cari usernya dan kembalikan sebagai login sukses
+                const errMsg = e.message || '';
+                if (errMsg.includes('Username sudah terdaftar') || errMsg.includes('exists') || errMsg.includes('dipakai')) {
                     const existingUser = await db.findUser(username);
                     if (existingUser) {
                         return res.status(200).json({ success: true, ...existingUser });
                     }
                 }
-                return res.status(400).json({ success: false, error: e.message || 'Gagal mendaftar.' });
+                return res.status(400).json({ success: false, error: errMsg });
             }
         }
         
@@ -65,6 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          avatar: payload.picture
                      });
                  } else {
+                     // Jika tidak ada di DB, arahkan ke registrasi dengan data Google yang sudah ada
                      return res.status(200).json({
                          success: false,
                          requireRegistration: true,
@@ -76,58 +74,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                      });
                  }
              } else {
-                 return res.status(400).json({ error: 'Invalid Google Token' });
+                 return res.status(400).json({ error: 'Token Google tidak valid.' });
              }
         }
 
-        // --- PROTECTED ACTIONS (RBAC ENFORCED) ---
-        
-        // Ambil role dari header (dikirim oleh frontend App.tsx/TeacherDashboard.tsx)
         const requesterRole = req.headers['x-role'] as string;
         
         if (action === 'get-users') {
-            // SECURITY CHECK: Hanya super_admin yang boleh lihat semua user
-            if (requesterRole !== 'super_admin') {
-                return res.status(403).json({ error: "Access Denied: Super Admin Only" });
-            }
-
-            try {
-                const allUsers = await db.getAllUsers();
-                const filteredUsers = allUsers
-                    .filter((u: any) => u.accountType !== 'super_admin')
-                    .map((u: any) => ({
-                        email: u.username,
-                        fullName: u.fullName,
-                        role: u.accountType,
-                        school: u.school
-                    }));
-                return res.status(200).json(filteredUsers);
-            } catch (e: any) {
-                return res.status(500).json({ error: e.message });
-            }
+            if (requesterRole !== 'super_admin') return res.status(403).json({ error: "Akses Ditolak" });
+            const allUsers = await db.getAllUsers();
+            return res.status(200).json(allUsers.filter((u: any) => u.accountType !== 'super_admin').map((u: any) => ({
+                email: u.username, fullName: u.fullName, role: u.accountType, school: u.school
+            })));
         }
 
         if (action === 'update-role') {
-            // SECURITY CHECK: Hanya super_admin yang boleh ubah role
-            if (requesterRole !== 'super_admin') {
-                return res.status(403).json({ error: "Access Denied: Super Admin Only" });
-            }
-
+            if (requesterRole !== 'super_admin') return res.status(403).json({ error: "Akses Ditolak" });
             const { email, role, school } = req.body;
-            if (!email || !role) return res.status(400).json({ error: 'Data tidak lengkap' });
-            
-            try {
-                const success = await db.updateUserRole(email, role, school || '');
-                return res.status(200).json({ success });
-            } catch (e: any) {
-                return res.status(500).json({ error: e.message });
-            }
+            const success = await db.updateUserRole(email, role, school || '');
+            return res.status(200).json({ success });
         }
 
-        return res.status(400).json({ error: 'Action not supported' });
+        return res.status(400).json({ error: 'Aksi tidak didukung.' });
 
     } catch (error: any) {
-        console.error("Auth Error:", error);
         return res.status(500).json({ error: error.message });
     }
 }
