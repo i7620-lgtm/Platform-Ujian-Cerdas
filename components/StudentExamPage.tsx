@@ -14,36 +14,42 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Menghitung titik waktu deadline (Tenggat Waktu)
-    // Diambil dari waktu mulai (timestamp awal) + limit waktu dari config
+    // Menghitung Titik Waktu Akhir (Deadline Absolut) berdasarkan Konfigurasi Ujian
+    // Sesuai dengan logika monitor: (Waktu Mulai Jadwal + Durasi)
     const deadline = useMemo(() => {
-        const startTimestamp = initialData?.timestamp || Date.now();
-        return startTimestamp + (exam.config.timeLimit * 60 * 1000);
-    }, [initialData?.timestamp, exam.config.timeLimit]);
+        // Jika mode preview, kita buat deadline relatif dari "sekarang" agar timer mulai dari durasi penuh
+        if (student.class === 'PREVIEW') {
+            return Date.now() + (exam.config.timeLimit * 60 * 1000);
+        }
+
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
+        return examStartDateTime.getTime() + (exam.config.timeLimit * 60 * 1000);
+    }, [exam.config.date, exam.config.startTime, exam.config.timeLimit, student.class]);
 
     // Fungsi untuk menghitung sisa waktu berdasarkan (Deadline - Waktu Berjalan)
-    const calculateTimeLeft = () => {
+    const calculateTimeRemaining = () => {
         const now = Date.now();
         const difference = deadline - now;
         return Math.max(0, Math.floor(difference / 1000));
     };
 
-    const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+    const [timeLeft, setTimeLeft] = useState(calculateTimeRemaining());
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const remaining = calculateTimeLeft();
+            const remaining = calculateTimeRemaining();
             setTimeLeft(remaining);
 
-            // Jika waktu habis, otomatis kumpulkan
-            if (remaining <= 0) {
+            // Jika waktu benar-benar habis, otomatis kumpulkan (kecuali preview)
+            if (remaining <= 0 && student.class !== 'PREVIEW') {
                 clearInterval(timer);
                 handleSubmit(true);
             }
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [deadline]); // Re-subscribe jika deadline berubah (misal: guru tambah waktu)
+    }, [deadline, student.class]);
 
     const handleAnswer = (qId: string, val: string) => {
         const newAnswers = { ...answers, [qId]: val };
@@ -90,8 +96,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     };
 
     const formatTime = (s: number) => {
-        const m = Math.floor(s / 60);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
         const sec = s % 60;
+        
+        if (h > 0) {
+            return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
@@ -127,6 +138,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     </div>
                     
                     <div className="flex items-center gap-4">
+                        {student.class === 'PREVIEW' && (
+                            <span className="hidden md:block text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 uppercase tracking-widest">Mode Pratinjau</span>
+                        )}
                         <div className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-500 shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                             <ClockIcon className="w-4 h-4" />
                             <span className="font-mono font-black text-sm tracking-widest tabular-nums">{formatTime(timeLeft)}</span>
@@ -282,7 +296,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     value={answers[q.id] || ''}
                                     onChange={(e) => handleAnswer(q.id, e.target.value)}
                                     placeholder="Tulis jawaban lengkap Anda di sini..."
-                                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] focus:bg-white focus:border-brand-300 outline-none transition-all text-sm font-medium min-h-[200px] leading-relaxed shadow-inner"
+                                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] focus:bg-white focus:border-brand-400 outline-none transition-all text-sm font-medium min-h-[200px] leading-relaxed shadow-inner"
                                 />
                             )}
 
