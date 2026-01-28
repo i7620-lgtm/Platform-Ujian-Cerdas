@@ -7,12 +7,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Id, X-Role, X-School');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
         const { action } = req.body;
+
+        // --- PUBLIC ACTIONS (Login/Register) ---
 
         if (action === 'login') {
             const { username, password } = req.body;
@@ -31,7 +33,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (action === 'register') {
             const { username, password, fullName, school } = req.body;
             
-            // Password boleh kosong untuk Google Login
             if (!username || !fullName || !school) {
                 return res.status(400).json({ success: false, error: 'Semua data (Username, Nama, Sekolah) wajib diisi.' });
             }
@@ -40,13 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const user = await db.registerUser({ username, password: password || '', fullName, school });
                 return res.status(200).json({ success: true, ...user });
             } catch (e: any) {
-                // LOGIKA SELF-HEALING:
-                // Jika errornya "Username sudah dipakai", artinya user sebenarnya ada tapi proses cek awal (findUser) gagal/dilewati.
-                // Kita coba ambil data user tersebut (Force Login)
                 if (e.message && (e.message.includes('Username sudah dipakai') || e.message.includes('duplicate'))) {
                     const existingUser = await db.findUser(username);
                     if (existingUser) {
-                        // Jika ketemu, return success seolah-olah baru register/login
                         return res.status(200).json({ success: true, ...existingUser });
                     }
                 }
@@ -54,25 +51,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
-        // Google Login Support
         if (action === 'google-login') {
              const { token } = req.body;
              const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
              const payload = await googleRes.json() as any;
              
              if (payload.email) {
-                 // Cek apakah user sudah ada di database
                  const existingUser = await db.findUser(payload.email);
-                 
                  if (existingUser) {
-                     // Login sukses
                      return res.status(200).json({
                          success: true,
                          ...existingUser,
-                         avatar: payload.picture // Update avatar dari google jika perlu
+                         avatar: payload.picture
                      });
                  } else {
-                     // User belum ada, minta registrasi
                      return res.status(200).json({
                          success: false,
                          requireRegistration: true,
@@ -88,12 +80,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              }
         }
 
-        // --- NEW: User Management Features ---
+        // --- PROTECTED ACTIONS (RBAC ENFORCED) ---
+        
+        // Ambil role dari header (dikirim oleh frontend App.tsx/TeacherDashboard.tsx)
+        const requesterRole = req.headers['x-role'] as string;
         
         if (action === 'get-users') {
+            // SECURITY CHECK: Hanya super_admin yang boleh lihat semua user
+            if (requesterRole !== 'super_admin') {
+                return res.status(403).json({ error: "Access Denied: Super Admin Only" });
+            }
+
             try {
                 const allUsers = await db.getAllUsers();
-                // FILTER: Hapus akun super_admin dari daftar yang dikembalikan
                 const filteredUsers = allUsers
                     .filter((u: any) => u.accountType !== 'super_admin')
                     .map((u: any) => ({
@@ -109,6 +108,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (action === 'update-role') {
+            // SECURITY CHECK: Hanya super_admin yang boleh ubah role
+            if (requesterRole !== 'super_admin') {
+                return res.status(403).json({ error: "Access Denied: Super Admin Only" });
+            }
+
             const { email, role, school } = req.body;
             if (!email || !role) return res.status(400).json({ error: 'Data tidak lengkap' });
             
