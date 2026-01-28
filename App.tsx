@@ -6,7 +6,7 @@ import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import type { Exam, Student, Result, ResultStatus, TeacherProfile } from './types';
-import { LogoIcon, CloudArrowUpIcon, NoWifiIcon, ExclamationTriangleIcon } from './components/Icons';
+import { LogoIcon, CloudArrowUpIcon, NoWifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { OngoingExamModal } from './components/teacher/DashboardModals'; 
 
@@ -24,7 +24,6 @@ const App: React.FC = () => {
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [loginConflict, setLoginConflict] = useState<{ message: string; onConfirm: () => void; } | null>(null);
 
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
@@ -44,7 +43,7 @@ const App: React.FC = () => {
     try {
         const headers = getHeaders();
         // Menggunakan storageService agar tetap mengambil data dari local cache jika server lambat
-        const examMap = await storageService.getExams(headers as any);
+        const examMap = await storageService.getExams(headers as Record<string, string>);
         setExams(examMap);
     } catch (e) {
         console.error("Failed to load exams:", e);
@@ -111,13 +110,13 @@ const App: React.FC = () => {
       setView('TEACHER_DASHBOARD');
   };
 
-  const handleStudentLoginSuccess = async (examCode: string, student: Student, _bypassValidation = false) => {
+  const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode);
       if (!exam) { alert("Kode soal tidak ditemukan."); setIsSyncing(false); return; }
       
-      const existingResult = await storageService.getStudentResult(examCode, student.studentId);
+      const existingResult = await storageService.getStudentResult(examCode, student.studentId) as Result | null;
       if (existingResult && existingResult.status === 'completed' && !exam.config.allowRetakes) {
           alert("Anda sudah menyelesaikan ujian ini.");
           setIsSyncing(false);
@@ -165,7 +164,7 @@ const App: React.FC = () => {
      if (!currentExam || !currentStudent) return;
      const result = await storageService.submitExamResult({
          student: currentStudent, examCode: currentExam.code, answers, totalQuestions: 0, completionTime: 0, activityLog: activityLog || [], status: 'force_submitted'
-     });
+     }) as Result;
      setStudentResult(result);
      setView('STUDENT_RESULT');
   }, [currentExam, currentStudent]);
@@ -180,7 +179,7 @@ const App: React.FC = () => {
 
   const handleCheckExamStatus = async () => {
       if(currentExam && currentStudent) {
-          const res = await storageService.getStudentResult(currentExam.code, currentStudent.studentId);
+          const res = await storageService.getStudentResult(currentExam.code, currentStudent.studentId) as Result | null;
           if(res && res.status === 'in_progress') {
               setResumedResult(res);
               setView('STUDENT_EXAM');
