@@ -1,82 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234F46E5'%3E%3Cpath d='M12 2.25c-5.376 0-9.75 4.374-9.75 9.75s4.374 9.75 9.75 9.75 9.75-4.374 9.75-9.75S17.376 2.25 12 2.25Zm.094 15.341a.75.75 0 0 1-.884-.652l-.003-2.435-.002-3.35c0-1.242.02-2.484.058-3.725.011-.371.363-.642.736-.642.373 0 .725.27.736.642.038 1.24.058 2.482.058 3.725l.001 5.79.001.002a.75.75 0 0 1-.696.749Z' /%3E%3Cpath d='M12 2.25a9.715 9.715 0 0 0-7.398 3.482c.453.053.918.14 1.39.26 1.768.442 3.536.885 3.536 2.213v1.332a.75.75 0 0 1-1.5 0V9.528c0-.501-.83-1.028-1.66-1.272a.75.75 0 0 1-.51-1.337A8.21 8.21 0 0 1 12 3.75c2.193 0 4.212.85 5.733 2.25a.75.75 0 0 1-.53 1.282c-1.428.1-1.678.89-1.678 1.51v4.101a.75.75 0 0 1-1.5 0V10.5c0-1.328 1.768-1.77 3.536-2.214.472-.118.937-.206 1.39-.26A9.715 9.715 0 0 0 12 2.25Z' /%3E%3C/svg%3E" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="google-site-verification" content="dhTj8lqPNS9MFRD_mKVyOblB_O3q5XpZLDp85RF0AOU" />
-    <title>Platform Ujian Siswa Cerdas</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366F1'%3E%3Cpath d='M12 2.25c-5.376 0-9.75 4.374-9.75 9.75s4.374 9.75 9.75 9.75 9.75-4.374 9.75-9.75S17.376 2.25 12 2.25Z'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>UjianCerdas - Platform Evaluasi Modern</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- KaTeX CSS without integrity check -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
+            fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
             colors: {
-              primary: '#4F46E5', // Indigo 600
-              'primary-focus': '#4338CA', // Indigo 700
-              'primary-content': '#ffffff',
-              secondary: '#14B8A6', // Teal 500
-              'secondary-focus': '#0D9488', // Teal 600
-              accent: '#F59E0B', // Amber 500
-              'accent-focus': '#D97706', // Amber 600
-              neutral: '#1F2937', // Gray 800
-              'neutral-focus': '#111827', // Gray 900
-              'base-100': '#FFFFFF',
-              'base-200': '#F3F4F6', // Gray 100
-              'base-300': '#E5E7EB', // Gray 200
-              'base-content': '#374151', // Gray 700
+              brand: {
+                50: '#f5f7ff',
+                100: '#ebf0fe',
+                200: '#dae3fd',
+                500: '#6366f1', // Indigo 500
+                600: '#4f46e5',
+                700: '#4338ca',
+                900: '#1e1b4b',
+              },
+              surface: '#FDFEFF',
             },
-             animation: {
-              'fade-in': 'fadeIn 0.5s ease-in-out',
-              'slide-in-up': 'slideInUp 0.5s ease-out',
+            animation: {
+              'fast-fade': 'fadeIn 0.2s ease-out',
+              'gentle-slide': 'slideUp 0.3s ease-out',
             },
             keyframes: {
-              fadeIn: {
-                '0%': { opacity: 0 },
-                '100%': { opacity: 1 },
-              },
-              slideInUp: {
-                '0%': { transform: 'translateY(20px)', opacity: 0 },
-                '100%': { transform: 'translateY(0)', opacity: 1 },
-              },
+              fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+              slideUp: { '0%': { transform: 'translateY(10px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } },
             }
           }
         }
       }
     </script>
-  <script type="importmap">
+    <style>
+      body { -webkit-tap-highlight-color: transparent; }
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+      .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+    </style>
+    <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^18.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
     "react/": "https://aistudiocdn.com/react@^18.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
-    "pg": "https://aistudiocdn.com/pg@^8.16.3",
-    "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.15",
-    "module": "https://aistudiocdn.com/module@^2.0.0"
+    "@vercel/node": "https://esm.sh/@vercel/node@^5.5.28"
   }
 }
 </script>
-<!-- Menggunakan Pustaka PDF.js Asli dari CDN agar fitur visual (render canvas) berfungsi -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
-<!-- KaTeX JS without integrity check -->
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<!-- Google Identity Services -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-</head>
-  <body class="bg-base-200 font-sans text-base-content antialiased">
+  </head>
+  <body class="bg-[#F8FAFC] font-sans text-slate-900 antialiased selection:bg-brand-100 selection:text-brand-700">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
