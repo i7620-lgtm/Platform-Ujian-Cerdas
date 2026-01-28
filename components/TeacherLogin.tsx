@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
@@ -14,6 +13,7 @@ interface TeacherLoginProps {
   onBack: () => void;
 }
 
+// Gunakan Client ID dari env atau string kosong
 const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
@@ -31,10 +31,13 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    // Jika Client ID tidak ada, berikan peringatan di konsol tapi jangan hentikan render UI
+    if (!GOOGLE_CLIENT_ID) {
+        console.warn("Google Client ID belum dikonfigurasi. Tombol login Google mungkin tidak muncul.");
+    }
 
     const initGoogle = () => {
-        if (window.google?.accounts?.id && !isInitialized.current) {
+        if (window.google?.accounts?.id && !isInitialized.current && GOOGLE_CLIENT_ID) {
             try {
                 window.google.accounts.id.initialize({
                     client_id: GOOGLE_CLIENT_ID,
@@ -53,8 +56,11 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
         const btnDiv = document.getElementById("googleSignInBtn");
         if (btnDiv && window.google?.accounts?.id) {
             window.google.accounts.id.renderButton(btnDiv, { 
-                theme: "outline", size: "large", text: "signin_with", 
-                shape: "pill", width: btnDiv.offsetWidth || 350 
+                theme: "outline", 
+                size: "large", 
+                text: "signin_with", 
+                shape: "pill", 
+                width: 360 // Paksa lebar agar tombol terlihat
             });
         }
     };
@@ -64,7 +70,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
             initGoogle(); 
             clearInterval(timer); 
         } 
-    }, 300);
+    }, 500);
 
     return () => clearInterval(timer);
   }, [isRegistering, isGoogleRegister]); 
@@ -90,7 +96,6 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
         const data = await res.json();
         
         if (res.ok && data.success) {
-            // FIX: Gunakan data.id atau data.username sebagai ID profil
             onLoginSuccess({ 
                 id: data.id || data.username || username, 
                 fullName: data.fullName || fullName, 
@@ -164,7 +169,14 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 
                 {!isRegistering && !isGoogleRegister && (
                     <div className="space-y-6">
-                        <div id="googleSignInBtn" className="min-h-[48px] w-full flex justify-center"></div>
+                        {/* Container tombol Google */}
+                        <div id="googleSignInBtn" className="min-h-[48px] w-full flex justify-center overflow-hidden rounded-full">
+                            {!GOOGLE_CLIENT_ID && (
+                                <div className="text-[10px] text-amber-500 bg-amber-50 p-2 rounded-lg border border-amber-100">
+                                    Google Login tidak tersedia (Client ID kosong)
+                                </div>
+                            )}
+                        </div>
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
                             <div className="relative flex justify-center text-xs uppercase"><span className="px-3 bg-white text-slate-300 font-bold tracking-widest">Atau Manual</span></div>
