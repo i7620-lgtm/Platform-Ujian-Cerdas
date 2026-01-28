@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Student, Question, Result } from '../types';
 import { ClockIcon, CheckCircleIcon, ArrowPathIcon } from './Icons';
@@ -25,7 +25,7 @@ const DataSaverImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) =>
     const [view, setView] = useState(false);
 
     // Jika src adalah base64 (dari PDF crop), kita anggap sudah terload karena ada di memori
-    // Tapi jika URL eksternal, kita bisa lazy load
+    // Tapi jika URL eksternal, kita bisa lazy load untuk hemat data
     const isBase64 = src.startsWith('data:');
 
     if (!view && !isBase64) {
@@ -69,14 +69,13 @@ const QuestionCard: React.FC<{
     onAnswerChange: (id: string, val: string) => void;
 }> = React.memo(({ question, index, answer, onAnswerChange }) => {
     
-    // Simple Shuffle Effect (Hanya render, tidak state berat)
     const options = useMemo(() => {
         if (!question.options) return [];
         return question.options.map((text, i) => ({ text, originalIndex: i }));
     }, [question.options]);
 
     return (
-        <div id={`q-${question.id}`} className="mb-8 scroll-mt-24">
+        <div id={`q-${question.id}`} className="mb-8 scroll-mt-32">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative">
                 {/* Nomor Soal Badge */}
                 <div className="absolute -top-3 -left-2 bg-slate-800 text-white text-sm font-bold px-3 py-1 rounded shadow-md border-2 border-white">
@@ -115,7 +114,6 @@ const QuestionCard: React.FC<{
                         />
                     )}
                     
-                    {/* Simplified Support for other types to save code size */}
                     {['FILL_IN_THE_BLANK'].includes(question.questionType) && (
                          <input
                             type="text"
@@ -175,7 +173,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const timer = setTimeout(() => {
             if(onUpdate) {
                 setSaveStatus('SAVING');
-                onUpdate(answers, timeLeft, undefined, []); // Simple update
+                onUpdate(answers, timeLeft, undefined, []); 
                 setTimeout(() => setSaveStatus('SAVED'), 800);
             }
         }, 2000);
@@ -194,30 +192,43 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     const answeredCount = Object.keys(answers).filter(k => answers[k]).length;
     const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
+    const progress = totalQ > 0 ? (answeredCount / totalQ) * 100 : 0;
 
     return (
-        <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-800">
-            {/* Header Minimalis */}
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 py-3 shadow-sm flex justify-between items-center">
-                <div className="flex flex-col">
-                    <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">{exam.config.subject}</h1>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span>{answeredCount}/{totalQ} Terjawab</span>
-                        {saveStatus === 'SAVING' && <span className="text-amber-500 font-medium">Menyimpan...</span>}
-                        {saveStatus === 'SAVED' && <span className="text-emerald-500 font-medium">Tersimpan</span>}
+        <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-slate-800">
+            {/* Header Modern Minimalis dengan Progress Bar */}
+            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm transition-all">
+                <div className="px-4 py-3 flex justify-between items-center relative">
+                    <div className="flex flex-col">
+                        <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{exam.config.subject}</h1>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span>{answeredCount}/{totalQ} Terjawab</span>
+                            <span className="text-slate-300">•</span>
+                            {saveStatus === 'SAVING' && <span className="text-amber-500 font-medium animate-pulse">Menyimpan...</span>}
+                            {saveStatus === 'SAVED' && <span className="text-emerald-500 font-medium">Tersimpan</span>}
+                            {saveStatus === 'PENDING' && <span className="text-slate-400">...</span>}
+                        </div>
+                    </div>
+                    
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                        <ClockIcon className="w-4 h-4" />
+                        <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
                     </div>
                 </div>
-                
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${timeLeft < 300 ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-                    <ClockIcon className="w-4 h-4" />
-                    <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
+                {/* Visual Progress Bar - Clean & Modern */}
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-slate-100">
+                    <div 
+                        className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
+                        style={{ width: `${progress}%` }}
+                    />
                 </div>
             </div>
 
             {/* Offline Banner */}
             {!isOnline && (
-                <div className="bg-rose-500 text-white text-xs font-bold text-center py-1">
-                    Koneksi Terputus - Jawaban Disimpan di Perangkat
+                <div className="bg-rose-500 text-white text-xs font-bold text-center py-2 shadow-inner flex items-center justify-center gap-2 animate-pulse">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>
+                    Koneksi Terputus - Jawaban Disimpan Lokal
                 </div>
             )}
 
@@ -234,18 +245,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             </div>
 
             {/* Floating Action Bar */}
-            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 p-3 px-6 flex items-center justify-between z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+            <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-200 p-3 px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                    <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-rose-500'}`}></div>
                     {isOnline ? 'Online' : 'Offline Mode'}
                 </div>
                 <button 
                     onClick={() => handleSubmit(false)}
                     disabled={isSubmitting}
-                    className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95 disabled:opacity-50 flex items-center gap-2"
                 >
                     {isSubmitting ? <ArrowPathIcon className="w-4 h-4 animate-spin"/> : <CheckCircleIcon className="w-4 h-4"/>}
-                    {isSubmitting ? 'Mengirim...' : 'Selesai'}
+                    {isSubmitting ? 'Mengirim...' : 'Selesai & Kumpulkan'}
                 </button>
             </div>
         </div>
