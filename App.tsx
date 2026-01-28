@@ -64,14 +64,9 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode);
-      
-      if (!exam) { 
-          alert("Maaf, Kode Ujian tidak ditemukan. Silakan periksa kembali kode Anda."); 
-          return; 
-      }
+      if (!exam) { alert("Kode Ujian tidak ditemukan."); return; }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
-      
       if (res && res.status === 'completed') {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -79,23 +74,14 @@ const App: React.FC = () => {
           setView('STUDENT_RESULT');
           return;
       }
-      
       if (res && res.status === 'in_progress') setResumedResult(res);
       
       setCurrentExam(exam);
       setCurrentStudent(student);
       setView('STUDENT_EXAM');
     } catch (err: any) {
-        if (err.message === "EXAM_IS_DRAFT") {
-            alert("Ujian ini belum dipublikasikan oleh Guru (Status: Draf). Silakan hubungi guru Anda.");
-        } else if (err.message === "EXAM_NOT_FOUND") {
-            alert("Kode Ujian tidak terdaftar. Pastikan penulisan kode sudah benar.");
-        } else {
-            alert("Gagal memuat ujian. Pastikan koneksi internet Anda stabil.");
-        }
-    } finally { 
-        setIsSyncing(false); 
-    }
+        alert(err.message === "EXAM_IS_DRAFT" ? "Ujian belum dipublikasikan." : "Gagal memuat ujian.");
+    } finally { setIsSyncing(false); }
   };
 
   const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number) => {
@@ -121,45 +107,42 @@ const App: React.FC = () => {
     setResumedResult(null);
   };
 
-  const StatusOverlay = () => (
-      <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end gap-3 pointer-events-none">
-          {!isOnline && (
-              <div className="bg-rose-500 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2.5 animate-bounce ring-4 ring-rose-500/20">
-                  <NoWifiIcon className="w-4 h-4"/> Mode Offline Aktif
-              </div>
-          )}
-          {isSyncing && (
-              <div className="bg-white/90 backdrop-blur-xl text-indigo-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-indigo-100 flex items-center gap-2.5">
-                  <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  Proses Database...
-              </div>
-          )}
-      </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden antialiased">
-        <StatusOverlay />
+        {/* Network & Sync Toast */}
+        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 pointer-events-none">
+            {!isOnline && (
+                <div className="bg-rose-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2.5 animate-bounce ring-4 ring-rose-600/20 pointer-events-auto">
+                    <NoWifiIcon className="w-4 h-4"/> Offline
+                </div>
+            )}
+            {isSyncing && (
+                <div className="bg-white/90 backdrop-blur-xl text-indigo-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-indigo-100 flex items-center gap-2.5 pointer-events-auto">
+                    <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    Syncing...
+                </div>
+            )}
+        </div>
         
         {view === 'SELECTOR' && (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full -z-10">
-                    <div className="absolute top-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-50/50 rounded-full blur-[120px]"></div>
-                    <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-blue-50/50 rounded-full blur-[100px]"></div>
+                    <div className="absolute top-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-50/40 rounded-full blur-[120px]"></div>
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-blue-50/40 rounded-full blur-[100px]"></div>
                 </div>
 
-                <div className="w-full max-w-[420px] text-center animate-slide-in-up">
-                    <div className="inline-flex p-6 bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-100/50 mb-10 border border-white">
+                <div className="w-full max-w-[440px] text-center animate-slide-in-up">
+                    <div className="inline-flex p-7 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-15px_rgba(79,70,229,0.15)] mb-10 border border-white">
                         <LogoIcon className="w-14 h-14 text-indigo-600" />
                     </div>
                     
-                    <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-3">UjianCerdas</h1>
+                    <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">UjianCerdas</h1>
                     <p className="text-slate-400 font-medium mb-12 leading-relaxed">Sistem Evaluasi Digital yang Ringan,<br/>Aman, dan Profesional.</p>
                     
                     <div className="flex flex-col gap-4">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="group flex items-center justify-between p-7 bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-indigo-100/40 hover:-translate-y-1.5 transition-all duration-500"
+                            className="group flex items-center justify-between p-7 bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-indigo-100/40 hover:-translate-y-1.5 transition-all duration-500"
                         >
                             <div className="flex items-center gap-6">
                                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
@@ -177,7 +160,7 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="group flex items-center justify-between p-7 bg-slate-900 rounded-[2rem] shadow-2xl shadow-slate-300 hover:bg-black hover:-translate-y-1.5 transition-all duration-500"
+                            className="group flex items-center justify-between p-7 bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-slate-300 hover:bg-black hover:-translate-y-1.5 transition-all duration-500"
                         >
                             <div className="flex items-center gap-6">
                                 <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-black transition-all duration-500">
@@ -194,9 +177,9 @@ const App: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="mt-20 flex items-center justify-center gap-3 opacity-60">
+                    <div className="mt-16 flex items-center justify-center gap-3 opacity-60">
                         <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{isOnline ? 'Network Stable' : 'Offline Access'}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{isOnline ? 'Stable Access' : 'Local Mode'}</span>
                     </div>
                 </div>
             </div>
