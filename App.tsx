@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -6,7 +5,7 @@ import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import type { Exam, Student, Result, TeacherProfile } from './types';
-import { LogoIcon, NoWifiIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
@@ -56,7 +55,7 @@ const App: React.FC = () => {
       
       setView('STUDENT_EXAM');
     } catch (err: any) {
-        alert(err.message === "EXAM_IS_DRAFT" ? "Ujian belum dipublikasikan. Gunakan mode pratinjau dari dashboard guru." : "Gagal memuat ujian.");
+        alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
     } finally { setIsSyncing(false); }
   }, []);
 
@@ -65,26 +64,11 @@ const App: React.FC = () => {
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    // Deteksi Mode Preview dari URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const previewCode = urlParams.get('preview');
-    if (previewCode) {
-        handleStudentLoginSuccess(previewCode, {
-            fullName: 'Pratinjau Guru',
-            class: 'PREVIEW',
-            absentNumber: '0',
-            studentId: 'preview-mode-' + Date.now()
-        }, true);
-        // Bersihkan URL tanpa reload
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [handleStudentLoginSuccess]);
+  }, []);
 
   const refreshExams = useCallback(async () => {
     if (!teacherProfile) return;
@@ -136,78 +120,67 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden antialiased">
-        {/* Network & Sync Toast */}
-        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 pointer-events-none">
-            {!isOnline && (
-                <div className="bg-rose-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2.5 animate-bounce ring-4 ring-rose-600/20 pointer-events-auto">
-                    <NoWifiIcon className="w-4 h-4"/> Offline
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-brand-100 selection:text-brand-700 overflow-x-hidden antialiased">
+        {/* Network & Sync Status - Lean Design */}
+        <div className="fixed top-4 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+            {!isOnline ? (
+                <div className="bg-rose-500 text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 animate-pulse pointer-events-auto">
+                    <NoWifiIcon className="w-3.5 h-3.5"/> Offline
                 </div>
-            )}
-            {isSyncing && (
-                <div className="bg-white/90 backdrop-blur-xl text-indigo-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-indigo-100 flex items-center gap-2.5 pointer-events-auto">
-                    <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                    Syncing...
+            ) : isSyncing ? (
+                <div className="bg-white/80 backdrop-blur-md text-brand-600 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border border-brand-100 flex items-center gap-2 pointer-events-auto">
+                    <div className="w-2 h-2 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
+                    Sinkronisasi...
+                </div>
+            ) : (
+                <div className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-2 pointer-events-auto opacity-50 hover:opacity-100 transition-opacity">
+                    <WifiIcon className="w-3.5 h-3.5"/> Online
                 </div>
             )}
         </div>
         
         {view === 'SELECTOR' && (
-            <div className="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full -z-10">
-                    <div className="absolute top-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-50/40 rounded-full blur-[120px]"></div>
-                    <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-blue-50/40 rounded-full blur-[100px]"></div>
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
+                {/* Minimalist Background Accents */}
+                <div className="absolute inset-0 -z-10 overflow-hidden">
+                    <div className="absolute -top-24 -left-24 w-96 h-96 bg-brand-50 rounded-full blur-3xl opacity-50"></div>
+                    <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
                 </div>
 
-                <div className="w-full max-w-[440px] text-center animate-slide-in-up">
-                    <div className="inline-flex p-7 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-15px_rgba(79,70,229,0.15)] mb-10 border border-white">
-                        <LogoIcon className="w-14 h-14 text-indigo-600" />
+                <div className="w-full max-w-sm text-center animate-gentle-slide">
+                    <div className="inline-flex p-6 bg-white rounded-3xl shadow-xl shadow-brand-100/50 mb-8 border border-white">
+                        <LogoIcon className="w-12 h-12 text-brand-600" />
                     </div>
                     
-                    <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">UjianCerdas</h1>
-                    <p className="text-slate-400 font-medium mb-12 leading-relaxed">Sistem Evaluasi Digital yang Ringan,<br/>Aman, dan Profesional.</p>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">UjianCerdas</h1>
+                    <p className="text-slate-500 text-sm font-medium mb-12 leading-relaxed px-4">
+                        Platform evaluasi digital yang elegan, ringan, dan siap diakses kapan saja.
+                    </p>
                     
-                    <div className="flex flex-col gap-4">
+                    <div className="space-y-4">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="group flex items-center justify-between p-7 bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-indigo-100/40 hover:-translate-y-1.5 transition-all duration-500"
+                            className="w-full group flex items-center justify-between p-5 bg-brand-600 rounded-2xl shadow-lg shadow-brand-100 hover:bg-brand-700 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <div className="flex items-center gap-6">
-                                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
-                                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                </div>
-                                <div className="text-left">
-                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-0.5">Siswa</span>
-                                    <span className="text-xl font-bold text-slate-800 tracking-tight">Mulai Ujian</span>
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                            <span className="text-white font-bold text-lg ml-2">Mulai Ujian</span>
+                            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-brand-600 transition-all">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                             </div>
                         </button>
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="group flex items-center justify-between p-7 bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-slate-300 hover:bg-black hover:-translate-y-1.5 transition-all duration-500"
+                            className="w-full group flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all duration-300"
                         >
-                            <div className="flex items-center gap-6">
-                                <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-black transition-all duration-500">
-                                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 01-2-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
-                                </div>
-                                <div className="text-left">
-                                    <span className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-0.5">Pengelola</span>
-                                    <span className="text-xl font-bold text-white tracking-tight">Halaman Guru</span>
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white group-hover:bg-white/10 transition-all">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                            <span className="text-slate-700 font-bold text-lg ml-2">Halaman Guru</span>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-brand-100 group-hover:text-brand-600 transition-all">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
                         </button>
                     </div>
 
-                    <div className="mt-16 flex items-center justify-center gap-3 opacity-60">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{isOnline ? 'Stable Access' : 'Local Mode'}</span>
+                    <div className="mt-16 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                        v2.0 • Minimalist Edition
                     </div>
                 </div>
             </div>
