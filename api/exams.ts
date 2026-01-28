@@ -33,7 +33,6 @@ const sanitizeForPublic = (exam: any) => {
     return exam;
 };
 
-// Helper normalisasi string
 const normalize = (str: string) => (str || '').trim().toLowerCase();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,23 +48,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'GET') {
             const { code, preview } = req.query;
 
-            // --- PUBLIC ACCESS (SISWA) ---
             if (code && req.query.public === 'true') {
                 const teachers = await db.getAllTeacherKeys();
                 for (const tId of teachers) {
                     const exams = await db.getExams(tId);
                     const found = exams.find((e: any) => e.code === code);
                     if (found) {
-                        if (found.status === 'DRAFT' && preview !== 'true') {
-                            return res.status(403).json({ error: 'Exam is draft' });
+                        // PERBAIKAN: Gunakan normalisasi agar 'draft' atau 'DRAFT' tetap terdeteksi
+                        const isDraft = normalize(found.status) === 'draft';
+                        if (isDraft && preview !== 'true') {
+                            return res.status(403).json({ error: 'EXAM_IS_DRAFT' });
                         }
                         return res.status(200).json(sanitizeForPublic(found));
                     }
                 }
-                return res.status(404).json({ error: 'Exam not found' });
+                return res.status(404).json({ error: 'EXAM_NOT_FOUND' });
             } 
-            
-            // --- TEACHER / ADMIN DASHBOARD ACCESS ---
             else {
                 const requesterId = (req.headers['x-user-id'] as string);
                 const requesterRole = (req.headers['x-role'] as string) || 'guru';
@@ -73,19 +71,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 if (!requesterId) return res.status(400).json({ error: 'User ID header required' });
 
-                // 1. Ambil SEMUA data ujian (Raw Data)
                 const rawExams = await db.getExams('GLOBAL_TEACHER');
-
-                // 2. Filter Berdasarkan Role (RBAC)
                 let filteredExams = [];
 
                 if (requesterRole === 'super_admin') {
-                    // Super Admin melihat semuanya
                     filteredExams = rawExams;
                 } 
                 else if (requesterRole === 'admin') {
-                    // Admin Sekolah: WAJIB punya sekolah yang valid
-                    // Jika requesterSchool kosong, dia tidak melihat apa-apa (safety default)
                     if (normalize(requesterSchool) === '') {
                         filteredExams = [];
                     } else {
@@ -95,10 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }
                 } 
                 else {
-                    // Guru (Default): Hanya melihat ujian buatannya sendiri
                     filteredExams = rawExams.filter((e: any) => e.authorId === requesterId);
                 }
-
                 return res.status(200).json(filteredExams);
             }
         } 
@@ -106,30 +96,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const exam = req.body;
             const authorId = exam.authorId;
             if (!authorId) return res.status(400).json({ error: "Author ID missing" });
-            
-            // Simpan Ujian
             await db.saveExam(authorId, exam);
             return res.status(200).json({ success: true });
         }
         else if (req.method === 'DELETE') {
             const { code } = req.query;
             const requesterId = (req.headers['x-user-id'] as string);
-            const requesterRole = (req.headers['x-role'] as string);
-
             if (!code || !requesterId) return res.status(400).json({ error: "Missing params" });
-            
-            // Hanya pemilik atau super_admin yang boleh menghapus
-            // (Disederhanakan: Backend db.deleteExam saat ini menghapus berdasarkan code)
-            // Idealnya kita cek dulu kepemilikan di sini, tapi untuk MVP kita percaya client side check + header ID
-            
             await db.deleteExam(requesterId, code as string);
             return res.status(200).json({ success: true });
         }
-
-        return res.status(405).json({ error: `Method '${req.method}' not allowed on /api/exams` });
-        
+        return res.status(405).json({ error: `Method '${req.method}' not allowed` });
     } catch (error: any) {
-        console.error("API Error:", error);
         return res.status(500).json({ error: error.message });
     }
 }
