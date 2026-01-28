@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
 
@@ -18,9 +18,8 @@ const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
 
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isGoogleRegister, setIsGoogleRegister] = useState(false); // Mode khusus registrasi google
+  const [isGoogleRegister, setIsGoogleRegister] = useState(false);
   
-  // Form State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -29,29 +28,44 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+  const isInitialized = useRef(false);
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+
     const initGoogle = () => {
-        if (window.google && window.google.accounts) {
+        if (window.google?.accounts?.id && !isInitialized.current) {
             try {
                 window.google.accounts.id.initialize({
                     client_id: GOOGLE_CLIENT_ID,
                     callback: handleGoogleCallback,
                     auto_select: false,
-                    cancel_on_tap_outside: true
                 });
-                const btnDiv = document.getElementById("googleSignInBtn");
-                if (btnDiv) {
-                    window.google.accounts.id.renderButton(btnDiv, { 
-                        theme: "outline", size: "large", text: "continue_with", 
-                        shape: "pill", width: "350" 
-                    });
-                }
-            } catch (e) { console.error("Google Sign-In Error:", e); }
+                isInitialized.current = true;
+                renderButton();
+            } catch (e) { console.error("Google Init Error:", e); }
+        } else if (isInitialized.current) {
+            renderButton();
         }
     };
-    const timer = setInterval(() => { if (window.google) { initGoogle(); clearInterval(timer); } }, 500);
+
+    const renderButton = () => {
+        const btnDiv = document.getElementById("googleSignInBtn");
+        if (btnDiv && window.google?.accounts?.id) {
+            window.google.accounts.id.renderButton(btnDiv, { 
+                theme: "outline", size: "large", text: "signin_with", 
+                shape: "pill", width: btnDiv.offsetWidth || 350 
+            });
+        }
+    };
+
+    const timer = setInterval(() => { 
+        if (window.google) { 
+            initGoogle(); 
+            clearInterval(timer); 
+        } 
+    }, 300);
+
     return () => clearInterval(timer);
   }, [isRegistering, isGoogleRegister]); 
 
@@ -59,36 +73,28 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     e.preventDefault();
     setError(''); 
     
-    // Validasi untuk register manual atau google register
     if ((isRegistering || isGoogleRegister) && (!fullName || !school)) {
         setError("Nama Lengkap dan Sekolah wajib diisi.");
         return;
     }
 
     setIsLoading(true);
-    
     const action = (isRegistering || isGoogleRegister) ? 'register' : 'login';
-    const payload = { 
-        action, 
-        username, 
-        password: isGoogleRegister ? '' : password, // Password kosong untuk google register
-        fullName, 
-        school 
-    };
-
+    
     try {
         const res = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ action, username, password: isGoogleRegister ? '' : password, fullName, school })
         });
         const data = await res.json();
         
         if (res.ok && data.success) {
+            // FIX: Gunakan data.id atau data.username sebagai ID profil
             onLoginSuccess({ 
-                id: data.username, 
-                fullName: data.fullName, 
-                accountType: data.accountType, 
+                id: data.id || data.username || username, 
+                fullName: data.fullName || fullName, 
+                accountType: data.accountType || 'guru', 
                 school: data.school || school, 
                 avatarUrl: avatarUrl || data.avatar 
             });
@@ -103,166 +109,148 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   };
 
   const handleGoogleCallback = (response: any) => {
-      const performGoogleCheck = async () => {
-          setIsLoading(true);
-          try {
-              const res = await fetch('/api/auth', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'google-login', token: response.credential })
+      setIsLoading(true);
+      fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'google-login', token: response.credential })
+      }).then(res => res.json()).then(data => {
+          if (data.success) {
+              onLoginSuccess({ 
+                  id: data.id || data.username, 
+                  fullName: data.fullName, 
+                  accountType: data.accountType, 
+                  school: data.school, 
+                  avatarUrl: data.avatar 
               });
-              const data = await res.json();
-              
-              if (res.ok && data.success) {
-                  // User sudah ada, langsung login
-                  onLoginSuccess({ 
-                      id: data.username, 
-                      fullName: data.fullName, 
-                      accountType: data.accountType, 
-                      school: data.school, 
-                      avatarUrl: data.avatar 
-                  });
-              } else if (res.ok && data.requireRegistration) {
-                  // User belum ada, tampilkan form kelengkapan data
-                  setIsGoogleRegister(true);
-                  setIsRegistering(true); // Supaya UI switch ke mode register
-                  setUsername(data.googleData.email);
-                  setFullName(data.googleData.name);
-                  setAvatarUrl(data.googleData.picture);
-                  setPassword(''); // Password kosong
-                  setError('Silakan lengkapi nama sekolah untuk melanjutkan.');
-              } else {
-                  setError(data.error || "Gagal login Google");
-              }
-          } catch(e) { setError("Error koneksi"); }
-          finally { setIsLoading(false); }
-      };
-      performGoogleCheck();
+          } else if (data.requireRegistration) {
+              setIsGoogleRegister(true);
+              setIsRegistering(true);
+              setUsername(data.googleData.email);
+              setFullName(data.googleData.name);
+              setAvatarUrl(data.googleData.picture);
+              setError('Silakan lengkapi nama sekolah untuk melanjutkan.');
+          } else {
+              setError(data.error || "Gagal login Google");
+          }
+      }).catch(() => setError("Error koneksi")).finally(() => setIsLoading(false));
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-gray-200">
-        <div className="w-full max-w-md animate-fade-in flex flex-col">
-            <button onClick={onBack} className="flex items-center gap-2 text-base-content hover:text-primary mb-6 font-semibold transition-colors self-start"><ArrowLeftIcon className="w-5 h-5" /> Kembali</button>
+    <div className="flex items-center justify-center min-h-screen p-6 bg-[#F9FAFB] font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="w-full max-w-[440px] animate-fade-in flex flex-col">
+            <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 mb-8 font-bold transition-all self-start">
+                <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> 
+                Kembali
+            </button>
             
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center relative z-10">
-                <div className="flex justify-center mb-6"><div className="bg-primary/10 p-3 rounded-full"><LogoIcon className="w-12 h-12 text-primary" /></div></div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    {isGoogleRegister ? 'Lengkapi Pendaftaran' : (isRegistering ? 'Daftar Akun Guru' : 'Login Guru')}
+            <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_15px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                
+                <div className="flex justify-center mb-8">
+                    <div className="bg-indigo-50 p-4 rounded-3xl">
+                        <LogoIcon className="w-10 h-10 text-indigo-600" />
+                    </div>
+                </div>
+
+                <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
+                    {isGoogleRegister ? 'Lengkapi Data' : (isRegistering ? 'Daftar Akun' : 'Selamat Datang')}
                 </h2>
-                <p className="text-gray-500 text-sm mb-8">
+                <p className="text-slate-400 text-sm mb-10 font-medium">
                     {isGoogleRegister 
-                        ? 'Satu langkah lagi! Masukkan nama sekolah Anda.' 
-                        : (isRegistering ? 'Lengkapi data diri dan sekolah Anda.' : 'Masuk untuk mengelola ujian dan data siswa.')}
+                        ? 'Satu langkah lagi untuk bergabung.' 
+                        : (isRegistering ? 'Daftar untuk mengelola ujian Anda.' : 'Masuk untuk mengelola ujian dan data siswa.')}
                 </p>
                 
-                {/* Google Button - Only show on initial Login screen */}
                 {!isRegistering && !isGoogleRegister && (
-                    <>
-                        <div className="flex justify-center w-full mb-6">
-                            <div id="googleSignInBtn" className="min-h-[44px]"></div>
+                    <div className="space-y-6">
+                        <div id="googleSignInBtn" className="min-h-[48px] w-full flex justify-center"></div>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="px-3 bg-white text-slate-300 font-bold tracking-widest">Atau Manual</span></div>
                         </div>
-                        <div className="relative my-6">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                            <div className="relative flex justify-center text-xs uppercase"><span className="px-2 bg-white text-gray-400 font-bold">Atau Manual</span></div>
-                        </div>
-                    </>
+                    </div>
                 )}
 
-                <form onSubmit={handleAuthAction} className="space-y-4 text-left">
+                <form onSubmit={handleAuthAction} className="space-y-5 text-left mt-6">
                     {(isRegistering || isGoogleRegister) && (
-                        <>
+                        <div className="space-y-5">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Nama Lengkap</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
                                 <input 
                                     type="text" 
                                     value={fullName} 
                                     onChange={(e) => setFullName(e.target.value)} 
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                                    className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                                     placeholder="Contoh: Budi Santoso, S.Pd"
                                     required 
-                                    disabled={isGoogleRegister} // Nama dari Google
+                                    disabled={isGoogleRegister}
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Nama Sekolah</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Sekolah</label>
                                 <input 
                                     type="text" 
                                     value={school} 
                                     onChange={(e) => setSchool(e.target.value)} 
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                                    className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                                     placeholder="Contoh: SMA Negeri 1 Jakarta"
                                     required 
                                     autoFocus={isGoogleRegister}
                                 />
                             </div>
-                        </>
+                        </div>
                     )}
 
                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase">Username / ID (Email)</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email / Username</label>
                         <input 
                             type="text" 
                             value={username} 
                             onChange={(e) => setUsername(e.target.value)} 
-                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                             required 
                             disabled={isLoading || isGoogleRegister} 
+                            placeholder="nama@email.com"
                         />
                     </div>
                     
                     {!isGoogleRegister && (
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
                             <input 
                                 type="password" 
                                 value={password} 
                                 onChange={(e) => setPassword(e.target.value)} 
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none mt-1" 
+                                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                                 required 
                                 disabled={isLoading} 
+                                placeholder="••••••••"
                             />
                         </div>
                     )}
                     
                     {error && (
-                        <div className="text-rose-500 text-sm bg-rose-50 p-3 rounded-lg text-center font-bold animate-pulse">
+                        <div className="text-rose-500 text-xs bg-rose-50 p-4 rounded-2xl text-center font-bold border border-rose-100 animate-shake">
                             {error}
                         </div>
                     )}
                     
-                    <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg mt-2">
-                        {isLoading ? 'Memproses...' : (isGoogleRegister ? 'Selesaikan Pendaftaran' : (isRegistering ? 'Daftar Sekarang' : 'Masuk'))}
+                    <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-black text-sm uppercase tracking-widest py-4.5 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-50 mt-4 h-[56px] flex items-center justify-center">
+                        {isLoading ? (
+                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                        ) : (isGoogleRegister ? 'Selesaikan' : (isRegistering ? 'Daftar' : 'Masuk'))}
                     </button>
                 </form>
 
                 {!isGoogleRegister && (
-                    <div className="mt-6 pt-4 border-t border-gray-100">
+                    <div className="mt-10 pt-6 border-t border-slate-50">
                         <button 
                             type="button"
                             onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
-                            className="text-sm font-medium text-primary hover:underline"
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 tracking-wide uppercase transition-colors"
                         >
-                            {isRegistering ? 'Sudah punya akun? Login di sini' : 'Belum punya akun? Daftar Guru Baru'}
-                        </button>
-                    </div>
-                )}
-                
-                {isGoogleRegister && (
-                     <div className="mt-6 pt-4 border-t border-gray-100">
-                        <button 
-                            type="button"
-                            onClick={() => { 
-                                setIsGoogleRegister(false); 
-                                setIsRegistering(false); 
-                                setUsername(''); 
-                                setFullName(''); 
-                                setSchool('');
-                                setError(''); 
-                            }}
-                            className="text-sm font-medium text-slate-400 hover:text-slate-600"
-                        >
-                            Batal Pendaftaran Google
+                            {isRegistering ? 'Sudah punya akun? Masuk' : 'Belum punya akun? Daftar Baru'}
                         </button>
                     </div>
                 )}
