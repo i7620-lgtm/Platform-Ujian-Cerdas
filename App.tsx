@@ -67,6 +67,8 @@ const App: React.FC = () => {
       if (!exam) { alert("Kode Ujian tidak ditemukan."); return; }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
+      
+      // Jika hasil sudah ada dan selesai, tampilkan result
       if (res && res.status === 'completed') {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -74,10 +76,25 @@ const App: React.FC = () => {
           setView('STUDENT_RESULT');
           return;
       }
-      if (res && res.status === 'in_progress') setResumedResult(res);
-      
+
+      // Jika ini adalah login pertama atau sedang berlangsung
       setCurrentExam(exam);
       setCurrentStudent(student);
+      
+      if (res && res.status === 'in_progress') {
+        setResumedResult(res);
+      } else {
+        // PERBAIKAN: Jika siswa baru (belum ada data), kirim ping awal ke backend
+        // Ini akan memicu pembuatan file Spreadsheet pribadi di Drive
+        await storageService.submitExamResult({
+          student,
+          examCode,
+          answers: {},
+          status: 'in_progress',
+          timestamp: Date.now()
+        });
+      }
+      
       setView('STUDENT_EXAM');
     } catch (err: any) {
         alert(err.message === "EXAM_IS_DRAFT" ? "Ujian belum dipublikasikan." : "Gagal memuat ujian.");
