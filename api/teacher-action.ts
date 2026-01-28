@@ -1,106 +1,44 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
-
-// Endpoint ini KHUSUS untuk aksi Guru (Otoritas Tertinggi)
-// Tidak menerima jawaban siswa, hanya mengubah Status dan Log.
+import db from './_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Id');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        const { examCode, studentId, action, teacherId } = req.body;
+        const { examCode, studentId, action } = req.body;
+        const teachers = await db.getAllTeacherKeys();
+        let targetTeacher = null;
+        let targetResult = null;
 
-        if (!examCode || !studentId || !action) {
-            return res.status(400).json({ error: 'Missing parameters' });
+        for (const tId of teachers) {
+            const results = await db.getResults(tId, examCode);
+            const found = results.find((r: any) => r.student.studentId === studentId);
+            if (found) {
+                targetTeacher = tId;
+                targetResult = found;
+                break;
+            }
         }
 
-        const serverTimestamp = Date.now();
-        let newStatus = '';
-        let logMessage = '';
-        let statusCode = 1;
+        if (!targetTeacher || !targetResult) return res.status(404).json({ error: 'Result not found' });
 
-        // Tentukan aksi
         if (action === 'UNLOCK') {
-            newStatus = 'in_progress';
-            statusCode = 1;
-            logMessage = `[Guru] Membuka kunci akses ujian secara manual.`;
+            targetResult.status = 'in_progress';
+            targetResult.activityLog.push('[Guru] Membuka kunci akses manual.');
         } else if (action === 'STOP') {
-            newStatus = 'completed';
-            statusCode = 3;
-            logMessage = `[Guru] Menghentikan paksa ujian siswa.`;
-        } else {
-            return res.status(400).json({ error: 'Invalid action' });
+            targetResult.status = 'completed';
+            targetResult.activityLog.push('[Guru] Menghentikan paksa ujian.');
         }
 
-        // Ambil data saat ini untuk append log
-        const currentRes = await db.query(
-            'SELECT activity_log FROM results WHERE exam_code = $1 AND student_id = $2',
-            [examCode, studentId]
-        );
-
-        let finalLog = [logMessage];
-        if (currentRes.rows.length > 0) {
-            const existingLog = JSON.parse(currentRes.rows[0].activity_log || '[]');
-            finalLog = [...existingLog, logMessage];
-        }
-
-        // EKSEKUSI UPDATE OTORITATIF
-        // Kita hanya update status, status_code, activity_log, dan timestamp.
-        // Jawaban siswa TIDAK disentuh.
-        const query = `
-            UPDATE results 
-            SET 
-                status = $1, 
-                status_code = $2, 
-                activity_log = $3, 
-                timestamp = $4
-            WHERE exam_code = $5 AND student_id = $6
-            RETURNING *;
-        `;
-
-        const updateResult = await db.query(query, [
-            newStatus, 
-            statusCode, 
-            JSON.stringify(finalLog), 
-            serverTimestamp, 
-            examCode, 
-            studentId
-        ]);
-
-        if (updateResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Student result not found' });
-        }
-
-        const row = updateResult.rows[0];
-        
-        // Kembalikan format standar Result
-        return res.status(200).json({
-            examCode: row.exam_code,
-            student: {
-                studentId: row.student_id,
-                fullName: row.student_name,
-                class: row.student_class,
-                absentNumber: row.student_absent_number || ''
-            },
-            answers: JSON.parse(row.answers || '{}'),
-            score: row.score,
-            correctAnswers: row.correct_answers,
-            totalQuestions: row.total_questions,
-            status: row.status,
-            activityLog: JSON.parse(row.activity_log || '[]'),
-            timestamp: parseInt(row.timestamp),
-            isSynced: true
-        });
+        await db.saveResult(targetTeacher, targetResult);
+        return res.status(200).json(targetResult);
 
     } catch (error: any) {
-        console.error("Teacher Action Error:", error);
-        return res.status(500).json({ error: "Server Error", details: error.message });
+        return res.status(500).json({ error: error.message });
     }
 }
