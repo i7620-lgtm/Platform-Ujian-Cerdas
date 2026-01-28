@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Student } from '../types';
-import { LogoIcon, ArrowLeftIcon, TrashIcon, ClockIcon } from './Icons';
+import { LogoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
 
 interface StudentLoginProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -20,8 +20,6 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [studentClass, setStudentClass] = useState(() => localStorage.getItem(STORAGE_KEYS.CLASS) || '');
   const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem(STORAGE_KEYS.ABSENT) || '');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  
   const examCodeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,11 +31,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!examCode || !fullName || !studentClass || !absentNumber) {
-      setError('Lengkapi semua data diri dan kode ujian.');
+      setError('Semua data wajib diisi.');
       return;
     }
     setError('');
-    setIsLoading(true);
 
     const cleanName = fullName.trim();
     const cleanClass = studentClass.trim();
@@ -55,16 +52,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       absentNumber: cleanAbsent,
       studentId: compositeId, 
     };
-    
-    // Memberikan sedikit jeda untuk sensasi UX yang lebih halus
-    setTimeout(() => {
-        onLoginSuccess(examCode.toUpperCase(), student);
-        setIsLoading(false);
-    }, 600);
+    onLoginSuccess(examCode.toUpperCase(), student);
   };
 
   const handleClearData = () => {
-      if(confirm("Hapus data identitas tersimpan?")) {
+      if(confirm("Hapus data tersimpan?")) {
           setFullName(''); setStudentClass(''); setAbsentNumber('');
           localStorage.removeItem(STORAGE_KEYS.NAME);
           localStorage.removeItem(STORAGE_KEYS.CLASS);
@@ -73,50 +65,47 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] flex items-center justify-center p-6 relative overflow-hidden font-sans">
-        {/* Background Gradients */}
-        <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-50/50 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] bg-blue-50/50 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC] p-4 font-sans relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute top-[-15%] left-[-5%] w-[500px] h-[500px] bg-indigo-100/30 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-[-15%] right-[-5%] w-[400px] h-[400px] bg-sky-100/30 rounded-full blur-[80px] pointer-events-none"></div>
 
-        <div className="w-full max-w-[440px] z-10 animate-fade-in">
-            <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-indigo-600 mb-8 text-xs font-black uppercase tracking-widest transition-all">
+        <div className="w-full max-w-[420px] relative z-10 animate-fade-in">
+            <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-indigo-600 mb-8 text-[11px] font-black uppercase tracking-widest transition-colors pl-1">
                 <ArrowLeftIcon className="w-4 h-4" />
                 Kembali
             </button>
             
-            <div className="bg-white/80 backdrop-blur-2xl p-10 sm:p-12 rounded-[3.5rem] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.06)] border border-white relative">
+            <div className="bg-white/90 backdrop-blur-2xl p-8 sm:p-10 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.06)] border border-white">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-600 rounded-[2rem] text-white shadow-xl shadow-indigo-200 mb-6 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <ClockIcon className="w-10 h-10" />
+                    <div className="inline-block p-4 bg-indigo-50 rounded-3xl text-indigo-600 mb-5">
+                        <LogoIcon className="w-8 h-8" />
                     </div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Portal Ujian</h2>
-                    <p className="text-sm text-slate-400 mt-2 font-medium">Gunakan identitas resmi Anda.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Login Peserta</h2>
+                    <p className="text-sm text-slate-400 font-medium mt-1">Gunakan identitas asli Anda.</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-6">
-                    <div className="relative group">
-                         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-[2rem] opacity-0 group-focus-within:opacity-10 transition duration-500 blur-xl"></div>
-                         <div className="relative">
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block">Kode Akses</label>
                             <input
                                 ref={examCodeInputRef}
                                 type="text"
                                 value={examCode}
                                 onChange={(e) => setExamCode(e.target.value)}
-                                className="w-full px-6 py-5 bg-slate-50 rounded-3xl text-center text-3xl font-black tracking-[0.2em] text-indigo-600 placeholder:text-slate-200 focus:bg-white focus:ring-4 focus:ring-indigo-50 outline-none uppercase transition-all"
+                                className="block w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl focus:outline-none transition-all text-center text-2xl font-black tracking-[0.3em] text-indigo-600 uppercase placeholder:text-slate-200"
                                 placeholder="KODE"
                                 autoComplete="off"
                             />
-                            <div className="text-[10px] font-black text-center text-slate-300 uppercase tracking-[0.3em] mt-3">Kode Akses Ujian</div>
-                         </div>
-                    </div>
+                        </div>
 
-                    <div className="pt-4 space-y-4">
-                        <div className="flex items-center justify-between px-2">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identitas Siswa</span>
+                        <div className="h-px bg-slate-50 w-full my-6"></div>
+
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Diri</span>
                             {(fullName || studentClass) && (
-                                <button type="button" onClick={handleClearData} className="text-[10px] font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors">
-                                    Reset
-                                </button>
+                                <button type="button" onClick={handleClearData} className="text-[10px] font-bold text-rose-500 hover:underline">Reset Data</button>
                             )}
                         </div>
                         
@@ -124,16 +113,17 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                             type="text"
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
-                            className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
-                            placeholder="Nama Lengkap Sesuai Absen"
+                            className="block w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
+                            placeholder="Nama Lengkap"
                         />
+
                         <div className="grid grid-cols-5 gap-4">
                             <div className="col-span-3">
                                 <input
                                     type="text"
                                     value={studentClass}
                                     onChange={(e) => setStudentClass(e.target.value)}
-                                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
+                                    className="block w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
                                     placeholder="Kelas"
                                 />
                             </div>
@@ -142,33 +132,24 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                     type="text"
                                     value={absentNumber}
                                     onChange={(e) => setAbsentNumber(e.target.value)}
-                                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300 text-center"
-                                    placeholder="No. Absen"
+                                    className="block w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-700 text-center placeholder:text-slate-300"
+                                    placeholder="No.Absen"
                                 />
                             </div>
                         </div>
                     </div>
 
                     {error && (
-                        <div className="p-4 rounded-2xl bg-rose-50 text-rose-500 text-[11px] font-bold text-center animate-shake border border-rose-100">
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[11px] font-bold text-center animate-shake">
                             {error}
                         </div>
                     )}
                     
-                    <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-black py-5 rounded-[2rem] hover:bg-black hover:shadow-2xl hover:shadow-indigo-200 transition-all duration-300 mt-4 flex items-center justify-center gap-3 active:scale-[0.98]">
-                        {isLoading ? (
-                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                        ) : (
-                            <>
-                                Mulai Kerjakan
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                            </>
-                        )}
+                    <button type="submit" className="w-full bg-slate-900 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl hover:bg-black hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 shadow-xl shadow-slate-200 mt-6">
+                        Mulai Mengerjakan
                     </button>
                 </form>
             </div>
-            
-            <p className="text-center mt-12 text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em]">Terpantau Sistem Keamanan Ujian</p>
         </div>
     </div>
   );
