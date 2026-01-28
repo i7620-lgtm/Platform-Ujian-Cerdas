@@ -32,7 +32,8 @@ export default {
     async getManualUser(username: string) { return null; },
     
     async loginUser(username: string, password: string) {
-        const res = await callScript('auth', { username, password });
+        // FIX: Menggunakan action 'login' agar sesuai dengan router di Code.gs
+        const res = await callScript('login', { username, password });
         return res.user;
     },
 
