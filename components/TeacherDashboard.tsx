@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -71,9 +70,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // Admin State
     const [adminUsers, setAdminUsers] = useState<any[]>([]);
-    const [newAdminEmail, setNewAdminEmail] = useState('');
-    const [newAdminRole, setNewAdminRole] = useState('admin');
-    const [newAdminSchool, setNewAdminSchool] = useState('');
 
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
@@ -82,52 +78,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         if (view === 'ONGOING' || view === 'FINISHED_EXAMS') {
             onRefreshResults();
         }
-        if (view === 'ADMIN_USERS') {
-            fetchAdminUsers();
-        }
     }, [view, onRefreshExams, onRefreshResults]);
-
-    const fetchAdminUsers = async () => {
-        try {
-            const res = await fetch('/api/auth', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': teacherProfile.id,
-                    'x-role': teacherProfile.accountType,
-                    'x-school': teacherProfile.school
-                },
-                body: JSON.stringify({ action: 'get-users' })
-            });
-            const data = await res.json();
-            if (res.ok && Array.isArray(data)) {
-                setAdminUsers(data);
-            }
-        } catch(e) {}
-    };
-
-    const handleUpdateRole = async (email: string, role: string, school: string) => {
-        try {
-            const res = await fetch('/api/auth', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': teacherProfile.id,
-                    'x-role': teacherProfile.accountType,
-                    'x-school': teacherProfile.school
-                },
-                body: JSON.stringify({ action: 'update-role', email, role, school })
-            });
-            if (res.ok) {
-                alert("Role berhasil diperbarui!");
-                fetchAdminUsers();
-                setNewAdminEmail('');
-            }
-        } catch(e) {}
-    };
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
     
+    const resetForm = () => { 
+        setQuestions([]); 
+        setGeneratedCode(''); 
+        setManualMode(false); 
+        setEditingExam(null); 
+        setResetKey(prev => prev + 1); 
+    };
+
     const handleSaveExam = (status: 'PUBLISHED' | 'DRAFT') => {
         if (status === 'PUBLISHED' && questions.length === 0) { alert("Tidak ada soal."); return; }
         const code = editingExam ? editingExam.code : generateExamCode();
@@ -137,8 +99,37 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, questions, config,
             createdAt: editingExam?.createdAt || String(readableDate), status
         };
-        if (editingExam) { updateExam(examData); setIsEditModalOpen(false); setEditingExam(null); } 
-        else { addExam(examData); setEditingExam(examData); if(status === 'PUBLISHED') setGeneratedCode(code); }
+        
+        if (editingExam) { 
+            updateExam(examData); 
+            setIsEditModalOpen(false); 
+            setEditingExam(null); 
+        } else { 
+            addExam(examData); 
+            if(status === 'PUBLISHED') setGeneratedCode(code); 
+        }
+
+        // Navigasi Otomatis berdasarkan status dan waktu
+        if (status === 'DRAFT') {
+            setView('DRAFTS');
+            resetForm();
+        } else {
+            const dateStr = config.date.includes('T') ? config.date.split('T')[0] : config.date;
+            const start = new Date(`${dateStr}T${config.startTime}`);
+            const end = new Date(start.getTime() + config.timeLimit * 60 * 1000);
+            
+            if (now >= start && now <= end) {
+                setView('ONGOING');
+            } else if (now < start) {
+                setView('UPCOMING_EXAMS');
+            } else {
+                setView('FINISHED_EXAMS');
+            }
+            
+            // Berikan sedikit delay agar jika user baru membuat exam, 
+            // mereka bisa melihat notifikasi sukses (jika ada) atau transisinya halus
+            resetForm();
+        }
     };
     
     const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian?")) deleteExam(exam.code); };
@@ -153,7 +144,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setResetKey(prev => prev + 1); 
     };
 
-    const resetForm = () => { setQuestions([]); setGeneratedCode(''); setManualMode(false); setEditingExam(null); setView('UPLOAD'); setResetKey(prev => prev + 1); };
     const openEditModal = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setIsEditModalOpen(true); };
     const continueDraft = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setManualMode(true); setView('UPLOAD'); };
     const handleExamUpdate = (updatedExam: Exam) => { updateExam(updatedExam); };
