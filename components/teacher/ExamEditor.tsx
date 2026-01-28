@@ -200,44 +200,31 @@ const VisualMathModal: React.FC<{
     onInsert: (latex: string) => void; 
 }> = ({ isOpen, onClose, onInsert }) => {
     const [tab, setTab] = useState<'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS'>('BASIC');
-    
-    // Inputs State
-    // val1 = Numerator / Base / Arg 1
-    // val2 = Denominator / Power / Arg 2
-    // val3 = Mixed Whole Number / Limits / Functions
     const [val1, setVal1] = useState('');
     const [val2, setVal2] = useState('');
     const [val3, setVal3] = useState(''); 
-    
     const [rows, setRows] = useState(2);
     const [cols, setCols] = useState(2);
     const [matData, setMatData] = useState<string[][]>([]);
 
     useEffect(() => {
         if (isOpen) {
-            // Safeguard against invalid inputs which cause "Invalid array length"
             const safeRows = Math.max(1, Math.min(10, Math.floor(rows || 1)));
             const safeCols = Math.max(1, Math.min(10, Math.floor(cols || 1)));
-            
-            // Create matrix using Array.from to avoid shared references
             setMatData(Array.from({ length: safeRows }, () => Array(safeCols).fill('')));
             setVal1(''); setVal2(''); setVal3('');
         }
     }, [isOpen, rows, cols]);
 
     const updateMatrix = (r: number, c: number, v: string) => {
-        const d = matData.map(row => [...row]); // Deep copy outer and inner arrays
-        if(d[r]) {
-            d[r][c] = v;
-            setMatData(d);
-        }
+        const d = matData.map(row => [...row]); 
+        if(d[r]) { d[r][c] = v; setMatData(d); }
     };
 
     const insertStructure = (type: 'FRAC' | 'ROOT' | 'LIMIT' | 'INT' | 'SUM' | 'MATRIX' | 'SYMBOL', symbolVal?: string) => {
         let latex = '';
         switch(type) {
             case 'FRAC': 
-                // Mendukung pecahan campuran. val3 = bilangan bulat, val1 = pembilang, val2 = penyebut
                 const wholePart = val3 ? `${val3}` : '';
                 const fractionPart = `\\frac{${val1 || 'x'}}{${val2 || 'y'}}`;
                 latex = wholePart + fractionPart;
@@ -253,7 +240,7 @@ const VisualMathModal: React.FC<{
             case 'SYMBOL': latex = symbolVal || ''; break;
         }
         onInsert(latex);
-        if (type !== 'SYMBOL') onClose(); // Keep open for symbols
+        if (type !== 'SYMBOL') onClose(); 
     };
 
     if (!isOpen) return null;
@@ -289,38 +276,18 @@ const VisualMathModal: React.FC<{
                                 <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 text-center">Pecahan & Pecahan Campuran</p>
                                 <div className="flex flex-col gap-2">
                                     <div className="flex items-center justify-center gap-3">
-                                        {/* Bilangan Bulat (Campuran) */}
                                         <div className="flex flex-col items-center">
-                                            <input 
-                                                placeholder="Int" 
-                                                className="w-12 h-10 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
-                                                value={val3} 
-                                                onChange={e => setVal3(e.target.value)} 
-                                                title="Bilangan Bulat (Opsional)"
-                                            />
+                                            <input placeholder="Int" className="w-12 h-10 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" value={val3} onChange={e => setVal3(e.target.value)} title="Bilangan Bulat (Opsional)" />
                                         </div>
-                                        
-                                        {/* Pecahan */}
                                         <div className="flex flex-col items-center gap-1">
-                                            <input 
-                                                placeholder="Atas" 
-                                                className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
-                                                value={val1} 
-                                                onChange={e => setVal1(e.target.value)} 
-                                            />
+                                            <input placeholder="Atas" className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" value={val1} onChange={e => setVal1(e.target.value)} />
                                             <div className="w-20 h-0.5 bg-gray-800 rounded-full"></div>
-                                            <input 
-                                                placeholder="Bawah" 
-                                                className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" 
-                                                value={val2} 
-                                                onChange={e => setVal2(e.target.value)} 
-                                            />
+                                            <input placeholder="Bawah" className="w-16 text-center text-sm p-1 border rounded focus:ring-1 focus:ring-indigo-300 outline-none bg-white shadow-sm" value={val2} onChange={e => setVal2(e.target.value)} />
                                         </div>
                                     </div>
                                     <button onClick={() => insertStructure('FRAC')} className="mt-2 w-full text-xs bg-indigo-600 text-white border border-indigo-600 font-bold py-1.5 rounded hover:bg-indigo-700 shadow-sm transition-colors">Sisipkan Pecahan</button>
                                 </div>
                             </div>
-
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">Akar</p>
                                 <div className="flex items-end gap-1 justify-center">
@@ -332,13 +299,11 @@ const VisualMathModal: React.FC<{
                             </div>
                         </div>
                     )}
-
                     {tab === 'CALCULUS' && (
                         <div className="space-y-4">
                             <div className="flex gap-2 justify-center border-b pb-2">
                                 <button onClick={() => {setVal1(''); setVal2(''); setVal3('');}} className="text-xs font-bold px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Reset Input</button>
                             </div>
-                            
                             <div className="grid grid-cols-1 gap-4">
                                 <div className="border p-3 rounded bg-white">
                                     <p className="text-[10px] font-bold mb-2">Limit</p>
@@ -353,7 +318,6 @@ const VisualMathModal: React.FC<{
                                         <button onClick={() => insertStructure('LIMIT')} className="ml-auto text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold">Add</button>
                                     </div>
                                 </div>
-
                                 <div className="border p-3 rounded bg-white">
                                     <p className="text-[10px] font-bold mb-2">Integral / Sigma</p>
                                     <div className="flex items-center gap-2">
@@ -372,7 +336,6 @@ const VisualMathModal: React.FC<{
                             </div>
                         </div>
                     )}
-
                     {tab === 'MATRIX' && (
                         <div>
                             <div className="flex gap-4 justify-center mb-4">
@@ -387,7 +350,6 @@ const VisualMathModal: React.FC<{
                             <button onClick={() => insertStructure('MATRIX')} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-indigo-700">Sisipkan Matriks</button>
                         </div>
                     )}
-
                     {tab === 'SYMBOLS' && (
                         <div className="grid grid-cols-5 gap-2">
                             {symbols.map((s, i) => (
@@ -412,21 +374,17 @@ const WysiwygEditor: React.FC<{
 }> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px" }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const savedRange = useRef<Range | null>(null); // NEW: Store selection range
+    const savedRange = useRef<Range | null>(null); 
     
     const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>('FORMAT');
     const [activeCmds, setActiveCmds] = useState<string[]>([]);
     const [isInsideTable, setIsInsideTable] = useState(false);
-    
-    // Modals State
     const [showMath, setShowMath] = useState(false);
     const [showTable, setShowTable] = useState(false);
 
-    // Initial Load & Sync
     useEffect(() => {
         if (editorRef.current) {
             if (value !== editorRef.current.innerHTML) {
-                // Check emptiness to prevent cursor jump on simple typing, but allow external updates
                 if (!editorRef.current.innerText.trim() && !value) {
                      editorRef.current.innerHTML = "";
                 } else if (document.activeElement !== editorRef.current) {
@@ -439,12 +397,11 @@ const WysiwygEditor: React.FC<{
     const handleInput = () => {
         if (editorRef.current) {
             onChange(editorRef.current.innerHTML);
-            saveSelection(); // Save position on typing
+            saveSelection(); 
             checkActiveFormats();
         }
     };
 
-    // --- SELECTION HELPERS ---
     const saveSelection = () => {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
@@ -458,7 +415,6 @@ const WysiwygEditor: React.FC<{
             sel.removeAllRanges();
             sel.addRange(savedRange.current);
         } else if (editorRef.current) {
-            // Fallback: move cursor to end if no saved selection
             editorRef.current.focus();
             const range = document.createRange();
             range.selectNodeContents(editorRef.current);
@@ -469,12 +425,11 @@ const WysiwygEditor: React.FC<{
     };
 
     const checkActiveFormats = () => {
-        saveSelection(); // Save selection on click/navigate
+        saveSelection(); 
         const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'];
         const active = cmds.filter(cmd => document.queryCommandState(cmd));
         setActiveCmds(active);
 
-        // Check Table Context
         const selection = window.getSelection();
         let inTable = false;
         if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
@@ -491,10 +446,10 @@ const WysiwygEditor: React.FC<{
     };
 
     const runCmd = (cmd: string, val?: string) => {
-        restoreSelection(); // Restore cursor before command
+        restoreSelection(); 
         if(editorRef.current) editorRef.current.focus();
         execCmd(cmd, val);
-        saveSelection(); // Save new position
+        saveSelection(); 
         checkActiveFormats();
     };
 
@@ -531,10 +486,8 @@ const WysiwygEditor: React.FC<{
     const insertMath = (latex: string) => {
         if ((window as any).katex) {
             const html = (window as any).katex.renderToString(latex, { throwOnError: false });
-            // contenteditable="false" prevents cursor from entering the span easily, making it treated as a block
-            // FIXED: Removed mx-1 to fix wide spacing, added &nbsp; buffer, and reset span style for subsequent text (using 100% to inherit).
             const wrapper = `&nbsp;<span class="math-visual inline-block px-0.5 rounded select-none cursor-pointer hover:bg-indigo-50 align-middle" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 100%; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`;
-            runCmd('insertHTML', wrapper); // runCmd already handles restoreSelection
+            runCmd('insertHTML', wrapper); 
             handleInput();
         }
     };
@@ -569,7 +522,6 @@ const WysiwygEditor: React.FC<{
         .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; }
     `;
 
-    // --- TOOLBAR BUTTON COMPONENT ---
     const Btn: React.FC<{ cmd?: string; label?: string; icon?: React.FC<any>; active?: boolean; onClick?: () => void }> = ({ cmd, label, icon: Icon, active, onClick }) => (
         <button 
             type="button" 
@@ -584,10 +536,7 @@ const WysiwygEditor: React.FC<{
     return (
         <div className="relative group rounded-xl border border-gray-200 bg-white transition-all focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300">
             <style>{editorStyle}</style>
-            
-            {/* RIBBON TOOLBAR */}
             <div className="border-b border-gray-100 bg-gray-50/50 rounded-t-xl select-none">
-                {/* Tabs */}
                 <div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 justify-between items-end">
                     <div className="flex gap-1">
                         {['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (
@@ -596,15 +545,10 @@ const WysiwygEditor: React.FC<{
                             </button>
                         ))}
                     </div>
-                    {/* Table Context Indicator */}
                     {isInsideTable && (
-                        <div className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100">
-                            Table Active
-                        </div>
+                        <div className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100">Table Active</div>
                     )}
                 </div>
-
-                {/* Ribbon Content */}
                 <div className="p-1.5 flex flex-wrap gap-1 items-center bg-white rounded-b-none min-h-[36px]">
                     {activeTab === 'FORMAT' && (
                         <>
@@ -619,7 +563,6 @@ const WysiwygEditor: React.FC<{
                             <Btn cmd="removeFormat" icon={EraserIcon} label="Clear" />
                         </>
                     )}
-
                     {activeTab === 'PARAGRAPH' && (
                         <>
                             <Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} />
@@ -634,70 +577,28 @@ const WysiwygEditor: React.FC<{
                             <Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} />
                         </>
                     )}
-
                     {activeTab === 'INSERT' && (
                         <>
-                            <button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-700 rounded text-xs font-bold hover:bg-gray-100 transition-colors">
-                                <PhotoIcon className="w-4 h-4"/> Gambar
-                            </button>
-                            <button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold hover:bg-indigo-100 transition-colors">
-                                <TableCellsIcon className="w-4 h-4"/> Tabel N x N
-                            </button>
-                            <button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-600 rounded text-xs font-bold hover:bg-gray-100 transition-colors">
-                                —— Garis Pemisah
-                            </button>
+                            <button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-700 rounded text-xs font-bold hover:bg-gray-100 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button>
+                            <button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold hover:bg-indigo-100 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel N x N</button>
+                            <button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-600 rounded text-xs font-bold hover:bg-gray-100 transition-colors">—— Garis Pemisah</button>
                         </>
                     )}
-
                     {activeTab === 'MATH' && (
                         <div className="flex items-center gap-2 w-full">
-                            <button onMouseDown={(e) => {e.preventDefault(); setShowMath(true);}} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all">
-                                <FunctionIcon className="w-4 h-4" />
-                                Buka Math Builder Pro
-                            </button>
+                            <button onMouseDown={(e) => {e.preventDefault(); setShowMath(true);}} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Builder Pro</button>
                             <span className="text-[10px] text-gray-400 italic">Untuk Limit, Integral, Matriks, dll.</span>
                         </div>
                     )}
-
-                    {/* DYNAMIC CONTEXTUAL ACTIONS */}
                     {isInsideTable && (
                         <div className="ml-auto pl-2 border-l border-gray-200 flex items-center animate-fade-in">
-                            <button 
-                                onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }}
-                                className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded text-[10px] font-bold hover:bg-red-100 border border-red-100 transition-colors"
-                                title="Hapus Tabel ini"
-                            >
-                                <TrashIcon className="w-3 h-3"/> Hapus Tabel
-                            </button>
+                            <button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded text-[10px] font-bold hover:bg-red-100 border border-red-100 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus Tabel</button>
                         </div>
                     )}
                 </div>
             </div>
-
-            {/* Content */}
-            <div 
-                ref={editorRef}
-                className="wysiwyg-content p-4 outline-none text-sm text-slate-800 leading-relaxed overflow-auto"
-                style={{ minHeight }}
-                contentEditable={true}
-                onInput={handleInput}
-                onKeyUp={checkActiveFormats}
-                onMouseUp={checkActiveFormats}
-                onBlur={saveSelection} // Save selection when leaving editor
-                onClick={checkActiveFormats}
-                data-placeholder={placeholder}
-                spellCheck={false}
-            />
-
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageFileChange}
-            />
-
-            {/* Modals */}
+            <div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-800 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={saveSelection} onClick={checkActiveFormats} data-placeholder={placeholder} spellCheck={false} />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} />
             <TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} />
             <VisualMathModal isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} />
         </div>
@@ -708,9 +609,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); // Modal Mata Pelajaran
-    const [isClassModalOpen, setIsClassModalOpen] = useState(false); // Modal Kelas
-    const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); // Modal Jenis Evaluasi
+    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
+    const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
+    const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); 
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
@@ -719,9 +620,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     useEffect(() => {
         if (!isEditing && !generatedCode) {
             const timer = setTimeout(() => {
-                if (questionsSectionRef.current) {
-                    questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                if (questionsSectionRef.current) questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 300);
             return () => clearTimeout(timer);
         }
@@ -741,9 +640,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             const { checked } = e.target as HTMLInputElement;
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
-                if (name === 'detectBehavior' && !checked) {
-                    newConfig.continueWithPermission = false;
-                }
+                if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
                 return newConfig;
             });
         } else {
@@ -751,14 +648,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }
     };
 
-    const handleSubjectSelect = (subject: string) => {
-        setConfig(prev => ({ ...prev, subject }));
-    };
-
-    const handleQuestionTextChange = (id: string, text: string) => {
-        setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
-    };
-
+    const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
+    const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleTypeChange = (qId: string, newType: QuestionType) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId) {
@@ -785,7 +676,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 const oldOption = q.options[optIndex];
                 const newOptions = [...q.options];
                 newOptions[optIndex] = text;
-                
                 let newCorrectAnswer = q.correctAnswer;
                 if (q.questionType === 'MULTIPLE_CHOICE') {
                     if (q.correctAnswer === oldOption) newCorrectAnswer = text;
@@ -796,45 +686,28 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         newCorrectAnswer = answers.join(',');
                     }
                 }
-                
                 return { ...q, options: newOptions, correctAnswer: newCorrectAnswer };
             }
             return q;
         }));
     };
 
-    const handleCorrectAnswerChange = (questionId: string, answer: string) => {
-        setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
-    };
-
+    const handleCorrectAnswerChange = (questionId: string, answer: string) => setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
     const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) {
                 let currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : [];
-                if (isChecked) {
-                    if (!currentAnswers.includes(option)) currentAnswers.push(option);
-                } else {
-                    currentAnswers = currentAnswers.filter(a => a !== option);
-                }
+                if (isChecked) { if (!currentAnswers.includes(option)) currentAnswers.push(option); } 
+                else { currentAnswers = currentAnswers.filter(a => a !== option); }
                 return { ...q, correctAnswer: currentAnswers.join(',') };
             }
             return q;
         }));
     };
+    const handleDeleteQuestion = (id: string) => setQuestions(prev => prev.filter(q => q.id !== id));
     
-    const handleDeleteQuestion = (id: string) => {
-        setQuestions(prev => prev.filter(q => q.id !== id));
-    };
-
     const createNewQuestion = (type: QuestionType): Question => {
-        const base = {
-            id: `q-${Date.now()}-${Math.random()}`,
-            questionText: '',
-            questionType: type,
-            imageUrl: undefined,
-            optionImages: undefined
-        };
-
+        const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined };
         switch (type) {
             case 'INFO': return { ...base };
             case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' };
@@ -846,18 +719,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }
     };
 
-    const openTypeSelectionModal = (index: number | null = null) => {
-        setInsertIndex(index);
-        setIsTypeSelectionModalOpen(true);
-    };
-
+    const openTypeSelectionModal = (index: number | null = null) => { setInsertIndex(index); setIsTypeSelectionModalOpen(true); };
     const handleSelectQuestionType = (type: QuestionType) => {
         const newQuestion = createNewQuestion(type);
         if (insertIndex === null) {
             setQuestions(prev => [...prev, newQuestion]);
-             setTimeout(() => {
-                document.getElementById(newQuestion.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
+             setTimeout(() => { document.getElementById(newQuestion.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
         } else {
             const newQuestions = [...questions];
             newQuestions.splice(insertIndex + 1, 0, newQuestion);
@@ -885,7 +752,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 const optionToRemove = q.options[indexToRemove];
                 const newOptions = q.options.filter((_, i) => i !== indexToRemove);
                 const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined;
-                
                 let newCorrectAnswer = q.correctAnswer;
                 if (q.questionType === 'MULTIPLE_CHOICE') {
                      if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; 
@@ -894,7 +760,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     answers = answers.filter(a => a !== optionToRemove);
                     newCorrectAnswer = answers.join(',');
                 }
-
                 return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer };
             }
             return q;
@@ -914,9 +779,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     const handleAddMatchingPair = (qId: string) => {
         setQuestions(prev => prev.map(q => {
-             if (q.id === qId && q.matchingPairs) {
-                 return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] };
-             }
+             if (q.id === qId && q.matchingPairs) return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] };
              return q;
         }));
     };
@@ -975,7 +838,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     const renderTypeSelectionModal = () => {
         if (!isTypeSelectionModalOpen) return null;
-        
         const types: {type: QuestionType, label: string, desc: string, icon: React.FC<any>}[] = [
             { type: 'INFO', label: 'Keterangan / Info', desc: 'Hanya teks atau gambar, tanpa pertanyaan.', icon: FileTextIcon },
             { type: 'MULTIPLE_CHOICE', label: 'Pilihan Ganda', desc: 'Satu jawaban benar dari beberapa opsi.', icon: ListBulletIcon },
@@ -985,7 +847,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             { type: 'TRUE_FALSE', label: 'Benar / Salah', desc: 'Memilih pernyataan benar atau salah.', icon: CheckIcon },
             { type: 'MATCHING', label: 'Menjodohkan', desc: 'Menghubungkan pasangan item kiri dan kanan.', icon: ArrowLeftIcon },
         ];
-
         return (
             <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60] animate-fade-in">
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
@@ -995,18 +856,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     </div>
                     <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {types.map((t) => (
-                            <button 
-                                key={t.type}
-                                onClick={() => handleSelectQuestionType(t.type)}
-                                className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-md transition-all text-left group"
-                            >
-                                <div className="bg-gray-100 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <t.icon className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <p className="font-bold text-gray-800 group-hover:text-primary">{t.label}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{t.desc}</p>
-                                </div>
+                            <button key={t.type} onClick={() => handleSelectQuestionType(t.type)} className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-md transition-all text-left group">
+                                <div className="bg-gray-100 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors"><t.icon className="w-6 h-6" /></div>
+                                <div><p className="font-bold text-gray-800 group-hover:text-primary">{t.label}</p><p className="text-xs text-gray-500 mt-1">{t.desc}</p></div>
                             </button>
                         ))}
                     </div>
@@ -1019,118 +871,48 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
             <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
-                    <h2 className="text-xl font-bold text-neutral">
-                        {isEditing ? '1. Editor Soal' : '3. Editor Soal'}
-                    </h2>
+                    <h2 className="text-xl font-bold text-neutral">{isEditing ? '1. Editor Soal' : '3. Editor Soal'}</h2>
                     <p className="text-sm text-gray-500 mt-1">Gunakan editor di bawah untuk membuat soal. Klik tombol tabel atau rumus untuk menyisipkan objek visual.</p>
                 </div>
                 <div className="space-y-6">
                     {questions.length > 0 && (
                         <div className="relative py-2 group/insert">
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                <div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div>
-                            </div>
-                            <div className="relative flex justify-center">
-                                <button
-                                    onClick={() => openTypeSelectionModal(-1)}
-                                    className="bg-white text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
-                                    >
-                                    <PlusCircleIcon className="w-4 h-4" />
-                                    Sisipkan Soal Di Awal
-                                </button>
-                            </div>
+                            <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div></div>
+                            <div className="relative flex justify-center"><button onClick={() => openTypeSelectionModal(-1)} className="bg-white text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Sisipkan Soal Di Awal</button></div>
                         </div>
                     )}
-
                     {questions.map((q, index) => {
                         const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                        
                         return (
                         <React.Fragment key={q.id}>
                             <div id={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 group transition-all duration-300 hover:shadow-md relative overflow-visible">
-                                    {/* Question Header & Controls */}
                                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                          <div className="relative inline-block bg-white rounded-lg shadow-sm">
-                                            <select
-                                                value={q.questionType}
-                                                onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)}
-                                                className="appearance-none bg-gray-50 border border-gray-200 text-gray-600 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                            >
-                                                <option value="MULTIPLE_CHOICE">Pilihan Ganda</option>
-                                                <option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option>
-                                                <option value="TRUE_FALSE">Benar / Salah</option>
-                                                <option value="MATCHING">Menjodohkan</option>
-                                                <option value="ESSAY">Esai / Uraian</option>
-                                                <option value="FILL_IN_THE_BLANK">Isian Singkat</option>
-                                                <option value="INFO">Info / Teks</option>
+                                            <select value={q.questionType} onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)} className="appearance-none bg-gray-50 border border-gray-200 text-gray-600 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                                <option value="MULTIPLE_CHOICE">Pilihan Ganda</option><option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option><option value="TRUE_FALSE">Benar / Salah</option><option value="MATCHING">Menjodohkan</option><option value="ESSAY">Esai / Uraian</option><option value="FILL_IN_THE_BLANK">Isian Singkat</option><option value="INFO">Info / Teks</option>
                                             </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                                                <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                            </div>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"><svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
                                         </div>
                                         <button onClick={() => handleDeleteQuestion(q.id)} className="p-1.5 bg-white text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 border border-gray-200 transition-colors shadow-sm" title="Hapus Soal"><TrashIcon className="w-4 h-4" /></button>
                                     </div>
-
                                     <div className="p-6 md:p-8">
                                         <div className="flex items-start gap-4 md:gap-6">
-                                            {/* Numbering */}
-                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">
-                                                {q.questionType === 'INFO' ? (
-                                                     <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">i</div>
-                                                ) : (
-                                                    <span className="text-slate-300 font-bold text-xl">{String(questionNumber).padStart(2, '0')}</span>
-                                                )}
-                                            </div>
-
+                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 font-bold text-xl">{String(questionNumber).padStart(2, '0')}</span>}</div>
                                             <div className="flex-1 min-w-0">
-                                                 {/* Mobile Number */}
-                                                <div className="md:hidden mb-2">
-                                                     {q.questionType !== 'INFO' && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}
-                                                </div>
-
-                                                {/* WYSIWYG EDITOR FOR QUESTION TEXT */}
-                                                <WysiwygEditor 
-                                                    value={q.questionText} 
-                                                    onChange={(val) => handleQuestionTextChange(q.id, val)} 
-                                                    placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."}
-                                                    minHeight="80px"
-                                                />
-
-                                                {/* --- OPTIONS AREA --- */}
-                                                
-                                                {/* 1. Multiple Choice */}
+                                                <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
+                                                <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => (
                                                             <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${q.correctAnswer === option ? 'bg-emerald-50/50' : ''}`}>
-                                                                {/* Radio Indicator */}
-                                                                <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}>
-                                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${q.correctAnswer === option ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white group-hover/opt:border-emerald-300'}`}>
-                                                                        {q.correctAnswer === option && <div className="w-2 h-2 bg-white rounded-full" />}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex-1">
-                                                                     {/* WYSIWYG FOR OPTION */}
-                                                                    <WysiwygEditor 
-                                                                        value={option} 
-                                                                        onChange={(val) => handleOptionTextChange(q.id, i, val)} 
-                                                                        placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
-                                                                        minHeight="40px"
-                                                                    />
-                                                                </div>
-
-                                                                {/* Option Controls */}
-                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
-                                                                    <button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
-                                                                </div>
+                                                                <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}><div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${q.correctAnswer === option ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white group-hover/opt:border-emerald-300'}`}>{q.correctAnswer === option && <div className="w-2 h-2 bg-white rounded-full" />}</div></div>
+                                                                <div className="flex-1"><WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" /></div>
+                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
                                                             </div>
                                                         ))}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
-
-                                                {/* 2. Complex Choice */}
                                                 {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         <p className="text-xs text-gray-400 italic mb-2 ml-1">Pilih semua jawaban benar:</p>
@@ -1138,200 +920,123 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                              const isChecked = q.correctAnswer ? q.correctAnswer.split(',').includes(option) : false;
                                                              return (
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isChecked ? 'bg-emerald-50/50' : ''}`}>
-                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isChecked)}>
-                                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white'}`}>
-                                                                            {isChecked && <CheckIcon className="w-3.5 h-3.5 text-white" />}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" />
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
-                                                                        <button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
-                                                                    </div>
+                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isChecked)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white'}`}>{isChecked && <CheckIcon className="w-3.5 h-3.5 text-white" />}</div></div>
+                                                                    <div className="flex-1"><WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" /></div>
+                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
                                                                 </div>
                                                         )})}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
-
-                                                {/* 3. True/False */}
                                                 {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                                     <div className="mt-6 ml-1 overflow-hidden rounded-xl border border-gray-100">
                                                         {q.trueFalseRows.map((row, i) => (
                                                             <div key={i} className="flex items-center gap-4 bg-white border-b border-gray-50 p-3 last:border-0 group/row">
-                                                                <div className="flex-1">
-                                                                     <input 
-                                                                        type="text" 
-                                                                        value={row.text} 
-                                                                        onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)} 
-                                                                        className="w-full text-sm border-0 focus:ring-0 p-2 bg-gray-50 rounded hover:bg-white transition-colors placeholder-gray-300" 
-                                                                        placeholder="Pernyataan..." 
-                                                                     />
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${row.answer ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-300 border-gray-200'}`}>Benar</button>
-                                                                    <button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, false)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${!row.answer ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-gray-300 border-gray-200'}`}>Salah</button>
-                                                                </div>
+                                                                <div className="flex-1"><input type="text" value={row.text} onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2 bg-gray-50 rounded hover:bg-white transition-colors placeholder-gray-300" placeholder="Pernyataan..." /></div>
+                                                                <div className="flex gap-2"><button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${row.answer ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-300 border-gray-200'}`}>Benar</button><button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, false)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${!row.answer ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-gray-300 border-gray-200'}`}>Salah</button></div>
                                                                 <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity"><TrashIcon className="w-4 h-4"/></button>
                                                             </div>
                                                         ))}
-                                                        <div className="p-2 bg-gray-50 text-center">
-                                                            <button onClick={() => handleAddTrueFalseRow(q.id)} className="text-xs font-bold text-primary hover:underline">+ Tambah Baris</button>
-                                                        </div>
+                                                        <div className="p-2 bg-gray-50 text-center"><button onClick={() => handleAddTrueFalseRow(q.id)} className="text-xs font-bold text-primary hover:underline">+ Tambah Baris</button></div>
                                                     </div>
                                                 )}
-
-                                                {/* 4. Matching */}
                                                 {q.questionType === 'MATCHING' && q.matchingPairs && (
                                                     <div className="mt-6 space-y-2">
                                                         {q.matchingPairs.map((pair, i) => (
                                                             <div key={i} className="flex gap-4 items-center group/match">
-                                                                <div className="flex-1 bg-white border border-gray-200 rounded-lg p-1 focus-within:ring-1 focus-within:ring-primary">
-                                                                    <input type="text" value={pair.left} onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2" placeholder="Item Kiri" />
-                                                                </div>
+                                                                <div className="flex-1 bg-white border border-gray-200 rounded-lg p-1 focus-within:ring-1 focus-within:ring-primary"><input type="text" value={pair.left} onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2" placeholder="Item Kiri" /></div>
                                                                 <div className="text-gray-300">➜</div>
-                                                                <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-lg p-1 focus-within:ring-1 focus-within:ring-emerald-400">
-                                                                    <input type="text" value={pair.right} onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2 bg-transparent text-emerald-800" placeholder="Pasangan Kanan" />
-                                                                </div>
+                                                                <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-lg p-1 focus-within:ring-1 focus-within:ring-emerald-400"><input type="text" value={pair.right} onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2 bg-transparent text-emerald-800" placeholder="Pasangan Kanan" /></div>
                                                                 <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/match:opacity-100"><TrashIcon className="w-4 h-4"/></button>
                                                             </div>
                                                         ))}
                                                         <button onClick={() => handleAddMatchingPair(q.id)} className="mt-2 text-xs font-bold text-primary hover:underline">+ Tambah Pasangan</button>
                                                     </div>
                                                 )}
-                                                
-                                                {/* 5. Key for Essay/FillBlank */}
                                                 {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
                                                     <div className="mt-8 pt-4 border-t border-gray-50">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
-                                                            {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}
-                                                        </label>
-                                                        <WysiwygEditor 
-                                                            value={q.correctAnswer || ''}
-                                                            onChange={(val) => handleCorrectAnswerChange(q.id, val)}
-                                                            placeholder="Tulis kunci jawaban..."
-                                                            minHeight="60px"
-                                                        />
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">{q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}</label>
+                                                        <WysiwygEditor value={q.correctAnswer || ''} onChange={(val) => handleCorrectAnswerChange(q.id, val)} placeholder="Tulis kunci jawaban..." minHeight="60px" />
                                                     </div>
                                                 )}
-
                                             </div>
                                         </div>
                                     </div>
                             </div>
-                            
                             <div className="relative py-2 group/insert">
-                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                    <div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div>
-                                </div>
-                                <div className="relative flex justify-center">
-                                    <button
-                                        onClick={() => openTypeSelectionModal(index)}
-                                        className="bg-white text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
-                                    >
-                                        <PlusCircleIcon className="w-4 h-4" />
-                                        Sisipkan Soal
-                                    </button>
-                                </div>
+                                <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-200 group-hover/insert:border-primary/30 transition-colors"></div></div>
+                                <div className="relative flex justify-center"><button onClick={() => openTypeSelectionModal(index)} className="bg-white text-gray-400 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Sisipkan Soal</button></div>
                             </div>
                         </React.Fragment>
                         );
                     })}
                 </div>
-                 <div className="mt-12 mb-20 text-center">
-                    <button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-bold hover:text-primary-focus mx-auto transition-all bg-white border border-primary/20 px-8 py-4 rounded-2xl hover:bg-primary hover:text-white shadow-sm hover:shadow-lg active:scale-95 group">
-                        <PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" />
-                        Tambah Soal Baru
-                    </button>
-                </div>
+                 <div className="mt-12 mb-20 text-center"><button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-bold hover:text-primary-focus mx-auto transition-all bg-white border border-primary/20 px-8 py-4 rounded-2xl hover:bg-primary hover:text-white shadow-sm hover:shadow-lg active:scale-95 group"><PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" /> Tambah Soal Baru</button></div>
              </div>
 
             {/* --- CONFIGURATION --- */}
             <div className="pt-10">
                  <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm mb-6">
-                    <h2 className="text-xl font-bold text-neutral">
-                        {isEditing ? '2. Konfigurasi' : '4. Konfigurasi'}
-                    </h2>
+                    <h2 className="text-xl font-bold text-neutral">{isEditing ? '2. Konfigurasi' : '4. Konfigurasi'}</h2>
                      <p className="text-sm text-gray-500 mt-1">Pengaturan waktu dan akses.</p>
                 </div>
                 <div className="bg-white p-8 border border-gray-200 rounded-2xl shadow-sm space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-                        <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
-                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Umum</h4>
-                        </div>
+                        <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2"><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Umum</h4></div>
                         
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Mata Pelajaran</label>
-                            <div 
-                                onClick={() => setIsSubjectModalOpen(true)}
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
-                            >
-                                <span className={config.subject ? 'text-slate-800' : 'text-gray-400'}>
-                                    {config.subject || 'Pilih Mata Pelajaran...'}
-                                </span>
+                            <div onClick={() => setIsSubjectModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300">
+                                <span className={config.subject ? 'text-slate-800' : 'text-gray-400'}>{config.subject || 'Pilih Mata Pelajaran...'}</span>
                                 <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Kelas</label>
-                            <div 
-                                onClick={() => setIsClassModalOpen(true)}
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
-                            >
-                                <span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>
-                                    {config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}
-                                </span>
+                            <div onClick={() => setIsClassModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300">
+                                <span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>{config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}</span>
                                 <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
                             </div>
                         </div>
 
+                        {/* NEW: TARGET CLASSES FOR SHARDING */}
+                        <div className="md:col-span-2 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+                            <label className="block text-sm font-bold text-indigo-900 mb-1">Daftar Kelas Spesifik (Opsional)</label>
+                            <p className="text-xs text-indigo-500 mb-2">Masukkan nama kelas yang dipisahkan dengan koma (contoh: X-IPA-1, X-IPA-2). Sistem akan menyiapkan database terpisah untuk setiap kelas ini secara otomatis.</p>
+                            <input 
+                                type="text" 
+                                value={config.targetClasses?.join(', ') || ''} 
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    const classes = val.split(',').map(c => c.trim()).filter(c => c !== '');
+                                    setConfig(prev => ({ ...prev, targetClasses: classes }));
+                                }}
+                                className="w-full p-3 bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm font-bold text-indigo-900 placeholder:text-indigo-300"
+                                placeholder="X-IPA-1, X-IPA-2, X-IPS-1"
+                            />
+                        </div>
+
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Evaluasi</label>
-                            <div 
-                                onClick={() => setIsExamTypeModalOpen(true)}
-                                className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"
-                            >
-                                <span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>
-                                    {config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}
-                                </span>
+                            <div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300">
+                                <span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span>
                                 <ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" />
                             </div>
                         </div>
 
                          <div className="md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 mb-2">Instruksi Pengerjaan</label>
-                            <textarea
-                                name="description"
-                                value={config.description || ''}
-                                onChange={handleConfigChange}
-                                className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner"
-                                placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..."
-                            />
+                            <textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." />
                         </div>
                     </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 pt-8 border-t border-gray-100">
-                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2">
-                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Keamanan</h4>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Pelaksanaan</label>
-                            <input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Jam Mulai</label>
-                            <input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Durasi Pengerjaan (Menit)</label>
-                            <input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Interval Auto-Save (Detik)</label>
-                            <input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" />
-                        </div>
+                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2"><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Keamanan</h4></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Pelaksanaan</label><input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-2">Jam Mulai</label><input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-2">Durasi Pengerjaan (Menit)</label><input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-2">Interval Auto-Save (Detik)</label><input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
                         
                         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Acak Soal</span></label>
@@ -1346,22 +1051,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100">
                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pengaturan Hasil & Stream</h4>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
-                                    <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span>
-                                </label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
-                                    <input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span>
-                                </label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
-                                    <input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Pantauan Orang Tua (Live)</span>
-                                </label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm">
-                                    <input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span>
-                                </label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span></label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Pantauan Orang Tua (Live)</span></label>
+                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                              </div>
                         </div>
                     </div>
@@ -1372,32 +1065,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             <div className="text-center pt-10 pb-20">
                 {isEditing ? (
                     <div className="flex justify-center items-center gap-4">
-                        <button onClick={onCancel} className="bg-white text-gray-700 border border-gray-300 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                            Batal
-                        </button>
-                        {onSaveDraft && (
-                            <button onClick={onSaveDraft} className="bg-slate-100 text-slate-700 border border-slate-200 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 transition-all shadow-sm flex items-center gap-2 active:scale-95">
-                                <PencilIcon className="w-5 h-5" />
-                                Perbarui Draf
-                            </button>
-                        )}
-                        <button onClick={onSave} className="bg-primary text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus transition-all shadow-xl shadow-indigo-100 transform hover:-translate-y-1 active:scale-95">
-                            Simpan Perubahan
-                        </button>
+                        <button onClick={onCancel} className="bg-white text-gray-700 border border-gray-300 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 transition-all shadow-sm active:scale-95">Batal</button>
+                        {onSaveDraft && <button onClick={onSaveDraft} className="bg-slate-100 text-slate-700 border border-slate-200 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 transition-all shadow-sm flex items-center gap-2 active:scale-95"><PencilIcon className="w-5 h-5" /> Perbarui Draf</button>}
+                        <button onClick={onSave} className="bg-primary text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus transition-all shadow-xl shadow-indigo-100 transform hover:-translate-y-1 active:scale-95">Simpan Perubahan</button>
                     </div>
                 ) : (
                     <>
                         <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
-                            {onSaveDraft && (
-                                <button onClick={onSaveDraft} className="w-full sm:w-auto bg-white text-slate-600 border-2 border-slate-100 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95">
-                                    <PencilIcon className="w-5 h-5" />
-                                    Simpan Draf
-                                </button>
-                            )}
-                            <button onClick={onSave} className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95">
-                                <CheckCircleIcon className="w-6 h-6" />
-                                Publikasikan Sekarang
-                            </button>
+                            {onSaveDraft && <button onClick={onSaveDraft} className="w-full sm:w-auto bg-white text-slate-600 border-2 border-slate-100 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95"><PencilIcon className="w-5 h-5" /> Simpan Draf</button>}
+                            <button onClick={onSave} className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95"><CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang</button>
                         </div>
                         {generatedCode && (
                             <div ref={generatedCodeSectionRef} className="mt-12 p-1 rounded-3xl animate-fade-in text-center max-w-md mx-auto bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-2xl">
@@ -1405,19 +1081,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     <h4 className="font-black text-2xl text-slate-800 mb-2">Ujian Aktif!</h4>
                                     <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">Berikan kode unik ini kepada siswa Anda agar mereka dapat mulai mengerjakan.</p>
                                     <div className="flex flex-col gap-4">
-                                        <div className="bg-slate-50 p-6 rounded-2xl border-2 border-emerald-50 shadow-inner group transition-all hover:bg-emerald-50/30">
-                                            <span className="text-4xl font-black tracking-[0.3em] text-emerald-600 font-mono block">{generatedCode}</span>
-                                        </div>
-                                        <button onClick={() => {
-                                            navigator.clipboard.writeText(generatedCode);
-                                            alert("Kode berhasil disalin!");
-                                        }} className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors py-2">
-                                            Salin Kode Akses
-                                        </button>
+                                        <div className="bg-slate-50 p-6 rounded-2xl border-2 border-emerald-50 shadow-inner group transition-all hover:bg-emerald-50/30"><span className="text-4xl font-black tracking-[0.3em] text-emerald-600 font-mono block">{generatedCode}</span></div>
+                                        <button onClick={() => {navigator.clipboard.writeText(generatedCode); alert("Kode berhasil disalin!");}} className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors py-2">Salin Kode Akses</button>
                                     </div>
-                                    <button onClick={onReset} className="mt-8 w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-black transition-all shadow-lg active:scale-95">
-                                        Selesai & Tutup
-                                    </button>
+                                    <button onClick={onReset} className="mt-8 w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-black transition-all shadow-lg active:scale-95">Selesai & Tutup</button>
                                 </div>
                             </div>
                         )}
@@ -1426,33 +1093,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             </div>
 
             {renderTypeSelectionModal()}
-            <SelectionModal 
-                isOpen={isSubjectModalOpen}
-                title="Pilih Mata Pelajaran"
-                options={SUBJECTS}
-                selectedValue={config.subject || ''}
-                onClose={() => setIsSubjectModalOpen(false)}
-                onSelect={handleSubjectSelect}
-                searchPlaceholder="Cari mata pelajaran..."
-            />
-            <SelectionModal 
-                isOpen={isClassModalOpen}
-                title="Pilih Kelas"
-                options={CLASSES}
-                selectedValue={config.classLevel || ''}
-                onClose={() => setIsClassModalOpen(false)}
-                onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))}
-                searchPlaceholder="Cari kelas..."
-            />
-            <SelectionModal 
-                isOpen={isExamTypeModalOpen}
-                title="Pilih Jenis Evaluasi"
-                options={EXAM_TYPES}
-                selectedValue={config.examType || ''}
-                onClose={() => setIsExamTypeModalOpen(false)}
-                onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))}
-                searchPlaceholder="Cari jenis evaluasi..."
-            />
+            <SelectionModal isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
+            <SelectionModal isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
+            <SelectionModal isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
         </div>
     );
 };
