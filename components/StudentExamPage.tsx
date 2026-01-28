@@ -1,287 +1,134 @@
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { Exam, Student, Question, Result } from '../types';
-import { ClockIcon, CheckCircleIcon, ArrowPathIcon } from './Icons';
+import React, { useState, useEffect } from 'react';
+import type { Exam, Student, Result } from '../types';
+import { ClockIcon, CheckCircleIcon } from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => void;
-  onForceSubmit: (answers: Record<string, string>, timeLeft: number, activityLog?: string[]) => void;
-  onUpdate?: (answers: Record<string, string>, timeLeft: number, location?: string, activityLog?: string[]) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+  onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
-const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-};
-
-const DataSaverImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [view, setView] = useState(false);
-    const isBase64 = src.startsWith('data:');
-
-    if (!view && !isBase64) {
-        return (
-            <button 
-                onClick={() => setView(true)}
-                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-2 hover:bg-slate-100 transition-colors my-2"
-            >
-                <span className="text-xs font-bold">Klik untuk memuat gambar</span>
-                <span className="text-[10px]">(Hemat Data)</span>
-            </button>
-        )
-    }
-
-    return (
-        <div className="relative my-3 rounded-lg overflow-hidden border border-slate-100 bg-white">
-            <img 
-                src={src} 
-                alt={alt} 
-                className={`max-w-full h-auto object-contain mx-auto transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-                onLoad={() => setIsLoaded(true)}
-                loading="lazy"
-            />
-            {!isLoaded && <div className="absolute inset-0 bg-slate-50 animate-pulse"></div>}
-        </div>
-    );
-};
-
-const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
-    if (content.startsWith('data:image/') || content.startsWith('http')) {
-        return <DataSaverImage src={content} alt="Soal" />;
-    }
-    return <div className="whitespace-pre-wrap font-serif text-slate-800 text-lg leading-relaxed" dangerouslySetInnerHTML={{ __html: content }}></div>;
-});
-
-const QuestionCard: React.FC<{
-    question: Question;
-    index: number;
-    answer: string;
-    onAnswerChange: (id: string, val: string) => void;
-}> = React.memo(({ question, index, answer, onAnswerChange }) => {
-    const options = useMemo(() => {
-        if (!question.options) return [];
-        return question.options.map((text, i) => ({ text, originalIndex: i }));
-    }, [question.options]);
-
-    return (
-        <div id={`q-${question.id}`} className="mb-8 scroll-mt-32">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative">
-                <div className="absolute -top-3 -left-2 bg-slate-800 text-white text-sm font-bold px-3 py-1 rounded shadow-md border-2 border-white">
-                    No. {index + 1}
-                </div>
-
-                <div className="mt-2 mb-4">
-                    <RenderContent content={question.questionText} />
-                    {question.imageUrl && <DataSaverImage src={question.imageUrl} alt="Gambar Soal" />}
-                </div>
-
-                <div className="space-y-3">
-                    {question.questionType === 'MULTIPLE_CHOICE' && options.map((opt, i) => (
-                        <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${answer === opt.text ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
-                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${answer === opt.text ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-white'}`}>
-                                {answer === opt.text && <div className="w-2 h-2 bg-white rounded-full"></div>}
-                            </div>
-                            <input 
-                                type="radio" 
-                                name={`q-${question.id}`} 
-                                className="hidden" 
-                                checked={answer === opt.text} 
-                                onChange={() => onAnswerChange(question.id, opt.text)} 
-                            />
-                            <div className="text-sm md:text-base text-slate-700 leading-snug">{opt.text}</div>
-                        </label>
-                    ))}
-
-                    {question.questionType === 'ESSAY' && (
-                        <textarea
-                            value={answer}
-                            onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm min-h-[120px]"
-                            placeholder="Tulis jawaban Anda di sini..."
-                        />
-                    )}
-                    
-                    {['FILL_IN_THE_BLANK'].includes(question.questionType) && (
-                         <input
-                            type="text"
-                            value={answer}
-                            onChange={(e) => onAnswerChange(question.id, e.target.value)}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Jawaban singkat..."
-                        />
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-});
-
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onForceSubmit, onUpdate }) => {
-    const [answers, setAnswers] = useState<Record<string, string>>({ ...initialData?.answers });
-    const [timeLeft, setTimeLeft] = useState(0);
-    const [isOnline, setIsOnline] = useState(navigator.onLine);
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onUpdate }) => {
+    const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
+    const [timeLeft, setTimeLeft] = useState(exam.config.timeLimit * 60);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [saveStatus, setSaveStatus] = useState<'SAVED' | 'SAVING' | 'PENDING'>('SAVED');
-    const [logs, setLogs] = useState<string[]>(initialData?.activityLog || []);
-
-    const endTimeRef = useRef<number>(0);
-    const violationOccurred = useRef(false);
-    
-    const addLog = (msg: string) => {
-        const time = new Date().toLocaleTimeString();
-        setLogs(prev => [...prev, `[${time}] ${msg}`]);
-    };
 
     useEffect(() => {
-        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const startObj = new Date(`${dateStr}T${exam.config.startTime}`);
-        endTimeRef.current = startObj.getTime() + (exam.config.timeLimit * 60 * 1000);
-
-        const tick = setInterval(() => {
-            const diff = Math.floor((endTimeRef.current - Date.now()) / 1000);
-            if (diff <= 0) {
-                clearInterval(tick);
-                if (!violationOccurred.current) handleSubmit(true);
-            } else {
-                setTimeLeft(diff);
-            }
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) { clearInterval(timer); handleSubmit(true); return 0; }
+                return prev - 1;
+            });
         }, 1000);
-
-        // --- ANTI-CHEAT LOGIC ---
-        const handleViolation = (reason: string) => {
-            if (violationOccurred.current || !exam.config.detectBehavior) return;
-            
-            const detailedMsg = `PELANGGARAN: ${reason}`;
-            addLog(detailedMsg);
-            
-            if (exam.config.continueWithPermission) {
-                violationOccurred.current = true;
-                clearInterval(tick);
-                onForceSubmit(answers, timeLeft, [...logs, detailedMsg]);
-            }
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                handleViolation("Siswa meninggalkan tab ujian/pindah tab.");
-            }
-        };
-
-        const handleBlur = () => {
-            handleViolation("Siswa membuka aplikasi lain atau kehilangan fokus pada layar ujian.");
-        };
-
-        window.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('blur', handleBlur);
-
-        const netHandler = () => setIsOnline(navigator.onLine);
-        window.addEventListener('online', netHandler);
-        window.addEventListener('offline', netHandler);
-
-        return () => {
-            clearInterval(tick);
-            window.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('blur', handleBlur);
-            window.removeEventListener('online', netHandler);
-            window.removeEventListener('offline', netHandler);
-        };
-    }, [exam.config, answers, timeLeft, logs]);
-
-    useEffect(() => {
-        if(Object.keys(answers).length === 0 || violationOccurred.current) return;
-        setSaveStatus('PENDING');
-        const timer = setTimeout(() => {
-            if(onUpdate) {
-                setSaveStatus('SAVING');
-                onUpdate(answers, timeLeft, undefined, logs); 
-                setTimeout(() => setSaveStatus('SAVED'), 800);
-            }
-        }, 2000);
-        return () => clearTimeout(timer);
-    }, [answers]);
-
-    const handleAnswer = useCallback((id: string, val: string) => {
-        if (violationOccurred.current) return;
-        setAnswers(prev => ({ ...prev, [id]: val }));
+        return () => clearInterval(timer);
     }, []);
 
-    const handleSubmit = (auto = false) => {
-        if (violationOccurred.current) return;
-        if (!auto && !confirm("Kirim jawaban sekarang? Anda tidak bisa mengubahnya lagi.")) return;
+    const handleSubmit = async (auto = false) => {
+        if (!auto && !confirm("Yakin ingin menyelesaikan ujian?")) return;
         setIsSubmitting(true);
-        onSubmit(answers, timeLeft, undefined, logs);
+        await onSubmit(answers, timeLeft);
     };
 
-    const answeredCount = Object.keys(answers).filter(k => answers[k]).length;
-    const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
-    const progress = totalQ > 0 ? (answeredCount / totalQ) * 100 : 0;
+    const handleAnswer = (qId: string, val: string) => {
+        const newAnswers = { ...answers, [qId]: val };
+        setAnswers(newAnswers);
+        onUpdate?.(newAnswers, timeLeft);
+    };
+
+    const formatTime = (s: number) => {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+
+    const answeredCount = Object.keys(answers).length;
+    const totalQ = exam.questions.length;
+    const progress = (answeredCount / totalQ) * 100;
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-slate-800">
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm transition-all">
-                <div className="px-4 py-3 flex justify-between items-center relative">
-                    <div className="flex flex-col">
-                        <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{exam.config.subject}</h1>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span>{answeredCount}/{totalQ} Terjawab</span>
-                            <span className="text-slate-300">•</span>
-                            {saveStatus === 'SAVING' && <span className="text-amber-500 font-medium animate-pulse">Menyimpan...</span>}
-                            {saveStatus === 'SAVED' && <span className="text-emerald-500 font-medium">Tersimpan</span>}
-                            {saveStatus === 'PENDING' && <span className="text-slate-400">...</span>}
+        <div className="min-h-screen bg-[#FDFEFF]">
+            {/* Elegant Fixed Header */}
+            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-100 px-6 py-5 shadow-sm">
+                <div className="max-w-4xl mx-auto flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{exam.config.subject}</h2>
+                        <div className="flex items-center gap-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                             <p className="text-sm font-bold text-slate-800">{student.fullName}</p>
                         </div>
                     </div>
                     
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                    <div className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all duration-500 ${timeLeft < 300 ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                         <ClockIcon className="w-4 h-4" />
-                        <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
+                        <span className="font-mono font-black text-sm">{formatTime(timeLeft)}</span>
                     </div>
                 </div>
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-slate-100">
-                    <div 
-                        className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
-                        style={{ width: `${progress}%` }}
-                    />
+                
+                {/* Visual Progress Bar */}
+                <div className="absolute bottom-0 left-0 w-full h-[3px] bg-slate-50">
+                    <div className="h-full bg-indigo-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
                 </div>
             </div>
 
-            {!isOnline && (
-                <div className="bg-rose-500 text-white text-xs font-bold text-center py-2 shadow-inner flex items-center justify-center gap-2 animate-pulse">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>
-                    Koneksi Terputus - Jawaban Disimpan Lokal
-                </div>
-            )}
-
-            <div className="max-w-2xl mx-auto p-4 pt-6">
+            <div className="max-w-3xl mx-auto p-8 pt-12 pb-32 space-y-12">
                 {exam.questions.map((q, idx) => (
-                    <QuestionCard 
-                        key={q.id} 
-                        question={q} 
-                        index={idx} 
-                        answer={answers[q.id] || ''} 
-                        onAnswerChange={handleAnswer} 
-                    />
+                    <div key={q.id} className="animate-fade-in">
+                        <div className="flex items-start gap-8">
+                            <span className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm shrink-0 shadow-sm border border-indigo-100/50">{idx + 1}</span>
+                            <div className="flex-1">
+                                <div className="text-lg font-medium text-slate-800 leading-relaxed mb-10 prose-slate" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                
+                                <div className="space-y-3.5">
+                                    {q.options?.map((opt, i) => {
+                                        const isSelected = answers[q.id] === opt;
+                                        return (
+                                            <button 
+                                                key={i} 
+                                                onClick={() => handleAnswer(q.id, opt)}
+                                                className={`w-full flex items-center gap-5 p-5 rounded-2xl border transition-all duration-300 text-left group
+                                                    ${isSelected 
+                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-200' 
+                                                        : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
+                                            >
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all
+                                                    ${isSelected ? 'border-white bg-white/20' : 'border-slate-200 bg-white group-hover:border-indigo-300'}`}>
+                                                    {isSelected && <div className="w-2 h-2 bg-white rounded-full animate-scale-in"></div>}
+                                                </div>
+                                                <span className="text-sm font-semibold">{opt}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 ))}
             </div>
 
-            <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-200 p-3 px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-rose-500'}`}></div>
-                    {isOnline ? 'Online' : 'Offline Mode'}
+            {/* Bottom Sticky Action Bar */}
+            <div className="fixed bottom-0 left-0 w-full p-8 flex justify-center z-40 pointer-events-none">
+                <div className="bg-slate-900/95 backdrop-blur-2xl shadow-2xl rounded-[2.2rem] px-10 py-5 flex items-center gap-14 pointer-events-auto ring-1 ring-white/10">
+                    <div className="text-center">
+                        <span className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-0.5">Progress</span>
+                        <span className="text-lg font-black text-white">{answeredCount} <span className="text-white/20 font-medium">/ {totalQ}</span></span>
+                    </div>
+                    
+                    <button 
+                        onClick={() => handleSubmit(false)}
+                        disabled={isSubmitting}
+                        className="bg-indigo-500 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.15em] hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-3 disabled:opacity-50"
+                    >
+                        {isSubmitting ? (
+                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                            <>Selesai <CheckCircleIcon className="w-5 h-5"/></>
+                        )}
+                    </button>
                 </div>
-                <button 
-                    onClick={() => handleSubmit(false)}
-                    disabled={isSubmitting || violationOccurred.current}
-                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                >
-                    {isSubmitting ? <ArrowPathIcon className="w-4 h-4 animate-spin"/> : <CheckCircleIcon className="w-4 h-4"/>}
-                    {isSubmitting ? 'Mengirim...' : 'Selesai & Kumpulkan'}
-                </button>
             </div>
         </div>
     );
 };
- 
