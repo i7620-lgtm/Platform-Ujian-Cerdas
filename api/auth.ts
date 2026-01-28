@@ -1,145 +1,129 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import db from './db.js';
-
-let isTableInitialized = false;
-
-// 1. Inisialisasi Tabel Users
-const ensureAuthSchema = async () => {
-    if (isTableInitialized) return;
-    try {
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password TEXT, 
-                full_name TEXT,
-                auth_provider TEXT DEFAULT 'local',
-                avatar_url TEXT,
-                account_type TEXT DEFAULT 'guru',
-                school TEXT DEFAULT '',
-                created_at BIGINT
-            );
-        `);
-
-        // Migration for existing tables
-        try {
-            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT DEFAULT 'guru';`);
-            await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS school TEXT DEFAULT '';`);
-        } catch (e) { /* ignore if exists */ }
-
-        // Logika seeding default guru telah dihapus sesuai permintaan
-        
-        isTableInitialized = true;
-    } catch (e) {
-        console.error("Failed to init auth schema", e);
-    }
-};
+import db from './_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-        await ensureAuthSchema();
         const { action } = req.body;
 
-        // --- LOGIN MANUAL ---
         if (action === 'login') {
             const { username, password } = req.body;
-            if (!username || !password) return res.status(400).json({ error: 'Data tidak lengkap' });
-
-            const result = await db.query(
-                "SELECT username, full_name, account_type, school, avatar_url FROM users WHERE username = $1 AND password = $2 AND auth_provider = 'local'",
-                [username, password]
-            );
-
-            if (result.rows.length > 0) {
-                const user = result.rows[0];
+            const user = await db.loginUser(username, password);
+            
+            if (user) {
                 return res.status(200).json({ 
                     success: true, 
-                    username: user.username,
-                    fullName: user.full_name,
-                    accountType: user.account_type || 'guru',
-                    school: user.school || ''
+                    ...user
                 });
             } else {
                 return res.status(401).json({ success: false, error: 'Username atau Password salah.' });
             }
         }
 
-        // --- LOGIN GOOGLE ---
-        else if (action === 'google-login') {
-            const { token } = req.body;
-            if (!token) return res.status(400).json({ error: 'Token Google diperlukan' });
-
-            // Verifikasi Token ke Google
-            const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+        if (action === 'register') {
+            const { username, password, fullName, school } = req.body;
             
-            if (!googleRes.ok) {
-                return res.status(401).json({ success: false, error: 'Token Google tidak valid.' });
+            // Password boleh kosong untuk Google Login
+            if (!username || !fullName || !school) {
+                return res.status(400).json({ success: false, error: 'Semua data (Username, Nama, Sekolah) wajib diisi.' });
             }
 
-            const payload = await googleRes.json();
-            const { email, name, picture } = payload;
-
-            if (!email) {
-                return res.status(400).json({ success: false, error: 'Email tidak ditemukan dalam token Google.' });
+            try {
+                const user = await db.registerUser({ username, password: password || '', fullName, school });
+                return res.status(200).json({ success: true, ...user });
+            } catch (e: any) {
+                // LOGIKA SELF-HEALING:
+                // Jika errornya "Username sudah dipakai", artinya user sebenarnya ada tapi proses cek awal (findUser) gagal/dilewati.
+                // Kita coba ambil data user tersebut (Force Login)
+                if (e.message && (e.message.includes('Username sudah dipakai') || e.message.includes('duplicate'))) {
+                    const existingUser = await db.findUser(username);
+                    if (existingUser) {
+                        // Jika ketemu, return success seolah-olah baru register/login
+                        return res.status(200).json({ success: true, ...existingUser });
+                    }
+                }
+                return res.status(400).json({ success: false, error: e.message || 'Gagal mendaftar.' });
             }
-
-            // Cek apakah user sudah ada
-            const userCheck = await db.query("SELECT * FROM users WHERE username = $1", [email]);
-            let userData;
-
-            if (userCheck.rows.length === 0) {
-                // Buat User Baru (Default: guru, school: empty)
-                await db.query(`
-                    INSERT INTO users (username, password, full_name, auth_provider, avatar_url, account_type, school, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                `, [email, '', name, 'google', picture, 'guru', '', Date.now()]);
-                
-                userData = {
-                    username: email,
-                    full_name: name,
-                    account_type: 'guru',
-                    school: '',
-                    avatar_url: picture
-                };
-            } else {
-                userData = userCheck.rows[0];
-            }
-
-            return res.status(200).json({ 
-                success: true, 
-                username: userData.username,
-                fullName: userData.full_name,
-                avatar: userData.avatar_url,
-                accountType: userData.account_type || 'guru',
-                school: userData.school || ''
-            });
+        }
+        
+        // Google Login Support
+        if (action === 'google-login') {
+             const { token } = req.body;
+             const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+             const payload = await googleRes.json() as any;
+             
+             if (payload.email) {
+                 // Cek apakah user sudah ada di database
+                 const existingUser = await db.findUser(payload.email);
+                 
+                 if (existingUser) {
+                     // Login sukses
+                     return res.status(200).json({
+                         success: true,
+                         ...existingUser,
+                         avatar: payload.picture // Update avatar dari google jika perlu
+                     });
+                 } else {
+                     // User belum ada, minta registrasi
+                     return res.status(200).json({
+                         success: false,
+                         requireRegistration: true,
+                         googleData: {
+                             email: payload.email,
+                             name: payload.name,
+                             picture: payload.picture
+                         }
+                     });
+                 }
+             } else {
+                 return res.status(400).json({ error: 'Invalid Google Token' });
+             }
         }
 
-        // --- UPDATE PROFILE (SCHOOL) ---
-        else if (action === 'update-profile') {
-            const { username, school } = req.body;
-            if (!username || !school) return res.status(400).json({ error: 'Data tidak lengkap' });
-
-            await db.query(
-                "UPDATE users SET school = $1 WHERE username = $2",
-                [school, username]
-            );
-
-            return res.status(200).json({ success: true, school });
+        // --- NEW: User Management Features ---
+        
+        if (action === 'get-users') {
+            try {
+                const allUsers = await db.getAllUsers();
+                // FILTER: Hapus akun super_admin dari daftar yang dikembalikan
+                const filteredUsers = allUsers
+                    .filter((u: any) => u.accountType !== 'super_admin')
+                    .map((u: any) => ({
+                        email: u.username,
+                        fullName: u.fullName,
+                        role: u.accountType,
+                        school: u.school
+                    }));
+                return res.status(200).json(filteredUsers);
+            } catch (e: any) {
+                return res.status(500).json({ error: e.message });
+            }
         }
 
-        return res.status(400).json({ error: 'Action not recognized' });
+        if (action === 'update-role') {
+            const { email, role, school } = req.body;
+            if (!email || !role) return res.status(400).json({ error: 'Data tidak lengkap' });
+            
+            try {
+                const success = await db.updateUserRole(email, role, school || '');
+                return res.status(200).json({ success });
+            } catch (e: any) {
+                return res.status(500).json({ error: e.message });
+            }
+        }
+
+        return res.status(400).json({ error: 'Action not supported' });
 
     } catch (error: any) {
         console.error("Auth Error:", error);
-        return res.status(500).json({ error: "Server Error", details: error.message });
+        return res.status(500).json({ error: error.message });
     }
 }
