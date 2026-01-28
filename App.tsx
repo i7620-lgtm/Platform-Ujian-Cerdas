@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [exams, setExams] = useState<Record<string, Exam>>({});
+  const [results, setResults] = useState<Result[]>([]);
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -49,6 +50,21 @@ const App: React.FC = () => {
         setIsSyncing(false);
     }
   }, [getHeaders]);
+
+  const refreshResults = useCallback(async () => {
+    if (!teacherProfile) return;
+    setIsSyncing(true);
+    try {
+        const headers = getHeaders();
+        // Fetch all results for the teacher
+        const data = await storageService.getResults(undefined, undefined, headers as Record<string, string>);
+        setResults(data);
+    } catch (e) {
+        console.error("Failed to load results:", e);
+    } finally {
+        setIsSyncing(false);
+    }
+  }, [getHeaders, teacherProfile]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -81,8 +97,9 @@ const App: React.FC = () => {
                     setCurrentExam(exam);
                     setView('PUBLIC_STREAM');
                 } else {
-                    alert("Livestream tidak ditemukan.");
+                    alert("Livestream tidak ditemukan atau akses publik dinonaktifkan.");
                     window.history.replaceState(null, '', '/');
+                    setView('SELECTOR');
                 }
             } catch(e) {} finally { setIsSyncing(false); }
         };
@@ -204,7 +221,10 @@ const App: React.FC = () => {
     await storageService.deleteExam(c, getHeaders() as Record<string, string>); 
   }, [getHeaders]);
 
-  const onAllowContinuation = async () => { };
+  const onAllowContinuation = async () => { 
+      // Refresh results to show unlocked status
+      refreshResults();
+  };
 
   const resetToHome = () => {
     setCurrentExam(null); setCurrentStudent(null); setStudentResult(null); setResumedResult(null); setTeacherProfile(null); setView('SELECTOR'); window.history.replaceState(null, '', '/'); 
@@ -291,11 +311,11 @@ const App: React.FC = () => {
                   updateExam={updateExam} 
                   deleteExam={deleteExam}
                   exams={exams} 
-                  results={[]} 
+                  results={results} 
                   onLogout={resetToHome} 
                   onAllowContinuation={onAllowContinuation}
                   onRefreshExams={refreshExams}
-                  onRefreshResults={async ()=>{}}
+                  onRefreshResults={refreshResults}
             />
         )}
         {view === 'STUDENT_EXAM' && currentExam && currentStudent && (
@@ -319,8 +339,11 @@ const App: React.FC = () => {
         {view === 'PUBLIC_STREAM' && (
              <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
                  <div className="w-full max-w-7xl mb-4 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-gray-800">Public Live View</h1>
-                    <button onClick={resetToHome} className="text-sm font-medium text-indigo-600 hover:underline">Home</button>
+                    <div className="flex items-center gap-3">
+                         <LogoIcon className="w-6 h-6 text-indigo-600" />
+                         <h1 className="text-xl font-black text-gray-800 tracking-tight">Public Live View</h1>
+                    </div>
+                    <button onClick={resetToHome} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-colors">Keluar</button>
                  </div>
                  <div className="w-full">
                      <OngoingExamModal 
