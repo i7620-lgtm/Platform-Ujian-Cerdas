@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -75,7 +75,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [newAdminRole, setNewAdminRole] = useState('admin');
     const [newAdminSchool, setNewAdminSchool] = useState('');
 
-    // --- LAZY FETCHING LOGIC ---
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
             onRefreshExams();
@@ -103,10 +102,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             const data = await res.json();
             if (res.ok && Array.isArray(data)) {
                 setAdminUsers(data);
-            } else {
-                console.error("Failed to fetch users:", data.error);
             }
-        } catch(e) { console.error(e); }
+        } catch(e) {}
     };
 
     const handleUpdateRole = async (email: string, role: string, school: string) => {
@@ -121,16 +118,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 },
                 body: JSON.stringify({ action: 'update-role', email, role, school })
             });
-            
             if (res.ok) {
                 alert("Role berhasil diperbarui!");
                 fetchAdminUsers();
                 setNewAdminEmail('');
-            } else {
-                const data = await res.json();
-                alert(data.error || "Gagal update role.");
             }
-        } catch(e) { alert("Kesalahan koneksi."); }
+        } catch(e) {}
     };
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
@@ -144,14 +137,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, questions, config,
             createdAt: editingExam?.createdAt || String(readableDate), status
         };
-        if (editingExam) { updateExam(examData); setIsEditModalOpen(false); setEditingExam(null); alert('Berhasil diperbarui!'); } 
-        else { addExam(examData); setEditingExam(examData); status === 'PUBLISHED' ? setGeneratedCode(code) : alert("Disimpan ke Draf."); }
+        if (editingExam) { updateExam(examData); setIsEditModalOpen(false); setEditingExam(null); } 
+        else { addExam(examData); setEditingExam(examData); if(status === 'PUBLISHED') setGeneratedCode(code); }
     };
     
     const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian?")) deleteExam(exam.code); };
     
     const handleDuplicateExam = (exam: Exam) => { 
-        if (!confirm(`Duplicate?`)) return; 
         setQuestions(exam.questions); 
         setConfig({ ...exam.config, date: new Date().toISOString().split('T')[0] }); 
         setManualMode(true); 
@@ -166,7 +158,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const continueDraft = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setManualMode(true); setView('UPLOAD'); };
     const handleExamUpdate = (updatedExam: Exam) => { updateExam(updatedExam); };
 
-    // -- Computed Data --
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
@@ -190,39 +181,35 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     }).sort((a,b)=>b.config.date.localeCompare(a.config.date));
 
     return (
-        <div className="min-h-screen bg-base-200">
-            <header className="bg-base-100 shadow-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="min-h-screen bg-[#F8FAFC]">
+            <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="py-5 flex justify-between items-center">
                         <div>
                             <div className="flex items-center gap-3">
-                                <h1 className="text-2xl font-bold text-neutral">Dashboard Guru</h1>
-                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-indigo-100 text-indigo-700 border-indigo-200">
+                                <h1 className="text-xl font-black text-slate-900 tracking-tight">Dashboard Guru</h1>
+                                <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
                                     {teacherProfile.accountType.replace('_', ' ')}
                                 </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-sm font-medium text-gray-500">{teacherProfile.fullName}</span>
-                                {teacherProfile.school && <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{teacherProfile.school}</span>}
+                                <span className="text-xs font-bold text-slate-400">{teacherProfile.fullName}</span>
+                                <span className="text-[10px] font-black text-emerald-600 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-100">{teacherProfile.school}</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4 self-end md:self-auto">
-                            <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary font-semibold"><LogoutIcon className="w-5 h-5"/> Logout</button>
-                        </div>
+                        <button onClick={onLogout} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-rose-600 transition-colors uppercase tracking-widest"><LogoutIcon className="w-5 h-5"/> Keluar</button>
                     </div>
-                    <nav className="flex border-b -mb-px overflow-x-auto whitespace-nowrap mt-2">
-                         <button onClick={() => setView('UPLOAD')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'UPLOAD' ? 'border-primary text-primary' : 'text-gray-500 border-transparent'}`}><CheckCircleIcon className="w-5 h-5"/> Buat Ujian</button>
-                         <button onClick={() => setView('DRAFTS')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'DRAFTS' ? 'border-primary text-primary' : 'text-gray-500 border-transparent'}`}><PencilIcon className="w-5 h-5"/> Draf</button>
-                         <button onClick={() => setView('ONGOING')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'ONGOING' ? 'border-primary text-primary' : 'text-gray-500 border-transparent'}`}><ClockIcon className="w-5 h-5"/> Berlangsung</button>
-                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-primary text-primary' : 'text-gray-500 border-transparent'}`}><CalendarDaysIcon className="w-5 h-5"/> Akan Datang</button>
-                         <button onClick={() => setView('FINISHED_EXAMS')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-primary text-primary' : 'text-gray-500 border-transparent'}`}><ChartBarIcon className="w-5 h-5"/> Selesai</button>
-                         {teacherProfile.accountType === 'super_admin' && (
-                             <button onClick={() => setView('ADMIN_USERS')} className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 ${view === 'ADMIN_USERS' ? 'border-purple-600 text-purple-600' : 'text-gray-500 border-transparent'}`}><CheckCircleIcon className="w-5 h-5"/> Manage Users</button>
-                         )}
+                    <nav className="flex gap-8 overflow-x-auto whitespace-nowrap">
+                         <button onClick={() => setView('UPLOAD')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buat Ujian</button>
+                         <button onClick={() => setView('DRAFTS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Draf</button>
+                         <button onClick={() => setView('ONGOING')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Berlangsung</button>
+                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Terjadwal</button>
+                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Selesai</button>
                     </nav>
                 </div>
             </header>
-            <main className="max-w-[95%] mx-auto p-4 md:p-8">
+            
+            <main className="max-w-7xl mx-auto p-6 md:p-10">
                 {view === 'UPLOAD' && (
                     <>
                         <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
@@ -235,62 +222,38 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
                 {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} />}
                 {view === 'FINISHED_EXAMS' && <FinishedExamsView exams={finishedExams} onSelectExam={setSelectedFinishedExam} onDuplicateExam={handleDuplicateExam} onDeleteExam={handleDeleteExam} />}
-                
-                {view === 'ADMIN_USERS' && (
-                    <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-purple-100">
-                            <h2 className="text-xl font-bold text-purple-900 mb-4">Tambah / Update Admin</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <input placeholder="Email User" value={newAdminEmail} onChange={e=>setNewAdminEmail(e.target.value)} className="p-3 border rounded-xl" />
-                                <select value={newAdminRole} onChange={e=>setNewAdminRole(e.target.value)} className="p-3 border rounded-xl bg-white">
-                                    <option value="guru">Guru</option>
-                                    <option value="admin">School Admin</option>
-                                    <option value="super_admin">Super Admin</option>
-                                </select>
-                                <input placeholder="Nama Sekolah" value={newAdminSchool} onChange={e=>setNewAdminSchool(e.target.value)} className="p-3 border rounded-xl" />
-                                <button onClick={() => handleUpdateRole(newAdminEmail, newAdminRole, newAdminSchool)} className="bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700">Simpan Role</button>
-                            </div>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-700 mb-4">Daftar Admin & Role</h3>
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-50 text-gray-500">
-                                    <tr><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">School</th><th className="p-3">Action</th></tr>
-                                </thead>
-                                <tbody>
-                                    {adminUsers.map((u, i) => (
-                                        <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
-                                            <td className="p-3 font-medium">{u.email}</td>
-                                            <td className="p-3"><span className="bg-gray-100 px-2 py-1 rounded text-xs font-bold uppercase">{u.role}</span></td>
-                                            <td className="p-3">{u.school}</td>
-                                            <td className="p-3">
-                                                <button onClick={() => handleUpdateRole(u.email, 'guru', u.school)} className="text-red-500 hover:underline text-xs">Demote to Guru</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
             </main>
 
-            <OngoingExamModal 
-                exam={selectedOngoingExam} 
-                results={results} 
-                teacherProfile={teacherProfile}
-                onClose={() => setSelectedOngoingExam(null)} 
-                onAllowContinuation={onAllowContinuation} 
-                onUpdateExam={handleExamUpdate} 
-            />
+            {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}
+            {selectedOngoingExam && (
+                <OngoingExamModal 
+                    exam={selectedOngoingExam} 
+                    teacherProfile={teacherProfile}
+                    onClose={() => setSelectedOngoingExam(null)} 
+                    onAllowContinuation={onAllowContinuation} 
+                    onUpdateExam={handleExamUpdate} 
+                />
+            )}
             
-            <FinishedExamModal exam={selectedFinishedExam} results={results} onClose={() => setSelectedFinishedExam(null)} />
+            {/* Modal Analisis Statistik (Khusus Ujian Selesai) */}
+            {selectedFinishedExam && (
+                <FinishedExamModal 
+                    exam={selectedFinishedExam} 
+                    teacherProfile={teacherProfile}
+                    onClose={() => setSelectedFinishedExam(null)} 
+                />
+            )}
             
             {isEditModalOpen && editingExam && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-                    <div className="bg-base-200 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                        <div className="p-4 bg-base-100 border-b flex justify-between items-center"><h2 className="font-bold">Edit</h2><button onClick={()=>setIsEditModalOpen(false)}><XMarkIcon className="w-6 h-6"/></button></div>
-                        <div className="p-6 overflow-y-auto"><ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} /></div>
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white">
+                        <div className="p-6 border-b flex justify-between items-center bg-white rounded-t-3xl">
+                            <h2 className="font-black text-slate-800">Edit Detail Ujian</h2>
+                            <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600"><XMarkIcon className="w-6 h-6"/></button>
+                        </div>
+                        <div className="p-8 overflow-y-auto flex-1 bg-slate-50/30">
+                            <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} />
+                        </div>
                     </div>
                 </div>
             )}
