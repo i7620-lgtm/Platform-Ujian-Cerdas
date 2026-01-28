@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -176,8 +176,9 @@ const App: React.FC = () => {
   
   const handleForceSubmit = useCallback(async (answers: Record<string, string>, _timeLeft: number, activityLog?: string[]) => {
      if (!currentExam || !currentStudent) return;
+     // Correcting status to 'force_closed' to match ResultStatus union type
      const result = await storageService.submitExamResult({
-         student: currentStudent, examCode: currentExam.code, answers, totalQuestions: 0, completionTime: 0, activityLog: activityLog || [], status: 'force_submitted'
+         student: currentStudent, examCode: currentExam.code, answers, totalQuestions: 0, completionTime: 0, activityLog: activityLog || [], status: 'force_closed'
      }) as Result;
      setStudentResult(result);
      setView('STUDENT_RESULT');
@@ -333,7 +334,8 @@ const App: React.FC = () => {
                 result={studentResult} 
                 config={currentExam?.config} 
                 onFinish={resetToHome} 
-                onCheckStatus={studentResult.status === 'force_submitted' ? handleCheckExamStatus : undefined}
+                // Correcting comparison: ResultStatus uses 'force_closed' for violations
+                onCheckStatus={studentResult.status === 'force_closed' ? handleCheckExamStatus : undefined}
             />
         )}
         {view === 'PUBLIC_STREAM' && (
