@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -90,7 +90,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const fetchAdminUsers = async () => {
         try {
-            // FIX: Sertakan headers identitas untuk validasi RBAC backend
             const res = await fetch('/api/auth', {
                 method: 'POST',
                 headers: {
@@ -112,7 +111,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const handleUpdateRole = async (email: string, role: string, school: string) => {
         try {
-            // FIX: Sertakan headers identitas
             const res = await fetch('/api/auth', {
                 method: 'POST',
                 headers: {
@@ -135,8 +133,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         } catch(e) { alert("Kesalahan koneksi."); }
     };
 
-    // ... (Existing handlers like handleQuestionsGenerated, handleSaveExam, etc. - kept identical)
     const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
+    
     const handleSaveExam = (status: 'PUBLISHED' | 'DRAFT') => {
         if (status === 'PUBLISHED' && questions.length === 0) { alert("Tidak ada soal."); return; }
         const code = editingExam ? editingExam.code : generateExamCode();
@@ -149,8 +147,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         if (editingExam) { updateExam(examData); setIsEditModalOpen(false); setEditingExam(null); alert('Berhasil diperbarui!'); } 
         else { addExam(examData); setEditingExam(examData); status === 'PUBLISHED' ? setGeneratedCode(code) : alert("Disimpan ke Draf."); }
     };
+    
     const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian?")) deleteExam(exam.code); };
-    const handleDuplicateExam = (exam: Exam) => { if (!confirm(`Duplicate?`)) return; setQuestions(exam.questions); setConfig({ ...exam.config, date: new Date().toISOString().split('T')[0] }); setManualMode(true); setEditingExam(null); setGeneratedCode(''); setView('UPLOAD'); setResetKey(prev => prev + 1); };
+    
+    const handleDuplicateExam = (exam: Exam) => { 
+        if (!confirm(`Duplicate?`)) return; 
+        setQuestions(exam.questions); 
+        setConfig({ ...exam.config, date: new Date().toISOString().split('T')[0] }); 
+        setManualMode(true); 
+        setEditingExam(null); 
+        setGeneratedCode(''); 
+        setView('UPLOAD'); 
+        setResetKey(prev => prev + 1); 
+    };
+
     const resetForm = () => { setQuestions([]); setGeneratedCode(''); setManualMode(false); setEditingExam(null); setView('UPLOAD'); setResetKey(prev => prev + 1); };
     const openEditModal = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setIsEditModalOpen(true); };
     const continueDraft = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setManualMode(true); setView('UPLOAD'); };
@@ -161,13 +171,23 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
     const now = new Date();
+    
     const ongoingExams = publishedExams.filter((exam) => {
-        const start = new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`);
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        const start = new Date(`${dateStr}T${exam.config.startTime}`);
         const end = new Date(start.getTime() + exam.config.timeLimit * 60 * 1000);
         return now >= start && now <= end;
     });
-    const upcomingExams = publishedExams.filter((exam) => new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`) > now).sort((a,b)=>a.config.date.localeCompare(b.config.date));
-    const finishedExams = publishedExams.filter((exam) => new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`).getTime() + exam.config.timeLimit * 60000 < now.getTime()).sort((a,b)=>b.config.date.localeCompare(a.config.date));
+
+    const upcomingExams = publishedExams.filter((exam) => {
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        return new Date(`${dateStr}T${exam.config.startTime}`) > now;
+    }).sort((a,b)=>a.config.date.localeCompare(b.config.date));
+
+    const finishedExams = publishedExams.filter((exam) => {
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        return new Date(`${dateStr}T${exam.config.startTime}`).getTime() + exam.config.timeLimit * 60000 < now.getTime();
+    }).sort((a,b)=>b.config.date.localeCompare(a.config.date));
 
     return (
         <div className="min-h-screen bg-base-200">
@@ -216,7 +236,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} />}
                 {view === 'FINISHED_EXAMS' && <FinishedExamsView exams={finishedExams} onSelectExam={setSelectedFinishedExam} onDuplicateExam={handleDuplicateExam} onDeleteExam={handleDeleteExam} />}
                 
-                {/* ADMIN USER MANAGEMENT */}
                 {view === 'ADMIN_USERS' && (
                     <div className="space-y-6">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-purple-100">
@@ -256,8 +275,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 )}
             </main>
 
-            <OngoingExamModal exam={selectedOngoingExam} results={results} onClose={() => setSelectedOngoingExam(null)} onAllowContinuation={onAllowContinuation} onUpdateExam={handleExamUpdate} />
+            <OngoingExamModal 
+                exam={selectedOngoingExam} 
+                results={results} 
+                teacherProfile={teacherProfile}
+                onClose={() => setSelectedOngoingExam(null)} 
+                onAllowContinuation={onAllowContinuation} 
+                onUpdateExam={handleExamUpdate} 
+            />
+            
             <FinishedExamModal exam={selectedFinishedExam} results={results} onClose={() => setSelectedFinishedExam(null)} />
+            
             {isEditModalOpen && editingExam && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
                     <div className="bg-base-200 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
