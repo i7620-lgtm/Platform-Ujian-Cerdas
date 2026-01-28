@@ -1,4 +1,5 @@
 
+
 import type { Exam, Result, Question } from '../types';
 
 const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
@@ -81,16 +82,24 @@ class StorageService {
     const examToSave = { ...exam, isSynced: false, createdAt: String(exam.createdAt || new Date().toLocaleString()) };
     exams[exam.code] = examToSave;
     this.saveLocal(KEYS.EXAMS, exams);
+    
     if (this.isOnline) {
         try {
-            await retryOperation(() => fetch(`${API_URL}/exams`, { 
+            const res = await retryOperation(() => fetch(`${API_URL}/exams`, { 
                 method: 'POST', 
                 headers: {'Content-Type':'application/json'}, 
                 body: JSON.stringify(examToSave) 
             }));
-            exams[exam.code].isSynced = true; 
-            this.saveLocal(KEYS.EXAMS, exams);
-        } catch (e) {}
+            
+            if (res.ok) {
+                exams[exam.code].isSynced = true; 
+                this.saveLocal(KEYS.EXAMS, exams);
+            } else {
+                console.error("Server refused to save exam:", await res.text());
+            }
+        } catch (e) {
+            console.error("Network error saving exam:", e);
+        }
     }
   }
 
