@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { Exam, Result } from '../../types';
+import type { Exam, Result, TeacherProfile } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, SignalIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { RemainingTime } from './DashboardViews';
@@ -40,13 +40,14 @@ const QuestionAnalysisItem: React.FC<{ q: any; index: number; stats: any }> = ({
 interface OngoingExamModalProps {
     exam: Exam | null;
     results: Result[]; 
+    teacherProfile?: TeacherProfile | null;
     onClose: () => void;
     onAllowContinuation: (studentId: string, examCode: string) => void;
     onUpdateExam?: (exam: Exam) => void;
     isReadOnly?: boolean; 
 }
 
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClose, onAllowContinuation, onUpdateExam, isReadOnly = false }) => {
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClose, teacherProfile, onAllowContinuation, onUpdateExam, isReadOnly = false }) => {
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
@@ -72,8 +73,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
             if(!isMounted) return;
             setIsRefreshing(true);
             try {
-                // Fetch data (Support global merge di backend jika class='ALL')
-                const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
+                const headers = teacherProfile ? {
+                    'x-role': teacherProfile.accountType,
+                    'x-user-id': teacherProfile.id,
+                    'x-school': teacherProfile.school
+                } : {};
+                
+                // Fetch data
+                const data = await storageService.getResults(
+                    displayExam.code, 
+                    selectedClass === 'ALL' ? '' : selectedClass,
+                    headers as Record<string, string>
+                );
                 
                 if (isMounted) {
                     setLocalResults(data);
@@ -86,9 +97,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         fetchLatest(); 
         const intervalId = setInterval(fetchLatest, 10000); 
         return () => { isMounted = false; clearInterval(intervalId); };
-    }, [displayExam, selectedClass]);
+    }, [displayExam, selectedClass, teacherProfile]);
 
-    // --- ANALYTICS CALCULATION (UPDATED: More Robust) ---
+    // --- ANALYTICS CALCULATION ---
     const analytics = useMemo(() => {
         if (!localResults.length || !displayExam) return null;
         const completed = localResults.filter(r => ['completed', 'force_submitted'].includes(r.status || ''));
@@ -100,9 +111,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         const max = Math.max(...scores);
         const min = Math.min(...scores);
 
-        // Question Analysis - Exclude Essays/Info
+        // Question Analysis
         const questionStats = displayExam.questions
-            .filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY') // Filter out Essay/Info from auto stats
+            .filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY')
             .map(q => {
                 let correct = 0;
                 let totalAnswered = 0;
@@ -111,11 +122,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                         totalAnswered++;
                         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'TRUE_FALSE') {
                              if (String(r.answers[q.id]).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct++;
-                        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                             // Basic array check (length match) for simplicity in visualization
-                             const correctArr = String(q.correctAnswer).split(',');
-                             const answerArr = String(r.answers[q.id]).split(','); // Assuming client sends comma sep
-                             if (correctArr.length === answerArr.length) correct++;
                         }
                     }
                 });
@@ -170,7 +176,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400"><WifiIcon className="w-3 h-3"/>Offline</span>;
     };
 
-    // Calculate elapsed time string relative to now
     const getRelativeTime = (timestamp?: number) => {
         if (!timestamp) return 'Offline';
         const diff = Math.floor((Date.now() - timestamp) / 1000);
@@ -181,7 +186,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
     const isOnlineRecent = (timestamp?: number) => {
         if (!timestamp) return false;
-        return (Date.now() - timestamp) < 60000; // Active within last 60s
+        return (Date.now() - timestamp) < 60000; 
     };
 
     return (
@@ -225,7 +230,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-between items-end sm:items-center">
-                        {/* TABS SWITCHER */}
                         <div className="flex p-1 bg-slate-100 rounded-xl">
                             <button onClick={() => setActiveTab('MONITOR')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab==='MONITOR' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Live Monitor</button>
                             <button onClick={() => setActiveTab('ANALYSIS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab==='ANALYSIS' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Analisis Statistik</button>
