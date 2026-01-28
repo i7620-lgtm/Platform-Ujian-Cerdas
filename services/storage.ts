@@ -1,5 +1,5 @@
 
-import type { Exam, Result, Question, ResultStatus } from '../types';
+import type { Exam, Result, Question } from '../types';
 
 const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
 const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
@@ -133,10 +133,47 @@ class StorageService {
 
   private loadLocal<T>(key: string): T | null { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
   private saveLocal(key: string, data: any): void { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
-  async syncData() {}
-  async getStudentResult(a:any, b:any) { return null; }
-  async unlockStudentExam(a:any, b:any) {}
-  async extendExamTime(a:any, b:any) {}
+  
+  async syncData() {
+      // Sync logic can be implemented here
+  }
+
+  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
+      if (this.isOnline) {
+          try {
+              const res = await fetch(`${API_URL}/results?code=${examCode}&studentId=${studentId}`);
+              if (res.ok) {
+                  const data = await res.json();
+                  return Array.isArray(data) ? data[0] : data;
+              }
+          } catch(e) {}
+      }
+      return null;
+  }
+
+  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
+      if (this.isOnline) {
+          try {
+              await fetch(`${API_URL}/teacher-action`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ examCode, studentId, action: 'UNLOCK' })
+              });
+          } catch(e) {}
+      }
+  }
+
+  async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
+      if (this.isOnline) {
+          try {
+              await fetch(`${API_URL}/extend-time`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ examCode, additionalMinutes })
+              });
+          } catch(e) {}
+      }
+  }
 }
 
 export const storageService = new StorageService();
