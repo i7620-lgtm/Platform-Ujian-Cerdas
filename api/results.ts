@@ -12,47 +12,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        const { code, class: className } = req.query; 
+        const { code, class: className, studentId } = req.query; 
         const requesterId = (req.headers['x-user-id'] as string);
         const requesterRole = (req.headers['x-role'] as string);
-        const requesterSchool = (req.headers['x-school'] as string);
         
-        // SECURITY CHECK: Jika tidak ada User ID, cek apakah ini akses publik (Livestream)
+        // SECURITY CHECK REVISED:
+        // Jika tidak ada User ID (berarti diakses siswa/publik)
         if (!requesterId) {
-            if (code) {
-                // Cari apakah ujian ini mengizinkan streaming publik
+            // 1. Jika ada studentId, berarti siswa mengecek progresnya sendiri (BOLEH)
+            if (studentId) {
+                // Lanjut ke pengambilan data
+            } 
+            // 2. Jika HANYA ada kode (berarti publik melihat dashboard live)
+            else if (code) {
                 const teachers = await db.getAllTeacherKeys();
-                let isPublic = false;
+                let isPublicStreamEnabled = false;
                 for (const tId of teachers) {
                     const exams = await db.getExams(tId);
                     const found = exams.find((e: any) => e.code === code);
                     if (found && found.config && found.config.enablePublicStream) {
-                        isPublic = true;
+                        isPublicStreamEnabled = true;
                         break;
                     }
                 }
-                
-                if (!isPublic) {
-                    return res.status(403).json({ error: 'Akses Ditolak: Ujian tidak diset publik atau kredensial hilang.' });
+                if (!isPublicStreamEnabled) {
+                    return res.status(403).json({ error: 'Akses Ditolak: Fitur pantauan publik tidak diaktifkan.' });
                 }
             } else {
-                return res.status(400).json({ error: 'User ID missing' });
+                return res.status(401).json({ error: 'Kredensial tidak ditemukan.' });
             }
         }
 
-        // Fetch results based on filters
-        // Note: 'GLOBAL_TEACHER' is used as a placeholder in this simplified multi-tenant setup
+        // Ambil hasil dari database
         const allResults = await db.getResults('GLOBAL_TEACHER', code as string, className as string);
 
-        // RBAC Filter: Jika bukan super_admin dan ada requesterId, filter berdasarkan kepemilikan atau sekolah
+        // Filter tambahan jika pencarian spesifik per siswa
         let filteredResults = allResults;
-        if (requesterId && requesterRole !== 'super_admin') {
-            if (requesterRole === 'admin') {
-                // Admin hanya melihat hasil dari sekolahnya
-                // (Implementasi sharding db.getResults biasanya sudah menangani ini, tapi ini layer pengaman)
-            } else {
-                // Guru biasa hanya melihat hasil ujian miliknya sendiri (filter by code is usually enough if codes are unique)
-            }
+        if (studentId) {
+            filteredResults = allResults.filter((r: any) => r.student.studentId === studentId);
         }
 
         return res.status(200).json(filteredResults);
