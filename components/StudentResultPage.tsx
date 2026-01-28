@@ -1,4 +1,4 @@
-
+ 
 import React, { useEffect } from 'react';
 import type { Result, ExamConfig } from '../types';
 import { CheckCircleIcon, WifiIcon, ClockIcon, LockClosedIcon, ArrowPathIcon } from './Icons';
