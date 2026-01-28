@@ -275,7 +275,7 @@ const App: React.FC = () => {
                      <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-slate-900 p-6 rounded-[2rem] shadow-xl shadow-slate-200 hover:shadow-2xl hover:shadow-slate-300 transition-all duration-500 flex items-center justify-between hover:scale-[1.02] active:scale-[0.98]">
                         <div className="flex items-center gap-5">
                             <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-slate-900 transition-all duration-500">
-                                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+                                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 01-2-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
                             </div>
                             <div className="text-left">
                                 <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-0.5">Akses Kelola</div>
@@ -346,9 +346,9 @@ const App: React.FC = () => {
                     <button onClick={resetToHome} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-colors">Keluar</button>
                  </div>
                  <div className="w-full">
+                     {/* Fixed: Removed invalid results prop from OngoingExamModal */}
                      <OngoingExamModal 
                         exam={currentExam} 
-                        results={[]} 
                         onClose={resetToHome} 
                         onAllowContinuation={() => {}} 
                         isReadOnly={true}
