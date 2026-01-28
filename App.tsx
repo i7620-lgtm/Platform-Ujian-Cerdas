@@ -53,7 +53,8 @@ const App: React.FC = () => {
     try {
         const data = await storageService.getResults(undefined, undefined, { 
           'x-user-id': teacherProfile.id,
-          'x-role': teacherProfile.accountType 
+          'x-role': teacherProfile.accountType,
+          'x-school': teacherProfile.school
         });
         setResults(data);
     } finally { setIsSyncing(false); }
@@ -63,11 +64,11 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode);
-      if (!exam) { alert("Maaf, Kode Ujian tidak ditemukan atau belum dipublikasikan."); return; }
+      if (!exam) { alert("Maaf, Kode Ujian tidak ditemukan."); return; }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
-      // PERBAIKAN: Jika user sudah selesai, jangan di-alert, tapi arahkan ke halaman hasil.
+      // PERSISTENCE: Jika sudah selesai, bawa ke halaman hasil
       if (res && res.status === 'completed') {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -76,6 +77,7 @@ const App: React.FC = () => {
           return;
       }
       
+      // Jika sedang mengerjakan (in_progress), siapkan data resume
       if (res && res.status === 'in_progress') setResumedResult(res);
       
       setCurrentExam(exam);
@@ -111,13 +113,13 @@ const App: React.FC = () => {
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end gap-3 pointer-events-none">
           {!isOnline && (
               <div className="bg-rose-500 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2.5 animate-bounce ring-4 ring-rose-500/20">
-                  <NoWifiIcon className="w-4 h-4"/> Koneksi Terputus
+                  <NoWifiIcon className="w-4 h-4"/> Mode Offline Aktif
               </div>
           )}
           {isSyncing && (
               <div className="bg-white/90 backdrop-blur-xl text-indigo-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-indigo-100 flex items-center gap-2.5">
                   <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  Mensinkronisasi...
+                  Proses Database...
               </div>
           )}
       </div>
