@@ -1,5 +1,4 @@
 
-
 import type { Exam, Result, Question } from '../types';
 
 const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
@@ -42,7 +41,6 @@ class StorageService {
         const response = await retryOperation(() => fetch(`${API_URL}/exams`, { headers: headers as any }));
         if (response.ok) {
           const cloudExams: Exam[] = await response.json();
-          // Merge logic: Jangan timpa draf lokal yang belum tersinkron
           cloudExams.forEach(exam => { 
               if (!localExams[exam.code] || localExams[exam.code].isSynced !== false) {
                   localExams[exam.code] = { ...exam, isSynced: true }; 
@@ -77,7 +75,7 @@ class StorageService {
       return exam ? sanitizeExamForStudent(exam) : null;
   }
 
-  async saveExam(exam: Exam): Promise<void> {
+  async saveExam(exam: Exam, headers: Record<string, string> = {}): Promise<void> {
     const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const examToSave = { ...exam, isSynced: false, createdAt: String(exam.createdAt || new Date().toLocaleString()) };
     exams[exam.code] = examToSave;
@@ -87,7 +85,10 @@ class StorageService {
         try {
             const res = await retryOperation(() => fetch(`${API_URL}/exams`, { 
                 method: 'POST', 
-                headers: {'Content-Type':'application/json'}, 
+                headers: {
+                    'Content-Type':'application/json',
+                    ...headers
+                }, 
                 body: JSON.stringify(examToSave) 
             }));
             
@@ -95,7 +96,8 @@ class StorageService {
                 exams[exam.code].isSynced = true; 
                 this.saveLocal(KEYS.EXAMS, exams);
             } else {
-                console.error("Server refused to save exam:", await res.text());
+                const errText = await res.text();
+                console.error("Server refused to save exam:", errText);
             }
         } catch (e) {
             console.error("Network error saving exam:", e);
@@ -103,12 +105,15 @@ class StorageService {
     }
   }
 
-  async deleteExam(code: string): Promise<void> {
+  async deleteExam(code: string, headers: Record<string, string> = {}): Promise<void> {
       const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       delete exams[code];
       this.saveLocal(KEYS.EXAMS, exams);
       if (this.isOnline) {
-          try { await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, { method: 'DELETE' })); } catch (e) {}
+          try { await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, { 
+              method: 'DELETE',
+              headers: headers as any
+          })); } catch (e) {}
       }
   }
 
@@ -143,9 +148,7 @@ class StorageService {
   private loadLocal<T>(key: string): T | null { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
   private saveLocal(key: string, data: any): void { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
   
-  async syncData() {
-      // Sync logic can be implemented here
-  }
+  async syncData() { }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
       if (this.isOnline) {
