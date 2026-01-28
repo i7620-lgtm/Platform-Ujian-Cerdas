@@ -40,6 +40,7 @@ export interface ExamConfig {
   // Metadata
   subject: string;
   classLevel: string;
+  targetClasses?: string[]; // New: List of specific classes for DB pre-creation
   examType: string;
   description: string;
 }
