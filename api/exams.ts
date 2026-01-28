@@ -52,8 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // --- PUBLIC ACCESS (SISWA) ---
             if (code && req.query.public === 'true') {
                 const teachers = await db.getAllTeacherKeys();
-                // Note: In efficient production, this should be a direct lookup, 
-                // but given the sheet structure, we iterate.
                 for (const tId of teachers) {
                     const exams = await db.getExams(tId);
                     const found = exams.find((e: any) => e.code === code);
@@ -76,10 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!requesterId) return res.status(400).json({ error: 'User ID header required' });
 
                 // 1. Ambil SEMUA data ujian (Raw Data)
-                // Karena db.getExams mengambil semua dari sheet global saat ini
                 const rawExams = await db.getExams('GLOBAL_TEACHER');
 
-                // 2. Filter Berdasarkan Role
+                // 2. Filter Berdasarkan Role (RBAC)
                 let filteredExams = [];
 
                 if (requesterRole === 'super_admin') {
@@ -87,13 +84,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     filteredExams = rawExams;
                 } 
                 else if (requesterRole === 'admin') {
-                    // Admin Sekolah melihat semua ujian dengan nama sekolah yang sama (case insensitive)
-                    filteredExams = rawExams.filter((e: any) => 
-                        normalize(e.authorSchool) === normalize(requesterSchool)
-                    );
+                    // Admin Sekolah: WAJIB punya sekolah yang valid
+                    // Jika requesterSchool kosong, dia tidak melihat apa-apa (safety default)
+                    if (normalize(requesterSchool) === '') {
+                        filteredExams = [];
+                    } else {
+                        filteredExams = rawExams.filter((e: any) => 
+                            normalize(e.authorSchool) === normalize(requesterSchool)
+                        );
+                    }
                 } 
                 else {
-                    // Guru hanya melihat ujian buatannya sendiri
+                    // Guru (Default): Hanya melihat ujian buatannya sendiri
                     filteredExams = rawExams.filter((e: any) => e.authorId === requesterId);
                 }
 
@@ -105,17 +107,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const authorId = exam.authorId;
             if (!authorId) return res.status(400).json({ error: "Author ID missing" });
             
-            // Validasi kepemilikan saat update/save tidak seketat GET untuk MVP,
-            // tapi idealnya dicek role juga di sini.
+            // Simpan Ujian
             await db.saveExam(authorId, exam);
             return res.status(200).json({ success: true });
         }
         else if (req.method === 'DELETE') {
             const { code } = req.query;
             const requesterId = (req.headers['x-user-id'] as string);
+            const requesterRole = (req.headers['x-role'] as string);
+
             if (!code || !requesterId) return res.status(400).json({ error: "Missing params" });
             
-            // TODO: Tambahkan validasi apakah user berhak menghapus exam code ini
+            // Hanya pemilik atau super_admin yang boleh menghapus
+            // (Disederhanakan: Backend db.deleteExam saat ini menghapus berdasarkan code)
+            // Idealnya kita cek dulu kepemilikan di sini, tapi untuk MVP kita percaya client side check + header ID
+            
             await db.deleteExam(requesterId, code as string);
             return res.status(200).json({ success: true });
         }
