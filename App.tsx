@@ -43,13 +43,9 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
         const headers = getHeaders();
-        const res = await fetch('/api/exams', { headers: headers as any });
-        if (res.ok) {
-            const data: Exam[] = await res.json();
-            const examMap: Record<string, Exam> = {};
-            data.forEach(e => examMap[e.code] = { ...e, isSynced: true });
-            setExams(examMap);
-        }
+        // Menggunakan storageService agar tetap mengambil data dari local cache jika server lambat
+        const examMap = await storageService.getExams(headers as any);
+        setExams(examMap);
     } catch (e) {
         console.error("Failed to load exams:", e);
     } finally {
@@ -87,7 +83,6 @@ const App: React.FC = () => {
                 const exam = await storageService.getExamForStudent(streamCode);
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
-                    // Stream will load its own results
                     setView('PUBLIC_STREAM');
                 } else {
                     alert("Livestream tidak ditemukan.");
@@ -214,7 +209,6 @@ const App: React.FC = () => {
       </div>
   );
 
-  // --- NEW ELEGANT LANDING PAGE ---
   if (view === 'SELECTOR') {
       return (
         <div className="relative min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 overflow-hidden flex flex-col items-center justify-center p-6">
@@ -234,10 +228,7 @@ const App: React.FC = () => {
                  </div>
 
                  <div className="space-y-4">
-                     <button 
-                        onClick={() => setView('STUDENT_LOGIN')}
-                        className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100"
-                     >
+                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100">
                         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         <div className="relative bg-white group-hover:bg-opacity-95 rounded-[20px] p-5 flex items-center justify-between transition-colors">
                             <div className="flex items-center gap-4">
@@ -254,11 +245,7 @@ const App: React.FC = () => {
                             </div>
                         </div>
                      </button>
-
-                     <button 
-                        onClick={() => setView('TEACHER_LOGIN')}
-                        className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100"
-                     >
+                     <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100">
                         <div className="absolute inset-0 bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         <div className="relative bg-white group-hover:bg-opacity-95 rounded-[20px] p-5 flex items-center justify-between transition-colors">
                              <div className="flex items-center gap-4">
@@ -290,7 +277,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <SyncStatus />
-        
         {view === 'TEACHER_LOGIN' && <TeacherLogin onLoginSuccess={handleTeacherLoginSuccess} onBack={() => setView('SELECTOR')} />}
         {view === 'STUDENT_LOGIN' && <StudentLogin onLoginSuccess={(code, student) => handleStudentLoginSuccess(code, student)} onBack={() => setView('SELECTOR')} />}
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
@@ -300,7 +286,7 @@ const App: React.FC = () => {
                   updateExam={updateExam} 
                   deleteExam={deleteExam}
                   exams={exams} 
-                  results={[]} // Pass empty initially, component will load on demand
+                  results={[]} 
                   onLogout={resetToHome} 
                   onAllowContinuation={onAllowContinuation}
                   onRefreshExams={refreshExams}
@@ -340,32 +326,6 @@ const App: React.FC = () => {
                         isReadOnly={true}
                      />
                  </div>
-            </div>
-        )}
-
-        {loginConflict && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 transform scale-100 transition-all border border-gray-100 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-amber-500"></div>
-                    <div className="flex items-center gap-4 mb-6">
-                         <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0 border border-amber-100">
-                            <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800">Konfirmasi Data</h3>
-                            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Peringatan Validasi Identitas</p>
-                        </div>
-                    </div>
-                    <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 mb-8">
-                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                            {loginConflict.message}
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                         <button onClick={() => setLoginConflict(null)} className="w-full bg-white text-gray-700 border-2 border-gray-200 font-bold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">Periksa Lagi</button>
-                         <button onClick={loginConflict.onConfirm} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors text-sm shadow-lg shadow-gray-200">Data Benar</button>
-                    </div>
-                </div>
             </div>
         )}
     </div>
