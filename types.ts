@@ -6,18 +6,18 @@ export interface Question {
   questionText: string;
   questionType: QuestionType;
   options?: string[];
-  correctAnswer?: string; // This will be removed in PublicQuestion for students
+  correctAnswer?: string; 
   imageUrl?: string; 
   optionImages?: (string | null)[];
   
   matchingPairs?: {
     left: string;
-    right: string; // This will be removed in PublicQuestion for students
+    right: string; 
   }[];
 
   trueFalseRows?: {
     text: string;
-    answer: boolean; // This will be removed in PublicQuestion for students
+    answer: boolean; 
   }[];
 }
 
@@ -32,39 +32,36 @@ export interface ExamConfig {
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
   continueWithPermission: boolean;
-  // New Configurations
   showResultToStudent: boolean;
   showCorrectAnswer: boolean;
   enablePublicStream: boolean;
   trackLocation: boolean;
-  // Metadata
   subject: string;
   classLevel: string;
-  targetClasses?: string[]; // New: List of specific classes for DB pre-creation
+  targetClasses?: string[]; 
   examType: string;
   description: string;
 }
 
 export interface Exam {
   code: string;
-  authorId?: string; // Track teacher/author
-  authorSchool?: string; // New: Track school context
+  authorId?: string; 
+  authorSchool?: string; 
   questions: Question[];
   config: ExamConfig;
   isSynced?: boolean; 
-  createdAt?: string; // Changed to string for readable Date & Time
-  status?: 'DRAFT' | 'PUBLISHED'; // New: Support Drafts
+  createdAt?: string; 
+  status?: 'DRAFT' | 'PUBLISHED'; 
 }
 
 export interface Student {
   fullName: string;
   class: string;
-  absentNumber: string; // New: Nomor Absen/Urut
-  studentId: string; // Now Composite: Name-Class-AbsentNumber
+  absentNumber: string; 
+  studentId: string; 
 }
 
-// Added 'in_progress' explicitly to support live monitoring
-export type ResultStatus = 'in_progress' | 'completed' | 'force_submitted' | 'pending_grading';
+export type ResultStatus = 'in_progress' | 'completed' | 'force_closed' | 'pending_grading';
 
 export interface Result {
     student: Student;
@@ -73,19 +70,18 @@ export interface Result {
     score: number;
     totalQuestions: number;
     correctAnswers: number;
-    completionTime?: number; // in seconds
+    completionTime?: number; 
     activityLog?: string[];
     status?: ResultStatus;
     isSynced?: boolean; 
     timestamp?: number;
-    location?: string; // GPS Coordinates
+    location?: string; 
 }
 
-// --- NEW TYPES FOR USER MANAGEMENT ---
 export type AccountType = 'super_admin' | 'admin' | 'guru';
 
 export interface TeacherProfile {
-    id: string; // username
+    id: string; 
     fullName: string;
     accountType: AccountType;
     school: string;
