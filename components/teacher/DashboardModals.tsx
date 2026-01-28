@@ -1,11 +1,10 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { RemainingTime } from './DashboardViews';
 
-// --- STATISTIK WIDGET COMPONENTS (Hanya untuk Analisis) ---
 const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
         <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
@@ -30,14 +29,12 @@ const QuestionAnalysisItem: React.FC<{ q: any; index: number; stats: any }> = ({
             </div>
             <div className="text-sm text-slate-700 line-clamp-2 mb-4 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
             <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-indigo-500 h-full transition-all duration-1000" style={{ width: `${stats.correctRate}%` }}></div>
+                <div className="bg-indigo-50 h-full transition-all duration-1000" style={{ width: `${stats.correctRate}%` }}></div>
             </div>
         </div>
     );
 };
 
-// --- LIVE MONITOR MODAL (Hanya untuk Ujian Berlangsung) ---
-// Fixed: Updated OngoingExamModalProps to include isReadOnly and made teacherProfile optional
 interface OngoingExamModalProps {
     exam: Exam | null;
     teacherProfile?: TeacherProfile;
@@ -47,7 +44,6 @@ interface OngoingExamModalProps {
     isReadOnly?: boolean;
 }
 
-// Fixed: Destructured isReadOnly from props
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClose, teacherProfile, onAllowContinuation, onUpdateExam, isReadOnly }) => {
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
@@ -67,7 +63,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
             if(!isMounted) return;
             setIsRefreshing(true);
             try {
-                // Fixed: Conditional headers based on teacherProfile availability for public stream support
                 const headers: Record<string, string> = teacherProfile ? {
                     'x-role': teacherProfile.accountType,
                     'x-user-id': teacherProfile.id,
@@ -124,7 +119,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
             <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white">
                 
-                {/* Header Section */}
                 <div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20">
                     <div className="flex justify-between items-start">
                         <div className="flex items-center gap-4">
@@ -141,7 +135,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                             {/* Fixed: Hide add time control if in read-only mode */}
                              {!isReadOnly && <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all" title="Tambah Waktu"><PlusCircleIcon className="w-6 h-6"/></button>}
                              <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
@@ -166,9 +159,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                     </div>
                 </div>
 
-                {/* Content Table */}
                 <div className="flex-1 overflow-auto p-6 bg-slate-50/30">
-                     {/* Fixed: Hide add time section if in read-only mode */}
                      {isAddTimeOpen && !isReadOnly && (
                         <div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between">
                             <div>
@@ -210,9 +201,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                             <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-center">
-                                                    {r.status === 'force_submitted' ? (
-                                                        <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100">
-                                                            <LockClosedIcon className="w-3 h-3"/> Terkunci
+                                                    {r.status === 'force_closed' ? (
+                                                        <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}>
+                                                            <LockClosedIcon className="w-3 h-3"/> Dihentikan
                                                         </span>
                                                     ) : r.status === 'completed' ? (
                                                         <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5">
@@ -220,7 +211,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                         </span>
                                                     ) : (
                                                         <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100">
-                                                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Aktif
+                                                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan
                                                         </span>
                                                     )}
                                                 </div>
@@ -237,8 +228,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                 {getRelativeTime(r.timestamp)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                {/* Fixed: Hide unlock action if in read-only mode */}
-                                                {r.status === 'force_submitted' && !isReadOnly && (
+                                                {r.status === 'force_closed' && !isReadOnly && (
                                                     <button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>
                                                 )}
                                             </td>
@@ -256,7 +246,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     );
 };
 
-// --- FINISHED EXAM / ANALYSIS MODAL ---
 interface FinishedExamModalProps {
     exam: Exam | null;
     teacherProfile: TeacherProfile;
@@ -317,7 +306,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
              <div className="bg-white sm:rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-full sm:h-[90vh] flex flex-col overflow-hidden border border-white">
                 
-                {/* Header */}
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                     <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100">
@@ -331,7 +319,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                 </div>
 
-                {/* Analysis Content */}
                 <div className="flex-1 overflow-auto p-8 bg-slate-50/30">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -340,7 +327,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                         </div>
                     ) : analytics ? (
                         <div className="space-y-10 animate-fade-in">
-                            {/* Summary Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                                 <StatWidget label="Rata-Rata" value={analytics.avg} color="bg-indigo-100" />
                                 <StatWidget label="Tertinggi" value={analytics.max} color="bg-emerald-100" />
@@ -348,7 +334,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                 <StatWidget label="Siswa Selesai" value={analytics.completedCount} color="bg-purple-100" />
                             </div>
 
-                            {/* Question Performance */}
                             <div>
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-lg font-black text-slate-800 tracking-tight">Performa per Butir Soal</h3>
