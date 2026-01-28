@@ -33,7 +33,6 @@ class StorageService {
     window.addEventListener('offline', () => { this.isOnline = false; });
   }
 
-  // --- EXAMS ---
   async getExams(headers: Record<string, string> = {}): Promise<Record<string, Exam>> {
     let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     if (this.isOnline) {
@@ -56,21 +55,28 @@ class StorageService {
   async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
       const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
       let exam = allExams[code];
+      
       if (this.isOnline) {
-          try {
-              const previewParam = isPreview ? '&preview=true' : '';
-              const res = await retryOperation(() => fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`));
-              if (res.ok) {
-                  const cloudExam = await res.json();
-                  if (cloudExam) { 
-                      if (!isPreview) {
-                          allExams[cloudExam.code] = cloudExam; 
-                          this.saveLocal(KEYS.EXAMS, allExams); 
-                      }
-                      exam = cloudExam;
+          const previewParam = isPreview ? '&preview=true' : '';
+          const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`);
+          
+          if (res.status === 403) {
+              throw new Error("EXAM_IS_DRAFT");
+          }
+          if (res.status === 404) {
+              throw new Error("EXAM_NOT_FOUND");
+          }
+          
+          if (res.ok) {
+              const cloudExam = await res.json();
+              if (cloudExam) { 
+                  if (!isPreview) {
+                      allExams[cloudExam.code] = cloudExam; 
+                      this.saveLocal(KEYS.EXAMS, allExams); 
                   }
+                  exam = cloudExam;
               }
-          } catch(e) {}
+          }
       }
       return exam ? sanitizeExamForStudent(exam) : null;
   }
@@ -85,23 +91,14 @@ class StorageService {
         try {
             const res = await retryOperation(() => fetch(`${API_URL}/exams`, { 
                 method: 'POST', 
-                headers: {
-                    'Content-Type':'application/json',
-                    ...headers
-                }, 
+                headers: { 'Content-Type':'application/json', ...headers }, 
                 body: JSON.stringify(examToSave) 
             }));
-            
             if (res.ok) {
                 exams[exam.code].isSynced = true; 
                 this.saveLocal(KEYS.EXAMS, exams);
-            } else {
-                const errText = await res.text();
-                console.error("Server refused to save exam:", errText);
             }
-        } catch (e) {
-            console.error("Network error saving exam:", e);
-        }
+        } catch (e) { console.error("Network error saving exam:", e); }
     }
   }
 
@@ -110,10 +107,10 @@ class StorageService {
       delete exams[code];
       this.saveLocal(KEYS.EXAMS, exams);
       if (this.isOnline) {
-          try { await retryOperation(() => fetch(`${API_URL}/exams?code=${code}`, { 
+          try { await fetch(`${API_URL}/exams?code=${code}`, { 
               method: 'DELETE',
               headers: headers as any
-          })); } catch (e) {}
+          }); } catch (e) {}
       }
   }
 
@@ -124,7 +121,7 @@ class StorageService {
             if (examCode) queryParts.push(`code=${examCode}`);
             if (className && className !== 'ALL') queryParts.push(`class=${encodeURIComponent(className)}`);
             const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-            const response = await retryOperation(() => fetch(`${API_URL}/results${queryString}`, { headers: headers as any }));
+            const response = await fetch(`${API_URL}/results${queryString}`, { headers: headers as any });
             if (response.ok) return await response.json();
         } catch (e) {}
     }
