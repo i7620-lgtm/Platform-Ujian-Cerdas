@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Exam, Student, Result, Question } from '../types';
 import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon } from './Icons';
 
@@ -12,22 +12,38 @@ interface StudentExamPageProps {
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onUpdate }) => {
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
-    const [timeLeft, setTimeLeft] = useState(exam.config.timeLimit * 60);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Menghitung titik waktu deadline (Tenggat Waktu)
+    // Diambil dari waktu mulai (timestamp awal) + limit waktu dari config
+    const deadline = useMemo(() => {
+        const startTimestamp = initialData?.timestamp || Date.now();
+        return startTimestamp + (exam.config.timeLimit * 60 * 1000);
+    }, [initialData?.timestamp, exam.config.timeLimit]);
+
+    // Fungsi untuk menghitung sisa waktu berdasarkan (Deadline - Waktu Berjalan)
+    const calculateTimeLeft = () => {
+        const now = Date.now();
+        const difference = deadline - now;
+        return Math.max(0, Math.floor(difference / 1000));
+    };
+
+    const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmit(true);
-                    return 0;
-                }
-                return prev - 1;
-            });
+            const remaining = calculateTimeLeft();
+            setTimeLeft(remaining);
+
+            // Jika waktu habis, otomatis kumpulkan
+            if (remaining <= 0) {
+                clearInterval(timer);
+                handleSubmit(true);
+            }
         }, 1000);
+
         return () => clearInterval(timer);
-    }, []);
+    }, [deadline]); // Re-subscribe jika deadline berubah (misal: guru tambah waktu)
 
     const handleAnswer = (qId: string, val: string) => {
         const newAnswers = { ...answers, [qId]: val };
