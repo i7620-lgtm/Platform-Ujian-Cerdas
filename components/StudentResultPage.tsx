@@ -13,7 +13,6 @@ interface StudentResultPageProps {
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish, onCheckStatus }) => {
     
     useEffect(() => {
-        // Prevent Back Button
         window.history.pushState(null, "", window.location.href);
         const onPopState = () => {
             window.history.pushState(null, "", window.location.href);
@@ -22,13 +21,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         return () => window.removeEventListener("popstate", onPopState);
     }, []);
 
-    // --- HANDLING FORCE SUBMITTED (LOCKED) STATE - ELEGANT DESIGN ---
-    if (result.status === 'force_submitted') {
+    if (result.status === 'force_closed') {
         return (
              <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6 animate-fade-in font-sans">
                 <div className="w-full max-w-md">
                     <div className="bg-white rounded-[2rem] shadow-2xl shadow-slate-200/60 overflow-hidden border border-slate-100 relative">
-                        {/* Decorative background circle */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-red-50 rounded-full blur-3xl -z-10 opacity-60 pointer-events-none"></div>
 
                         <div className="p-8 text-center flex flex-col items-center">
@@ -36,9 +33,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                                 <LockClosedIcon className="w-8 h-8 text-red-500" />
                             </div>
                             
-                            <h1 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Akses Ujian Ditangguhkan</h1>
+                            <h1 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Akses Ujian Dihentikan</h1>
                             <p className="text-slate-500 text-sm leading-relaxed mb-8 px-2">
-                                Sistem mendeteksi aktivitas di luar aplikasi ujian. Demi keamanan dan integritas, sesi Anda dikunci sementara.
+                                Sistem mendeteksi aktivitas yang tidak diizinkan. Demi menjaga integritas, sesi pengerjaan Anda telah dihentikan otomatis.
                             </p>
                             
                             <div className="w-full bg-slate-50 rounded-xl p-5 mb-8 text-left border border-slate-100">
@@ -50,11 +47,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                                     </li>
                                     <li className="flex gap-3 items-start">
                                         <span className="flex items-center justify-center w-5 h-5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-500 shrink-0 shadow-sm">2</span>
-                                        <span>Minta izin untuk membuka kunci (Unlock).</span>
+                                        <span>Minta izin pembukaan kunci (Unlock).</span>
                                     </li>
                                     <li className="flex gap-3 items-start">
                                         <span className="flex items-center justify-center w-5 h-5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-500 shrink-0 shadow-sm">3</span>
-                                        <span>Klik tombol refresh di bawah ini.</span>
+                                        <span>Klik tombol cek status di bawah.</span>
                                     </li>
                                 </ol>
                             </div>
@@ -65,7 +62,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                                     className="w-full bg-slate-900 text-white font-bold py-4 px-6 rounded-xl hover:bg-black transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 mb-4 group"
                                 >
                                     <ArrowPathIcon className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
-                                    Cek Izin Akses
+                                    Cek Status Izin
                                 </button>
                             )}
                             
@@ -82,7 +79,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         );
     }
 
-    // --- HANDLING IN PROGRESS (FALLBACK SAFETY) ---
     if (result.status === 'in_progress') {
         return (
              <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4 animate-fade-in">
@@ -100,7 +96,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         );
     }
 
-    // Handling Pending Grading (Offline Mode)
     if (result.status === 'pending_grading') {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 animate-fade-in">
@@ -135,7 +130,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
         );
     }
 
-    // Hide result logic if configured
     const showResult = config ? config.showResultToStudent : true;
 
     if (!showResult) {
