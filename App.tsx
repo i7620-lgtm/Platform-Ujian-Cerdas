@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -28,7 +28,6 @@ const App: React.FC = () => {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
-  // -- AUTH HEADER LOGIC --
   const getHeaders = useCallback(() => {
       if (!teacherProfile) return {};
       return {
@@ -42,7 +41,6 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
         const headers = getHeaders();
-        // Menggunakan storageService agar tetap mengambil data dari local cache jika server lambat
         const examMap = await storageService.getExams(headers as Record<string, string>);
         setExams(examMap);
     } catch (e) {
@@ -69,7 +67,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // --- LOGIC EFFECT FOR PUBLIC STREAM ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const streamCode = urlParams.get('stream');
@@ -188,14 +185,26 @@ const App: React.FC = () => {
   };
 
   const addExam = useCallback(async (newExam: Exam) => {
-    const enriched = { ...newExam, authorSchool: teacherProfile?.school || '' };
+    const enriched = { 
+        ...newExam, 
+        authorId: teacherProfile?.id, 
+        authorSchool: teacherProfile?.school || '' 
+    };
     setExams(prev => ({ ...prev, [newExam.code]: enriched }));
-    await storageService.saveExam(enriched);
-  }, [teacherProfile]);
+    await storageService.saveExam(enriched, getHeaders() as Record<string, string>);
+  }, [teacherProfile, getHeaders]);
 
-  const updateExam = useCallback(async (u: Exam) => { setExams(p => ({...p, [u.code]: u})); await storageService.saveExam(u); }, []);
-  const deleteExam = useCallback(async (c: string) => { setExams(p => { const n = {...p}; delete n[c]; return n; }); await storageService.deleteExam(c); }, []);
-  const onAllowContinuation = async () => { /* No-op global refresh */ };
+  const updateExam = useCallback(async (u: Exam) => { 
+    setExams(p => ({...p, [u.code]: u})); 
+    await storageService.saveExam(u, getHeaders() as Record<string, string>); 
+  }, [getHeaders]);
+
+  const deleteExam = useCallback(async (c: string) => { 
+    setExams(p => { const n = {...p}; delete n[c]; return n; }); 
+    await storageService.deleteExam(c, getHeaders() as Record<string, string>); 
+  }, [getHeaders]);
+
+  const onAllowContinuation = async () => { };
 
   const resetToHome = () => {
     setCurrentExam(null); setCurrentStudent(null); setStudentResult(null); setResumedResult(null); setTeacherProfile(null); setView('SELECTOR'); window.history.replaceState(null, '', '/'); 
@@ -210,62 +219,59 @@ const App: React.FC = () => {
 
   if (view === 'SELECTOR') {
       return (
-        <div className="relative min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 overflow-hidden flex flex-col items-center justify-center p-6">
+        <div className="relative min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-indigo-100 overflow-hidden flex flex-col items-center justify-center p-6">
              <SyncStatus />
-             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                 <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-gradient-to-br from-indigo-200/20 to-purple-200/20 rounded-full blur-[80px]" />
-                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-gradient-to-tr from-cyan-200/20 to-blue-200/20 rounded-full blur-[80px]" />
+             
+             <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                 <div className="absolute top-[-15%] right-[-5%] w-[500px] h-[500px] bg-indigo-100/40 rounded-full blur-[100px]" />
+                 <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-blue-50/40 rounded-full blur-[100px]" />
              </div>
 
-             <div className="relative z-10 w-full max-w-[400px] flex flex-col gap-6 animate-slide-in-up">
-                 <div className="text-center mb-4">
-                     <div className="inline-flex p-4 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 border border-slate-50">
+             <div className="relative z-10 w-full max-w-[400px] flex flex-col gap-8 animate-slide-in-up">
+                 <div className="text-center">
+                     <div className="inline-flex p-5 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.05)] mb-8 border border-white">
                         <LogoIcon className="w-12 h-12 text-indigo-600" />
                      </div>
                      <h1 className="text-4xl font-black tracking-tight text-slate-900 mb-2">UjianCerdas</h1>
-                     <p className="text-slate-500 font-medium text-sm">Platform asesmen modern untuk<br/>sekolah masa depan.</p>
+                     <p className="text-slate-400 font-medium text-sm leading-relaxed">Platform asesmen modern yang ringan,<br/>aman, dan mudah diakses.</p>
                  </div>
 
                  <div className="space-y-4">
-                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100">
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <div className="relative bg-white group-hover:bg-opacity-95 rounded-[20px] p-5 flex items-center justify-between transition-colors">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-white group-hover:text-indigo-600 transition-colors">
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5 group-hover:text-indigo-900/60">Akses Masuk</div>
-                                    <div className="text-lg font-bold text-slate-800 group-hover:text-indigo-900">Siswa</div>
-                                </div>
+                     <button onClick={() => setView('STUDENT_LOGIN')} className="group w-full bg-white p-6 rounded-[2rem] shadow-[0_8px_30px_-5px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.06)] transition-all duration-500 border border-white flex items-center justify-between hover:scale-[1.02] active:scale-[0.98]">
+                        <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
+                                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100/50">
-                                <svg className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <div className="text-left">
+                                <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-0.5">Akses Masuk</div>
+                                <div className="text-xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">Siswa</div>
                             </div>
                         </div>
+                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                        </div>
                      </button>
-                     <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full relative overflow-hidden bg-white p-1 rounded-[24px] shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 border border-slate-100">
-                        <div className="absolute inset-0 bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <div className="relative bg-white group-hover:bg-opacity-95 rounded-[20px] p-5 flex items-center justify-between transition-colors">
-                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-white group-hover:text-slate-800 transition-colors">
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5 group-hover:text-slate-500">Akses Masuk</div>
-                                    <div className="text-lg font-bold text-slate-800 group-hover:text-slate-900">Guru / Admin</div>
-                                </div>
+
+                     <button onClick={() => setView('TEACHER_LOGIN')} className="group w-full bg-slate-900 p-6 rounded-[2rem] shadow-xl shadow-slate-200 hover:shadow-2xl hover:shadow-slate-300 transition-all duration-500 flex items-center justify-between hover:scale-[1.02] active:scale-[0.98]">
+                        <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-slate-900 transition-all duration-500">
+                                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-slate-200">
-                                <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <div className="text-left">
+                                <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-0.5">Akses Kelola</div>
+                                <div className="text-xl font-black text-white">Guru / Admin</div>
                             </div>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:bg-white/20 group-hover:text-white transition-all">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                         </div>
                      </button>
                  </div>
-                 <div className="mt-8 flex justify-center">
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+
+                 <div className="mt-4 flex justify-center">
+                    <div className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border transition-all ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm shadow-emerald-50' : 'bg-rose-50 text-rose-600 border-rose-100 shadow-sm shadow-rose-50'}`}>
                         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                        {isOnline ? 'System Online' : 'Offline Mode'}
+                        {isOnline ? 'System Online' : 'Network Offline'}
                     </div>
                  </div>
              </div>
