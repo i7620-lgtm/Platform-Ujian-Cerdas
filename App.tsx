@@ -64,11 +64,14 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode);
-      if (!exam) { alert("Maaf, Kode Ujian tidak ditemukan."); return; }
+      
+      if (!exam) { 
+          alert("Maaf, Kode Ujian tidak ditemukan. Silakan periksa kembali kode Anda."); 
+          return; 
+      }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
-      // PERSISTENCE: Jika sudah selesai, bawa ke halaman hasil
       if (res && res.status === 'completed') {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -77,13 +80,22 @@ const App: React.FC = () => {
           return;
       }
       
-      // Jika sedang mengerjakan (in_progress), siapkan data resume
       if (res && res.status === 'in_progress') setResumedResult(res);
       
       setCurrentExam(exam);
       setCurrentStudent(student);
       setView('STUDENT_EXAM');
-    } finally { setIsSyncing(false); }
+    } catch (err: any) {
+        if (err.message === "EXAM_IS_DRAFT") {
+            alert("Ujian ini belum dipublikasikan oleh Guru (Status: Draf). Silakan hubungi guru Anda.");
+        } else if (err.message === "EXAM_NOT_FOUND") {
+            alert("Kode Ujian tidak terdaftar. Pastikan penulisan kode sudah benar.");
+        } else {
+            alert("Gagal memuat ujian. Pastikan koneksi internet Anda stabil.");
+        }
+    } finally { 
+        setIsSyncing(false); 
+    }
   };
 
   const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number) => {
