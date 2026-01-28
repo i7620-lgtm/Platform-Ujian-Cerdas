@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, SignalIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { RemainingTime } from './DashboardViews';
 
@@ -48,7 +48,7 @@ interface OngoingExamModalProps {
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClose, onAllowContinuation, onUpdateExam, isReadOnly = false }) => {
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
-    const [selectedClass, setSelectedClass] = useState<string>('ALL'); // Default ALL untuk Global View
+    const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
     const [activeTab, setActiveTab] = useState<'MONITOR' | 'ANALYSIS'>('MONITOR');
     
@@ -84,11 +84,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         };
 
         fetchLatest(); 
-        const intervalId = setInterval(fetchLatest, 10000); // 10s interval is safer for global fetch
+        const intervalId = setInterval(fetchLatest, 10000); 
         return () => { isMounted = false; clearInterval(intervalId); };
     }, [displayExam, selectedClass]);
 
-    // --- ANALYTICS CALCULATION ---
+    // --- ANALYTICS CALCULATION (UPDATED: More Robust) ---
     const analytics = useMemo(() => {
         if (!localResults.length || !displayExam) return null;
         const completed = localResults.filter(r => ['completed', 'force_submitted'].includes(r.status || ''));
@@ -100,22 +100,30 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         const max = Math.max(...scores);
         const min = Math.min(...scores);
 
-        // Question Analysis
-        const questionStats = displayExam.questions.map(q => {
-            let correct = 0;
-            let totalAnswered = 0;
-            completed.forEach(r => {
-                if (r.answers[q.id]) {
-                    totalAnswered++;
-                    // Basic check logic (simplified for stats view)
-                    if (q.questionType === 'MULTIPLE_CHOICE' && r.answers[q.id] === q.correctAnswer) correct++;
-                }
+        // Question Analysis - Exclude Essays/Info
+        const questionStats = displayExam.questions
+            .filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY') // Filter out Essay/Info from auto stats
+            .map(q => {
+                let correct = 0;
+                let totalAnswered = 0;
+                completed.forEach(r => {
+                    if (r.answers[q.id]) {
+                        totalAnswered++;
+                        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'TRUE_FALSE') {
+                             if (String(r.answers[q.id]).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct++;
+                        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                             // Basic array check (length match) for simplicity in visualization
+                             const correctArr = String(q.correctAnswer).split(',');
+                             const answerArr = String(r.answers[q.id]).split(','); // Assuming client sends comma sep
+                             if (correctArr.length === answerArr.length) correct++;
+                        }
+                    }
+                });
+                return {
+                    id: q.id,
+                    correctRate: totalAnswered > 0 ? Math.round((correct / totalAnswered) * 100) : 0
+                };
             });
-            return {
-                id: q.id,
-                correctRate: totalAnswered > 0 ? Math.round((correct / totalAnswered) * 100) : 0
-            };
-        });
 
         return { avg, max, min, completedCount: completed.length, questionStats };
     }, [localResults, displayExam]);
@@ -148,11 +156,32 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         } catch(e) { alert("Gagal."); } finally { setIsSubmittingTime(false); }
     };
 
+    const handleShareStream = () => {
+        if(!displayExam) return;
+        const url = `${window.location.origin}/?stream=${displayExam.code}`;
+        navigator.clipboard.writeText(url);
+        alert("Link Livestream Publik berhasil disalin! Bagikan ke orang tua atau proyektor.");
+    };
+
     const renderStatusBadge = (status: string) => {
         if (status === 'in_progress') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200"><span className="animate-ping w-2 h-2 rounded-full bg-emerald-500 opacity-75"></span>Kerja</span>;
         if (status === 'completed') return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200"><CheckCircleIcon className="w-3 h-3"/>Selesai</span>;
         if (status === 'force_submitted') return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 animate-pulse"><LockClosedIcon className="w-3 h-3"/>Kunci</span>;
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400"><WifiIcon className="w-3 h-3"/>Offline</span>;
+    };
+
+    // Calculate elapsed time string relative to now
+    const getRelativeTime = (timestamp?: number) => {
+        if (!timestamp) return 'Offline';
+        const diff = Math.floor((Date.now() - timestamp) / 1000);
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+        return 'Long ago';
+    };
+
+    const isOnlineRecent = (timestamp?: number) => {
+        if (!timestamp) return false;
+        return (Date.now() - timestamp) < 60000; // Active within last 60s
     };
 
     return (
@@ -185,8 +214,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                              </div>
                         </div>
                         <div className="flex items-center gap-2">
-                             {!isReadOnly && <button onClick={()=>setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 bg-indigo-50 text-indigo-700 rounded-xl"><PlusCircleIcon className="w-5 h-5"/></button>}
-                             <button onClick={onClose} className="p-2 bg-white border rounded-xl"><XMarkIcon className="w-5 h-5 text-slate-400"/></button>
+                             {!isReadOnly && displayExam.config.enablePublicStream && (
+                                 <button onClick={handleShareStream} className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors font-bold text-xs border border-emerald-100" title="Bagikan Link Livestream">
+                                     <ShareIcon className="w-4 h-4"/> Share Stream
+                                 </button>
+                             )}
+                             {!isReadOnly && <button onClick={()=>setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors"><PlusCircleIcon className="w-5 h-5"/></button>}
+                             <button onClick={onClose} className="p-2 bg-white border rounded-xl hover:bg-slate-50"><XMarkIcon className="w-5 h-5 text-slate-400"/></button>
                         </div>
                     </div>
 
@@ -226,12 +260,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase">Siswa</th>
                                                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase">Kelas</th>
                                                 <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Status</th>
-                                                <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Nilai/Progres</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Progress / Nilai</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Last Active</th>
                                                 <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {localResults.sort((a,b) => a.student.fullName.localeCompare(b.student.fullName)).map((r, i) => (
+                                            {localResults.sort((a,b) => a.student.fullName.localeCompare(b.student.fullName)).map((r, i) => {
+                                                const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length;
+                                                const answered = Object.keys(r.answers).length;
+                                                const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0;
+                                                const isOnline = isOnlineRecent(r.timestamp);
+
+                                                return (
                                                 <tr key={r.student.studentId} className="hover:bg-slate-50">
                                                     <td className="px-4 py-3 text-xs font-mono text-slate-400">{i+1}</td>
                                                     <td className="px-4 py-3">
@@ -244,10 +285,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                         {['completed','force_submitted'].includes(r.status||'') ? (
                                                             <span className={`font-black text-lg ${r.score >= 70 ? 'text-emerald-600' : 'text-slate-800'}`}>{r.score}</span>
                                                         ) : (
-                                                            <div className="w-24 h-1.5 bg-slate-100 rounded-full mx-auto overflow-hidden">
-                                                                <div className="h-full bg-blue-500" style={{width: `${Math.round((Object.keys(r.answers).length / displayExam.questions.filter(q=>q.questionType!=='INFO').length)*100)}%`}}></div>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-blue-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-400">{answered}/{totalQ} Soal</span>
                                                             </div>
                                                         )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                                                            <span className="text-xs font-mono text-slate-500">{getRelativeTime(r.timestamp)}</span>
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         {(r.status === 'force_submitted' || processingIdsRef.current.has(r.student.studentId)) && !isReadOnly && (
@@ -257,7 +307,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                         )}
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            )})}
                                         </tbody>
                                     </table>
                                 ) : (
@@ -275,14 +325,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                             <StatWidget label="Selesai" value={`${analytics.completedCount} Siswa`} color="bg-purple-100" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-lg text-slate-800 mb-4">Analisis Butir Soal</h3>
+                                            <h3 className="font-bold text-lg text-slate-800 mb-4">Analisis Butir Soal (Otomatis)</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                 {analytics.questionStats.map((s, i) => {
                                                     const q = displayExam.questions.find(qu => qu.id === s.id);
-                                                    if (!q || q.questionType === 'INFO') return null;
+                                                    if (!q) return null;
                                                     return <QuestionAnalysisItem key={s.id} q={q} index={i} stats={s} />;
                                                 })}
                                             </div>
+                                            <p className="text-xs text-slate-400 mt-4 italic">* Analisis hanya mencakup soal Pilihan Ganda dan Benar/Salah.</p>
                                         </div>
                                     </>
                                 ) : (
