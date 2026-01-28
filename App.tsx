@@ -66,8 +66,14 @@ const App: React.FC = () => {
       if (!exam) { alert("Maaf, Kode Ujian tidak ditemukan atau belum dipublikasikan."); return; }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
-      if (res && res.status === 'completed' && !exam.config.allowRetakes) {
-          alert("Anda sudah menyelesaikan ujian ini."); return;
+      
+      // PERBAIKAN: Jika user sudah selesai, jangan di-alert, tapi arahkan ke halaman hasil.
+      if (res && res.status === 'completed') {
+          setCurrentExam(exam);
+          setCurrentStudent(student);
+          setStudentResult(res);
+          setView('STUDENT_RESULT');
+          return;
       }
       
       if (res && res.status === 'in_progress') setResumedResult(res);
@@ -93,7 +99,13 @@ const App: React.FC = () => {
     setIsSyncing(false);
   };
 
-  const resetToHome = () => { setView('SELECTOR'); setCurrentExam(null); setCurrentStudent(null); };
+  const resetToHome = () => { 
+    setView('SELECTOR'); 
+    setCurrentExam(null); 
+    setCurrentStudent(null); 
+    setStudentResult(null); 
+    setResumedResult(null);
+  };
 
   const StatusOverlay = () => (
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end gap-3 pointer-events-none">
@@ -105,7 +117,7 @@ const App: React.FC = () => {
           {isSyncing && (
               <div className="bg-white/90 backdrop-blur-xl text-indigo-600 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl border border-indigo-100 flex items-center gap-2.5">
                   <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  Mengamankan Data...
+                  Mensinkronisasi...
               </div>
           )}
       </div>
@@ -204,8 +216,8 @@ const App: React.FC = () => {
             />
         )}
         
-        {view === 'STUDENT_RESULT' && studentResult && (
-            <StudentResultPage result={studentResult} onFinish={resetToHome} />
+        {view === 'STUDENT_RESULT' && studentResult && currentExam && (
+            <StudentResultPage result={studentResult} config={currentExam.config} onFinish={resetToHome} />
         )}
     </div>
   );
