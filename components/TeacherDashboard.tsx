@@ -54,6 +54,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         trackLocation: false,
         subject: 'Lainnya',
         classLevel: 'Lainnya',
+        targetClasses: [],
         examType: 'Lainnya',
         description: ''
     });
