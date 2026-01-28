@@ -26,7 +26,10 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const exam = await storageService.getExamForStudent(examCode, isPreview);
-      if (!exam) { alert("Kode Ujian tidak ditemukan."); return; }
+      if (!exam) { 
+        alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
+        return; 
+      }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
@@ -41,7 +44,7 @@ const App: React.FC = () => {
       setCurrentExam(exam);
       setCurrentStudent(student);
       
-      if (res && res.status === 'in_progress') {
+      if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
       } else if (!isPreview) {
         await storageService.submitExamResult({
@@ -55,9 +58,30 @@ const App: React.FC = () => {
       
       setView('STUDENT_EXAM');
     } catch (err: any) {
-        alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
+        if (err.message === 'EXAM_IS_DRAFT') {
+            alert("Ujian ini masih berupa draf. Gunakan fitur Preview dari dashboard guru.");
+        } else {
+            alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
+        }
     } finally { setIsSyncing(false); }
   }, []);
+
+  // Effect to handle URL parameters (for Preview Mode)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const previewCode = params.get('preview');
+    if (previewCode) {
+        const dummyStudent: Student = {
+            fullName: 'Mode Pratinjau',
+            class: 'PREVIEW',
+            absentNumber: '00',
+            studentId: 'preview_mode_' + Date.now()
+        };
+        handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
+        // Clear param to prevent re-triggering on manual refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [handleStudentLoginSuccess]);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); storageService.syncData(); };
@@ -98,6 +122,14 @@ const App: React.FC = () => {
 
   const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
+    
+    // In preview mode, just go back home after finishing
+    if (currentStudent.class === 'PREVIEW') {
+        alert("Mode Pratinjau: Jawaban Anda tidak disimpan di server.");
+        resetToHome();
+        return;
+    }
+
     setIsSyncing(true);
     const res = await storageService.submitExamResult({
         student: currentStudent,
@@ -210,7 +242,11 @@ const App: React.FC = () => {
                 student={currentStudent} 
                 initialData={resumedResult}
                 onSubmit={handleExamSubmit}
-                onUpdate={(a, t) => storageService.submitExamResult({ student: currentStudent, examCode: currentExam.code, answers: a, status: 'in_progress' })}
+                onUpdate={(a, t) => {
+                    if (currentStudent.class !== 'PREVIEW') {
+                        storageService.submitExamResult({ student: currentStudent, examCode: currentExam.code, answers: a, status: 'in_progress' });
+                    }
+                }}
             />
         )}
         
