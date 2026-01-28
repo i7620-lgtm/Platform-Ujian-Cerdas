@@ -23,16 +23,68 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
+    setIsSyncing(true);
+    try {
+      const exam = await storageService.getExamForStudent(examCode, isPreview);
+      if (!exam) { alert("Kode Ujian tidak ditemukan."); return; }
+      
+      const res = await storageService.getStudentResult(examCode, student.studentId);
+      
+      if (res && res.status === 'completed' && !isPreview) {
+          setCurrentExam(exam);
+          setCurrentStudent(student);
+          setStudentResult(res);
+          setView('STUDENT_RESULT');
+          return;
+      }
+
+      setCurrentExam(exam);
+      setCurrentStudent(student);
+      
+      if (res && res.status === 'in_progress') {
+        setResumedResult(res);
+      } else if (!isPreview) {
+        await storageService.submitExamResult({
+          student,
+          examCode,
+          answers: {},
+          status: 'in_progress',
+          timestamp: Date.now()
+        });
+      }
+      
+      setView('STUDENT_EXAM');
+    } catch (err: any) {
+        alert(err.message === "EXAM_IS_DRAFT" ? "Ujian belum dipublikasikan. Gunakan mode pratinjau dari dashboard guru." : "Gagal memuat ujian.");
+    } finally { setIsSyncing(false); }
+  }, []);
+
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); storageService.syncData(); };
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    
+    // Deteksi Mode Preview dari URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const previewCode = urlParams.get('preview');
+    if (previewCode) {
+        handleStudentLoginSuccess(previewCode, {
+            fullName: 'Pratinjau Guru',
+            class: 'PREVIEW',
+            absentNumber: '0',
+            studentId: 'preview-mode-' + Date.now()
+        }, true);
+        // Bersihkan URL tanpa reload
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [handleStudentLoginSuccess]);
 
   const refreshExams = useCallback(async () => {
     if (!teacherProfile) return;
@@ -59,47 +111,6 @@ const App: React.FC = () => {
         setResults(data);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
-
-  const handleStudentLoginSuccess = async (examCode: string, student: Student) => {
-    setIsSyncing(true);
-    try {
-      const exam = await storageService.getExamForStudent(examCode);
-      if (!exam) { alert("Kode Ujian tidak ditemukan."); return; }
-      
-      const res = await storageService.getStudentResult(examCode, student.studentId);
-      
-      // Jika hasil sudah ada dan selesai, tampilkan result
-      if (res && res.status === 'completed') {
-          setCurrentExam(exam);
-          setCurrentStudent(student);
-          setStudentResult(res);
-          setView('STUDENT_RESULT');
-          return;
-      }
-
-      // Jika ini adalah login pertama atau sedang berlangsung
-      setCurrentExam(exam);
-      setCurrentStudent(student);
-      
-      if (res && res.status === 'in_progress') {
-        setResumedResult(res);
-      } else {
-        // PERBAIKAN: Jika siswa baru (belum ada data), kirim ping awal ke backend
-        // Ini akan memicu pembuatan file Spreadsheet pribadi di Drive
-        await storageService.submitExamResult({
-          student,
-          examCode,
-          answers: {},
-          status: 'in_progress',
-          timestamp: Date.now()
-        });
-      }
-      
-      setView('STUDENT_EXAM');
-    } catch (err: any) {
-        alert(err.message === "EXAM_IS_DRAFT" ? "Ujian belum dipublikasikan." : "Gagal memuat ujian.");
-    } finally { setIsSyncing(false); }
-  };
 
   const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number) => {
     if (!currentExam || !currentStudent) return;
