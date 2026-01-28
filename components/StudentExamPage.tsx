@@ -14,20 +14,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Menghitung Titik Waktu Akhir (Deadline Absolut) berdasarkan Konfigurasi Ujian
-    // Sesuai dengan logika monitor: (Waktu Mulai Jadwal + Durasi)
     const deadline = useMemo(() => {
-        // Jika mode preview, kita buat deadline relatif dari "sekarang" agar timer mulai dari durasi penuh
         if (student.class === 'PREVIEW') {
             return Date.now() + (exam.config.timeLimit * 60 * 1000);
         }
-
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
         const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
         return examStartDateTime.getTime() + (exam.config.timeLimit * 60 * 1000);
     }, [exam.config.date, exam.config.startTime, exam.config.timeLimit, student.class]);
 
-    // Fungsi untuk menghitung sisa waktu berdasarkan (Deadline - Waktu Berjalan)
     const calculateTimeRemaining = () => {
         const now = Date.now();
         const difference = deadline - now;
@@ -40,14 +35,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const timer = setInterval(() => {
             const remaining = calculateTimeRemaining();
             setTimeLeft(remaining);
-
-            // Jika waktu benar-benar habis, otomatis kumpulkan (kecuali preview)
             if (remaining <= 0 && student.class !== 'PREVIEW') {
                 clearInterval(timer);
                 handleSubmit(true);
             }
         }, 1000);
-
         return () => clearInterval(timer);
     }, [deadline, student.class]);
 
@@ -57,7 +49,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         onUpdate?.(newAnswers, timeLeft);
     };
 
-    // Handler untuk Pilihan Ganda Kompleks (Multi-Select)
     const handleComplexChoice = (qId: string, option: string) => {
         const current = answers[qId] ? answers[qId].split(',') : [];
         let updated;
@@ -69,22 +60,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         handleAnswer(qId, updated.join(','));
     };
 
-    // Handler untuk Benar / Salah
     const handleTrueFalse = (qId: string, rowIndex: number, value: boolean) => {
         let current: Record<string, boolean> = {};
-        try { 
-            current = JSON.parse(answers[qId] || '{}'); 
-        } catch(e) { current = {}; }
+        try { current = JSON.parse(answers[qId] || '{}'); } catch(e) { current = {}; }
         current[rowIndex] = value;
         handleAnswer(qId, JSON.stringify(current));
     };
 
-    // Handler untuk Menjodohkan
     const handleMatching = (qId: string, leftItem: string, rightValue: string) => {
         let current: Record<string, string> = {};
-        try { 
-            current = JSON.parse(answers[qId] || '{}'); 
-        } catch(e) { current = {}; }
+        try { current = JSON.parse(answers[qId] || '{}'); } catch(e) { current = {}; }
         current[leftItem] = rightValue;
         handleAnswer(qId, JSON.stringify(current));
     };
@@ -99,10 +84,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
         const sec = s % 60;
-        
-        if (h > 0) {
-            return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-        }
+        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
@@ -124,30 +106,45 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     return (
         <div className="min-h-screen bg-white pb-32 font-sans selection:bg-brand-100">
-            {/* Header Modern dengan Progress */}
-            <header className="sticky top-0 z-[60] bg-white/90 backdrop-blur-xl border-b border-slate-100">
-                <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-brand-100">
+            {/* Header Teroptimasi untuk Mobile & Desktop */}
+            <header className="sticky top-0 z-[60] bg-white/95 backdrop-blur-xl border-b border-slate-100 shadow-sm">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center relative">
+                    
+                    {/* Sisi Kiri: Info Ujian/Siswa */}
+                    <div className="flex items-center gap-2 sm:gap-3 z-10 overflow-hidden pr-12 sm:pr-0">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-brand-100 shrink-0">
                              {exam.config.subject.charAt(0)}
                         </div>
-                        <div className="hidden sm:block">
-                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{exam.config.subject}</h2>
-                            <p className="text-sm font-bold text-slate-800 truncate max-w-[180px]">{student.fullName}</p>
+                        <div className="truncate">
+                            <h2 className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5 truncate">{exam.config.subject}</h2>
+                            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[120px] sm:max-w-[180px]">{student.fullName}</p>
+                        </div>
+                    </div>
+
+                    {/* Sisi Tengah: Sisa Waktu (Selalu Center & Dominan) */}
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+                        <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all duration-500 shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse scale-105' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                            <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="font-mono font-black text-sm sm:text-base tracking-widest tabular-nums leading-none">{formatTime(timeLeft)}</span>
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-4">
+                    {/* Sisi Kanan: Badge Status / Ruang Kosong untuk Network Status App.tsx */}
+                    <div className="ml-auto flex items-center gap-2 z-10 pl-4">
                         {student.class === 'PREVIEW' && (
-                            <span className="hidden md:block text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 uppercase tracking-widest">Mode Pratinjau</span>
+                            <span className="text-[8px] sm:text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 uppercase tracking-tighter sm:tracking-widest whitespace-nowrap">
+                                <span className="sm:inline hidden">Mode Pratinjau</span>
+                                <span className="sm:hidden inline">Preview</span>
+                            </span>
                         )}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-500 shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                            <ClockIcon className="w-4 h-4" />
-                            <span className="font-mono font-black text-sm tracking-widest tabular-nums">{formatTime(timeLeft)}</span>
-                        </div>
+                        {/* Ruang di sebelah kanan ini dibiarkan agak lega pada mobile 
+                            agar tidak bertabrakan dengan indikator Online/Offline dari App.tsx */}
+                        <div className="w-8 sm:w-0"></div> 
                     </div>
                 </div>
-                <div className="absolute bottom-0 left-0 w-full h-[3px] bg-slate-50">
+
+                {/* Progress Bar di Bawah Header */}
+                <div className="absolute bottom-0 left-0 w-full h-[2.5px] bg-slate-50">
                     <div className="h-full bg-brand-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
                 </div>
             </header>
@@ -177,9 +174,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 <div className="text-lg font-medium text-slate-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                             </div>
 
-                            {/* --- RENDERER BERDASARKAN TIPE SOAL --- */}
-
-                            {/* 1. Pilihan Ganda */}
                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                 <div className="grid grid-cols-1 gap-3.5">
                                     {q.options.map((opt, i) => (
@@ -201,7 +195,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             )}
 
-                            {/* 2. Pilihan Ganda Kompleks */}
                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                 <div className="grid grid-cols-1 gap-3.5">
                                     {q.options.map((opt, i) => {
@@ -226,7 +219,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             )}
 
-                            {/* 3. Benar / Salah */}
                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                 <div className="space-y-4">
                                     {q.trueFalseRows.map((row, i) => {
@@ -246,7 +238,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             )}
 
-                            {/* 4. Menjodohkan */}
                             {q.questionType === 'MATCHING' && q.matchingPairs && (
                                 <div className="space-y-3">
                                     {q.matchingPairs.map((pair, i) => {
@@ -276,7 +267,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             )}
 
-                            {/* 5. Isian Singkat */}
                             {q.questionType === 'FILL_IN_THE_BLANK' && (
                                 <div className="relative">
                                     <input
@@ -290,17 +280,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             )}
 
-                            {/* 6. Esai */}
                             {q.questionType === 'ESSAY' && (
                                 <textarea
                                     value={answers[q.id] || ''}
                                     onChange={(e) => handleAnswer(q.id, e.target.value)}
                                     placeholder="Tulis jawaban lengkap Anda di sini..."
-                                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] focus:bg-white focus:border-brand-400 outline-none transition-all text-sm font-medium min-h-[200px] leading-relaxed shadow-inner"
+                                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] focus:bg-white focus:border-brand-300 outline-none transition-all text-sm font-medium min-h-[200px] leading-relaxed shadow-inner"
                                 />
                             )}
 
-                            {/* Divider halus */}
                             <div className="h-px bg-slate-100 w-full mt-16"></div>
                         </section>
                     );
@@ -311,7 +299,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
             </main>
 
-            {/* Floating Footer Control */}
             <div className="fixed bottom-8 left-0 w-full px-6 flex justify-center pointer-events-none z-[70]">
                 <nav className="glass-card shadow-2xl rounded-full px-8 py-5 flex items-center gap-10 pointer-events-auto transition-all hover:scale-[1.02]">
                     <div className="flex flex-col">
