@@ -1,25 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// WAJIB menggunakan ekstensi .js saat mengimpor file lokal di mode ESM ("type": "module")
-import db from './db.js';
+import db from './_db.js';
 
-// Cache untuk status tabel agar tidak menjalankan CREATE TABLE setiap kali request
-let isTableInitialized = false;
-
-// Definisi Skema Tabel yang Benar
-const CREATE_TABLE_SQL = `
-    CREATE TABLE IF NOT EXISTS exams (
-        code TEXT PRIMARY KEY, 
-        author_id TEXT DEFAULT 'anonymous',
-        questions TEXT, 
-        config TEXT,
-        created_at TEXT DEFAULT '',
-        status TEXT DEFAULT 'PUBLISHED',
-        author_school TEXT DEFAULT ''
-    );
-`;
-
-// Helper Shuffle
 const shuffleArray = (array: any[]) => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -27,51 +9,6 @@ const shuffleArray = (array: any[]) => {
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
-};
-
-// Fungsi inisialisasi tabel yang dijalankan sekali per cold-start
-const ensureSchema = async () => {
-    if (isTableInitialized) return;
-    try {
-        console.log("Checking/Creating 'exams' table...");
-        await db.query(CREATE_TABLE_SQL);
-        
-        // MIGRATION CHECK:
-        try {
-             const checkSchool = await db.query(`
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'exams' AND column_name = 'author_school';
-             `);
-             if (checkSchool.rows.length === 0) {
-                 console.log("Adding 'author_school' column...");
-                 await db.query(`ALTER TABLE exams ADD COLUMN author_school TEXT DEFAULT '';`);
-             }
-        } catch (migError) {
-            console.warn("Migration warning:", migError);
-        }
-
-        isTableInitialized = true;
-        console.log("'exams' table verified.");
-    } catch (error) {
-        console.error("Failed to create table:", error);
-    }
-};
-
-const sanitizeExam = (examRow: any) => {
-    try {
-        const questions = JSON.parse(examRow.questions || '[]');
-        return { 
-            code: examRow.code,
-            authorId: examRow.author_id,
-            authorSchool: examRow.author_school,
-            questions,
-            config: JSON.parse(examRow.config || '{}'),
-            createdAt: examRow.created_at || '',
-            status: examRow.status || 'PUBLISHED'
-        };
-    } catch (e) {
-        return { code: examRow.code, questions: [], config: {}, createdAt: '', status: 'PUBLISHED' };
-    }
 };
 
 const sanitizeForPublic = (exam: any) => {
@@ -96,144 +33,97 @@ const sanitizeForPublic = (exam: any) => {
     return exam;
 };
 
+// Helper normalisasi string
+const normalize = (str: string) => (str || '').trim().toLowerCase();
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-    
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-User-Id, X-Role, X-School');
+    res.setHeader('Cache-Control', 'no-store');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        await ensureSchema();
-
-        // --- GET: AMBIL DATA ---
         if (req.method === 'GET') {
             const { code, preview } = req.query;
 
-            // -- PUBLIC ACCESS (STUDENT/PREVIEW) --
-            if (code && req.url?.includes('public')) {
-                const result = await db.query('SELECT * FROM exams WHERE code = $1', [code]);
-                if (!result || result.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
-                
-                const exam = sanitizeExam(result.rows[0]);
-                if (exam.status === 'DRAFT' && preview !== 'true') {
-                    return res.status(403).json({ error: 'Exam is currently in draft mode.' });
+            // --- PUBLIC ACCESS (SISWA) ---
+            if (code && req.query.public === 'true') {
+                const teachers = await db.getAllTeacherKeys();
+                // Note: In efficient production, this should be a direct lookup, 
+                // but given the sheet structure, we iterate.
+                for (const tId of teachers) {
+                    const exams = await db.getExams(tId);
+                    const found = exams.find((e: any) => e.code === code);
+                    if (found) {
+                        if (found.status === 'DRAFT' && preview !== 'true') {
+                            return res.status(403).json({ error: 'Exam is draft' });
+                        }
+                        return res.status(200).json(sanitizeForPublic(found));
+                    }
                 }
-                return res.status(200).json(sanitizeForPublic(exam));
+                return res.status(404).json({ error: 'Exam not found' });
             } 
             
-            // -- TEACHER ACCESS (FILTER BY ROLE) --
+            // --- TEACHER / ADMIN DASHBOARD ACCESS ---
             else {
-                // We expect context headers from the client to identify the user role
-                // Note: In a production app, this should be validated via JWT/Session.
-                // Here we trust the headers sent by our frontend App logic for the requirement context.
+                const requesterId = (req.headers['x-user-id'] as string);
                 const requesterRole = (req.headers['x-role'] as string) || 'guru';
-                const requesterId = (req.headers['x-user-id'] as string) || '';
                 const requesterSchool = (req.headers['x-school'] as string) || '';
 
-                let query = 'SELECT * FROM exams';
-                let params: any[] = [];
+                if (!requesterId) return res.status(400).json({ error: 'User ID header required' });
+
+                // 1. Ambil SEMUA data ujian (Raw Data)
+                // Karena db.getExams mengambil semua dari sheet global saat ini
+                const rawExams = await db.getExams('GLOBAL_TEACHER');
+
+                // 2. Filter Berdasarkan Role
+                let filteredExams = [];
 
                 if (requesterRole === 'super_admin') {
-                    // Super Admin sees ALL
-                    query += ' ORDER BY created_at DESC LIMIT 100';
-                } else if (requesterRole === 'admin') {
-                    // Admin sees ALL from their SCHOOL
-                    query += ' WHERE author_school = $1 ORDER BY created_at DESC LIMIT 100';
-                    params.push(requesterSchool);
-                } else {
-                    // Guru sees ONLY OWN exams
-                    query += ' WHERE author_id = $1 ORDER BY created_at DESC LIMIT 100';
-                    params.push(requesterId);
+                    // Super Admin melihat semuanya
+                    filteredExams = rawExams;
+                } 
+                else if (requesterRole === 'admin') {
+                    // Admin Sekolah melihat semua ujian dengan nama sekolah yang sama (case insensitive)
+                    filteredExams = rawExams.filter((e: any) => 
+                        normalize(e.authorSchool) === normalize(requesterSchool)
+                    );
+                } 
+                else {
+                    // Guru hanya melihat ujian buatannya sendiri
+                    filteredExams = rawExams.filter((e: any) => e.authorId === requesterId);
                 }
 
-                const result = await db.query(query, params);
-                const data = result?.rows.map((row: any) => sanitizeExam(row)) || [];
-                return res.status(200).json(data);
+                return res.status(200).json(filteredExams);
             }
         } 
-        
-        // --- POST: SIMPAN DATA BARU ---
         else if (req.method === 'POST') {
             const exam = req.body;
-            if (!exam || !exam.code) return res.status(400).json({ error: "Invalid payload: 'code' is required" });
-
-            const authorId = exam.authorId && exam.authorId.trim() !== '' ? exam.authorId : 'anonymous';
-            const authorSchool = exam.authorSchool || ''; // Save the school context
-            const createdAt = exam.createdAt || new Date().toLocaleString(); 
-            const status = exam.status || 'PUBLISHED';
-
-            const questionsJson = JSON.stringify(exam.questions || []);
-            const configJson = JSON.stringify(exam.config || {});
-
-            const query = `
-                INSERT INTO exams (code, author_id, author_school, questions, config, created_at, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (code) 
-                DO UPDATE SET 
-                    author_id = EXCLUDED.author_id,
-                    author_school = EXCLUDED.author_school,
-                    questions = EXCLUDED.questions,
-                    config = EXCLUDED.config,
-                    created_at = EXCLUDED.created_at,
-                    status = EXCLUDED.status
-            `;
-
-            await db.query(query, [exam.code, authorId, authorSchool, questionsJson, configJson, createdAt, status]);
-            return res.status(200).json({ success: true, message: "Exam saved successfully" });
-        }
-        
-        // --- PATCH & DELETE (Existing Logic) ---
-        else if (req.method === 'PATCH') {
-            const { code, questionId, imageUrl, optionImages } = req.body;
-            if (!code || !questionId) return res.status(400).json({ error: "Missing parameters" });
-            // ... (keep existing patch logic)
-            const client = await db.getClient();
-            try {
-                await client.query('BEGIN');
-                const result = await client.query('SELECT questions FROM exams WHERE code = $1 FOR UPDATE', [code]);
-                if (result.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Exam not found" }); }
-                let questions = JSON.parse(result.rows[0].questions);
-                let found = false;
-                questions = questions.map((q: any) => {
-                    if (q.id === questionId) {
-                        found = true;
-                        if (imageUrl !== undefined) q.imageUrl = imageUrl;
-                        if (optionImages !== undefined) q.optionImages = optionImages;
-                    }
-                    return q;
-                });
-                if (!found) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Question not found" }); }
-                await client.query('UPDATE exams SET questions = $1 WHERE code = $2', [JSON.stringify(questions), code]);
-                await client.query('COMMIT');
-                return res.status(200).json({ success: true });
-            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+            const authorId = exam.authorId;
+            if (!authorId) return res.status(400).json({ error: "Author ID missing" });
+            
+            // Validasi kepemilikan saat update/save tidak seketat GET untuk MVP,
+            // tapi idealnya dicek role juga di sini.
+            await db.saveExam(authorId, exam);
+            return res.status(200).json({ success: true });
         }
         else if (req.method === 'DELETE') {
             const { code } = req.query;
-            if (!code) return res.status(400).json({ error: "Exam code is required" });
-            const client = await db.getClient();
-            try {
-                await client.query('BEGIN');
-                await client.query('DELETE FROM results WHERE exam_code = $1', [code]);
-                await client.query('DELETE FROM exams WHERE code = $1', [code]);
-                await client.query('COMMIT');
-                return res.status(200).json({ success: true });
-            } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+            const requesterId = (req.headers['x-user-id'] as string);
+            if (!code || !requesterId) return res.status(400).json({ error: "Missing params" });
+            
+            // TODO: Tambahkan validasi apakah user berhak menghapus exam code ini
+            await db.deleteExam(requesterId, code as string);
+            return res.status(200).json({ success: true });
         }
 
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.status(405).json({ error: `Method '${req.method}' not allowed on /api/exams` });
         
     } catch (error: any) {
-        console.error("API Fatal Error:", error);
-        return res.status(500).json({ 
-            error: "Internal Server Error", 
-            message: error.message || "Unknown error occurred"
-        });
+        console.error("API Error:", error);
+        return res.status(500).json({ error: error.message });
     }
 }
