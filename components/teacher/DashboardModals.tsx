@@ -1,35 +1,118 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { Exam, Result, TeacherProfile } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon } from '../Icons';
+import type { Exam, Result, TeacherProfile, Question } from '../../types';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { RemainingTime } from './DashboardViews';
+import { StudentResultPage } from '../StudentResultPage';
 
 const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1">
         <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
             {Icon ? <Icon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />}
         </div>
         <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-            <p className="text-2xl font-black text-slate-800 leading-none mt-1">{value}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 leading-none mt-1">{value}</p>
         </div>
     </div>
 );
 
-const QuestionAnalysisItem: React.FC<{ q: any; index: number; stats: any }> = ({ q, index, stats }) => {
-    const difficultyColor = stats.correctRate > 80 ? 'bg-emerald-100 text-emerald-700' : stats.correctRate > 50 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+// --- COMPONENT: ANALISIS BUTIR SOAL ---
+const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; examResults: Result[] }> = ({ q, index, stats, examResults }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // Logic Warna: <50 Merah (Sulit), 50-79 Oranye (Sedang), >=80 Hijau (Mudah)
+    const difficultyColor = stats.correctRate >= 80 
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+        : stats.correctRate >= 50 
+            ? 'bg-orange-100 text-orange-700 border-orange-200' 
+            : 'bg-rose-100 text-rose-700 border-rose-200';
+
+    const difficultyLabel = stats.correctRate >= 80 ? 'Mudah' : stats.correctRate >= 50 ? 'Sedang' : 'Sulit';
+
+    // Menghitung Distribusi Jawaban (Distractor Analysis)
+    const distribution = useMemo(() => {
+        const counts: Record<string, number> = {};
+        let totalAnswered = 0;
+        
+        examResults.forEach(r => {
+            const ans = r.answers[q.id];
+            if (ans) {
+                const normalizedAns = String(ans).trim(); // Simplifikasi, idealnya normalisasi huruf opsi
+                counts[normalizedAns] = (counts[normalizedAns] || 0) + 1;
+                totalAnswered++;
+            }
+        });
+        return { counts, totalAnswered };
+    }, [examResults, q.id]);
+
     return (
-        <div className="p-5 border border-slate-100 rounded-2xl bg-white hover:border-indigo-100 transition-all">
-            <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Soal {index + 1}</span>
-                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase ${difficultyColor}`}>
-                    {stats.correctRate}% Benar
-                </span>
-            </div>
-            <div className="text-sm text-slate-700 line-clamp-2 mb-4 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-indigo-50 h-full transition-all duration-1000" style={{ width: `${stats.correctRate}%` }}></div>
+        <div className={`border rounded-2xl bg-white transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-md ring-1 ring-indigo-50 border-indigo-100' : 'border-slate-100 hover:border-indigo-100'}`}>
+            <div 
+                className="p-5 cursor-pointer flex flex-col gap-3"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex justify-between items-start">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Soal {index + 1}</span>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor}`}>
+                        {stats.correctRate}% Benar • {difficultyLabel}
+                    </span>
+                </div>
+                
+                <div className="text-sm text-slate-700 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                    <div 
+                        className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? 'bg-emerald-500' : stats.correctRate >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} 
+                        style={{ width: `${stats.correctRate}%` }}
+                    ></div>
+                </div>
+                
+                {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
+                        
+                        {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
+                            <div className="space-y-2">
+                                {q.options.map((opt, i) => {
+                                    const count = distribution.counts[opt] || 0;
+                                    const percentage = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+                                    const isCorrect = opt === q.correctAnswer;
+                                    
+                                    return (
+                                        <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : count > 0 ? 'bg-slate-50' : ''}`}>
+                                            <div className="flex items-center gap-2 z-10 w-full">
+                                                <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                                    {String.fromCharCode(65+i)}
+                                                </span>
+                                                <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
+                                            </div>
+                                            {/* Bar Background untuk visualisasi proporsi */}
+                                            <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded-xl">
+                                <ul className="space-y-2">
+                                    {Object.entries(distribution.counts).map(([ans, count], idx) => (
+                                        <li key={idx} className="text-xs text-slate-600 flex justify-between border-b border-slate-100 pb-1 last:border-0">
+                                            <span className="truncate flex-1 pr-4 italic">"{ans}"</span>
+                                            <span className="font-bold">{count} Siswa</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                <div className="flex justify-center mt-1">
+                     {isExpanded ? <ChevronUpIcon className="w-4 h-4 text-slate-300"/> : <ChevronDownIcon className="w-4 h-4 text-slate-300"/>}
+                </div>
             </div>
         </div>
     );
@@ -169,7 +252,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                 <select 
                                     value={selectedClass} 
                                     onChange={(e) => setSelectedClass(e.target.value)} 
-                                    className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                                    className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white"
                                 >
                                     <option value="ALL">SEMUA KELAS</option>
                                     {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
@@ -318,9 +401,14 @@ interface FinishedExamModalProps {
     onClose: () => void;
 }
 
+type TabView = 'ANALYSIS' | 'STUDENTS';
+
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teacherProfile, onClose }) => {
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedClass, setSelectedClass] = useState<string>('ALL'); // Filter Kelas
+    const [activeTab, setActiveTab] = useState<TabView>('ANALYSIS'); // Tabs
+    const [inspectingResult, setInspectingResult] = useState<Result | null>(null); // Detail Siswa
 
     useEffect(() => {
         if (exam) {
@@ -339,9 +427,15 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         }
     }, [exam, teacherProfile]);
 
+    // Derived State berdasarkan Filter Kelas
+    const filteredResults = useMemo(() => {
+        if (selectedClass === 'ALL') return results;
+        return results.filter(r => r.student.class === selectedClass);
+    }, [results, selectedClass]);
+
     const analytics = useMemo(() => {
-        if (!results.length || !exam) return null;
-        const validResults = results.filter(r => r.status !== 'in_progress');
+        if (!filteredResults.length || !exam) return null;
+        const validResults = filteredResults.filter(r => r.status !== 'in_progress');
         if (validResults.length === 0) return null;
 
         const scores = validResults.map(r => r.score);
@@ -364,25 +458,78 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             });
 
         return { avg, max, min, completedCount: validResults.length, questionStats };
-    }, [results, exam]);
+    }, [filteredResults, exam]);
 
     if (!exam) return null;
 
+    // View Detail Siswa (Overlay di atas Modal)
+    if (inspectingResult) {
+        return (
+            <div className="fixed inset-0 bg-slate-900 z-[100] overflow-y-auto">
+                 <div className="max-w-4xl mx-auto min-h-screen bg-white shadow-2xl relative">
+                    <div className="sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
+                        <div>
+                            <h3 className="font-bold text-lg">{inspectingResult.student.fullName}</h3>
+                            <p className="text-xs text-slate-500">{inspectingResult.student.class} • Skor: {inspectingResult.score}</p>
+                        </div>
+                        <button onClick={() => setInspectingResult(null)} className="px-4 py-2 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200">Tutup Detail</button>
+                    </div>
+                    {/* Reuse StudentResultPage tapi dimodifikasi propnya jika perlu, 
+                        di sini kita gunakan apa adanya karena cukup representatif */}
+                    <div className="pointer-events-none select-none opacity-100 scale-90 origin-top">
+                        <StudentResultPage result={inspectingResult} exam={exam} onFinish={() => {}} />
+                    </div>
+                 </div>
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-             <div className="bg-white sm:rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-full sm:h-[90vh] flex flex-col overflow-hidden border border-white">
+             <div className="bg-white sm:rounded-[2.5rem] shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden border border-white">
                 
-                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100">
-                            <ChartBarIcon className="w-8 h-8"/>
+                <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-10">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm">
+                                <ChartBarIcon className="w-8 h-8"/>
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-800 tracking-tight">Analisis Hasil Ujian</h2>
+                                <p className="text-sm text-slate-400 font-medium mt-0.5">{exam.config.subject} • {exam.code}</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Analisis Hasil Ujian</h2>
-                            <p className="text-sm text-slate-400 font-medium mt-0.5">{exam.config.subject} • {exam.code}</p>
+                        <div className="flex items-center gap-3">
+                             <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas:</span>
+                                <select 
+                                    value={selectedClass} 
+                                    onChange={(e) => setSelectedClass(e.target.value)} 
+                                    className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
+                                >
+                                    <option value="ALL">SEMUA KELAS</option>
+                                    {Array.from(new Set(results.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
+
+                    {/* Navigation Tabs */}
+                    <div className="flex gap-1 border-b border-slate-100">
+                        <button 
+                            onClick={() => setActiveTab('ANALYSIS')} 
+                            className={`px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'ANALYSIS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Analisis Soal
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('STUDENTS')} 
+                            className={`px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'STUDENTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Daftar Siswa
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-auto p-8 bg-slate-50/30">
@@ -392,31 +539,83 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menganalisis Data...</p>
                         </div>
                     ) : analytics ? (
-                        <div className="space-y-10 animate-fade-in">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                                <StatWidget label="Rata-Rata" value={analytics.avg} color="bg-indigo-100" />
-                                <StatWidget label="Tertinggi" value={analytics.max} color="bg-emerald-100" />
-                                <StatWidget label="Terendah" value={analytics.min} color="bg-rose-100" />
-                                <StatWidget label="Siswa Selesai" value={analytics.completedCount} color="bg-purple-100" />
-                            </div>
+                        activeTab === 'ANALYSIS' ? (
+                            <div className="space-y-10 animate-fade-in">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                                    <StatWidget label="Rata-Rata" value={analytics.avg} color="bg-indigo-100" />
+                                    <StatWidget label="Tertinggi" value={analytics.max} color="bg-emerald-100" />
+                                    <StatWidget label="Terendah" value={analytics.min} color="bg-rose-100" />
+                                    <StatWidget label="Partisipan" value={analytics.completedCount} color="bg-purple-100" icon={UserIcon} />
+                                </div>
 
-                            <div>
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-lg font-black text-slate-800 tracking-tight">Performa per Butir Soal</h3>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full"></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mudah</span></div>
-                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-rose-500 rounded-full"></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sulit</span></div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Analisis Butir Soal</h3>
+                                        <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div>Mudah (&gt;80%)</div>
+                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-orange-500 rounded-full"></div>Sedang (50-80%)</div>
+                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-rose-500 rounded-full"></div>Sulit (&lt;50%)</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                        {analytics.questionStats.map((s, i) => {
+                                            const q = exam.questions.find(qu => qu.id === s.id);
+                                            if (!q) return null;
+                                            return <QuestionAnalysisItem key={s.id} q={q} index={i} stats={s} examResults={filteredResults} />;
+                                        })}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                    {analytics.questionStats.map((s, i) => {
-                                        const q = exam.questions.find(qu => qu.id === s.id);
-                                        if (!q) return null;
-                                        return <QuestionAnalysisItem key={s.id} q={q} index={i} stats={s} />;
-                                    })}
-                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Peringkat</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Siswa</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Benar / Salah</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai Akhir</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Detail</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredResults.sort((a,b) => b.score - a.score).map((r, idx) => (
+                                            <tr key={r.student.studentId} className="hover:bg-indigo-50/30 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex w-8 h-8 items-center justify-center rounded-full font-bold text-xs ${idx < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {idx + 1}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
+                                                    <div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs font-bold text-slate-500">{r.student.class}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="text-xs font-medium text-slate-600">
+                                                        <span className="text-emerald-600 font-bold">{r.correctAnswers}</span> / <span className="text-rose-600 font-bold">{r.totalQuestions - r.correctAnswers}</span>
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`text-lg font-black ${r.score >= 75 ? 'text-emerald-600' : r.score >= 50 ? 'text-orange-500' : 'text-rose-600'}`}>
+                                                        {r.score}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button 
+                                                        onClick={() => setInspectingResult(r)}
+                                                        className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm flex items-center gap-2 ml-auto"
+                                                    >
+                                                        <EyeIcon className="w-3 h-3" /> Lihat Detail
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
                     ) : (
                         <div className="text-center py-20">
                             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
