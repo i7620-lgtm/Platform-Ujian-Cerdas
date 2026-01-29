@@ -40,7 +40,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-User-Id, X-Role, X-School');
-    res.setHeader('Cache-Control', 'no-store');
+
+    // CACHING STRATEGY
+    // Default: No-Store (Data Guru/Admin harus selalu real-time)
+    let cacheControl = 'no-store, no-cache, must-revalidate, proxy-revalidate';
+
+    // Jika method GET dan mengakses data publik (Siswa sedang ujian), aktifkan Cache
+    if (req.method === 'GET') {
+        const { code, public: isPublic } = req.query;
+        if (code && isPublic === 'true') {
+            // Public Cache: Simpan 1 jam (3600s). 
+            // stale-while-revalidate=86400: Jika cache kadaluarsa tapi < 24 jam, 
+            // tampilkan versi lama dulu sambil update background (Instan load).
+            cacheControl = 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400';
+        }
+    }
+    res.setHeader('Cache-Control', cacheControl);
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
