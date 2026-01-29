@@ -58,7 +58,10 @@ class StorageService {
       
       if (this.isOnline) {
           const previewParam = isPreview ? '&preview=true' : '';
-          const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}&_t=${Date.now()}`);
+          
+          // CACHE UPDATE: Dihapus '&_t=${Date.now()}' agar browser bisa menggunakan cache 
+          // yang sudah diset oleh header server (max-age=3600)
+          const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}`);
           
           if (res.status === 403) {
               throw new Error("EXAM_IS_DRAFT");
