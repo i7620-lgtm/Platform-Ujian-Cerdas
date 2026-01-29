@@ -25,12 +25,7 @@ const shuffleArray = <T>(array: T[]): T[] => {
 const sanitizeExamForStudent = (exam: Exam): Exam => {
     let questionsToProcess = [...exam.questions];
 
-    // 1. FITUR: ACAK SOAL (Shuffle Questions)
     if (exam.config.shuffleQuestions) {
-        // Pisahkan soal INFO (bacaan) jika perlu, atau acak semua.
-        // Strategi aman: Acak semua kecuali INFO jika INFO terikat (logic kompleks), 
-        // tapi untuk sekarang kita acak semua non-INFO, lalu sisipkan INFO jika perlu. 
-        // Simplifikasi: Shuffle semua array questions.
         questionsToProcess = shuffleArray(questionsToProcess);
     }
 
@@ -38,7 +33,6 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
         const { correctAnswer, trueFalseRows, matchingPairs, options, ...rest } = q;
         const sanitizedQ = { ...rest, options: options ? [...options] : undefined } as Question;
 
-        // 2. FITUR: ACAK OPSI (Shuffle Answers)
         if (exam.config.shuffleAnswers) {
             if (sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                 if (sanitizedQ.options && sanitizedQ.options.length > 0) {
@@ -50,7 +44,6 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
         if (trueFalseRows) sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
         
         if (matchingPairs && Array.isArray(matchingPairs)) {
-            // Matching pairs selalu diacak sisi kanannya agar menjadi soal menjodohkan yang valid
             const rights = matchingPairs.map(p => p.right).sort(() => Math.random() - 0.5);
             sanitizedQ.matchingPairs = matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
         }
@@ -70,21 +63,49 @@ class StorageService {
 
   async getExams(headers: Record<string, string> = {}): Promise<Record<string, Exam>> {
     let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
+    const requesterId = headers['x-user-id'];
+    const requesterRole = headers['x-role'];
+    const requesterSchool = headers['x-school'];
+
     if (this.isOnline) {
       try {
         const response = await retryOperation(() => fetch(`${API_URL}/exams`, { headers: headers as any }));
         if (response.ok) {
           const cloudExams: Exam[] = await response.json();
+          
+          // Sinkronisasi data cloud ke local
           cloudExams.forEach(exam => { 
-              if (!localExams[exam.code] || localExams[exam.code].isSynced !== false) {
-                  localExams[exam.code] = { ...exam, isSynced: true }; 
-              }
+              localExams[exam.code] = { ...exam, isSynced: true }; 
           });
           this.saveLocal(KEYS.EXAMS, localExams);
+
+          // Kembalikan HANYA apa yang dikirim cloud (karena cloud sudah melakukan filtering)
+          // Ini mencegah data "nyangkut" dari login guru sebelumnya di localStorage yang sama
+          const filteredMap: Record<string, Exam> = {};
+          cloudExams.forEach(e => { filteredMap[e.code] = e; });
+          return filteredMap;
         }
-      } catch (e) { console.warn("Sync failed, using local."); }
+      } catch (e) { 
+          console.warn("Sync failed, fallback to local filtering."); 
+      }
     }
-    return localExams;
+
+    // Jika offline, lakukan pemfilteran manual di client agar tetap aman
+    const filteredLocal: Record<string, Exam> = {};
+    Object.values(localExams).forEach(exam => {
+        let isMatch = false;
+        if (requesterRole === 'super_admin') {
+            isMatch = true;
+        } else if (requesterRole === 'admin') {
+            isMatch = (exam.authorSchool || '').toLowerCase() === (requesterSchool || '').toLowerCase();
+        } else {
+            isMatch = String(exam.authorId) === String(requesterId);
+        }
+
+        if (isMatch) filteredLocal[exam.code] = exam;
+    });
+
+    return filteredLocal;
   }
 
   async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
@@ -93,17 +114,10 @@ class StorageService {
       
       if (this.isOnline) {
           const previewParam = isPreview ? '&preview=true' : '';
-          
-          // CACHE UPDATE: Dihapus '&_t=${Date.now()}' agar browser bisa menggunakan cache 
-          // yang sudah diset oleh header server (max-age=3600)
           const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}`);
           
-          if (res.status === 403) {
-              throw new Error("EXAM_IS_DRAFT");
-          }
-          if (res.status === 404) {
-              throw new Error("EXAM_NOT_FOUND");
-          }
+          if (res.status === 403) throw new Error("EXAM_IS_DRAFT");
+          if (res.status === 404) throw new Error("EXAM_NOT_FOUND");
           
           if (res.ok) {
               const cloudExam = await res.json();
@@ -116,7 +130,6 @@ class StorageService {
               }
           }
       }
-      // Sanitasi (termasuk pengacakan) dilakukan SETIAP KALI load untuk keamanan
       return exam ? sanitizeExamForStudent(exam) : null;
   }
 
