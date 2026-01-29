@@ -1,16 +1,20 @@
 
-import React from 'react';
-import type { Result, ExamConfig } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon } from './Icons';
+import React, { useState } from 'react';
+import type { Result, Exam, Question } from '../types';
+import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 
 interface StudentResultPageProps {
   result: Result;
-  config?: ExamConfig;
+  exam: Exam; // Need full exam object for correct answers
   onFinish: () => void;
 }
 
-export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish }) => {
-    
+const normalize = (str: string) => (str || '').trim().toLowerCase();
+
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish }) => {
+    const config = exam.config;
+    const [expandedReview, setExpandedReview] = useState(false);
+
     // TAMPILAN KHUSUS: FORCE CLOSED (KECURANGAN/PELANGGARAN)
     if (result.status === 'force_closed') {
         return (
@@ -57,24 +61,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                                 Kembali ke Halaman Utama
                             </button>
                         </div>
-
-                        <div className="mt-8 flex justify-center opacity-40">
-                             <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                                ID: {result.student.studentId.split('_')[0]} • {new Date().toLocaleTimeString('id-ID')}
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // TAMPILAN NORMAL: SELESAI UJIAN
-    const showResult = config ? config.showResultToStudent : true;
+    // 5. FITUR: UMUMKAN NILAI OTOMATIS (Show Result to Student)
+    const showResult = config.showResultToStudent;
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 font-sans">
-            <div className="w-full max-w-sm text-center animate-gentle-slide">
+            <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500`}>
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
                     {/* Minimal Top Decoration */}
                     <div className="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
@@ -104,6 +102,60 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, co
                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Soal</p>
                                 </div>
                             </div>
+                            
+                            {/* 4. FITUR: TAMPILKAN KUNCI JAWABAN (Review Mode) */}
+                            {config.showCorrectAnswer && (
+                                <div className="pt-6 border-t border-slate-100">
+                                    <button 
+                                        onClick={() => setExpandedReview(!expandedReview)}
+                                        className="text-sm font-bold text-slate-600 hover:text-brand-600 flex items-center justify-center gap-2 mx-auto py-2 px-4 rounded-xl hover:bg-slate-50 transition-all"
+                                    >
+                                        {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan Soal'}
+                                        {expandedReview ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
+                                    </button>
+
+                                    {expandedReview && (
+                                        <div className="mt-6 space-y-4 text-left">
+                                            {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                const studentAns = result.answers[q.id] || '(Kosong)';
+                                                const correctAns = q.correctAnswer || '-';
+                                                const isCorrect = normalize(studentAns) === normalize(correctAns);
+
+                                                // Simplifikasi hanya untuk Multiple Choice & Isian Singkat dulu untuk UI ini
+                                                const isReviewable = ['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType);
+
+                                                if (!isReviewable) return null; 
+
+                                                return (
+                                                    <div key={q.id} className={`p-4 rounded-2xl border ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                                                        <div className="flex justify-between mb-2">
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Soal {idx + 1}</span>
+                                                            {isCorrect 
+                                                                ? <span className="text-[10px] font-black uppercase text-emerald-600 bg-white px-2 py-0.5 rounded">Benar</span>
+                                                                : <span className="text-[10px] font-black uppercase text-rose-600 bg-white px-2 py-0.5 rounded">Salah</span>
+                                                            }
+                                                        </div>
+                                                        <div className="text-sm font-medium text-slate-800 mb-3" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                        
+                                                        <div className="grid grid-cols-1 gap-2 text-xs">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Jawaban Kamu:</span>
+                                                                <span className={`font-bold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`} dangerouslySetInnerHTML={{__html: studentAns}}></span>
+                                                            </div>
+                                                            {!isCorrect && (
+                                                                <div className="flex flex-col mt-1">
+                                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Kunci Jawaban:</span>
+                                                                    <span className="font-bold text-slate-700" dangerouslySetInnerHTML={{__html: correctAns}}></span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="bg-slate-50 p-6 rounded-2xl mb-8">
