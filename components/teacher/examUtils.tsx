@@ -233,7 +233,12 @@ export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> =
         reader.onload = async (e) => {
             if (!e.target?.result) return reject(new Error("Gagal membaca file."));
             try {
-                const doc = await pdfjsLib.getDocument({ data: e.target.result as ArrayBuffer }).promise;
+                // Set verbosity to 0 to suppress warnings (like "TT: undefined function: 32")
+                const doc = await pdfjsLib.getDocument({ 
+                    data: e.target.result as ArrayBuffer,
+                    verbosity: 0 
+                }).promise;
+                
                 const images: string[] = [];
                 // Only render first few pages for preview to save memory
                 const pagesToRender = Math.min(doc.numPages, 3);
@@ -263,7 +268,12 @@ export const extractTextFromPdf = async (file: File): Promise<string> => {
     const pdfjsLib = (window as any).pdfjsLib;
     if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
     
-    const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    // Set verbosity to 0
+    const doc = await pdfjsLib.getDocument({ 
+        data: await file.arrayBuffer(),
+        verbosity: 0 
+    }).promise;
+    
     let fullText = "";
     for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
@@ -280,7 +290,12 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
     const pdfjsLib = (window as any).pdfjsLib;
     if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
 
-    const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    // Set verbosity to 0
+    const doc = await pdfjsLib.getDocument({ 
+        data: await file.arrayBuffer(),
+        verbosity: 0 
+    }).promise;
+    
     const numPages = doc.numPages;
     // High Quality Scale for Cropping
     const SCALE = 2.0; 
@@ -489,16 +504,22 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
                 });
             }
+            
+            // WRAP IMAGE IN HTML TAG
+            const imgData = await processAnchorCrop(anchor, i);
             currentQObj = {
                 id: `q-${anchor.id}-${Date.now()}`,
-                questionText: await processAnchorCrop(anchor, i)
+                questionText: `<img src="${imgData}" alt="Soal" style="max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 10px 0;" />`
             };
             currentOptions = [];
         } else if (anchor.type === 'OPTION') {
             if (currentQObj.id) {
                 currentOptions.push({
                     id: anchor.id,
-                    promise: processAnchorCrop(anchor, i)
+                    // WRAP IMAGE IN HTML TAG
+                    promise: processAnchorCrop(anchor, i).then(imgData => {
+                        return `<img src="${imgData}" alt="Opsi" style="max-width: 100%; height: auto; border-radius: 6px; display: block;" />`;
+                    })
                 });
             }
         }
