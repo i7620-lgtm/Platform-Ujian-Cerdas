@@ -7,7 +7,7 @@ interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[]) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
@@ -15,6 +15,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [warningMsg, setWarningMsg] = useState('');
+    const [userLocation, setUserLocation] = useState<string>('');
 
     // Refs untuk akses data terbaru di dalam event listener tanpa stale closures
     const answersRef = useRef(answers);
@@ -24,6 +25,25 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // Sync Ref dengan State
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
+
+    // 7. FITUR: LACAK LOKASI (Track Location)
+    useEffect(() => {
+        if (exam.config.trackLocation && student.class !== 'PREVIEW') {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const loc = `${position.coords.latitude}, ${position.coords.longitude}`;
+                        setUserLocation(loc);
+                    },
+                    (error) => {
+                        console.warn("Geolocation denied or failed:", error);
+                        logRef.current.push(`[System] Gagal mengambil lokasi: ${error.message}`);
+                    },
+                    { enableHighAccuracy: true }
+                );
+            }
+        }
+    }, [exam.config.trackLocation, student.class]);
 
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') {
@@ -78,7 +98,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     alert("PELANGGARAN TERDETEKSI!\n\nAnda meninggalkan halaman ujian saat mode keamanan tinggi aktif.\nSistem akan mengunci jawaban Anda dan menghentikan ujian ini secara otomatis.");
                     
                     // Eksekusi Force Submit
-                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current);
+                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current, userLocation);
                 } else {
                     // Hanya Warning
                     setWarningMsg("PERINGATAN: Dilarang meninggalkan halaman ujian! Aktivitas Anda tercatat.");
@@ -91,7 +111,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [exam.config.detectBehavior, exam.config.continueWithPermission, student.class]);
+    }, [exam.config.detectBehavior, exam.config.continueWithPermission, student.class, userLocation]);
 
 
     const handleAnswer = (qId: string, val: string) => {
@@ -128,7 +148,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
         if (!auto && !confirm("Kumpulkan semua jawaban sekarang?")) return;
         setIsSubmitting(true);
-        await onSubmit(answers, timeLeft, status, logRef.current);
+        await onSubmit(answers, timeLeft, status, logRef.current, userLocation);
     };
 
     const formatTime = (s: number) => {
