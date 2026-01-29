@@ -12,51 +12,8 @@
     <!-- KaTeX for Math Styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-            colors: {
-              brand: {
-                50: '#f5f7ff',
-                100: '#ebf0fe',
-                200: '#dae3fd',
-                500: '#6366f1',
-                600: '#4f46e5',
-                700: '#4338ca',
-                900: '#1e1b4b',
-              },
-              primary: '#4f46e5',
-              'primary-focus': '#4338ca',
-              secondary: '#10b981',
-              neutral: '#0f172a',
-              surface: '#FDFEFF',
-            },
-            animation: {
-              'fast-fade': 'fadeIn 0.2s ease-out',
-              'gentle-slide': 'slideUp 0.3s ease-out',
-            },
-            keyframes: {
-              fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
-              slideUp: { '0%': { transform: 'translateY(10px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } },
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      body { -webkit-tap-highlight-color: transparent; }
-      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-      .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
-      
-      /* KaTeX rendering optimization */
-      .math-visual { display: inline-block; vertical-align: middle; }
-    </style>
+    
     <script type="importmap">
 {
   "imports": {
@@ -64,7 +21,9 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
     "react/": "https://aistudiocdn.com/react@^18.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
-    "@vercel/node": "https://esm.sh/@vercel/node@^5.5.28"
+    "@vercel/node": "https://esm.sh/@vercel/node@^5.5.28",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
