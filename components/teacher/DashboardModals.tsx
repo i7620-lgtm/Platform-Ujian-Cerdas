@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon } from '../Icons';
@@ -135,6 +135,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                             {!isReadOnly && displayExam.config.enablePublicStream && (
+                                <button 
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/?live=${displayExam.code}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert("Link monitoring berhasil disalin!");
+                                    }}
+                                    className="px-3 py-2 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2"
+                                >
+                                    <ShareIcon className="w-4 h-4"/> Salin Link
+                                </button>
+                             )}
                              {!isReadOnly && <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all" title="Tambah Waktu"><PlusCircleIcon className="w-6 h-6"/></button>}
                              <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
