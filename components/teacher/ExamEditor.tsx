@@ -704,7 +704,11 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             return q;
         }));
     };
-    const handleDeleteQuestion = (id: string) => setQuestions(prev => prev.filter(q => q.id !== id));
+    const handleDeleteQuestion = (id: string) => {
+        if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) {
+            setQuestions(prev => prev.filter(q => q.id !== id));
+        }
+    };
     
     const createNewQuestion = (type: QuestionType): Question => {
         const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined };
@@ -886,14 +890,21 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         return (
                         <React.Fragment key={q.id}>
                             <div id={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 group transition-all duration-300 hover:shadow-md relative overflow-visible">
-                                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <div className="absolute top-4 right-4 flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
                                          <div className="relative inline-block bg-white rounded-lg shadow-sm">
                                             <select value={q.questionType} onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)} className="appearance-none bg-gray-50 border border-gray-200 text-gray-600 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
                                                 <option value="MULTIPLE_CHOICE">Pilihan Ganda</option><option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option><option value="TRUE_FALSE">Benar / Salah</option><option value="MATCHING">Menjodohkan</option><option value="ESSAY">Esai / Uraian</option><option value="FILL_IN_THE_BLANK">Isian Singkat</option><option value="INFO">Info / Teks</option>
                                             </select>
                                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"><svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
                                         </div>
-                                        <button onClick={() => handleDeleteQuestion(q.id)} className="p-1.5 bg-white text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 border border-gray-200 transition-colors shadow-sm" title="Hapus Soal"><TrashIcon className="w-4 h-4" /></button>
+                                        <button 
+                                            type="button" 
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteQuestion(q.id); }} 
+                                            className="p-1.5 bg-white text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 border border-gray-200 transition-colors shadow-sm" 
+                                            title="Hapus Soal"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
                                     </div>
                                     <div className="p-6 md:p-8">
                                         <div className="flex items-start gap-4 md:gap-6">
@@ -907,7 +918,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                             <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${q.correctAnswer === option ? 'bg-emerald-50/50' : ''}`}>
                                                                 <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}><div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${q.correctAnswer === option ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white group-hover/opt:border-emerald-300'}`}>{q.correctAnswer === option && <div className="w-2 h-2 bg-white rounded-full" />}</div></div>
                                                                 <div className="flex-1"><WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" /></div>
-                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
+                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
+                                                                    <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
@@ -922,7 +935,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isChecked ? 'bg-emerald-50/50' : ''}`}>
                                                                     <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isChecked)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white'}`}>{isChecked && <CheckIcon className="w-3.5 h-3.5 text-white" />}</div></div>
                                                                     <div className="flex-1"><WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" /></div>
-                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button onClick={() => handleDeleteOption(q.id, i)} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
+                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
+                                                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
+                                                                    </div>
                                                                 </div>
                                                         )})}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
@@ -934,7 +949,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                             <div key={i} className="flex items-center gap-4 bg-white border-b border-gray-50 p-3 last:border-0 group/row">
                                                                 <div className="flex-1"><input type="text" value={row.text} onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2 bg-gray-50 rounded hover:bg-white transition-colors placeholder-gray-300" placeholder="Pernyataan..." /></div>
                                                                 <div className="flex gap-2"><button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${row.answer ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-300 border-gray-200'}`}>Benar</button><button onClick={() => handleTrueFalseRowAnswerChange(q.id, i, false)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${!row.answer ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-gray-300 border-gray-200'}`}>Salah</button></div>
-                                                                <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity"><TrashIcon className="w-4 h-4"/></button>
+                                                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteTrueFalseRow(q.id, i); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity"><TrashIcon className="w-4 h-4"/></button>
                                                             </div>
                                                         ))}
                                                         <div className="p-2 bg-gray-50 text-center"><button onClick={() => handleAddTrueFalseRow(q.id)} className="text-xs font-bold text-primary hover:underline">+ Tambah Baris</button></div>
@@ -947,7 +962,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                 <div className="flex-1 bg-white border border-gray-200 rounded-lg p-1 focus-within:ring-1 focus-within:ring-primary"><input type="text" value={pair.left} onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2" placeholder="Item Kiri" /></div>
                                                                 <div className="text-gray-300">➜</div>
                                                                 <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-lg p-1 focus-within:ring-1 focus-within:ring-emerald-400"><input type="text" value={pair.right} onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)} className="w-full text-sm border-0 focus:ring-0 p-2 bg-transparent text-emerald-800" placeholder="Pasangan Kanan" /></div>
-                                                                <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/match:opacity-100"><TrashIcon className="w-4 h-4"/></button>
+                                                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteMatchingPair(q.id, i); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/match:opacity-100"><TrashIcon className="w-4 h-4"/></button>
                                                             </div>
                                                         ))}
                                                         <button onClick={() => handleAddMatchingPair(q.id)} className="mt-2 text-xs font-bold text-primary hover:underline">+ Tambah Pasangan</button>
