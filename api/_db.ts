@@ -1,4 +1,4 @@
- 
+
 // api/_db.ts - Jembatan Stabil ke Google Apps Script
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
@@ -69,7 +69,8 @@ export default {
     },
 
     async deleteExam(userId: string, code: string) {
-        return { success: true };
+        // Mengaktifkan pemanggilan script sebenarnya untuk menghapus data di GAS
+        return callScript('deleteExam', { code, userId });
     },
 
     // UPDATE: Support Sharding Params
