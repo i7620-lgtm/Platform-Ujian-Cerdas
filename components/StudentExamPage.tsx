@@ -1,18 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import type { Exam, Student, Result, Question } from '../types';
-import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon } from './Icons';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import type { Exam, Student, Result, Question, ResultStatus } from '../types';
+import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[]) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onUpdate }) => {
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [warningMsg, setWarningMsg] = useState('');
+
+    // Refs untuk akses data terbaru di dalam event listener tanpa stale closures
+    const answersRef = useRef(answers);
+    const logRef = useRef<string[]>(initialData?.activityLog || []);
+    const isSubmittingRef = useRef(false);
+
+    // Sync Ref dengan State
+    useEffect(() => { answersRef.current = answers; }, [answers]);
+    useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') {
@@ -30,18 +41,58 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     };
 
     const [timeLeft, setTimeLeft] = useState(calculateTimeRemaining());
+    const timeLeftRef = useRef(timeLeft);
+    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
+    // Timer Logic
     useEffect(() => {
         const timer = setInterval(() => {
             const remaining = calculateTimeRemaining();
             setTimeLeft(remaining);
             if (remaining <= 0 && student.class !== 'PREVIEW') {
                 clearInterval(timer);
-                handleSubmit(true);
+                handleSubmit(true, 'completed');
             }
         }, 1000);
         return () => clearInterval(timer);
     }, [deadline, student.class]);
+
+    // --- BEHAVIOR DETECTION LOGIC ---
+    useEffect(() => {
+        if (student.class === 'PREVIEW') return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden && exam.config.detectBehavior && !isSubmittingRef.current) {
+                // 1. Log Aktivitas
+                const timestamp = new Date().toLocaleTimeString('id-ID');
+                const logEntry = `[${timestamp}] Meninggalkan halaman/tab`;
+                logRef.current.push(logEntry);
+
+                // 2. Cek Konfigurasi Keamanan
+                if (exam.config.continueWithPermission) {
+                    // KONDISI FORCE CLOSE: detectBehavior=TRUE && continueWithPermission=TRUE
+                    setIsSubmitting(true);
+                    isSubmittingRef.current = true;
+                    
+                    // Beri alert blocking agar user sadar
+                    alert("PELANGGARAN TERDETEKSI!\n\nAnda meninggalkan halaman ujian saat mode keamanan tinggi aktif.\nSistem akan mengunci jawaban Anda dan menghentikan ujian ini secara otomatis.");
+                    
+                    // Eksekusi Force Submit
+                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current);
+                } else {
+                    // Hanya Warning
+                    setWarningMsg("PERINGATAN: Dilarang meninggalkan halaman ujian! Aktivitas Anda tercatat.");
+                    setTimeout(() => setWarningMsg(''), 5000);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [exam.config.detectBehavior, exam.config.continueWithPermission, student.class]);
+
 
     const handleAnswer = (qId: string, val: string) => {
         const newAnswers = { ...answers, [qId]: val };
@@ -74,10 +125,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         handleAnswer(qId, JSON.stringify(current));
     };
 
-    const handleSubmit = async (auto = false) => {
+    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
         if (!auto && !confirm("Kumpulkan semua jawaban sekarang?")) return;
         setIsSubmitting(true);
-        await onSubmit(answers, timeLeft);
+        await onSubmit(answers, timeLeft, status, logRef.current);
     };
 
     const formatTime = (s: number) => {
@@ -148,6 +199,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     <div className="h-full bg-brand-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
                 </div>
             </header>
+
+            {warningMsg && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 animate-slide-in-up">
+                    <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                    <span className="text-xs font-bold">{warningMsg}</span>
+                </div>
+            )}
 
             <main className="max-w-2xl mx-auto px-6 pt-12 space-y-16">
                 {exam.questions.map((q, idx) => {
@@ -311,7 +369,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     <div className="h-8 w-px bg-slate-200/50"></div>
                     
                     <button 
-                        onClick={() => handleSubmit(false)}
+                        onClick={() => handleSubmit(false, 'completed')}
                         disabled={isSubmitting}
                         className="bg-slate-900 text-white px-10 py-3.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-black hover:shadow-2xl transition-all flex items-center gap-3 disabled:opacity-50"
                     >
