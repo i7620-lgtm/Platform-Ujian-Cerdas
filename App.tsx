@@ -1,15 +1,16 @@
- 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
+import { OngoingExamModal } from './components/teacher/DashboardModals'; // Import Modal
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, WifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -36,8 +37,6 @@ const App: React.FC = () => {
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
       // 3. FITUR: IZINKAN KERJAKAN ULANG (Allow Retakes)
-      // Jika status completed DAN tidak boleh retake, baru tampilkan hasil.
-      // Jika allowRetakes = true, kita abaikan hasil lama (anggap attempt baru).
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
@@ -46,7 +45,6 @@ const App: React.FC = () => {
               setView('STUDENT_RESULT');
               return;
           }
-          // Jika allowRetakes == true, biarkan flow lanjut ke inisialisasi ujian baru di bawah
       }
 
       // Jika status force_closed, langsung ke halaman hasil (terkunci), kecuali preview
@@ -61,11 +59,9 @@ const App: React.FC = () => {
       setCurrentExam(exam);
       setCurrentStudent(student);
       
-      // Resume logic: hanya jika status 'in_progress'
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
       } else if (!isPreview) {
-        // Inisialisasi attempt baru
         await storageService.submitExamResult({
           student,
           examCode,
@@ -85,9 +81,11 @@ const App: React.FC = () => {
     } finally { setIsSyncing(false); }
   }, []);
 
-  // Effect to handle URL parameters (for Preview Mode)
+  // Effect to handle URL parameters (Preview & Live Monitor)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // Handle Preview
     const previewCode = params.get('preview');
     if (previewCode) {
         const dummyStudent: Student = {
@@ -97,8 +95,31 @@ const App: React.FC = () => {
             studentId: 'preview_mode_' + Date.now()
         };
         handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
-        // Clear param to prevent re-triggering on manual refresh
         window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+    }
+
+    // Handle Live Monitor Link (?live=CODE)
+    const liveCode = params.get('live');
+    if (liveCode) {
+        setIsSyncing(true);
+        // Kita gunakan getExamForStudent dengan flag preview=true untuk mem-bypass cek draft,
+        // lalu validasi manual apakah public stream aktif.
+        storageService.getExamForStudent(liveCode.toUpperCase(), true)
+            .then(exam => {
+                if (exam && exam.config.enablePublicStream) {
+                    setCurrentExam(exam);
+                    setView('LIVE_MONITOR');
+                } else {
+                    alert("Akses Pantauan Ditolak.\n\nKode ujian tidak ditemukan atau fitur 'Pantauan Orang Tua' belum diaktifkan oleh guru.");
+                    window.history.replaceState({}, '', '/');
+                }
+            })
+            .catch(() => {
+                alert("Gagal memuat data ujian.");
+                window.history.replaceState({}, '', '/');
+            })
+            .finally(() => setIsSyncing(false));
     }
   }, [handleStudentLoginSuccess]);
 
@@ -139,11 +160,9 @@ const App: React.FC = () => {
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  // Updated Signature to support status and logs
   const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string) => {
     if (!currentExam || !currentStudent) return;
     
-    // In preview mode, just go back home after finishing
     if (currentStudent.class === 'PREVIEW') {
         alert("Mode Pratinjau: Jawaban Anda tidak disimpan di server.");
         resetToHome();
@@ -155,9 +174,9 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        status, // Use passed status (completed or force_closed)
-        activityLog, // Save activity logs
-        location, // Save Location
+        status, 
+        activityLog, 
+        location, 
         timestamp: Date.now()
     });
     setStudentResult(res);
@@ -171,6 +190,7 @@ const App: React.FC = () => {
     setCurrentStudent(null); 
     setStudentResult(null); 
     setResumedResult(null);
+    window.history.replaceState({}, '', '/');
   };
 
   return (
@@ -277,6 +297,15 @@ const App: React.FC = () => {
                 result={studentResult} 
                 exam={currentExam} 
                 onFinish={resetToHome} 
+            />
+        )}
+
+        {view === 'LIVE_MONITOR' && currentExam && (
+            <OngoingExamModal 
+                exam={currentExam}
+                onClose={resetToHome}
+                onAllowContinuation={()=>{}}
+                isReadOnly={true}
             />
         )}
     </div>
