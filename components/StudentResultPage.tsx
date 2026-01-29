@@ -1,6 +1,7 @@
+
 import React from 'react';
 import type { Result, ExamConfig } from '../types';
-import { CheckCircleIcon, WifiIcon, ClockIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon } from './Icons';
 
 interface StudentResultPageProps {
   result: Result;
@@ -10,6 +11,65 @@ interface StudentResultPageProps {
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, config, onFinish }) => {
     
+    // TAMPILAN KHUSUS: FORCE CLOSED (KECURANGAN/PELANGGARAN)
+    if (result.status === 'force_closed') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#FFF1F2] p-6 font-sans">
+                <div className="w-full max-w-sm text-center animate-gentle-slide">
+                    <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-rose-200/50 border border-white relative overflow-hidden">
+                        {/* Red Accent Bar */}
+                        <div className="absolute top-0 left-0 w-full h-2 bg-rose-500"></div>
+
+                        <div className="mb-8 mt-2">
+                            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-rose-50 text-rose-500 mb-6 shadow-sm ring-4 ring-rose-50/50">
+                                <LockClosedIcon className="w-12 h-12" />
+                            </div>
+                            <h1 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Akses Terkunci</h1>
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
+                                Sistem mendeteksi aktivitas yang melanggar aturan ujian (seperti berpindah tab atau keluar aplikasi).
+                            </p>
+                        </div>
+
+                        <div className="bg-rose-50 p-5 rounded-2xl mb-8 border border-rose-100 text-left relative overflow-hidden">
+                            <div className="absolute -right-4 -top-4 text-rose-100/50 transform rotate-12">
+                                <ExclamationTriangleIcon className="w-24 h-24" />
+                            </div>
+                            <div className="relative z-10 flex items-start gap-3">
+                                <ExclamationTriangleIcon className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-1">Status: Ditangguhkan</p>
+                                    <p className="text-xs text-rose-600/80 leading-relaxed font-medium">
+                                        Jawaban Anda sejauh ini telah diamankan, namun Anda tidak dapat melanjutkan pengerjaan sendiri.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                             <p className="text-xs text-slate-400 font-medium border-t border-slate-50 pt-6">
+                                Silakan lapor ke <span className="text-slate-700 font-bold">Guru / Pengawas</span> untuk membuka kembali akses ujian Anda.
+                            </p>
+                            
+                            <button
+                                onClick={onFinish}
+                                className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all shadow-lg hover:shadow-xl active:scale-[0.98] text-xs uppercase tracking-widest"
+                            >
+                                Kembali ke Halaman Utama
+                            </button>
+                        </div>
+
+                        <div className="mt-8 flex justify-center opacity-40">
+                             <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
+                                ID: {result.student.studentId.split('_')[0]} • {new Date().toLocaleTimeString('id-ID')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // TAMPILAN NORMAL: SELESAI UJIAN
     const showResult = config ? config.showResultToStudent : true;
 
     return (
