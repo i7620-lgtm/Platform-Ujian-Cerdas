@@ -405,6 +405,7 @@ export const DraftsView: React.FC<DraftsViewProps> = ({ exams, onContinueDraft, 
                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full">
                             {/* Delete Button */}
                             <button 
+                                type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onDeleteDraft(exam);
@@ -561,8 +562,9 @@ export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, 
                             
                             <div className="absolute top-4 right-4 z-10">
                                 <button 
+                                    type="button"
                                     onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }}
-                                    className="p-2 bg-white text-gray-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-transparent hover:border-gray-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                                    className="p-2 bg-white text-gray-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-transparent hover:border-gray-100 transition-all shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                                     title="Gunakan Kembali Soal"
                                 >
                                     <DocumentDuplicateIcon className="w-4 h-4" />
@@ -723,8 +725,9 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                         <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-gray-300 group relative">
                             {/* Delete Button - Fixed top-right in finished view */}
                             <button 
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); onDeleteExam(exam); }}
-                                className="absolute -top-2 -right-2 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10 opacity-0 group-hover:opacity-100"
+                                className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                                 title="Hapus Data Ujian & Hasil"
                             >
                                 <TrashIcon className="w-4 h-4" />
