@@ -12,17 +12,52 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = 2, delay
     }
 }
 
+// Helper shuffle array (Fisher-Yates)
+const shuffleArray = <T>(array: T[]): T[] => {
+    const newArr = [...array];
+    for (let i = newArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+};
+
 const sanitizeExamForStudent = (exam: Exam): Exam => {
-    const sanitizedQuestions = exam.questions.map(q => {
-        const { correctAnswer, trueFalseRows, matchingPairs, ...rest } = q;
-        const sanitizedQ = { ...rest } as Question;
+    let questionsToProcess = [...exam.questions];
+
+    // 1. FITUR: ACAK SOAL (Shuffle Questions)
+    if (exam.config.shuffleQuestions) {
+        // Pisahkan soal INFO (bacaan) jika perlu, atau acak semua.
+        // Strategi aman: Acak semua kecuali INFO jika INFO terikat (logic kompleks), 
+        // tapi untuk sekarang kita acak semua non-INFO, lalu sisipkan INFO jika perlu. 
+        // Simplifikasi: Shuffle semua array questions.
+        questionsToProcess = shuffleArray(questionsToProcess);
+    }
+
+    const sanitizedQuestions = questionsToProcess.map(q => {
+        const { correctAnswer, trueFalseRows, matchingPairs, options, ...rest } = q;
+        const sanitizedQ = { ...rest, options: options ? [...options] : undefined } as Question;
+
+        // 2. FITUR: ACAK OPSI (Shuffle Answers)
+        if (exam.config.shuffleAnswers) {
+            if (sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                if (sanitizedQ.options && sanitizedQ.options.length > 0) {
+                    sanitizedQ.options = shuffleArray(sanitizedQ.options);
+                }
+            }
+        }
+
         if (trueFalseRows) sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
+        
         if (matchingPairs && Array.isArray(matchingPairs)) {
+            // Matching pairs selalu diacak sisi kanannya agar menjadi soal menjodohkan yang valid
             const rights = matchingPairs.map(p => p.right).sort(() => Math.random() - 0.5);
             sanitizedQ.matchingPairs = matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
         }
+        
         return sanitizedQ;
     });
+
     return { ...exam, questions: sanitizedQuestions };
 };
 
@@ -81,6 +116,7 @@ class StorageService {
               }
           }
       }
+      // Sanitasi (termasuk pengacakan) dilakukan SETIAP KALI load untuk keamanan
       return exam ? sanitizeExamForStudent(exam) : null;
   }
 
