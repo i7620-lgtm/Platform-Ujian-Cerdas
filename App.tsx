@@ -32,17 +32,24 @@ const App: React.FC = () => {
         return; 
       }
       
+      // Ambil hasil sebelumnya (jika ada)
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
+      // 3. FITUR: IZINKAN KERJAKAN ULANG (Allow Retakes)
+      // Jika status completed DAN tidak boleh retake, baru tampilkan hasil.
+      // Jika allowRetakes = true, kita abaikan hasil lama (anggap attempt baru).
       if (res && res.status === 'completed' && !isPreview) {
-          setCurrentExam(exam);
-          setCurrentStudent(student);
-          setStudentResult(res);
-          setView('STUDENT_RESULT');
-          return;
+          if (!exam.config.allowRetakes) {
+              setCurrentExam(exam);
+              setCurrentStudent(student);
+              setStudentResult(res);
+              setView('STUDENT_RESULT');
+              return;
+          }
+          // Jika allowRetakes == true, biarkan flow lanjut ke inisialisasi ujian baru di bawah
       }
 
-      // Jika status force_closed, langsung ke halaman hasil (terkunci)
+      // Jika status force_closed, langsung ke halaman hasil (terkunci), kecuali preview
       if (res && res.status === 'force_closed' && !isPreview) {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -54,9 +61,11 @@ const App: React.FC = () => {
       setCurrentExam(exam);
       setCurrentStudent(student);
       
+      // Resume logic: hanya jika status 'in_progress'
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
       } else if (!isPreview) {
+        // Inisialisasi attempt baru
         await storageService.submitExamResult({
           student,
           examCode,
@@ -131,7 +140,7 @@ const App: React.FC = () => {
   }, [teacherProfile]);
 
   // Updated Signature to support status and logs
-  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = []) => {
+  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string) => {
     if (!currentExam || !currentStudent) return;
     
     // In preview mode, just go back home after finishing
@@ -148,6 +157,7 @@ const App: React.FC = () => {
         answers,
         status, // Use passed status (completed or force_closed)
         activityLog, // Save activity logs
+        location, // Save Location
         timestamp: Date.now()
     });
     setStudentResult(res);
@@ -263,7 +273,11 @@ const App: React.FC = () => {
         )}
         
         {view === 'STUDENT_RESULT' && studentResult && currentExam && (
-            <StudentResultPage result={studentResult} config={currentExam.config} onFinish={resetToHome} />
+            <StudentResultPage 
+                result={studentResult} 
+                exam={currentExam} 
+                onFinish={resetToHome} 
+            />
         )}
     </div>
   );
