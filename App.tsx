@@ -1,10 +1,11 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
-import type { Exam, Student, Result, TeacherProfile } from './types';
+import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, WifiIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
@@ -34,6 +35,15 @@ const App: React.FC = () => {
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
       if (res && res.status === 'completed' && !isPreview) {
+          setCurrentExam(exam);
+          setCurrentStudent(student);
+          setStudentResult(res);
+          setView('STUDENT_RESULT');
+          return;
+      }
+
+      // Jika status force_closed, langsung ke halaman hasil (terkunci)
+      if (res && res.status === 'force_closed' && !isPreview) {
           setCurrentExam(exam);
           setCurrentStudent(student);
           setStudentResult(res);
@@ -120,7 +130,8 @@ const App: React.FC = () => {
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number) => {
+  // Updated Signature to support status and logs
+  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = []) => {
     if (!currentExam || !currentStudent) return;
     
     // In preview mode, just go back home after finishing
@@ -135,7 +146,8 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
-        status: 'completed',
+        status, // Use passed status (completed or force_closed)
+        activityLog, // Save activity logs
         timestamp: Date.now()
     });
     setStudentResult(res);
