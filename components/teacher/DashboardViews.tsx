@@ -15,7 +15,8 @@ import {
     TrashIcon,
     DocumentDuplicateIcon,
     EyeIcon,
-    XMarkIcon
+    XMarkIcon,
+    ShareIcon // Import ShareIcon
 } from '../Icons';
 
 // --- REMAINING TIME COMPONENT (MODERN & ELEGANT) ---
@@ -560,7 +561,22 @@ export const OngoingExamsView: React.FC<OngoingExamsProps> = ({ exams, results, 
                         return (
                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-xl hover:shadow-emerald-50 hover:border-emerald-300 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
                             
-                            <div className="absolute top-4 right-4 z-10">
+                            <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                {exam.config.enablePublicStream && (
+                                    <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const url = `${window.location.origin}/?live=${exam.code}`;
+                                            navigator.clipboard.writeText(url);
+                                            alert("Link Pantauan Orang Tua disalin!");
+                                        }}
+                                        className="p-2 bg-white text-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg border border-transparent hover:border-indigo-100 transition-all shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                        title="Bagikan Link Pantauan"
+                                    >
+                                        <ShareIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                                 <button 
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }}
