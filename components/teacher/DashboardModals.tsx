@@ -147,7 +147,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                         <ShareIcon className="w-4 h-4"/> Akses Orang Tua
                                     </button>
                                 )}
-                                {!isReadOnly && <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all" title="Tambah Waktu"><PlusCircleIcon className="w-6 h-6"/></button>}
+                                {!isReadOnly && (
+                                    <button 
+                                        onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} 
+                                        className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
+                                    >
+                                        <PlusCircleIcon className="w-4 h-4"/> Tambah Waktu
+                                    </button>
+                                )}
                                 <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                             </div>
                         </div>
