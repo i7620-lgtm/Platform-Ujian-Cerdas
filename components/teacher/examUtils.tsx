@@ -489,16 +489,22 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
                 });
             }
+            
+            // WRAP IMAGE IN HTML TAG
+            const imgData = await processAnchorCrop(anchor, i);
             currentQObj = {
                 id: `q-${anchor.id}-${Date.now()}`,
-                questionText: await processAnchorCrop(anchor, i)
+                questionText: `<img src="${imgData}" alt="Soal" style="max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 10px 0;" />`
             };
             currentOptions = [];
         } else if (anchor.type === 'OPTION') {
             if (currentQObj.id) {
                 currentOptions.push({
                     id: anchor.id,
-                    promise: processAnchorCrop(anchor, i)
+                    // WRAP IMAGE IN HTML TAG
+                    promise: processAnchorCrop(anchor, i).then(imgData => {
+                        return `<img src="${imgData}" alt="Opsi" style="max-width: 100%; height: auto; border-radius: 6px; display: block;" />`;
+                    })
                 });
             }
         }
