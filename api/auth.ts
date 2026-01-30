@@ -16,6 +16,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (action === 'login') {
             const { username, password } = req.body;
+            // Logging untuk debugging (jangan log password di production)
+            console.log(`Attempting login for: ${username}`);
+            
             const user = await db.loginUser(username, password);
             if (user) {
                 return res.status(200).json({ success: true, ...user });
@@ -32,11 +35,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             try {
-                // Coba daftar user baru
                 const user = await db.registerUser({ username, password: password || '', fullName, school });
                 return res.status(200).json({ success: true, ...user });
             } catch (e: any) {
-                // CERDAS: Jika error karena duplikasi, langsung cari usernya dan kembalikan sebagai login sukses
                 const errMsg = e.message || '';
                 if (errMsg.includes('Username sudah terdaftar') || errMsg.includes('exists') || errMsg.includes('dipakai')) {
                     const existingUser = await db.findUser(username);
@@ -44,6 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         return res.status(200).json({ success: true, ...existingUser });
                     }
                 }
+                console.error("Register Error:", e);
                 return res.status(400).json({ success: false, error: errMsg });
             }
         }
@@ -62,7 +64,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          avatar: payload.picture
                      });
                  } else {
-                     // Jika tidak ada di DB, arahkan ke registrasi dengan data Google yang sudah ada
                      return res.status(200).json({
                          success: false,
                          requireRegistration: true,
@@ -98,6 +99,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Aksi tidak didukung.' });
 
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        console.error("API Auth Crash:", error); // Penting untuk Vercel Logs
+        // Mengembalikan JSON error, BUKAN membiarkan crash (yang menghasilkan HTML 500)
+        return res.status(500).json({ success: false, error: error.message || "Internal Server Error" });
     }
 }
