@@ -1,4 +1,4 @@
- 
+  
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
