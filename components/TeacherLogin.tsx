@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
+import { storageService } from '../services/storage';
 
 declare global {
     interface Window {
@@ -13,132 +15,42 @@ interface TeacherLoginProps {
   onBack: () => void;
 }
 
-// Gunakan Client ID dari env atau string kosong
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
-
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isGoogleRegister, setIsGoogleRegister] = useState(false);
-  
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [school, setSchool] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const isInitialized = useRef(false);
-
-  useEffect(() => {
-    // Jika Client ID tidak ada, berikan peringatan di konsol tapi jangan hentikan render UI
-    if (!GOOGLE_CLIENT_ID) {
-        console.warn("Google Client ID belum dikonfigurasi. Tombol login Google mungkin tidak muncul.");
-    }
-
-    const initGoogle = () => {
-        if (window.google?.accounts?.id && !isInitialized.current && GOOGLE_CLIENT_ID) {
-            try {
-                window.google.accounts.id.initialize({
-                    client_id: GOOGLE_CLIENT_ID,
-                    callback: handleGoogleCallback,
-                    auto_select: false,
-                });
-                isInitialized.current = true;
-                renderButton();
-            } catch (e) { console.error("Google Init Error:", e); }
-        } else if (isInitialized.current) {
-            renderButton();
-        }
-    };
-
-    const renderButton = () => {
-        const btnDiv = document.getElementById("googleSignInBtn");
-        if (btnDiv && window.google?.accounts?.id) {
-            window.google.accounts.id.renderButton(btnDiv, { 
-                theme: "outline", 
-                size: "large", 
-                text: "signin_with", 
-                shape: "pill", 
-                width: 360 // Paksa lebar agar tombol terlihat
-            });
-        }
-    };
-
-    const timer = setInterval(() => { 
-        if (window.google) { 
-            initGoogle(); 
-            clearInterval(timer); 
-        } 
-    }, 500);
-
-    return () => clearInterval(timer);
-  }, [isRegistering, isGoogleRegister]); 
 
   const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); 
     
-    if ((isRegistering || isGoogleRegister) && (!fullName || !school)) {
+    if (isRegistering && (!fullName || !school)) {
         setError("Nama Lengkap dan Sekolah wajib diisi.");
         return;
     }
 
     setIsLoading(true);
-    const action = (isRegistering || isGoogleRegister) ? 'register' : 'login';
     
     try {
-        const res = await fetch('/api/auth', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, username, password: isGoogleRegister ? '' : password, fullName, school })
-        });
-        const data = await res.json();
-        
-        if (res.ok && data.success) {
-            onLoginSuccess({ 
-                id: data.id || data.username || username, 
-                fullName: data.fullName || fullName, 
-                accountType: data.accountType || 'guru', 
-                school: data.school || school, 
-                avatarUrl: avatarUrl || data.avatar 
-            });
-        } else { 
-            setError(data.error || 'Autentikasi gagal.'); 
+        if (isRegistering) {
+            const user = await storageService.registerUser({ username, password, fullName, school });
+            if (user) onLoginSuccess(user);
+            else setError("Gagal mendaftar.");
+        } else {
+            const user = await storageService.loginUser(username, password);
+            if (user) onLoginSuccess(user);
+            else setError("Username atau Password salah.");
         }
-    } catch (e) { 
-        setError('Kesalahan koneksi ke server.'); 
+    } catch (e: any) { 
+        setError(e.message || 'Terjadi kesalahan sistem.'); 
     } finally { 
         setIsLoading(false); 
     }
-  };
-
-  const handleGoogleCallback = (response: any) => {
-      setIsLoading(true);
-      fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'google-login', token: response.credential })
-      }).then(res => res.json()).then(data => {
-          if (data.success) {
-              onLoginSuccess({ 
-                  id: data.id || data.username, 
-                  fullName: data.fullName, 
-                  accountType: data.accountType, 
-                  school: data.school, 
-                  avatarUrl: data.avatar 
-              });
-          } else if (data.requireRegistration) {
-              setIsGoogleRegister(true);
-              setIsRegistering(true);
-              setUsername(data.googleData.email);
-              setFullName(data.googleData.name);
-              setAvatarUrl(data.googleData.picture);
-              setError('Silakan lengkapi nama sekolah untuk melanjutkan.');
-          } else {
-              setError(data.error || "Gagal login Google");
-          }
-      }).catch(() => setError("Error koneksi")).finally(() => setIsLoading(false));
   };
 
   return (
@@ -159,33 +71,14 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                 </div>
 
                 <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
-                    {isGoogleRegister ? 'Lengkapi Data' : (isRegistering ? 'Daftar Akun' : 'Selamat Datang')}
+                    {isRegistering ? 'Daftar Akun' : 'Selamat Datang'}
                 </h2>
                 <p className="text-slate-400 text-sm mb-10 font-medium">
-                    {isGoogleRegister 
-                        ? 'Satu langkah lagi untuk bergabung.' 
-                        : (isRegistering ? 'Daftar untuk mengelola ujian Anda.' : 'Masuk untuk mengelola ujian dan data siswa.')}
+                    {isRegistering ? 'Daftar untuk mengelola ujian Anda.' : 'Masuk untuk mengelola ujian dan data siswa.'}
                 </p>
                 
-                {!isRegistering && !isGoogleRegister && (
-                    <div className="space-y-6">
-                        {/* Container tombol Google */}
-                        <div id="googleSignInBtn" className="min-h-[48px] w-full flex justify-center overflow-hidden rounded-full">
-                            {!GOOGLE_CLIENT_ID && (
-                                <div className="text-[10px] text-amber-500 bg-amber-50 p-2 rounded-lg border border-amber-100">
-                                    Google Login tidak tersedia (Client ID kosong)
-                                </div>
-                            )}
-                        </div>
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                            <div className="relative flex justify-center text-xs uppercase"><span className="px-3 bg-white text-slate-300 font-bold tracking-widest">Atau Manual</span></div>
-                        </div>
-                    </div>
-                )}
-
                 <form onSubmit={handleAuthAction} className="space-y-5 text-left mt-6">
-                    {(isRegistering || isGoogleRegister) && (
+                    {isRegistering && (
                         <div className="space-y-5">
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
@@ -196,7 +89,6 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                                     className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                                     placeholder="Contoh: Budi Santoso, S.Pd"
                                     required 
-                                    disabled={isGoogleRegister}
                                 />
                             </div>
                             <div>
@@ -208,39 +100,36 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                                     className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                                     placeholder="Contoh: SMA Negeri 1 Jakarta"
                                     required 
-                                    autoFocus={isGoogleRegister}
                                 />
                             </div>
                         </div>
                     )}
 
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email / Username</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
                         <input 
                             type="text" 
                             value={username} 
                             onChange={(e) => setUsername(e.target.value)} 
                             className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
                             required 
-                            disabled={isLoading || isGoogleRegister} 
-                            placeholder="nama@email.com"
+                            disabled={isLoading} 
+                            placeholder="username_anda"
                         />
                     </div>
                     
-                    {!isGoogleRegister && (
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                            <input 
-                                type="password" 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
-                                required 
-                                disabled={isLoading} 
-                                placeholder="••••••••"
-                            />
-                        </div>
-                    )}
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                        <input 
+                            type="password" 
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all" 
+                            required 
+                            disabled={isLoading} 
+                            placeholder="••••••••"
+                        />
+                    </div>
                     
                     {error && (
                         <div className="text-rose-500 text-xs bg-rose-50 p-4 rounded-2xl text-center font-bold border border-rose-100 animate-shake">
@@ -251,21 +140,19 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                     <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white font-black text-sm uppercase tracking-widest py-4.5 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-50 mt-4 h-[56px] flex items-center justify-center">
                         {isLoading ? (
                             <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                        ) : (isGoogleRegister ? 'Selesaikan' : (isRegistering ? 'Daftar' : 'Masuk'))}
+                        ) : (isRegistering ? 'Daftar' : 'Masuk')}
                     </button>
                 </form>
 
-                {!isGoogleRegister && (
-                    <div className="mt-10 pt-6 border-t border-slate-50">
-                        <button 
-                            type="button"
-                            onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 tracking-wide uppercase transition-colors"
-                        >
-                            {isRegistering ? 'Sudah punya akun? Masuk' : 'Belum punya akun? Daftar Baru'}
-                        </button>
-                    </div>
-                )}
+                <div className="mt-10 pt-6 border-t border-slate-50">
+                    <button 
+                        type="button"
+                        onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 tracking-wide uppercase transition-colors"
+                    >
+                        {isRegistering ? 'Sudah punya akun? Masuk' : 'Belum punya akun? Daftar Baru'}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
