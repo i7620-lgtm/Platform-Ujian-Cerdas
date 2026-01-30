@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile } from '../types';
 
@@ -48,19 +47,17 @@ class StorageService {
   
   // --- AUTH METHODS ---
   async loginUser(username: string, password: string): Promise<TeacherProfile | null> {
-      // NOTE: In production, use supabase.auth.signInWithPassword. 
-      // Mapping to 'users' table to match existing schema request.
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
-        .eq('password', password) // Warning: Storing plain text passwords is not recommended for production
+        .eq('password', password)
         .single();
 
       if (error || !data) return null;
 
       return {
-          id: data.username, // Using username as ID to maintain compatibility
+          id: data.username,
           fullName: data.full_name,
           accountType: data.role as any,
           school: data.school
@@ -94,10 +91,7 @@ class StorageService {
 
   async getExams(headers: Record<string, string> = {}): Promise<Record<string, Exam>> {
     const requesterId = headers['x-user-id'];
-    // const requesterRole = headers['x-role']; 
     
-    // Simple filter: Only show exams created by this user
-    // In a real app, use RLS policies on Supabase
     const { data, error } = await supabase
         .from('exams')
         .select('*')
@@ -165,8 +159,6 @@ class StorageService {
   }
 
   async deleteExam(code: string, headers: Record<string, string> = {}): Promise<void> {
-      // Cascade delete results logic should be in SQL (ON DELETE CASCADE), 
-      // but we'll do it manually here just in case.
       await supabase.from('results').delete().eq('exam_code', code);
       await supabase.from('exams').delete().eq('code', code);
   }
@@ -179,9 +171,6 @@ class StorageService {
     if (examCode) query = query.eq('exam_code', examCode);
     if (className && className !== 'ALL') query = query.eq('class_name', className);
 
-    // If teacher is viewing, maybe filter by their school? 
-    // Ideally handled by RLS, but for now we assume they pass specific examCode
-    
     const { data, error } = await query;
     
     if (error) return [];
@@ -191,7 +180,7 @@ class StorageService {
             studentId: row.student_id,
             fullName: row.student_name,
             class: row.class_name,
-            absentNumber: '00' // Not stored in flat schema, harmless
+            absentNumber: '00' 
         },
         examCode: row.exam_code,
         answers: row.answers,
@@ -206,14 +195,6 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    // Calculate Score Here (Client Side) or Server Side?
-    // Since we are going serverless/direct, we calculate here or use a Postgres Function.
-    // For simplicity & speed, we calculate in Client (Secure enough for this context, 
-    // secure version would need Postgres Function).
-    
-    // Note: grading logic is ideally done in the component or a shared helper
-    // to keep this service pure storage. But for upsert we need the fields.
-    
     const { examCode, student, answers, status, activityLog, score, correctAnswers, totalQuestions, location } = resultPayload;
 
     const { data, error } = await supabase
@@ -273,7 +254,6 @@ class StorageService {
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      // FIX: Fetch first then update to avoid 'supabase.sql' error
       const { data } = await supabase
         .from('results')
         .select('activity_log')
@@ -294,13 +274,33 @@ class StorageService {
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      // This requires reading config, updating it, saving it.
-      // This might be tricky with concurrent edits, but okay for this scale.
       const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
       if (data && data.config) {
           const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
           await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
       }
+  }
+
+  // --- REALTIME BROADCAST METHODS (Hemat Bandwidth) ---
+  
+  // Mengirim update progress ringan ke guru tanpa menulis ke database
+  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number) {
+      const channel = supabase.channel(`exam-room-${examCode}`);
+      
+      // Kita tidak perlu subscribe penuh, cukup kirim pesan jika channel aktif atau buat baru sebentar
+      // Namun untuk efisiensi, sebaiknya komponen React yang me-manage subscription.
+      // Di sini kita gunakan send langsung via channel yang mungkin sudah ada atau stateless.
+      
+      await channel.send({
+          type: 'broadcast',
+          event: 'student_progress',
+          payload: {
+              studentId,
+              answeredCount,
+              totalQuestions,
+              timestamp: Date.now()
+          }
+      });
   }
   
   async syncData() { }
