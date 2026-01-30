@@ -1,4 +1,3 @@
- 
 import React, { useState } from 'react';
 import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
@@ -75,10 +74,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500`}>
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
                     {/* Minimal Top Decoration */}
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-orange-500"></div>
                     
                     <div className="mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 mb-6">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 mb-6">
                             <CheckCircleIcon className="w-8 h-8" />
                         </div>
                         <h1 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">Hasil Ujian</h1>
@@ -87,9 +86,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     
                     {showResult ? (
                         <div className="space-y-8">
-                            <div className="bg-brand-50/50 rounded-3xl p-8 border border-brand-100">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 mb-2">Nilai Akhir</p>
-                                <p className="text-7xl font-black text-brand-600 tracking-tighter">{result.score}</p>
+                            <div className="bg-orange-50/50 rounded-3xl p-8 border border-orange-100">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 mb-2">Nilai Akhir</p>
+                                <p className="text-7xl font-black text-orange-600 tracking-tighter">{result.score}</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -108,7 +107,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 <div className="pt-6 border-t border-slate-100">
                                     <button 
                                         onClick={() => setExpandedReview(!expandedReview)}
-                                        className="text-sm font-bold text-slate-600 hover:text-brand-600 flex items-center justify-center gap-2 mx-auto py-2 px-4 rounded-xl hover:bg-slate-50 transition-all"
+                                        className="text-sm font-bold text-slate-600 hover:text-orange-600 flex items-center justify-center gap-2 mx-auto py-2 px-4 rounded-xl hover:bg-slate-50 transition-all"
                                     >
                                         {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan Soal'}
                                         {expandedReview ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
