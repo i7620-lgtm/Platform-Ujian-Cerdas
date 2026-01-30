@@ -66,7 +66,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                             type="text"
                             value={examCode}
                             onChange={(e) => setExamCode(e.target.value)}
-                            className="block w-full px-4 py-5 bg-slate-50 border-2 border-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-xl outline-none transition-all text-center text-xl font-mono font-bold tracking-[0.2em] text-slate-900 uppercase placeholder:text-slate-300"
+                            className="block w-full px-4 py-5 bg-slate-50 border-2 border-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-xl outline-none transition-all text-center text-xl font-code font-bold tracking-[0.2em] text-slate-900 uppercase placeholder:text-slate-300"
                             placeholder="KODE"
                             autoComplete="off"
                         />
