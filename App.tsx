@@ -6,7 +6,7 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR';
@@ -190,62 +190,67 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 font-sans selection:bg-orange-100 selection:text-orange-900 overflow-x-hidden antialiased flex flex-col">
+    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col">
         
-        {/* Status Jaringan Minimalis - Pojok Kiri Bawah */}
-        <div className="fixed bottom-6 left-6 z-[100] pointer-events-none transition-all duration-500">
-            {!isOnline ? (
-                <div className="bg-rose-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 animate-pulse pointer-events-auto">
-                    <NoWifiIcon className="w-3 h-3"/> Offline
+        {/* Status Jaringan Minimalis & Elegan */}
+        <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
+            {!isOnline && (
+                <div className="bg-rose-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto ring-1 ring-white/20">
+                    <NoWifiIcon className="w-3.5 h-3.5"/> 
+                    <span>Offline Mode</span>
                 </div>
-            ) : isSyncing ? (
-                <div className="bg-white/90 backdrop-blur text-orange-600 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow border border-orange-100 flex items-center gap-2 pointer-events-auto">
-                    <div className="w-2.5 h-2.5 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
-                    Sync
+            )}
+            
+            {isSyncing && isOnline && (
+                <div className="bg-white/80 backdrop-blur-md text-indigo-600 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 flex items-center gap-2 pointer-events-auto">
+                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Menyimpan...</span>
                 </div>
-            ) : null}
+            )}
         </div>
         
         {view === 'SELECTOR' && (
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
-                <div className="absolute inset-0 z-0 opacity-30">
-                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-slate-100"></div>
+                {/* Background Decor */}
+                <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 blur-[100px]"></div>
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 blur-[100px]"></div>
                 </div>
                 
-                <div className="w-full max-w-md z-10 animate-gentle-slide">
-                    <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-8 md:p-12 text-center">
-                        <div className="inline-flex p-5 bg-white rounded-2xl shadow-sm mb-8 border border-slate-50">
-                            <LogoIcon className="w-12 h-12 text-slate-800" />
+                <div className="w-full max-w-sm z-10 animate-gentle-slide">
+                    <div className="text-center mb-10">
+                        <div className="inline-flex p-4 bg-white rounded-2xl shadow-sm mb-6 border border-slate-50 ring-1 ring-slate-100">
+                            <LogoIcon className="w-10 h-10 text-indigo-600" />
                         </div>
                         
-                        <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight mb-3">UjianCerdas</h1>
-                        <p className="text-slate-500 text-sm font-medium mb-12 leading-relaxed">
-                            Platform evaluasi modern, cepat, dan terpercaya.
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-3">UjianCerdas</h1>
+                        <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                            Platform evaluasi modern.<br/>Ringan, Cepat, Terpercaya.
                         </p>
-                        
-                        <div className="space-y-4">
-                            <button 
-                                onClick={() => setView('STUDENT_LOGIN')} 
-                                className="w-full group relative overflow-hidden bg-slate-900 text-white p-5 rounded-2xl shadow-lg shadow-slate-200 hover:shadow-xl hover:scale-[1.01] transition-all duration-300"
-                            >
-                                <div className="relative z-10 flex items-center justify-center gap-3">
-                                    <span className="font-bold text-base tracking-wide">Mulai Ujian Siswa</span>
-                                    <ArrowLeftIcon className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </button>
-
-                            <button 
-                                onClick={() => setView('TEACHER_LOGIN')} 
-                                className="w-full flex items-center justify-center gap-2 p-5 bg-white text-slate-600 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/30 transition-all duration-300 font-bold text-sm"
-                            >
-                                <UserIcon className="w-4 h-4" />
-                                Area Pengajar
-                            </button>
-                        </div>
                     </div>
                     
-                    <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Versi 3.0 • Secure & Lightweight
+                    <div className="space-y-4">
+                        <button 
+                            onClick={() => setView('STUDENT_LOGIN')} 
+                            className="w-full group relative overflow-hidden bg-slate-900 text-white p-4 rounded-xl shadow-lg shadow-slate-200 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <div className="relative z-10 flex items-center justify-center gap-3">
+                                <span className="font-bold text-sm tracking-wide">Masuk sebagai Siswa</span>
+                                <ArrowLeftIcon className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform opacity-70" />
+                            </div>
+                        </button>
+
+                        <button 
+                            onClick={() => setView('TEACHER_LOGIN')} 
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-white text-slate-600 rounded-xl border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
+                        >
+                            <UserIcon className="w-4 h-4" />
+                            Area Pengajar
+                        </button>
+                    </div>
+
+                    <p className="mt-12 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                        Versi 3.0 • Hemat Data
                     </p>
                 </div>
             </div>
