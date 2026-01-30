@@ -1,10 +1,10 @@
 
 // api/_db.ts - Bridge Frontend ke Google Apps Script Cluster
 
-// URL Master: Khusus untuk Login, Register, dan Kelola Soal (Admin/Guru)
+// URL Master: Khusus untuk Login, Register, Kelola Soal, DAN INISIALISASI DB KELAS
 const MASTER_URL = process.env.VITE_MASTER_URL || process.env.APPS_SCRIPT_URL;
 
-// URL Workers: Khusus untuk Siswa (Submit) dan Live Monitor (Guru)
+// URL Workers: Khusus untuk update jawaban rutin dan load balancing
 // Format di .env: VITE_WORKER_URLS="https://...,https://...,https://..."
 const WORKER_URLS = (process.env.VITE_WORKER_URLS || "").split(',').filter(u => u);
 
@@ -22,15 +22,24 @@ const callScript = async (action: string, data: any = {}) => {
         throw new Error("Server Configuration Error: Database URL missing.");
     }
 
-    // Daftar aksi yang WAJIB ke Master (Write Metadata)
+    // Daftar aksi yang WAJIB ke Master (Write Metadata & Creation)
     const MASTER_ACTIONS = [
         'login', 'register', 'findUser', 'getUsers', 'updateRole', // Auth
         'saveExam', 'getExams', 'deleteExam' // Exam Management
     ];
 
+    // DETEKSI LOGIC: Apakah ini inisialisasi ujian siswa pertama kali?
+    // Ciri: action='saveResult', status='in_progress', dan belum ada jawaban (answers kosong/sedikit)
+    // Kita paksa ke MASTER agar pembuatan File Database Kelas (Shard) terjamin sukses.
+    const isInitialization = action === 'saveResult' && 
+                             data?.data?.status === 'in_progress' && 
+                             (!data?.data?.answers || Object.keys(data?.data?.answers).length === 0);
+
     // 2. Tentukan Tujuan (Routing)
     let targetUrl = MASTER_URL;
-    if (!MASTER_ACTIONS.includes(action)) {
+    
+    // Jika bukan aksi Master DAN bukan inisialisasi awal, baru boleh ke Worker
+    if (!MASTER_ACTIONS.includes(action) && !isInitialization) {
         targetUrl = getRandomWorkerUrl() || MASTER_URL;
     }
 
