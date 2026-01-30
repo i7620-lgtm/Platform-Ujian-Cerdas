@@ -1,4 +1,4 @@
-
+ 
 import { createClient } from '@supabase/supabase-js';
 
 // Menggunakan kredensial yang Anda berikan
