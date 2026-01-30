@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import type { Student } from '../types';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
@@ -44,83 +45,83 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8FAFC]">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-white">
         <div className="w-full max-w-sm animate-gentle-slide">
-            <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-brand-600 mb-6 text-[10px] font-black uppercase tracking-widest transition-all group">
-                <ArrowLeftIcon className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+            <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-slate-900 mb-8 text-[10px] font-black uppercase tracking-[0.2em] transition-all group">
+                <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 Kembali
             </button>
             
-            <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100">
-                <div className="text-center mb-8">
-                    <div className="inline-flex p-3 bg-brand-50 rounded-2xl text-brand-600 mb-4">
-                        <LogoIcon className="w-8 h-8" />
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-100 border border-slate-100">
+                <div className="text-center mb-10">
+                    <div className="inline-flex p-4 bg-slate-50 rounded-2xl text-slate-900 mb-6">
+                        <LogoIcon className="w-10 h-10" />
                     </div>
-                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Login Siswa</h2>
-                    <p className="text-[11px] text-slate-400 font-medium mt-1">Masukkan data diri untuk mulai ujian.</p>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Login Siswa</h2>
+                    <p className="text-xs text-slate-400 font-medium mt-2">Gunakan kode akses dari guru Anda.</p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kode Akses</label>
+                <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Kode Akses</label>
                         <input
                             ref={examCodeInputRef}
                             type="text"
                             value={examCode}
                             onChange={(e) => setExamCode(e.target.value)}
-                            className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-100 focus:bg-white focus:border-brand-200 rounded-xl focus:outline-none transition-all text-center text-xl font-black tracking-[0.2em] text-brand-600 uppercase placeholder:text-slate-200"
-                            placeholder="KODE"
+                            className="block w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-slate-100 rounded-2xl focus:outline-none transition-all text-center text-2xl font-black tracking-[0.4em] text-slate-900 uppercase placeholder:text-slate-200"
+                            placeholder="CODE"
                             autoComplete="off"
                         />
                     </div>
 
-                    <div className="space-y-3">
-                         <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Identitas</label>
+                    <div className="space-y-4">
+                         <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Identitas Siswa</label>
                             <input
                                 type="text"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
-                                className="block w-full px-4 py-3 bg-slate-50 border border-slate-100 focus:bg-white focus:border-brand-300 rounded-xl focus:outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
+                                className="block w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-slate-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300"
                                 placeholder="Nama Lengkap"
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-4">
                             <input
                                 type="text"
                                 value={studentClass}
                                 onChange={(e) => setStudentClass(e.target.value)}
-                                className="block w-full px-4 py-3 bg-slate-50 border border-slate-100 focus:bg-white focus:border-brand-300 rounded-xl focus:outline-none transition-all text-sm font-bold text-slate-700 placeholder:text-slate-300"
+                                className="block w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-slate-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300"
                                 placeholder="Kelas"
                             />
                             <input
                                 type="text"
                                 value={absentNumber}
                                 onChange={(e) => setAbsentNumber(e.target.value)}
-                                className="block w-full px-4 py-3 bg-slate-50 border border-slate-100 focus:bg-white focus:border-brand-300 rounded-xl focus:outline-none transition-all text-sm font-bold text-slate-700 text-center placeholder:text-slate-300"
-                                placeholder="No. Absen"
+                                className="block w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-slate-100 rounded-2xl focus:outline-none transition-all text-sm font-bold text-slate-800 text-center placeholder:text-slate-300"
+                                placeholder="Absen"
                             />
                         </div>
                     </div>
 
                     {error && (
-                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-bold text-center animate-fast-fade">
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase text-center animate-fast-fade">
                             {error}
                         </div>
                     )}
                     
                     <button 
                         type="submit" 
-                        className="w-full bg-slate-900 text-white font-black text-sm py-4 rounded-xl hover:bg-black shadow-lg shadow-slate-200 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2 group/btn"
+                        className="w-full bg-slate-900 text-white font-black text-xs uppercase tracking-[0.2em] py-5 rounded-2xl hover:bg-black shadow-xl shadow-slate-100 transition-all active:scale-95 mt-4 flex items-center justify-center gap-3 group/btn"
                     >
-                        Masuk Sekarang
-                        <ArrowLeftIcon className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
+                        Masuk Ujian
+                        <ArrowLeftIcon className="w-5 h-5 rotate-180 group-hover:translate-x-1 transition-transform" />
                     </button>
                 </form>
             </div>
             
-            <p className="text-center mt-8 text-[9px] font-bold text-slate-300 uppercase tracking-[0.3em]">
-                UjianCerdas • v2.0
+            <p className="text-center mt-12 text-[10px] font-black text-slate-200 uppercase tracking-[0.5em]">
+                UjianCerdas • v2.5
             </p>
         </div>
     </div>
