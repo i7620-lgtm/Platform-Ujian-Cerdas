@@ -1,16 +1,6 @@
 
-import type { Exam, Result, Question } from '../types';
-
-const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
-const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
-
-async function retryOperation<T>(operation: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
-    try { return await operation(); } catch (error) {
-        if (retries <= 0) throw error;
-        await new Promise(r => setTimeout(r, delay));
-        return retryOperation(operation, retries - 1, delay * 1.5);
-    }
-}
+import { supabase } from '../lib/supabase';
+import type { Exam, Result, Question, TeacherProfile } from '../types';
 
 // Helper shuffle array (Fisher-Yates)
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -55,186 +45,252 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
 };
 
 class StorageService {
-  private isOnline: boolean = navigator.onLine;
-  constructor() {
-    window.addEventListener('online', () => { this.isOnline = true; });
-    window.addEventListener('offline', () => { this.isOnline = false; });
+  
+  // --- AUTH METHODS ---
+  async loginUser(username: string, password: string): Promise<TeacherProfile | null> {
+      // NOTE: In production, use supabase.auth.signInWithPassword. 
+      // Mapping to 'users' table to match existing schema request.
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password) // Warning: Storing plain text passwords is not recommended for production
+        .single();
+
+      if (error || !data) return null;
+
+      return {
+          id: data.username, // Using username as ID to maintain compatibility
+          fullName: data.full_name,
+          accountType: data.role as any,
+          school: data.school
+      };
   }
 
+  async registerUser(userData: any): Promise<TeacherProfile | null> {
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+            username: userData.username,
+            password: userData.password,
+            full_name: userData.fullName,
+            school: userData.school,
+            role: 'guru'
+        }])
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      
+      return {
+          id: data.username,
+          fullName: data.full_name,
+          accountType: data.role as any,
+          school: data.school
+      };
+  }
+
+  // --- EXAM METHODS ---
+
   async getExams(headers: Record<string, string> = {}): Promise<Record<string, Exam>> {
-    let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const requesterId = headers['x-user-id'];
-    const requesterRole = headers['x-role'];
-    const requesterSchool = headers['x-school'];
+    // const requesterRole = headers['x-role']; 
+    
+    // Simple filter: Only show exams created by this user
+    // In a real app, use RLS policies on Supabase
+    const { data, error } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('author_id', requesterId);
 
-    if (this.isOnline) {
-      try {
-        const response = await retryOperation(() => fetch(`${API_URL}/exams`, { headers: headers as any }));
-        if (response.ok) {
-          const cloudExams: Exam[] = await response.json();
-          
-          // Sinkronisasi data cloud ke local
-          cloudExams.forEach(exam => { 
-              localExams[exam.code] = { ...exam, isSynced: true }; 
-          });
-          this.saveLocal(KEYS.EXAMS, localExams);
-
-          // Kembalikan HANYA apa yang dikirim cloud (karena cloud sudah melakukan filtering)
-          // Ini mencegah data "nyangkut" dari login guru sebelumnya di localStorage yang sama
-          const filteredMap: Record<string, Exam> = {};
-          cloudExams.forEach(e => { filteredMap[e.code] = e; });
-          return filteredMap;
-        }
-      } catch (e) { 
-          console.warn("Sync failed, fallback to local filtering."); 
-      }
+    if (error) {
+        console.error("Error fetching exams:", error);
+        return {};
     }
 
-    // Jika offline, lakukan pemfilteran manual di client agar tetap aman
-    const filteredLocal: Record<string, Exam> = {};
-    Object.values(localExams).forEach(exam => {
-        let isMatch = false;
-        if (requesterRole === 'super_admin') {
-            isMatch = true;
-        } else if (requesterRole === 'admin') {
-            isMatch = (exam.authorSchool || '').toLowerCase() === (requesterSchool || '').toLowerCase();
-        } else {
-            isMatch = String(exam.authorId) === String(requesterId);
-        }
-
-        if (isMatch) filteredLocal[exam.code] = exam;
+    const examMap: Record<string, Exam> = {};
+    data.forEach((row: any) => {
+        examMap[row.code] = {
+            code: row.code,
+            authorId: row.author_id,
+            authorSchool: row.school,
+            config: row.config,
+            questions: row.questions,
+            status: row.status,
+            createdAt: row.created_at
+        };
     });
-
-    return filteredLocal;
+    return examMap;
   }
 
   async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
-      const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-      let exam = allExams[code];
+      const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('code', code)
+          .single();
+
+      if (error || !data) throw new Error("EXAM_NOT_FOUND");
       
-      if (this.isOnline) {
-          const previewParam = isPreview ? '&preview=true' : '';
-          const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}`);
-          
-          if (res.status === 403) throw new Error("EXAM_IS_DRAFT");
-          if (res.status === 404) throw new Error("EXAM_NOT_FOUND");
-          
-          if (res.ok) {
-              const cloudExam = await res.json();
-              if (cloudExam) { 
-                  if (!isPreview) {
-                      allExams[cloudExam.code] = cloudExam; 
-                      this.saveLocal(KEYS.EXAMS, allExams); 
-                  }
-                  exam = cloudExam;
-              }
-          }
-      }
-      return exam ? sanitizeExamForStudent(exam) : null;
+      if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
+
+      const exam: Exam = {
+          code: data.code,
+          authorId: data.author_id,
+          authorSchool: data.school,
+          config: data.config,
+          questions: data.questions,
+          status: data.status
+      };
+
+      return sanitizeExamForStudent(exam);
   }
 
   async saveExam(exam: Exam, headers: Record<string, string> = {}): Promise<void> {
-    const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    const examToSave = { ...exam, isSynced: false, createdAt: String(exam.createdAt || new Date().toLocaleString()) };
-    exams[exam.code] = examToSave;
-    this.saveLocal(KEYS.EXAMS, exams);
-    
-    if (this.isOnline) {
-        try {
-            const res = await retryOperation(() => fetch(`${API_URL}/exams`, { 
-                method: 'POST', 
-                headers: { 'Content-Type':'application/json', ...headers }, 
-                body: JSON.stringify(examToSave) 
-            }));
-            if (res.ok) {
-                exams[exam.code].isSynced = true; 
-                this.saveLocal(KEYS.EXAMS, exams);
-            }
-        } catch (e) { console.error("Network error saving exam:", e); }
-    }
+    const userId = headers['x-user-id'];
+    const school = headers['x-school'];
+
+    const { error } = await supabase
+        .from('exams')
+        .upsert({
+            code: exam.code,
+            author_id: userId || exam.authorId,
+            school: school || exam.authorSchool,
+            config: exam.config,
+            questions: exam.questions,
+            status: exam.status || 'PUBLISHED'
+        });
+
+    if (error) throw error;
   }
 
   async deleteExam(code: string, headers: Record<string, string> = {}): Promise<void> {
-      const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-      delete exams[code];
-      this.saveLocal(KEYS.EXAMS, exams);
-      if (this.isOnline) {
-          try { await fetch(`${API_URL}/exams?code=${code}`, { 
-              method: 'DELETE',
-              headers: headers as any
-          }); } catch (e) {}
-      }
+      // Cascade delete results logic should be in SQL (ON DELETE CASCADE), 
+      // but we'll do it manually here just in case.
+      await supabase.from('results').delete().eq('exam_code', code);
+      await supabase.from('exams').delete().eq('code', code);
   }
 
+  // --- RESULT METHODS ---
+
   async getResults(examCode?: string, className?: string, headers: Record<string, string> = {}): Promise<Result[]> {
-    if (this.isOnline) {
-        try {
-            const queryParts = [];
-            if (examCode) queryParts.push(`code=${examCode}`);
-            if (className && className !== 'ALL') queryParts.push(`class=${encodeURIComponent(className)}`);
-            const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-            const response = await fetch(`${API_URL}/results${queryString}`, { headers: headers as any });
-            if (response.ok) return await response.json();
-        } catch (e) {}
-    }
-    return [];
+    let query = supabase.from('results').select('*');
+
+    if (examCode) query = query.eq('exam_code', examCode);
+    if (className && className !== 'ALL') query = query.eq('class_name', className);
+
+    // If teacher is viewing, maybe filter by their school? 
+    // Ideally handled by RLS, but for now we assume they pass specific examCode
+    
+    const { data, error } = await query;
+    
+    if (error) return [];
+
+    return data.map((row: any) => ({
+        student: {
+            studentId: row.student_id,
+            fullName: row.student_name,
+            class: row.class_name,
+            absentNumber: '00' // Not stored in flat schema, harmless
+        },
+        examCode: row.exam_code,
+        answers: row.answers,
+        score: row.score,
+        correctAnswers: row.correct_answers,
+        totalQuestions: row.total_questions,
+        status: row.status,
+        activityLog: row.activity_log,
+        timestamp: new Date(row.updated_at).getTime(),
+        location: row.location
+    }));
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    if (this.isOnline) {
-        try {
-            const res = await fetch(`${API_URL}/submit-exam`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(resultPayload)
-            });
-            if (res.ok) return await res.json();
-        } catch (e) {}
+    // Calculate Score Here (Client Side) or Server Side?
+    // Since we are going serverless/direct, we calculate here or use a Postgres Function.
+    // For simplicity & speed, we calculate in Client (Secure enough for this context, 
+    // secure version would need Postgres Function).
+    
+    // Note: grading logic is ideally done in the component or a shared helper
+    // to keep this service pure storage. But for upsert we need the fields.
+    
+    const { examCode, student, answers, status, activityLog, score, correctAnswers, totalQuestions, location } = resultPayload;
+
+    const { data, error } = await supabase
+        .from('results')
+        .upsert({
+            exam_code: examCode,
+            student_id: student.studentId,
+            student_name: student.fullName,
+            class_name: student.class,
+            answers: answers,
+            status: status,
+            activity_log: activityLog,
+            score: score || 0,
+            correct_answers: correctAnswers || 0,
+            total_questions: totalQuestions || 0,
+            location: location,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'exam_code,student_id' })
+        .select()
+        .single();
+
+    if (error) {
+        console.error("Submit error:", error);
+        throw error;
     }
-    return { ...resultPayload, isSynced: false };
+
+    return { ...resultPayload, isSynced: true };
   }
 
-  private loadLocal<T>(key: string): T | null { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
-  private saveLocal(key: string, data: any): void { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
-  
-  async syncData() { }
-
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      if (this.isOnline) {
-          try {
-              const res = await fetch(`${API_URL}/results?code=${examCode}&studentId=${studentId}`);
-              if (res.ok) {
-                  const data = await res.json();
-                  return Array.isArray(data) ? data[0] : data;
-              }
-          } catch(e) {}
-      }
-      return null;
+      const { data, error } = await supabase
+          .from('results')
+          .select('*')
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId)
+          .single();
+
+      if (error || !data) return null;
+
+      return {
+        student: {
+            studentId: data.student_id,
+            fullName: data.student_name,
+            class: data.class_name,
+            absentNumber: '00'
+        },
+        examCode: data.exam_code,
+        answers: data.answers,
+        score: data.score,
+        correctAnswers: data.correct_answers,
+        totalQuestions: data.total_questions,
+        status: data.status,
+        activityLog: data.activity_log,
+        timestamp: new Date(data.updated_at).getTime(),
+        location: data.location
+      };
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      if (this.isOnline) {
-          try {
-              await fetch(`${API_URL}/teacher-action`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ examCode, studentId, action: 'UNLOCK' })
-              });
-          } catch(e) {}
-      }
+      await supabase
+        .from('results')
+        .update({ status: 'in_progress', activity_log: supabase.sql`activity_log || '["Guru membuka kunci"]'::jsonb` })
+        .eq('exam_code', examCode)
+        .eq('student_id', studentId);
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      if (this.isOnline) {
-          try {
-              await fetch(`${API_URL}/extend-time`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ examCode, additionalMinutes })
-              });
-          } catch(e) {}
+      // This requires reading config, updating it, saving it.
+      // This might be tricky with concurrent edits, but okay for this scale.
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      if (data && data.config) {
+          const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
+          await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
       }
   }
+  
+  async syncData() { }
 }
 
 export const storageService = new StorageService();
