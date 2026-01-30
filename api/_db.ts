@@ -8,15 +8,6 @@ const MASTER_URL = process.env.VITE_MASTER_URL || process.env.APPS_SCRIPT_URL;
 // Format di .env: VITE_WORKER_URLS="https://...,https://...,https://..."
 const WORKER_URLS = (process.env.VITE_WORKER_URLS || "").split(',').filter(u => u);
 
-if (!MASTER_URL) console.error("CRITICAL: VITE_MASTER_URL is missing in .env");
-if (WORKER_URLS.length === 0) console.warn("WARNING: VITE_WORKER_URLS missing. Traffic will failover to Master (Not Recommended).");
-
-// Daftar aksi yang WAJIB ke Master (Write Metadata)
-const MASTER_ACTIONS = [
-    'login', 'register', 'findUser', 'getUsers', 'updateRole', // Auth
-    'saveExam', 'getExams', 'deleteExam' // Exam Management
-];
-
 // Helper untuk memilih Worker secara acak (Load Balancing Sederhana)
 const getRandomWorkerUrl = () => {
     if (WORKER_URLS.length === 0) return MASTER_URL; // Fallback ke Master jika tidak ada worker
@@ -25,15 +16,25 @@ const getRandomWorkerUrl = () => {
 };
 
 const callScript = async (action: string, data: any = {}) => {
-    // 1. Tentukan Tujuan (Routing)
-    let targetUrl = MASTER_URL;
-    
-    if (!MASTER_ACTIONS.includes(action)) {
-        // Jika bukan aksi admin, gunakan Worker untuk menyebar beban traffic
-        targetUrl = getRandomWorkerUrl();
+    // 1. Validasi Konfigurasi Server
+    if (!MASTER_URL) {
+        console.error("CRITICAL ERROR: VITE_MASTER_URL is not defined in Vercel Environment Variables.");
+        throw new Error("Server Configuration Error: Database URL missing.");
     }
 
-    if (!targetUrl) throw new Error("Server Configuration Error: No API URL available.");
+    // Daftar aksi yang WAJIB ke Master (Write Metadata)
+    const MASTER_ACTIONS = [
+        'login', 'register', 'findUser', 'getUsers', 'updateRole', // Auth
+        'saveExam', 'getExams', 'deleteExam' // Exam Management
+    ];
+
+    // 2. Tentukan Tujuan (Routing)
+    let targetUrl = MASTER_URL;
+    if (!MASTER_ACTIONS.includes(action)) {
+        targetUrl = getRandomWorkerUrl() || MASTER_URL;
+    }
+
+    if (!targetUrl) throw new Error("No API URL available.");
     
     try {
         const response = await fetch(targetUrl, {
@@ -41,16 +42,31 @@ const callScript = async (action: string, data: any = {}) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action, ...data })
         });
+
+        // 3. Handle Raw Response (Mencegah Error "<!DOCTYPE...")
+        const textResponse = await response.text();
         
-        const result = await response.json();
+        let result;
+        try {
+            result = JSON.parse(textResponse);
+        } catch (e) {
+            // Jika gagal parse JSON, berarti Google mengembalikan HTML (Error Page/Login Page)
+            console.error(`Google Script Error [${action}] RAW:`, textResponse.substring(0, 500)); // Log 500 karakter pertama
+            
+            if (textResponse.includes("<!DOCTYPE html>") || textResponse.includes("Google Accounts")) {
+                throw new Error("Database Access Denied. Pastikan Deployment Google Script diset ke 'Anyone' (Siapa Saja).");
+            }
+            throw new Error(`Invalid Database Response: ${textResponse.substring(0, 100)}...`);
+        }
         
-        // Error handling standar GAS
+        // 4. Handle Logical Error dari Script
         if (!result.success && !result.data && !result.user && !result.users && action !== 'findUser') {
             throw new Error(result.error || "Database operation failed");
         }
         return result;
+
     } catch (e: any) {
-        console.error(`DB Error [${action}] -> ${targetUrl}:`, e);
+        console.error(`DB Error [${action}] -> ${targetUrl}:`, e.message);
         throw new Error(e.message || "Gagal menghubungi server database");
     }
 };
@@ -102,10 +118,8 @@ export default {
     // --- WORKER ACTIONS (OPERASIONAL SISWA & MONITORING) ---
     
     async getResults(userId: string, examCode?: string, className?: string) {
-        // Load Balancer akan mengarahkan ini ke salah satu Worker
         const res = await callScript('getResults', { examCode, className });
         
-        // Client-side filtering sebagai pengaman tambahan
         let data = res.data || [];
         if (examCode) data = data.filter((r: any) => r.examCode === examCode);
         if (className && className !== 'ALL') data = data.filter((r: any) => r.student.class === className);
@@ -113,7 +127,6 @@ export default {
     },
 
     async saveResult(userId: string, result: any) {
-        // Load Balancer akan mengarahkan ini ke salah satu Worker
         return callScript('saveResult', { data: result });
     },
 
