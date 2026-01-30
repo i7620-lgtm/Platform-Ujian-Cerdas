@@ -273,9 +273,22 @@ class StorageService {
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
+      // FIX: Fetch first then update to avoid 'supabase.sql' error
+      const { data } = await supabase
+        .from('results')
+        .select('activity_log')
+        .eq('exam_code', examCode)
+        .eq('student_id', studentId)
+        .single();
+
+      const currentLog = (data?.activity_log as string[]) || [];
+
       await supabase
         .from('results')
-        .update({ status: 'in_progress', activity_log: supabase.sql`activity_log || '["Guru membuka kunci"]'::jsonb` })
+        .update({ 
+            status: 'in_progress', 
+            activity_log: [...currentLog, "Guru membuka kunci"] 
+        })
         .eq('exam_code', examCode)
         .eq('student_id', studentId);
   }
