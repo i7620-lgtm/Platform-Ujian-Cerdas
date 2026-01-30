@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import { LogoIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
