@@ -86,7 +86,8 @@ const App: React.FC = () => {
             fullName: 'Mode Pratinjau',
             class: 'PREVIEW',
             absentNumber: '00',
-            studentId: 'preview_mode_' + Date.now()
+            // Format ID Konsisten: Nama-Kelas-Absen
+            studentId: `Mode Pratinjau-PREVIEW-00-${Date.now()}`
         };
         handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
         window.history.replaceState({}, document.title, window.location.pathname);
