@@ -167,7 +167,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     };
 
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto && !confirm("Kumpulkan jawaban?")) return;
+        if (!auto && !confirm("Kumpulkan jawaban dan selesaikan ujian?")) return;
         setIsSubmitting(true);
         if (pendingUpdateRef.current) clearTimeout(pendingUpdateRef.current);
         const grading = calculateGrade(exam, answersRef.current);
@@ -193,68 +193,156 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
     return (
-        <div className="min-h-screen bg-white pb-32 font-sans">
-            <header className="sticky top-0 z-[60] bg-white/95 backdrop-blur-xl border-b border-slate-100 shadow-sm h-16 flex items-center px-4 sm:px-6 justify-between">
-                <div className="flex items-center gap-3 w-1/3">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">{exam.config.subject.charAt(0)}</div>
-                    <div className="hidden sm:block overflow-hidden"><h1 className="text-xs font-bold text-slate-900 truncate">{exam.config.subject}</h1><p className="text-[10px] text-slate-500 truncate">{student.fullName}</p></div>
+        <div className="min-h-screen bg-slate-50 pb-40 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+            {/* Elegant Sticky Header with Glassmorphism */}
+            <header className="sticky top-0 z-[60] bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
+                    {/* Left: Subject & Student */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-indigo-100">
+                            {exam.config.subject.charAt(0)}
+                        </div>
+                        <div className="hidden sm:block leading-tight">
+                            <h1 className="text-sm font-bold text-slate-800 truncate max-w-[150px]">{exam.config.subject}</h1>
+                            <p className="text-[10px] font-medium text-slate-500 truncate max-w-[150px]">{student.fullName}</p>
+                        </div>
+                    </div>
+                    
+                    {/* Center: Timer */}
+                    <div className="absolute left-1/2 -translate-x-1/2">
+                        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700'}`}>
+                            <ClockIcon className="w-4 h-4" />
+                            <span className="font-mono font-bold text-sm tracking-wider">{formatTime(timeLeft)}</span>
+                        </div>
+                    </div>
+
+                    {/* Right: Status */}
+                    <div className="flex items-center gap-2">
+                        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                            saveStatus === 'saving' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                            saveStatus === 'pending' ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                            'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        }`}>
+                            {saveStatus === 'saving' ? 'Menyimpan...' : saveStatus === 'pending' ? 'Unsaved' : 'Tersimpan'}
+                        </div>
+                        <div className="sm:hidden text-xs font-bold text-slate-400">
+                            {answeredCount}/{totalQuestions}
+                        </div>
+                    </div>
                 </div>
                 
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
-                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-                        <ClockIcon className="w-4 h-4" />
-                        <span className="font-mono font-bold text-sm tracking-widest">{formatTime(timeLeft)}</span>
-                    </div>
+                {/* Slim Progress Bar */}
+                <div className="h-0.5 w-full bg-slate-100 relative">
+                    <div className="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-500 ease-out" style={{width: `${progress}%`}}></div>
                 </div>
-
-                <div className="flex items-center justify-end gap-2 w-1/3">
-                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider border ${
-                        saveStatus === 'saving' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                        saveStatus === 'pending' ? 'bg-slate-50 text-slate-400 border-slate-100' :
-                        'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    }`}>
-                        {saveStatus === 'saving' ? 'Menyimpan...' : saveStatus === 'pending' ? 'Belum Disimpan' : 'Tersimpan'}
-                    </div>
-                </div>
-                <div className="absolute bottom-0 left-0 h-0.5 bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
             </header>
 
-            {warningMsg && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-full shadow-xl text-xs font-bold animate-bounce">{warningMsg}</div>}
+            {warningMsg && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-8 py-3 rounded-full shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-2">
+                    <ExclamationTriangleIcon className="w-4 h-4" /> {warningMsg}
+                </div>
+            )}
 
-            <main className="max-w-2xl mx-auto px-6 pt-10 space-y-12">
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
                 {exam.questions.map((q, idx) => {
                     const num = exam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
+                    const answered = isAnswered(q);
+                    
                     return (
-                        <div key={q.id} className="scroll-mt-24">
-                            <div className="flex gap-3 mb-4">
-                                <span className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold shrink-0 ${q.questionType === 'INFO' ? 'bg-blue-100 text-blue-700' : isAnswered(q) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{q.questionType === 'INFO' ? 'i' : num}</span>
-                                <div className="prose prose-sm max-w-none text-slate-800" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                        <div 
+                            key={q.id} 
+                            id={q.id}
+                            className={`scroll-mt-28 bg-white rounded-2xl p-6 md:p-8 border shadow-sm transition-all duration-300 ${answered ? 'border-indigo-100 shadow-md' : 'border-slate-100'}`}
+                        >
+                            {/* Question Header */}
+                            <div className="flex gap-4 mb-6">
+                                <div className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold shrink-0 transition-colors ${
+                                    q.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : 
+                                    answered ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                    {q.questionType === 'INFO' ? 'i' : num}
+                                </div>
+                                <div className="prose prose-slate prose-lg max-w-none text-slate-800 font-medium leading-relaxed">
+                                    <div dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                </div>
                             </div>
 
-                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                <div className="space-y-3 pl-10">
-                                    {q.options.map((opt, i) => (
-                                        <button key={i} onClick={() => handleAnswer(q.id, opt)} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 hover:border-indigo-200'}`}>
-                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`}>{answers[q.id] === opt && <div className="w-2 h-2 bg-white rounded-full"></div>}</div>
-                                            <div className="text-sm font-medium" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            
-                            {/* ... (Other types) ... */}
-                            {q.questionType === 'ESSAY' && (
-                                <textarea value={answers[q.id] || ''} onChange={e => handleAnswer(q.id, e.target.value)} className="w-full p-4 border-2 border-slate-100 rounded-xl focus:border-indigo-300 outline-none min-h-[150px] text-sm ml-10 block w-[calc(100%-2.5rem)]" placeholder="Jawaban Anda..." />
-                            )}
+                            {/* Options / Inputs */}
+                            <div className="pl-0 md:pl-12">
+                                {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {q.options.map((opt, i) => {
+                                            const isSelected = answers[q.id] === opt;
+                                            return (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={() => handleAnswer(q.id, opt)} 
+                                                    className={`w-full text-left p-4 md:p-5 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group ${
+                                                        isSelected 
+                                                        ? 'border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500' 
+                                                        : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <div className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                                        isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 group-hover:border-indigo-300'
+                                                    }`}>
+                                                        {isSelected && <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm"></div>}
+                                                    </div>
+                                                    <div className={`text-base ${isSelected ? 'font-bold text-indigo-900' : 'font-normal text-slate-700'}`} dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {q.questionType === 'ESSAY' && (
+                                    <div className="relative">
+                                        <textarea 
+                                            value={answers[q.id] || ''} 
+                                            onChange={e => handleAnswer(q.id, e.target.value)} 
+                                            className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 outline-none min-h-[180px] text-base text-slate-800 transition-all placeholder:text-slate-400" 
+                                            placeholder="Tulis jawaban Anda di sini secara lengkap..." 
+                                        />
+                                        <div className="absolute bottom-4 right-4 text-xs font-bold text-slate-300 pointer-events-none uppercase">Esai</div>
+                                    </div>
+                                )}
+                                
+                                {q.questionType === 'FILL_IN_THE_BLANK' && (
+                                    <div className="flex items-center gap-3">
+                                        <PencilIcon className="w-5 h-5 text-slate-400" />
+                                        <input 
+                                            type="text" 
+                                            value={answers[q.id] || ''} 
+                                            onChange={e => handleAnswer(q.id, e.target.value)} 
+                                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 outline-none text-base font-medium text-slate-800 transition-all" 
+                                            placeholder="Ketik jawaban singkat..." 
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
+
+                {/* Bottom Spacer for Floating Button */}
+                <div className="h-24"></div>
             </main>
 
-            <div className="fixed bottom-0 left-0 w-full p-4 bg-white border-t border-slate-100 flex justify-center">
-                <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-lg disabled:opacity-50">
-                    {isSubmitting ? 'Mengirim...' : 'Kumpulkan Ujian'} <CheckCircleIcon className="w-5 h-5"/>
-                </button>
+            {/* Floating Action Bar */}
+            <div className="fixed bottom-6 inset-x-0 px-4 flex justify-center z-50 pointer-events-none">
+                <div className="bg-white/90 backdrop-blur-xl p-2 rounded-2xl shadow-2xl shadow-slate-300/50 border border-white pointer-events-auto flex items-center gap-3 max-w-sm w-full mx-auto transform transition-transform hover:scale-[1.02]">
+                    <div className="flex-1 px-4">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progres</p>
+                        <p className="text-xs font-bold text-slate-700">{answeredCount} dari {totalQuestions} Soal</p>
+                    </div>
+                    <button 
+                        onClick={() => handleSubmit(false)} 
+                        disabled={isSubmitting} 
+                        className="bg-slate-900 text-white px-6 py-3.5 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                        {isSubmitting ? 'Mengirim...' : 'Selesai'} <CheckCircleIcon className="w-5 h-5"/>
+                    </button>
+                </div>
             </div>
         </div>
     );
