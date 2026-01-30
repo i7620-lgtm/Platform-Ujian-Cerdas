@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon, ExclamationTriangleIcon, CloudArrowUpIcon } from './Icons';
@@ -193,13 +192,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-40 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="min-h-screen bg-slate-50 pb-40 font-sans selection:bg-orange-100 selection:text-orange-900">
             {/* Elegant Sticky Header with Glassmorphism */}
             <header className="sticky top-0 z-[60] bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
                     {/* Left: Subject & Student */}
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-indigo-100">
+                        <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-orange-100">
                             {exam.config.subject.charAt(0)}
                         </div>
                         <div className="hidden sm:block leading-tight">
@@ -233,7 +232,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 
                 {/* Slim Progress Bar */}
                 <div className="h-0.5 w-full bg-slate-100 relative">
-                    <div className="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-500 ease-out" style={{width: `${progress}%`}}></div>
+                    <div className="absolute top-0 left-0 h-full bg-orange-500 transition-all duration-500 ease-out" style={{width: `${progress}%`}}></div>
                 </div>
             </header>
 
@@ -252,13 +251,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         <div 
                             key={q.id} 
                             id={q.id}
-                            className={`scroll-mt-28 bg-white rounded-2xl p-6 md:p-8 border shadow-sm transition-all duration-300 ${answered ? 'border-indigo-100 shadow-md' : 'border-slate-100'}`}
+                            className={`scroll-mt-28 bg-white rounded-2xl p-6 md:p-8 border shadow-sm transition-all duration-300 ${answered ? 'border-orange-100 shadow-md' : 'border-slate-100'}`}
                         >
                             {/* Question Header */}
                             <div className="flex gap-4 mb-6">
                                 <div className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold shrink-0 transition-colors ${
                                     q.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : 
-                                    answered ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-500'
+                                    answered ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : 'bg-slate-100 text-slate-500'
                                 }`}>
                                     {q.questionType === 'INFO' ? 'i' : num}
                                 </div>
@@ -279,16 +278,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                     onClick={() => handleAnswer(q.id, opt)} 
                                                     className={`w-full text-left p-4 md:p-5 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group ${
                                                         isSelected 
-                                                        ? 'border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500' 
-                                                        : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'
+                                                        ? 'border-orange-500 bg-orange-50 shadow-sm ring-1 ring-orange-500' 
+                                                        : 'border-slate-100 hover:border-orange-200 hover:bg-slate-50'
                                                     }`}
                                                 >
                                                     <div className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                                        isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 group-hover:border-indigo-300'
+                                                        isSelected ? 'border-orange-500 bg-orange-500' : 'border-slate-300 group-hover:border-orange-300'
                                                     }`}>
                                                         {isSelected && <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm"></div>}
                                                     </div>
-                                                    <div className={`text-base ${isSelected ? 'font-bold text-indigo-900' : 'font-normal text-slate-700'}`} dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                    <div className={`text-base ${isSelected ? 'font-bold text-orange-900' : 'font-normal text-slate-700'}`} dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                 </button>
                                             );
                                         })}
@@ -300,7 +299,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                         <textarea 
                                             value={answers[q.id] || ''} 
                                             onChange={e => handleAnswer(q.id, e.target.value)} 
-                                            className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 outline-none min-h-[180px] text-base text-slate-800 transition-all placeholder:text-slate-400" 
+                                            className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-orange-500 focus:bg-white focus:ring-0 outline-none min-h-[180px] text-base text-slate-800 transition-all placeholder:text-slate-400" 
                                             placeholder="Tulis jawaban Anda di sini secara lengkap..." 
                                         />
                                         <div className="absolute bottom-4 right-4 text-xs font-bold text-slate-300 pointer-events-none uppercase">Esai</div>
@@ -314,7 +313,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             type="text" 
                                             value={answers[q.id] || ''} 
                                             onChange={e => handleAnswer(q.id, e.target.value)} 
-                                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-0 outline-none text-base font-medium text-slate-800 transition-all" 
+                                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-orange-500 focus:bg-white focus:ring-0 outline-none text-base font-medium text-slate-800 transition-all" 
                                             placeholder="Ketik jawaban singkat..." 
                                         />
                                     </div>
