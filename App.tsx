@@ -192,7 +192,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFEFF] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-700 overflow-x-hidden antialiased">
+    <div className="min-h-screen bg-[#FDFEFF] text-slate-900 font-sans selection:bg-orange-100 selection:text-orange-700 overflow-x-hidden antialiased">
         {/* Network Status Bar - Moved to Bottom Left to prevent obstruction */}
         <div className="fixed bottom-4 left-4 z-[100] flex flex-col items-start gap-2 pointer-events-none">
             {!isOnline ? (
@@ -200,8 +200,8 @@ const App: React.FC = () => {
                     <NoWifiIcon className="w-3 h-3"/> Offline
                 </div>
             ) : isSyncing ? (
-                <div className="bg-white/90 backdrop-blur-md text-indigo-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-slate-100 flex items-center gap-2 pointer-events-auto">
-                    <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="bg-white/90 backdrop-blur-md text-orange-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-slate-100 flex items-center gap-2 pointer-events-auto">
+                    <div className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
                     Sync
                 </div>
             ) : (
@@ -213,11 +213,11 @@ const App: React.FC = () => {
         
         {view === 'SELECTOR' && (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 relative bg-white">
-                <div className="absolute inset-0 -z-10 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-40"></div>
+                <div className="absolute inset-0 -z-10 bg-[radial-gradient(#fed7aa_1px,transparent_1px)] [background-size:24px_24px] opacity-40"></div>
                 
                 <div className="w-full max-w-sm text-center animate-gentle-slide">
-                    <div className="inline-flex p-6 bg-white rounded-3xl shadow-2xl shadow-slate-200/50 mb-10 border border-slate-50">
-                        <LogoIcon className="w-14 h-14 text-indigo-600" />
+                    <div className="inline-flex p-6 bg-white rounded-3xl shadow-2xl shadow-orange-200/50 mb-10 border border-orange-50">
+                        <LogoIcon className="w-14 h-14 text-orange-600" />
                     </div>
                     
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-4">UjianCerdas</h1>
@@ -228,20 +228,20 @@ const App: React.FC = () => {
                     <div className="space-y-4">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="w-full group flex items-center justify-between p-6 bg-lime-400 rounded-2xl shadow-xl shadow-lime-200 hover:bg-lime-500 hover:-translate-y-1 transition-all duration-300"
+                            className="w-full group flex items-center justify-between p-6 bg-orange-600 rounded-2xl shadow-xl shadow-orange-200 hover:bg-orange-700 hover:-translate-y-1 transition-all duration-300"
                         >
-                            <span className="text-lime-950 font-black text-lg ml-2 tracking-tight">Mulai Ujian</span>
-                            <div className="w-10 h-10 rounded-xl bg-white/30 text-lime-900 flex items-center justify-center group-hover:bg-white group-hover:text-lime-600 transition-all">
+                            <span className="text-white font-bold text-lg ml-2">Mulai Ujian</span>
+                            <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center group-hover:bg-white group-hover:text-orange-600 transition-all">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                             </div>
                         </button>
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="w-full group flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition-all duration-300"
+                            className="w-full group flex items-center justify-between p-6 bg-white rounded-2xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50 transition-all duration-300"
                         >
-                            <span className="text-slate-700 font-bold text-lg ml-2 group-hover:text-blue-700 transition-colors">Area Pengajar</span>
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            <span className="text-slate-700 font-bold text-lg ml-2">Area Pengajar</span>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-all">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
                         </button>
