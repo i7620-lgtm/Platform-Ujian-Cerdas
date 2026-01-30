@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon, ExclamationTriangleIcon, CloudArrowUpIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon } from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -34,30 +34,23 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     return { score, correctCount, totalQuestions: scorable };
 };
 
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onUpdate }) => {
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [warningMsg, setWarningMsg] = useState('');
     const [userLocation, setUserLocation] = useState<string>('');
-    
-    // Auto-Save States
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'pending'>('saved');
     
-    // Refs
     const answersRef = useRef(answers);
     const logRef = useRef<string[]>(initialData?.activityLog || []);
     const isSubmittingRef = useRef(false);
     const timeLeftRef = useRef(0);
-    
-    // Throttling Refs
     const lastSentTimeRef = useRef<number>(0);
     const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Sync Ref
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
-    // Track Location
     useEffect(() => {
         if (exam.config.trackLocation && student.class !== 'PREVIEW') {
             if ('geolocation' in navigator) {
@@ -69,7 +62,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, []);
 
-    // Timer Logic
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (exam.config.timeLimit * 60 * 1000);
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
@@ -94,52 +86,39 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => clearInterval(timer);
     }, [deadline]);
 
-    // --- SMART THROTTLE SAVE LOGIC ---
     const triggerSmartSave = () => {
         if (student.class === 'PREVIEW') return;
-        
         const now = Date.now();
         const intervalMs = (exam.config.autoSaveInterval || 10) * 1000;
         const timeSinceLast = now - lastSentTimeRef.current;
-
         setSaveStatus('pending');
 
         if (timeSinceLast >= intervalMs) {
             performSave();
         } else {
             if (pendingUpdateRef.current) clearTimeout(pendingUpdateRef.current);
-            pendingUpdateRef.current = setTimeout(() => {
-                performSave();
-            }, intervalMs - timeSinceLast);
+            pendingUpdateRef.current = setTimeout(() => { performSave(); }, intervalMs - timeSinceLast);
         }
     };
 
     const performSave = () => {
         if (isSubmittingRef.current) return;
-        
         setSaveStatus('saving');
         lastSentTimeRef.current = Date.now();
-        
-        // Calculate basic grading even for auto-save
         const grading = calculateGrade(exam, answersRef.current);
-        
-        // Use onSubmit but with 'in_progress' status
         onSubmit(answersRef.current, timeLeftRef.current, 'in_progress', logRef.current, userLocation, grading);
-
         setTimeout(() => setSaveStatus('saved'), 800);
     };
 
-    // Clean up pending save on unmount
     useEffect(() => {
         return () => { if (pendingUpdateRef.current) clearTimeout(pendingUpdateRef.current); };
     }, []);
 
-    // --- BEHAVIOR DETECTION ---
     useEffect(() => {
         if (student.class === 'PREVIEW') return;
         const handleVisChange = () => {
             if (document.hidden && exam.config.detectBehavior && !isSubmittingRef.current) {
-                logRef.current.push(`[${new Date().toLocaleTimeString()}] Tab background/minimized`);
+                logRef.current.push(`[${new Date().toLocaleTimeString()}] Tab background`);
                 if (exam.config.continueWithPermission) {
                     setIsSubmitting(true);
                     alert("PELANGGARAN: Anda meninggalkan halaman ujian. Akses dikunci.");
@@ -187,159 +166,125 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return v !== "";
     };
 
-    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
     const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
+    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-40 font-sans selection:bg-orange-100 selection:text-orange-900">
-            {/* Elegant Sticky Header with Glassmorphism */}
-            <header className="sticky top-0 z-[60] bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all duration-300">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
-                    {/* Left: Subject & Student */}
+        <div className="min-h-screen bg-[#FDFDFD] font-sans selection:bg-orange-100 selection:text-orange-900 pb-32">
+            {/* Zen Header: Minimalis */}
+            <header className="fixed top-0 inset-x-0 z-[60] bg-white/90 backdrop-blur-md border-b border-slate-100 h-14 flex flex-col justify-end">
+                <div className="absolute top-0 left-0 h-0.5 bg-orange-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                <div className="flex items-center justify-between px-4 sm:px-6 h-full">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-orange-100">
-                            {exam.config.subject.charAt(0)}
-                        </div>
-                        <div className="hidden sm:block leading-tight">
-                            <h1 className="text-sm font-bold text-slate-800 truncate max-w-[150px]">{exam.config.subject}</h1>
-                            <p className="text-[10px] font-medium text-slate-500 truncate max-w-[150px]">{student.fullName}</p>
-                        </div>
+                         <span className="text-xs font-bold text-slate-800 truncate max-w-[120px] sm:max-w-xs">{exam.config.subject}</span>
+                         {saveStatus === 'saving' && <span className="text-[10px] text-orange-400 font-medium animate-pulse">Menyimpan...</span>}
                     </div>
                     
-                    {/* Center: Timer */}
-                    <div className="absolute left-1/2 -translate-x-1/2">
-                        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700'}`}>
-                            <ClockIcon className="w-4 h-4" />
-                            <span className="font-mono font-bold text-sm tracking-wider">{formatTime(timeLeft)}</span>
-                        </div>
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-tight transition-colors ${timeLeft < 300 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'}`}>
+                        <ClockIcon className="w-3.5 h-3.5" />
+                        {formatTime(timeLeft)}
                     </div>
-
-                    {/* Right: Status */}
-                    <div className="flex items-center gap-2">
-                        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
-                            saveStatus === 'saving' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                            saveStatus === 'pending' ? 'bg-slate-50 text-slate-400 border-slate-100' :
-                            'bg-emerald-50 text-emerald-600 border-emerald-100'
-                        }`}>
-                            {saveStatus === 'saving' ? 'Menyimpan...' : saveStatus === 'pending' ? 'Unsaved' : 'Tersimpan'}
-                        </div>
-                        <div className="sm:hidden text-xs font-bold text-slate-400">
-                            {answeredCount}/{totalQuestions}
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Slim Progress Bar */}
-                <div className="h-0.5 w-full bg-slate-100 relative">
-                    <div className="absolute top-0 left-0 h-full bg-orange-500 transition-all duration-500 ease-out" style={{width: `${progress}%`}}></div>
                 </div>
             </header>
 
             {warningMsg && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-8 py-3 rounded-full shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-2">
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce flex items-center gap-2">
                     <ExclamationTriangleIcon className="w-4 h-4" /> {warningMsg}
                 </div>
             )}
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 space-y-12">
                 {exam.questions.map((q, idx) => {
                     const num = exam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q);
                     
                     return (
-                        <div 
-                            key={q.id} 
-                            id={q.id}
-                            className={`scroll-mt-28 bg-white rounded-2xl p-6 md:p-8 border shadow-sm transition-all duration-300 ${answered ? 'border-orange-100 shadow-md' : 'border-slate-100'}`}
-                        >
-                            {/* Question Header */}
+                        <div key={q.id} id={q.id} className="scroll-mt-24">
+                            {/* Question Block */}
                             <div className="flex gap-4 mb-6">
-                                <div className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold shrink-0 transition-colors ${
-                                    q.questionType === 'INFO' ? 'bg-blue-50 text-blue-600' : 
-                                    answered ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                    {q.questionType === 'INFO' ? 'i' : num}
+                                <div className="shrink-0 pt-0.5">
+                                    <span className={`text-sm font-black ${answered ? 'text-orange-500' : 'text-slate-300'}`}>
+                                        {q.questionType === 'INFO' ? 'i' : num.toString().padStart(2, '0')}
+                                    </span>
                                 </div>
-                                <div className="prose prose-slate prose-lg max-w-none text-slate-800 font-medium leading-relaxed">
-                                    <div dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                <div className="flex-1 space-y-6">
+                                    {/* Text Content */}
+                                    <div className="prose prose-slate prose-lg max-w-none text-slate-800 font-medium leading-relaxed tracking-tight">
+                                        <div dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                    </div>
+
+                                    {/* Options Area */}
+                                    <div>
+                                        {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
+                                            <div className="flex flex-col gap-3">
+                                                {q.options.map((opt, i) => {
+                                                    const isSelected = answers[q.id] === opt;
+                                                    return (
+                                                        <button 
+                                                            key={i} 
+                                                            onClick={() => handleAnswer(q.id, opt)} 
+                                                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-start gap-4 group ${
+                                                                isSelected 
+                                                                ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-500 shadow-sm' 
+                                                                : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            <span className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold mt-0.5 transition-colors ${isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-300 text-slate-400 group-hover:border-orange-300'}`}>
+                                                                {String.fromCharCode(65 + i)}
+                                                            </span>
+                                                            <div className="text-base text-slate-700" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {q.questionType === 'ESSAY' && (
+                                            <textarea 
+                                                value={answers[q.id] || ''} 
+                                                onChange={e => handleAnswer(q.id, e.target.value)} 
+                                                className="w-full p-4 bg-white border border-slate-300 rounded-xl focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none min-h-[150px] text-base text-slate-800 placeholder:text-slate-300 shadow-sm" 
+                                                placeholder="Tulis jawaban..." 
+                                            />
+                                        )}
+
+                                        {q.questionType === 'FILL_IN_THE_BLANK' && (
+                                            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-4 py-3 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 shadow-sm">
+                                                <PencilIcon className="w-5 h-5 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    value={answers[q.id] || ''} 
+                                                    onChange={e => handleAnswer(q.id, e.target.value)} 
+                                                    className="w-full outline-none text-base text-slate-800 bg-transparent placeholder:text-slate-300 font-medium" 
+                                                    placeholder="Ketik jawaban singkat..." 
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-
-                            {/* Options / Inputs */}
-                            <div className="pl-0 md:pl-12">
-                                {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {q.options.map((opt, i) => {
-                                            const isSelected = answers[q.id] === opt;
-                                            return (
-                                                <button 
-                                                    key={i} 
-                                                    onClick={() => handleAnswer(q.id, opt)} 
-                                                    className={`w-full text-left p-4 md:p-5 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group ${
-                                                        isSelected 
-                                                        ? 'border-orange-500 bg-orange-50 shadow-sm ring-1 ring-orange-500' 
-                                                        : 'border-slate-100 hover:border-orange-200 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    <div className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                                        isSelected ? 'border-orange-500 bg-orange-500' : 'border-slate-300 group-hover:border-orange-300'
-                                                    }`}>
-                                                        {isSelected && <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm"></div>}
-                                                    </div>
-                                                    <div className={`text-base ${isSelected ? 'font-bold text-orange-900' : 'font-normal text-slate-700'}`} dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {q.questionType === 'ESSAY' && (
-                                    <div className="relative">
-                                        <textarea 
-                                            value={answers[q.id] || ''} 
-                                            onChange={e => handleAnswer(q.id, e.target.value)} 
-                                            className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-orange-500 focus:bg-white focus:ring-0 outline-none min-h-[180px] text-base text-slate-800 transition-all placeholder:text-slate-400" 
-                                            placeholder="Tulis jawaban Anda di sini secara lengkap..." 
-                                        />
-                                        <div className="absolute bottom-4 right-4 text-xs font-bold text-slate-300 pointer-events-none uppercase">Esai</div>
-                                    </div>
-                                )}
-                                
-                                {q.questionType === 'FILL_IN_THE_BLANK' && (
-                                    <div className="flex items-center gap-3">
-                                        <PencilIcon className="w-5 h-5 text-slate-400" />
-                                        <input 
-                                            type="text" 
-                                            value={answers[q.id] || ''} 
-                                            onChange={e => handleAnswer(q.id, e.target.value)} 
-                                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-orange-500 focus:bg-white focus:ring-0 outline-none text-base font-medium text-slate-800 transition-all" 
-                                            placeholder="Ketik jawaban singkat..." 
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                            
+                            {/* Divider for Rhythm */}
+                            {idx < exam.questions.length - 1 && <div className="h-px bg-slate-100 my-8 mx-auto w-11/12"></div>}
                         </div>
                     );
                 })}
-
-                {/* Bottom Spacer for Floating Button */}
-                <div className="h-24"></div>
             </main>
 
-            {/* Floating Action Bar */}
-            <div className="fixed bottom-6 inset-x-0 px-4 flex justify-center z-50 pointer-events-none">
-                <div className="bg-white/90 backdrop-blur-xl p-2 rounded-2xl shadow-2xl shadow-slate-300/50 border border-white pointer-events-auto flex items-center gap-3 max-w-sm w-full mx-auto transform transition-transform hover:scale-[1.02]">
-                    <div className="flex-1 px-4">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progres</p>
-                        <p className="text-xs font-bold text-slate-700">{answeredCount} dari {totalQuestions} Soal</p>
+            {/* Clean Floating Action Bar */}
+            <div className="fixed bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
+                <div className="bg-white/80 backdrop-blur-xl p-1.5 pr-2 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/50 pointer-events-auto flex items-center gap-3">
+                    <div className="px-4 flex flex-col items-start">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Terjawab</span>
+                        <span className="text-sm font-black text-slate-800 leading-none">{answeredCount}<span className="text-slate-300">/</span>{totalQuestions}</span>
                     </div>
                     <button 
                         onClick={() => handleSubmit(false)} 
                         disabled={isSubmitting} 
-                        className="bg-slate-900 text-white px-6 py-3.5 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        {isSubmitting ? 'Mengirim...' : 'Selesai'} <CheckCircleIcon className="w-5 h-5"/>
+                        {isSubmitting ? '...' : 'Selesai'} <CheckCircleIcon className="w-4 h-4 text-emerald-400"/>
                     </button>
                 </div>
             </div>
