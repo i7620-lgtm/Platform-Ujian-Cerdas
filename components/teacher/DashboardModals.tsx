@@ -1,8 +1,9 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon } from '../Icons';
 import { storageService } from '../../services/storage';
+import { supabase } from '../../lib/supabase'; // IMPORT SUPABASE
 import { RemainingTime } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
 
@@ -132,7 +133,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false); // State untuk Modal Share
@@ -140,34 +140,87 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
+    // FETCH INITIAL DATA
+    const fetchLatest = async () => {
+        if (!displayExam) return;
+        setIsRefreshing(true);
+        try {
+            const headers: Record<string, string> = teacherProfile ? {
+                'x-role': teacherProfile.accountType,
+                'x-user-id': teacherProfile.id,
+                'x-school': teacherProfile.school
+            } : {};
+            const data = await storageService.getResults(
+                displayExam.code, 
+                selectedClass === 'ALL' ? '' : selectedClass,
+                headers
+            );
+            setLocalResults(data);
+        } catch (e) { console.error("Fetch failed", e); }
+        finally { setIsRefreshing(false); }
+    };
+
+    useEffect(() => {
+        fetchLatest();
+    }, [displayExam, selectedClass, teacherProfile]);
+
+    // REALTIME SUBSCRIPTION
     useEffect(() => {
         if (!displayExam) return;
-        let isMounted = true;
-        const fetchLatest = async () => {
-            if(!isMounted) return;
-            setIsRefreshing(true);
-            try {
-                const headers: Record<string, string> = teacherProfile ? {
-                    'x-role': teacherProfile.accountType,
-                    'x-user-id': teacherProfile.id,
-                    'x-school': teacherProfile.school
-                } : {};
-                const data = await storageService.getResults(
-                    displayExam.code, 
-                    selectedClass === 'ALL' ? '' : selectedClass,
-                    headers
-                );
-                if (isMounted) {
-                    setLocalResults(data);
-                    setLastUpdated(new Date());
+
+        const channel = supabase
+            .channel('public:results')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to INSERT, UPDATE
+                    schema: 'public',
+                    table: 'results',
+                    filter: `exam_code=eq.${displayExam.code}`
+                },
+                (payload) => {
+                    const newResult = payload.new as any;
+                    
+                    // Filter based on class if selected
+                    if (selectedClass !== 'ALL' && newResult.class_name !== selectedClass) return;
+
+                    // Convert raw DB format to App Result format
+                    const convertedResult: Result = {
+                        student: {
+                            studentId: newResult.student_id,
+                            fullName: newResult.student_name,
+                            class: newResult.class_name,
+                            absentNumber: '00'
+                        },
+                        examCode: newResult.exam_code,
+                        answers: newResult.answers,
+                        score: newResult.score,
+                        correctAnswers: newResult.correct_answers,
+                        totalQuestions: newResult.total_questions,
+                        status: newResult.status,
+                        activityLog: newResult.activity_log,
+                        timestamp: new Date(newResult.updated_at).getTime(),
+                        location: newResult.location
+                    };
+
+                    setLocalResults(prev => {
+                        const idx = prev.findIndex(r => r.student.studentId === convertedResult.student.studentId);
+                        if (idx >= 0) {
+                            const updated = [...prev];
+                            updated[idx] = convertedResult;
+                            return updated;
+                        } else {
+                            return [...prev, convertedResult];
+                        }
+                    });
                 }
-            } catch (e) { console.error("Refresh failed", e); }
-            finally { if(isMounted) setIsRefreshing(false); }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
         };
-        fetchLatest(); 
-        const intervalId = setInterval(fetchLatest, 10000); 
-        return () => { isMounted = false; clearInterval(intervalId); };
-    }, [displayExam, selectedClass, teacherProfile]);
+    }, [displayExam, selectedClass]);
 
     if (!displayExam) return null;
 
@@ -217,7 +270,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                     <div className="flex items-center gap-3 mt-1">
                                         <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />
-                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Sinkronisasi...</span>}
+                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}
                                     </div>
                                 </div>
                             </div>
@@ -245,7 +298,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                Data diperbarui otomatis setiap 10 detik
+                                Supabase Realtime Connected
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
