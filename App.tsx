@@ -193,19 +193,19 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FDFEFF] text-slate-900 font-sans selection:bg-brand-100 selection:text-brand-700 overflow-x-hidden antialiased">
-        {/* Network Status Bar */}
-        <div className="fixed top-6 right-6 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+        {/* Network Status Bar - Moved to Bottom Left to prevent obstruction */}
+        <div className="fixed bottom-4 left-4 z-[100] flex flex-col items-start gap-2 pointer-events-none">
             {!isOnline ? (
                 <div className="bg-rose-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 animate-pulse pointer-events-auto">
                     <NoWifiIcon className="w-3 h-3"/> Offline
                 </div>
             ) : isSyncing ? (
-                <div className="bg-white/90 backdrop-blur-md text-brand-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border border-slate-100 flex items-center gap-2 pointer-events-auto">
+                <div className="bg-white/90 backdrop-blur-md text-brand-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-slate-100 flex items-center gap-2 pointer-events-auto">
                     <div className="w-3 h-3 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
                     Sync
                 </div>
             ) : (
-                <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-2 pointer-events-auto opacity-40 hover:opacity-100 transition-opacity">
+                <div className="bg-white/80 backdrop-blur-sm text-emerald-600 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-2 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity shadow-sm">
                     <WifiIcon className="w-3 h-3"/> Online
                 </div>
             )}
