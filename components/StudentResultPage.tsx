@@ -1,4 +1,4 @@
-
+ 
 import React, { useState } from 'react';
 import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
