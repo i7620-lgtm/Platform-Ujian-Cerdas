@@ -33,7 +33,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
 
-    const compositeId = `${fullName}-${studentClass}-${absentNumber}`.toLowerCase().replace(/[^a-z0-9-]/g, '_'); 
+    // PERUBAHAN: Format Student ID sekarang persis: "Nama Lengkap"-"Kelas"-"Nomor Absen"
+    // Ini memudahkan pembacaan manual di database Supabase.
+    // Contoh: "Budi Santoso-XII IPA 1-05"
+    const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
 
     onLoginSuccess(examCode.toUpperCase(), {
       fullName: fullName.trim(),
