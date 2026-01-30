@@ -170,19 +170,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
+    // Helper to optimize image rendering in dangerous HTML
+    const optimizeHtml = (html: string) => {
+        return html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
+    };
+
     return (
-        <div className="min-h-screen bg-[#FDFDFD] font-sans selection:bg-orange-100 selection:text-orange-900 pb-32">
+        <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-32">
             {/* Zen Header: Minimalis */}
-            <header className="fixed top-0 inset-x-0 z-[60] bg-white/90 backdrop-blur-md border-b border-slate-100 h-14 flex flex-col justify-end">
-                <div className="absolute top-0 left-0 h-0.5 bg-orange-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
-                <div className="flex items-center justify-between px-4 sm:px-6 h-full">
+            <header className="fixed top-0 inset-x-0 z-[60] bg-white/80 backdrop-blur-md border-b border-slate-100 h-12 flex flex-col justify-end transition-all">
+                <div className="absolute top-0 left-0 h-0.5 bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                <div className="flex items-center justify-between px-4 sm:px-6 h-full max-w-4xl mx-auto w-full">
                     <div className="flex items-center gap-3">
-                         <span className="text-xs font-bold text-slate-800 truncate max-w-[120px] sm:max-w-xs">{exam.config.subject}</span>
-                         {saveStatus === 'saving' && <span className="text-[10px] text-orange-400 font-medium animate-pulse">Menyimpan...</span>}
+                         <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{exam.config.subject}</span>
+                         {saveStatus === 'saving' && <span className="text-[9px] text-slate-400 font-medium tracking-wide">Menyimpan...</span>}
                     </div>
                     
-                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-tight transition-colors ${timeLeft < 300 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'}`}>
-                        <ClockIcon className="w-3.5 h-3.5" />
+                    <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-tight transition-colors ${timeLeft < 300 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'}`}>
+                        <ClockIcon className="w-3 h-3" />
                         {formatTime(timeLeft)}
                     </div>
                 </div>
@@ -194,46 +199,46 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
             )}
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 space-y-12">
+            <main className="max-w-3xl mx-auto px-5 sm:px-8 pt-24 space-y-12">
                 {exam.questions.map((q, idx) => {
                     const num = exam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q);
                     
                     return (
-                        <div key={q.id} id={q.id} className="scroll-mt-24">
+                        <div key={q.id} id={q.id} className="scroll-mt-28 group">
                             {/* Question Block */}
-                            <div className="flex gap-4 mb-6">
+                            <div className="flex gap-4 mb-4">
                                 <div className="shrink-0 pt-0.5">
-                                    <span className={`text-sm font-black ${answered ? 'text-orange-500' : 'text-slate-300'}`}>
-                                        {q.questionType === 'INFO' ? 'i' : num.toString().padStart(2, '0')}
+                                    <span className={`text-sm font-black w-6 h-6 flex items-center justify-center rounded-lg transition-colors ${answered ? 'text-white bg-indigo-500' : 'text-slate-300 bg-slate-50'}`}>
+                                        {q.questionType === 'INFO' ? 'i' : num}
                                     </span>
                                 </div>
-                                <div className="flex-1 space-y-6">
+                                <div className="flex-1 space-y-5">
                                     {/* Text Content */}
-                                    <div className="prose prose-slate prose-lg max-w-none text-slate-800 font-medium leading-relaxed tracking-tight">
-                                        <div dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                    <div className="prose prose-slate prose-sm max-w-none text-slate-700 font-medium leading-relaxed">
+                                        <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
                                     </div>
 
                                     {/* Options Area */}
                                     <div>
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                            <div className="flex flex-col gap-3">
+                                            <div className="flex flex-col gap-2">
                                                 {q.options.map((opt, i) => {
                                                     const isSelected = answers[q.id] === opt;
                                                     return (
                                                         <button 
                                                             key={i} 
                                                             onClick={() => handleAnswer(q.id, opt)} 
-                                                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-start gap-4 group ${
+                                                            className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 flex items-start gap-3 group/opt active:scale-[0.99] ${
                                                                 isSelected 
-                                                                ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-500 shadow-sm' 
-                                                                : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-slate-50'
+                                                                ? 'border-indigo-500 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-500' 
+                                                                : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50'
                                                             }`}
                                                         >
-                                                            <span className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold mt-0.5 transition-colors ${isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-300 text-slate-400 group-hover:border-orange-300'}`}>
+                                                            <span className={`flex items-center justify-center w-5 h-5 rounded border text-[10px] font-bold mt-0.5 transition-colors shrink-0 ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 text-slate-400 group-hover/opt:border-indigo-300'}`}>
                                                                 {String.fromCharCode(65 + i)}
                                                             </span>
-                                                            <div className="text-base text-slate-700" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                            <div className="text-sm text-slate-600 leading-snug" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                         </button>
                                                     );
                                                 })}
@@ -244,19 +249,19 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             <textarea 
                                                 value={answers[q.id] || ''} 
                                                 onChange={e => handleAnswer(q.id, e.target.value)} 
-                                                className="w-full p-4 bg-white border border-slate-300 rounded-xl focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none min-h-[150px] text-base text-slate-800 placeholder:text-slate-300 shadow-sm" 
+                                                className="w-full p-4 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none min-h-[120px] text-sm text-slate-700 placeholder:text-slate-300 shadow-sm transition-all" 
                                                 placeholder="Tulis jawaban..." 
                                             />
                                         )}
 
                                         {q.questionType === 'FILL_IN_THE_BLANK' && (
-                                            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-4 py-3 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 shadow-sm">
-                                                <PencilIcon className="w-5 h-5 text-slate-400" />
+                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 shadow-sm transition-all">
+                                                <PencilIcon className="w-4 h-4 text-slate-400" />
                                                 <input 
                                                     type="text" 
                                                     value={answers[q.id] || ''} 
                                                     onChange={e => handleAnswer(q.id, e.target.value)} 
-                                                    className="w-full outline-none text-base text-slate-800 bg-transparent placeholder:text-slate-300 font-medium" 
+                                                    className="w-full outline-none text-sm text-slate-700 bg-transparent placeholder:text-slate-300 font-medium" 
                                                     placeholder="Ketik jawaban singkat..." 
                                                 />
                                             </div>
@@ -265,26 +270,26 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             </div>
                             
-                            {/* Divider for Rhythm */}
-                            {idx < exam.questions.length - 1 && <div className="h-px bg-slate-100 my-8 mx-auto w-11/12"></div>}
+                            {/* Visual Divider (Only on large screens, subtle) */}
+                            {idx < exam.questions.length - 1 && <div className="h-px bg-slate-50 w-full my-8"></div>}
                         </div>
                     );
                 })}
             </main>
 
-            {/* Clean Floating Action Bar */}
-            <div className="fixed bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
-                <div className="bg-white/80 backdrop-blur-xl p-1.5 pr-2 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/50 pointer-events-auto flex items-center gap-3">
-                    <div className="px-4 flex flex-col items-start">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Terjawab</span>
-                        <span className="text-sm font-black text-slate-800 leading-none">{answeredCount}<span className="text-slate-300">/</span>{totalQuestions}</span>
+            {/* Floating Status & Submit - Ultra Compact */}
+            <div className="fixed bottom-6 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
+                <div className="bg-white/90 backdrop-blur-xl p-1.5 rounded-full shadow-2xl shadow-indigo-500/10 border border-white/50 pointer-events-auto flex items-center gap-2 pr-2">
+                    <div className="pl-4 pr-2 flex flex-col justify-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Terjawab</span>
+                        <span className="text-sm font-black text-slate-800 leading-none">{answeredCount}<span className="text-slate-300 font-light mx-0.5">/</span>{totalQuestions}</span>
                     </div>
                     <button 
                         onClick={() => handleSubmit(false)} 
                         disabled={isSubmitting} 
-                        className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="bg-indigo-600 text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        {isSubmitting ? '...' : 'Selesai'} <CheckCircleIcon className="w-4 h-4 text-emerald-400"/>
+                        {isSubmitting ? '...' : 'Selesai'} <CheckCircleIcon className="w-3.5 h-3.5"/>
                     </button>
                 </div>
             </div>
