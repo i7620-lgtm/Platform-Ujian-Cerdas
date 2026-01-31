@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile } from '../types';
 
@@ -51,8 +51,11 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
     }
 
     const sanitizedQuestions = questionsToProcess.map(q => {
-        const { correctAnswer, trueFalseRows, matchingPairs, options, ...rest } = q;
-        const sanitizedQ = { ...rest, options: options ? [...options] : undefined } as Question;
+        // PERBAIKAN: Kita tidak boleh menghapus kunci jawaban (correctAnswer, trueFalseRows value, matchingPairs relations)
+        // karena grading dilakukan di client-side (StudentExamPage).
+        // Kita hanya mengacak opsi tampilan (options) jika diminta.
+        
+        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
 
         if (exam.config.shuffleAnswers) {
             if (sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
@@ -62,13 +65,10 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
             }
         }
 
-        if (trueFalseRows) sanitizedQ.trueFalseRows = trueFalseRows.map(r => ({ text: r.text, answer: false })) as any;
-        
-        if (matchingPairs && Array.isArray(matchingPairs)) {
-            const rights = matchingPairs.map(p => p.right).sort(() => Math.random() - 0.5);
-            sanitizedQ.matchingPairs = matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
-        }
-        
+        // PERBAIKAN: Jangan reset jawaban True/False atau acak MatchingPairs di level objek data
+        // Pengacakan tampilan MatchingPairs akan dilakukan oleh komponen UI (StudentExamPage)
+        // agar logika pengecekan jawaban tetap valid.
+
         return sanitizedQ;
     });
 
