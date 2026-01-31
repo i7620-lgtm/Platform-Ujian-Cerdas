@@ -145,11 +145,26 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
             return next;
         });
+
+        // Fix #1: Realtime Logic Update
         if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
-            const now = Date.now();
-            if (now - lastBroadcastTimeRef.current > 5000) {
-                broadcastProgress();
-                lastBroadcastTimeRef.current = now;
+            // Cek apakah perlu broadcast
+            const q = exam.questions.find(x => x.id === qId);
+            let shouldBroadcast = true;
+            
+            // Khusus Pilihan Ganda Kompleks: Hanya update jika minimal 2 jawaban dipilih
+            if (q?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                 const count = val.split(',').filter(x => x.trim()).length;
+                 // Jika kurang dari 2, jangan broadcast ke guru (tapi tetap simpan lokal)
+                 if (count < 2) shouldBroadcast = false;
+            }
+
+            if (shouldBroadcast) {
+                const now = Date.now();
+                if (now - lastBroadcastTimeRef.current > 5000) {
+                    broadcastProgress();
+                    lastBroadcastTimeRef.current = now;
+                }
             }
         }
     };
