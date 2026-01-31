@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
 import { 
@@ -17,7 +17,9 @@ import {
     EyeIcon,
     XMarkIcon,
     ShareIcon,
-    DocumentArrowUpIcon // Used for Archive Icon
+    DocumentArrowUpIcon,
+    TableCellsIcon,
+    UserIcon,
 } from '../Icons';
 
 // ... (RemainingTime, MetaBadge, CreationView, DraftsView, OngoingExamsView, UpcomingExamsView tetap sama seperti sebelumnya) ...
@@ -156,6 +158,171 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
             ) : (
                 <div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ChartBarIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Belum Ada Riwayat</h3><p className="mt-1 text-sm text-gray-500">Hasil ujian yang telah selesai akan muncul di sini.</p></div>
             )}
+        </div>
+    );
+};
+
+// --- ARCHIVE VIEWER (NEW & ENHANCED) ---
+interface ArchiveViewerProps {
+    onReuseExam: (exam: Exam) => void;
+}
+
+type ArchiveData = {
+    exam: Exam;
+    results: Result[];
+};
+
+type ArchiveTab = 'DETAIL' | 'RESULTS' | 'ANALYSIS';
+
+export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
+    const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
+    const [error, setError] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            processFile(e.target.files[0]);
+        }
+    };
+    
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            processFile(e.dataTransfer.files[0]);
+        }
+    };
+    
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); e.stopPropagation();
+    };
+
+    const processFile = (file: File) => {
+        setError('');
+        if (file.type !== 'application/json') {
+            setError('File harus berformat .json');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const result = event.target?.result;
+                if (typeof result === 'string') {
+                    const data: ArchiveData = JSON.parse(result);
+                    if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
+                        setArchiveData(data);
+                        setActiveTab('DETAIL');
+                    } else {
+                        setError('File JSON tidak valid atau bukan format arsip lengkap.');
+                    }
+                }
+            } catch (e) {
+                setError('Gagal membaca file. Pastikan file berformat JSON yang benar.');
+            }
+        };
+        reader.onerror = () => setError('Terjadi kesalahan saat membaca file.');
+        reader.readAsText(file);
+    };
+
+    const resetView = () => {
+        setArchiveData(null); setError('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // --- UPLOAD VIEW ---
+    if (!archiveData) {
+        return (
+            <div className="max-w-4xl mx-auto text-center animate-fade-in p-8 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <div className="mb-8"><div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4"><DocumentArrowUpIcon className="w-8 h-8" /></div><h2 className="text-2xl font-bold text-slate-800">Buka Arsip Ujian</h2><p className="text-sm text-slate-500 mt-2">Pilih file arsip ujian (.json) untuk melihat detail soal, hasil siswa, dan analisisnya.</p></div>
+                <div onDrop={handleDrop} onDragOver={handleDragOver} className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:bg-slate-50 transition-colors relative cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                    <div className="space-y-2 pointer-events-none"><CloudArrowUpIcon className="w-12 h-12 text-slate-400 mx-auto" /><p className="text-slate-600 font-medium">Seret file ke sini atau klik untuk memilih</p><p className="text-xs text-slate-400">Hanya file .json yang berisi data ujian dan hasil siswa.</p></div>
+                </div>
+                {error && <div className="mt-6 p-4 bg-rose-50 text-rose-700 text-sm rounded-xl border border-rose-100"><strong>Error:</strong> {error}</div>}
+            </div>
+        );
+    }
+    
+    // --- DISPLAY VIEW ---
+    const { exam, results } = archiveData;
+    const totalStudents = results.length;
+    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
+    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
+    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
+
+    return (
+        <div className="max-w-5xl mx-auto animate-fade-in space-y-6">
+            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Pratinjau Arsip: <span className="text-indigo-600">{exam.config.subject}</span></h2>
+                        <p className="text-sm text-slate-500 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}</p>
+                    </div>
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 transition-all">Muat Lain</button>
+                        <button onClick={() => onReuseExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
+                    </div>
+                </div>
+                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-4">
+                    {(['DETAIL', 'RESULTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
+                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'RESULTS' ? `Hasil Siswa (${totalStudents})` : 'Analisis Soal';
+                        return <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>{label}</button>
+                    })}
+                </div>
+            </div>
+
+            {/* TAB CONTENT */}
+            <div className="animate-fade-in">
+                {activeTab === 'DETAIL' && (
+                    <div className="space-y-4">
+                        {exam.questions.map((q, index) => {
+                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                            return (
+                                <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                                    <div className="flex items-start gap-4">
+                                        <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500">{q.questionType === 'INFO' ? 'i' : questionNumber}</span>
+                                        <div className="flex-1 space-y-4 min-w-0">
+                                            <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer === opt ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer === opt && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 rounded-lg overflow-hidden"><table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="p-2 font-bold text-slate-600 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 text-center w-32">Jawaban</th></tr></thead><tbody>{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100"><td className="p-2">{r.text}</td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 bg-emerald-50':'text-rose-700 bg-rose-50'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
+                                            {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 text-sm"><div className="flex-1 font-medium">{p.left}</div><div className="text-slate-300">→</div><div className="flex-1 font-bold">{p.right}</div></div>)}</div>}
+                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && <div className="mt-4 pt-3 border-t"><p className="text-[10px] font-bold text-slate-400 uppercase">Kunci Jawaban</p><div className="mt-1 p-3 rounded-lg bg-slate-50 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div></div>}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+                {activeTab === 'RESULTS' && (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                         <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50/50"><tr><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Jawaban Benar</th></tr></thead>
+                            <tbody className="divide-y divide-slate-50">{results.map(r => <tr key={r.student.studentId}><td className="px-6 py-4 font-bold text-slate-800">{r.student.fullName}</td><td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td><td className="px-6 py-4 text-center text-lg font-black text-indigo-600">{r.score}</td><td className="px-6 py-4 text-center font-bold text-slate-600">{r.correctAnswers} / {r.totalQuestions}</td></tr>)}</tbody>
+                         </table>
+                    </div>
+                )}
+                {activeTab === 'ANALYSIS' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-indigo-50 text-indigo-600"><ChartBarIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Rata-rata</p><p className="text-2xl font-black text-slate-800">{averageScore}</p></div></div>
+                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-emerald-50 text-emerald-600"><CheckCircleIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Tertinggi</p><p className="text-2xl font-black text-slate-800">{highestScore}</p></div></div>
+                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-rose-50 text-rose-600"><XMarkIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Terendah</p><p className="text-2xl font-black text-slate-800">{lowestScore}</p></div></div>
+                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-blue-50 text-blue-600"><UserIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Partisipan</p><p className="text-2xl font-black text-slate-800">{totalStudents}</p></div></div>
+                        </div>
+                        <div className="space-y-4">
+                            {exam.questions.filter(q=>q.questionType !== 'INFO').map((q,idx) => {
+                                let correctCount = 0;
+                                results.forEach(r => { if(String(r.answers[q.id] || '').trim().toLowerCase() === String(q.correctAnswer || '').trim().toLowerCase()) correctCount++; });
+                                const correctRate = totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
+                                return (<div key={q.id} className="bg-white p-4 rounded-xl border border-slate-100"><div className="flex items-center justify-between"><div className="text-sm font-bold text-slate-700 truncate pr-4">Soal {idx+1}</div><div className="text-xs font-bold text-slate-500">{correctRate}% Benar</div></div><div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2"><div className={`h-full ${correctRate > 75 ? 'bg-emerald-500' : correctRate > 40 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{width: `${correctRate}%`}}></div></div></div>)
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
