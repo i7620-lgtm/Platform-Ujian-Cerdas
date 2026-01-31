@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon } from './Icons';
@@ -38,6 +39,7 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
     // LOCAL STORAGE KEY
     const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
+    const CACHED_EXAM_KEY = `exam_def_${exam.code}`; // New Cache for Exam Definition
 
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +47,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [userLocation, setUserLocation] = useState<string>('');
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'pending'>('saved');
     
+    // Gunakan local exam jika ada (untuk offline refresh support)
+    const [activeExam, setActiveExam] = useState<Exam>(exam);
+
     const answersRef = useRef<Record<string, string>>({});
     const logRef = useRef<string[]>(initialData?.activityLog || []);
     const isSubmittingRef = useRef(false);
@@ -54,11 +59,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // --- INITIALIZE STATE FROM LOCAL STORAGE OR DB ---
     useEffect(() => {
         const loadState = () => {
+            // 1. Cache Exam Definition (Anti-Refresh for Questions/Images)
+            try {
+                localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam));
+            } catch (e) { console.warn("Quota exceeded for caching exam"); }
+
+            // 2. Load Answers
             const localData = localStorage.getItem(STORAGE_KEY);
             if (localData) {
                 try {
                     const parsed = JSON.parse(localData);
-                    // Gunakan data lokal jika ada
                     setAnswers(parsed.answers || {});
                     answersRef.current = parsed.answers || {};
                     if (parsed.logs) logRef.current = parsed.logs;
@@ -66,14 +76,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 } catch(e) { console.error("Error parsing local exam data", e); }
             }
             
-            // Fallback ke data DB jika tidak ada di lokal
+            // Fallback ke DB
             if (initialData?.answers) {
                 setAnswers(initialData.answers);
                 answersRef.current = initialData.answers;
             }
         };
         loadState();
-    }, [STORAGE_KEY, initialData]);
+    }, [STORAGE_KEY, initialData, exam]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
@@ -113,7 +123,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [deadline]);
 
     // --- SAVE TO LOCAL STORAGE & BROADCAST PROGRESS ---
-    // Menggantikan fungsi save ke database yang lama
     const handleAnswerChange = (qId: string, val: string) => {
         setAnswers(prev => {
             const next = { ...prev, [qId]: val };
@@ -126,14 +135,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     logs: logRef.current,
                     lastUpdated: Date.now()
                 }));
-                setSaveStatus('saved'); // Dianggap tersimpan karena sudah di lokal
+                setSaveStatus('saved'); 
             }
-            
             return next;
         });
         
-        // 2. Broadcast Progress ke Guru (Throttled per 5 detik)
-        if (student.class !== 'PREVIEW') {
+        // 2. Broadcast Progress ke Guru (Conditional)
+        // Hanya jika TIDAK dalam mode skala besar (disableRealtime = false/undefined)
+        if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
             const now = Date.now();
             if (now - lastBroadcastTimeRef.current > 5000) {
                 broadcastProgress();
@@ -146,7 +155,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = Object.keys(answersRef.current).length;
         
-        // Kirim sinyal ringan ke guru (TIDAK MASUK DB)
         storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ)
             .catch(err => console.error("Broadcast failed", err));
     };
@@ -156,13 +164,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const handleVisChange = () => {
             if (document.hidden && exam.config.detectBehavior && !isSubmittingRef.current) {
                 logRef.current.push(`[${new Date().toLocaleTimeString()}] Tab background`);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current })); // Sync logs to local
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current })); 
                 
                 if (exam.config.continueWithPermission) {
                     setIsSubmitting(true);
                     alert("PELANGGARAN: Anda meninggalkan halaman ujian. Akses dikunci.");
                     const grading = calculateGrade(exam, answersRef.current);
-                    // Force Close: Kirim ke DB
                     onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current, userLocation, grading);
                 } else {
                     setWarningMsg("PERINGATAN: Jangan tinggalkan halaman ujian!");
@@ -179,13 +186,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setIsSubmitting(true);
         setSaveStatus('saving');
         
-        // Final Sync: Hitung nilai dan kirim ke DB Supabase
         const grading = calculateGrade(exam, answersRef.current);
+        
+        // Submit akan dihandle oleh storageService, termasuk antrean offline
         await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
         
-        // Hapus data lokal setelah sukses submit
         if (status === 'completed' || status === 'force_closed') {
             localStorage.removeItem(STORAGE_KEY);
+            // Optional: Keep exam definition cache until user explicitly exits or result shown
         }
     };
 
@@ -218,7 +226,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 <div className="flex items-center justify-between px-4 sm:px-6 h-full max-w-4xl mx-auto w-full">
                     <div className="flex items-center gap-3">
                          <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{exam.config.subject}</span>
-                         {/* Indikator Penyimpanan Lokal */}
                          <span className="text-[9px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 
                             Tersimpan di Perangkat
@@ -239,8 +246,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             )}
 
             <main className="max-w-3xl mx-auto px-5 sm:px-8 pt-24 space-y-12">
-                {exam.questions.map((q, idx) => {
-                    const num = exam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
+                {activeExam.questions.map((q, idx) => {
+                    const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q);
                     
                     return (
@@ -306,7 +313,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 </div>
                             </div>
                             
-                            {idx < exam.questions.length - 1 && <div className="h-px bg-slate-50 w-full my-8"></div>}
+                            {idx < activeExam.questions.length - 1 && <div className="h-px bg-slate-50 w-full my-8"></div>}
                         </div>
                     );
                 })}
