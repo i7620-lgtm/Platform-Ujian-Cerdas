@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime } from './DashboardViews';
@@ -45,6 +45,43 @@ const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; e
         });
         return { counts, totalAnswered };
     }, [examResults, q.id]);
+
+    // Determine correct answer string for comparison in generic list
+    const correctAnswerString = useMemo(() => {
+        if (q.questionType === 'MULTIPLE_CHOICE') return q.correctAnswer;
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return q.correctAnswer;
+        if (q.questionType === 'FILL_IN_THE_BLANK') return q.correctAnswer;
+        if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) {
+            const obj: Record<number, boolean> = {};
+            q.trueFalseRows.forEach((r, i) => obj[i] = r.answer);
+            return JSON.stringify(obj);
+        }
+        if (q.questionType === 'MATCHING' && q.matchingPairs) {
+            const obj: Record<number, string> = {};
+            q.matchingPairs.forEach((p, i) => obj[i] = p.right);
+            return JSON.stringify(obj);
+        }
+        return null;
+    }, [q]);
+
+    const normalize = (str: string) => str.trim().toLowerCase();
+
+    const isCorrectAnswer = (ans: string) => {
+        if (!correctAnswerString) return false;
+        // Simple comparison for exact matches (JSON strings or simple text)
+        if (ans === correctAnswerString) return true;
+        // Case insensitive for text
+        if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'MULTIPLE_CHOICE') {
+            return normalize(ans) === normalize(correctAnswerString);
+        }
+        // Set comparison for Complex MC
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(normalize(ans).split(','));
+            const cSet = new Set(normalize(correctAnswerString).split(','));
+            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        }
+        return false;
+    };
 
     return (
         <div className={`border rounded-2xl bg-white transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-md ring-1 ring-indigo-50 border-indigo-100' : 'border-slate-100 hover:border-indigo-100'}`}>
@@ -95,13 +132,39 @@ const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; e
                             </div>
                         ) : (
                             <div className="max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded-xl">
+                                {q.correctAnswer || (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') ? (
+                                    <div className="mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-xs text-indigo-700">
+                                        <span className="font-bold">Kunci Jawaban: </span> 
+                                        {q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? 
+                                            q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
+                                        q.questionType === 'MATCHING' && q.matchingPairs ?
+                                            q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
+                                            q.correctAnswer
+                                        }
+                                    </div>
+                                ) : null}
                                 <ul className="space-y-2">
-                                    {Object.entries(distribution.counts).map(([ans, count], idx) => (
-                                        <li key={idx} className="text-xs text-slate-600 flex justify-between border-b border-slate-100 pb-1 last:border-0">
-                                            <span className="truncate flex-1 pr-4 italic">"{ans}"</span>
-                                            <span className="font-bold">{count} Siswa</span>
-                                        </li>
-                                    ))}
+                                    {Object.entries(distribution.counts).map(([ans, count], idx) => {
+                                        const isCorrect = isCorrectAnswer(ans);
+                                        // Formatter for ugly JSON strings
+                                        let displayAns = ans;
+                                        try {
+                                            if (ans.startsWith('{')) {
+                                                const parsed = JSON.parse(ans);
+                                                displayAns = Object.entries(parsed).map(([k,v]) => `${v}`).join(', ');
+                                            }
+                                        } catch(e){}
+
+                                        return (
+                                            <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
+                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`}>"{displayAns}"</span>
+                                                </div>
+                                                <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             </div>
                         )}
@@ -503,6 +566,7 @@ interface FinishedExamModalProps {
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teacherProfile, onClose }) => {
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
 
     useEffect(() => {
         const fetchResults = async () => {
@@ -541,8 +605,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                 if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                     if (studentAns === correctAns) correctCount++;
                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                     // Check if sets match (order doesn't matter usually, but simple string compare might fail if sorted differently)
-                     // Assuming comma separated sorted for simple check or exact match
                      const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
                      const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
                      if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correctCount++;
@@ -558,51 +620,122 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
             <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-white relative">
-                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                 <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white sticky top-0 z-10 gap-4">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Analisis Hasil Ujian</h2>
                         <p className="text-sm text-slate-500">{exam.config.subject} • {exam.code}</p>
                     </div>
-                    <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all">
-                        <XMarkIcon className="w-6 h-6"/>
-                    </button>
+                    <div className="flex gap-2">
+                        <div className="bg-slate-100 p-1 rounded-xl flex">
+                            <button onClick={() => setActiveTab('ANALYSIS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'ANALYSIS' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Analisis Soal</button>
+                            <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'STUDENTS' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Rekap Siswa</button>
+                        </div>
+                        <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all">
+                            <XMarkIcon className="w-6 h-6"/>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
                     {isLoading ? (
                         <div className="flex items-center justify-center h-full text-slate-400 font-bold">Memuat data...</div>
                     ) : (
-                        <div className="space-y-8">
-                            {/* Summary Stats */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
-                                <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
-                                <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
-                                <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
-                            </div>
+                        activeTab === 'ANALYSIS' ? (
+                            <div className="space-y-8">
+                                {/* Summary Stats */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
+                                    <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
+                                    <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
+                                    <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
+                                </div>
 
-                            {/* Question Analysis */}
-                            <div>
-                                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <TableCellsIcon className="w-5 h-5 text-slate-400"/>
-                                    Analisis Butir Soal
-                                </h3>
-                                <div className="grid grid-cols-1 gap-4">
-                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                        const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
-                                        return (
-                                            <QuestionAnalysisItem 
-                                                key={q.id} 
-                                                q={q} 
-                                                index={idx} 
-                                                stats={stats} 
-                                                examResults={results}
-                                            />
-                                        );
-                                    })}
+                                {/* Question Analysis */}
+                                <div>
+                                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <TableCellsIcon className="w-5 h-5 text-slate-400"/>
+                                        Analisis Butir Soal
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                            const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
+                                            return (
+                                                <QuestionAnalysisItem 
+                                                    key={q.id} 
+                                                    q={q} 
+                                                    index={idx} 
+                                                    stats={stats} 
+                                                    examResults={results}
+                                                />
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">B/S/Total</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aktivitas</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Lokasi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {results.map(r => (
+                                            <tr key={r.student.studentId} className="hover:bg-slate-50/30">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                        {r.score}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
+                                                    <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {r.activityLog && r.activityLog.length > 0 ? (
+                                                        <div className="group relative inline-block">
+                                                            <span className="cursor-help text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 flex items-center justify-center gap-1 w-fit mx-auto">
+                                                                <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
+                                                            </span>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 pointer-events-none">
+                                                                <ul className="list-disc pl-3 space-y-1">
+                                                                    {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
+                                                                    {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">Aman</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
+                                                    {exam.config.trackLocation && r.location ? (
+                                                        <a 
+                                                            href={`https://www.google.com/maps?q=${r.location}`} 
+                                                            target="_blank" 
+                                                            rel="noreferrer"
+                                                            className="text-blue-600 hover:underline flex items-center justify-center gap-1"
+                                                        >
+                                                            Maps ↗
+                                                        </a>
+                                                    ) : '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
                     )}
                 </div>
             </div>
