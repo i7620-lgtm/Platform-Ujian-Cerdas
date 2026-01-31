@@ -22,8 +22,6 @@ import {
     UserIcon,
 } from '../Icons';
 
-// ... (RemainingTime, MetaBadge, CreationView, DraftsView, OngoingExamsView, UpcomingExamsView tetap sama seperti sebelumnya) ...
-
 // --- REMAINING TIME COMPONENT ---
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
     const calculateTimeLeft = () => {
@@ -46,9 +44,6 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
 };
 
 const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { if (!text || text === 'Lainnya') return null; return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>{text}</span>); };
-
-// ... [CreationView, DraftsView, OngoingExamsView, UpcomingExamsView components kept as is] ...
-// I will provide the CreationView etc in full to replace the file correctly.
 
 // --- CREATION VIEW ---
 interface CreationViewProps { onQuestionsGenerated: (questions: Question[], mode: 'manual' | 'auto') => void; }
