@@ -175,6 +175,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
                 if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
+                
+                // Jika Mode Skala Besar (disableRealtime) diaktifkan, matikan fitur realtime-heavy
+                if (name === 'disableRealtime' && checked) {
+                    newConfig.continueWithPermission = false;
+                    newConfig.enablePublicStream = false;
+                }
+
                 return newConfig;
             });
         } else {
@@ -447,7 +454,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Deteksi Pindah Tab</span></label>
                            {config.detectBehavior && (
-                            <label className="flex items-center ml-6 p-2 bg-rose-50 rounded-lg text-rose-700 cursor-pointer group"><input type="checkbox" name="continueWithPermission" checked={config.continueWithPermission} onChange={handleConfigChange} className="h-4 w-4 rounded text-rose-600 focus:ring-rose-500 border-rose-300" /><span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span></label>
+                            <label className={`flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group ${config.disableRealtime ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-rose-50 text-rose-700'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    name="continueWithPermission" 
+                                    checked={config.continueWithPermission} 
+                                    onChange={handleConfigChange} 
+                                    disabled={config.disableRealtime}
+                                    className={`h-4 w-4 rounded border-rose-300 ${config.disableRealtime ? 'text-gray-400 focus:ring-0 cursor-not-allowed' : 'text-rose-600 focus:ring-rose-500'}`} 
+                                />
+                                <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
+                            </label>
                            )}
                         </div>
 
@@ -456,7 +473,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span></label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Pantauan Orang Tua (Live)</span></label>
+                                <label className={`flex items-center p-3 rounded-xl border border-gray-100 transition-colors cursor-pointer group shadow-sm ${config.disableRealtime ? 'bg-gray-50 cursor-not-allowed' : 'hover:bg-slate-50'}`}>
+                                    <input 
+                                        type="checkbox" 
+                                        name="enablePublicStream" 
+                                        checked={config.enablePublicStream} 
+                                        onChange={handleConfigChange} 
+                                        disabled={config.disableRealtime}
+                                        className={`h-5 w-5 rounded border-gray-300 ${config.disableRealtime ? 'text-gray-400 focus:ring-0 cursor-not-allowed' : 'text-primary focus:ring-primary'}`} 
+                                    />
+                                    <span className={`ml-3 text-sm font-medium transition-colors ${config.disableRealtime ? 'text-gray-400' : 'text-gray-700 group-hover:text-primary'}`}>Pantauan Orang Tua (Live)</span>
+                                </label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                                 
                                 {/* Mode Skala Besar */}
