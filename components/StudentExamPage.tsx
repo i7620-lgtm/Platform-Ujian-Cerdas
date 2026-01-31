@@ -54,7 +54,7 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     });
 
     const score = scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
-    return { score, correctCount, totalQuestions: scorableQuestions.length };
+    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
 };
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {

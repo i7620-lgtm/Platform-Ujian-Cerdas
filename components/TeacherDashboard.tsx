@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -13,9 +13,9 @@ import {
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
-import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView } from './teacher/DashboardViews';
+import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
-import { storageService } from '../services/storage'; // Import service
+import { storageService } from '../services/storage'; // Perbaikan path: ../services/storage
 
 interface TeacherDashboardProps {
     teacherProfile: TeacherProfile;
@@ -30,7 +30,7 @@ interface TeacherDashboardProps {
     onRefreshResults: () => Promise<void>;
 }
 
-type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS';
+type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
     teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
@@ -145,33 +145,57 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setResetKey(prev => prev + 1); 
     };
 
+    const handleReuseExam = (examToReuse: Exam) => {
+        setQuestions(examToReuse.questions);
+        const newConfig = { ...examToReuse.config, date: new Date().toISOString().split('T')[0] };
+        setConfig(newConfig);
+        setManualMode(true);
+        setEditingExam(null);
+        setGeneratedCode('');
+        setView('UPLOAD');
+        setResetKey(prev => prev + 1);
+    };
+
     // ARCHIVE LOGIC
     const handleArchiveExam = async (exam: Exam) => {
-        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nFile JSON akan didownload ke perangkat Anda, dan gambar-gambar di cloud akan dihapus untuk menghemat ruang. Ujian ini tidak akan bisa diakses online lagi setelah ini.`)) return;
+        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nFile JSON (termasuk hasil siswa) akan diunduh, dan aset cloud akan dihapus. Ujian tidak bisa diakses online lagi.`)) return;
         
         try {
             // 1. Get Fat Exam Object (Base64 Images)
             const fatExam = await storageService.getExamForArchive(exam.code);
             if (!fatExam) throw new Error("Gagal mengambil data ujian.");
 
-            // 2. Trigger Download
-            const jsonString = JSON.stringify(fatExam, null, 2);
+            // 2. Get All Results for this exam
+            const examResults = await storageService.getResults(exam.code, undefined, { 
+                'x-user-id': teacherProfile.id,
+                'x-role': teacherProfile.accountType,
+                'x-school': teacherProfile.school
+            });
+
+            // 3. Create comprehensive archive object
+            const archivePayload = {
+                exam: fatExam,
+                results: examResults
+            };
+
+            // 4. Trigger Download
+            const jsonString = JSON.stringify(archivePayload, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `ARSIP_${exam.config.subject.replace(/\s+/g, '_')}_${exam.code}.json`;
+            link.download = `ARSIP_LENGKAP_${exam.config.subject.replace(/\s+/g, '_')}_${exam.code}.json`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            // 3. Cleanup Cloud
+            // 5. Cleanup Cloud
             await storageService.cleanupExamAssets(exam.code);
-            await deleteExam(exam.code); // Hapus dari DB juga karena sudah diarsip
+            await deleteExam(exam.code); // Hapus dari DB
             onRefreshExams();
             
-            alert("Arsip berhasil didownload dan data cloud dibersihkan.");
+            alert("Arsip berhasil diunduh dan data cloud dibersihkan.");
         } catch (e) {
             console.error(e);
             alert("Gagal mengarsipkan ujian.");
@@ -229,6 +253,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                          <button onClick={() => setView('ONGOING')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Berlangsung</button>
                          <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Terjadwal</button>
                          <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Selesai</button>
+                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buka Arsip</button>
                     </nav>
                 </div>
             </header>
@@ -254,6 +279,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onArchiveExam={handleArchiveExam} // Pass Archive Handler
                     />
                 )}
+                {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
             </main>
 
             {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}
