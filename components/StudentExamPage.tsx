@@ -27,8 +27,6 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             // Jawaban siswa: "A,C" -> set("a", "c")
-             // Kunci: "A,C" -> set("a", "c")
              const studentSet = new Set(normalize(studentAnswer).split(',').map(s => s.trim()));
              const correctSet = new Set(normalize(q.correctAnswer).split(',').map(s => s.trim()));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
@@ -37,7 +35,6 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
         }
         else if (q.questionType === 'TRUE_FALSE') {
             try {
-                // Jawaban siswa: {"0": true, "1": false}
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.trueFalseRows?.every((row: any, idx: number) => {
                     return ansObj[idx] === row.answer;
@@ -47,10 +44,8 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
         }
         else if (q.questionType === 'MATCHING') {
             try {
-                // Jawaban siswa: {"0": "Text Kanan", "1": "Text Kanan Lain"}
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.matchingPairs?.every((pair: any, idx: number) => {
-                    // Cek apakah jawaban untuk baris ke-idx (kiri) sama dengan pasangan kanannya (right)
                     return ansObj[idx] === pair.right;
                 });
                 if (allCorrect) correctCount++;
@@ -145,18 +140,39 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
             return next;
         });
+
+        // Fix #1: Realtime Logic Update & Debounce
         if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
             const now = Date.now();
-            if (now - lastBroadcastTimeRef.current > 5000) {
+            // Reduce throttle to 2000ms (2 seconds) for more responsive updates
+            if (now - lastBroadcastTimeRef.current > 2000) {
                 broadcastProgress();
                 lastBroadcastTimeRef.current = now;
+            } else {
+                // Ensure the final state is eventually sent if the user stops typing/clicking
+                if ((window as any).broadcastTimeout) clearTimeout((window as any).broadcastTimeout);
+                (window as any).broadcastTimeout = setTimeout(() => {
+                    broadcastProgress();
+                    lastBroadcastTimeRef.current = Date.now();
+                }, 2000);
             }
         }
     };
 
+    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
+        const v = ansMap[q.id];
+        if (!v) return false;
+        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
+        }
+        return v.trim() !== "";
+    };
+
     const broadcastProgress = () => {
         const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
-        const answeredQ = Object.keys(answersRef.current).length;
+        // Fix: Count ONLY truly answered questions based on logic, not just keys in object
+        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
+        
         storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
     };
 
@@ -195,17 +211,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
     };
 
-    const isAnswered = (q: Question) => {
-        const v = answers[q.id];
-        if (!v) return false;
-        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
-        }
-        return v !== "";
-    };
-
     const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
-    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
+    // UI Local Calculation
+    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
     const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
 
@@ -227,7 +235,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             <main className="max-w-3xl mx-auto px-5 sm:px-8 pt-24 space-y-12">
                 {activeExam.questions.map((q, idx) => {
                     const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
-                    const answered = isAnswered(q);
+                    const answered = isAnswered(q, answers);
                     
                     return (
                         <div key={q.id} id={q.id} className="scroll-mt-28 group">

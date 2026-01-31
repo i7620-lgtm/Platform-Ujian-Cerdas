@@ -169,14 +169,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
         const channel = supabase
             .channel(`exam-room-${displayExam.code}`)
-            // 1. Listen DB Changes (Hanya untuk Status Akhir: Selesai/Force Closed)
+            // Fix #3: Listen to ALL events (INSERT/UPDATE/DELETE) to catch new logins immediately
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` },
+                { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` },
                 (payload) => {
                     const newResult = payload.new as any;
-                    // Jika status berubah menjadi final, update tabel
-                    if (['completed', 'force_closed'].includes(newResult.status)) {
+                    
+                    // Handle INSERT (New Student) or UPDATE
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                         setLocalResults(prev => {
                             const idx = prev.findIndex(r => r.student.studentId === newResult.student_id);
                              const convertedResult: Result = {
@@ -193,11 +194,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                             };
                             
                             if (idx >= 0) {
+                                // Update existing
                                 const updated = [...prev];
                                 updated[idx] = convertedResult;
                                 return updated;
                             } else {
-                                return [...prev, convertedResult];
+                                // Add new student
+                                if (selectedClass === 'ALL' || selectedClass === newResult.class_name) {
+                                    return [...prev, convertedResult];
+                                }
+                                return prev;
                             }
                         });
                     }
@@ -215,7 +221,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                     const idx = prev.findIndex(r => r.student.studentId === studentId);
                     if (idx >= 0 && prev[idx].status === 'in_progress') {
                         // Kita hack sedikit objek result di memory dengan data terbaru dari broadcast
-                        // Tanpa mengubah struktur asli Result secara permanen di DB
                         const updated = [...prev];
                         updated[idx] = {
                             ...updated[idx],
@@ -232,16 +237,32 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [displayExam]);
+    }, [displayExam, selectedClass]);
 
     if (!displayExam) return null;
 
     const handleUnlockClick = async (studentId: string, examCode: string) => {
         processingIdsRef.current.add(studentId);
+        
+        // Fix #2: Optimistic UI Update - Immediately update UI to "in_progress"
+        setLocalResults(prev => prev.map(r => 
+            r.student.studentId === studentId 
+            ? { ...r, status: 'in_progress' } 
+            : r
+        ));
+
         try {
             await storageService.unlockStudentExam(examCode, studentId);
             onAllowContinuation(studentId, examCode);
-        } catch (error) { alert("Gagal."); } 
+        } catch (error) { 
+            alert("Gagal membuka kunci."); 
+            // Revert on failure (optional, but safer)
+            setLocalResults(prev => prev.map(r => 
+                r.student.studentId === studentId 
+                ? { ...r, status: 'force_closed' } 
+                : r
+            ));
+        } 
         finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); }
     };
 

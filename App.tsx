@@ -26,7 +26,8 @@ const App: React.FC = () => {
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
     try {
-      const exam = await storageService.getExamForStudent(examCode, isPreview);
+      // Pass studentId to ensure consistent shuffling (Fix #2)
+      const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
       if (!exam) { 
         alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
         return; 
@@ -97,7 +98,8 @@ const App: React.FC = () => {
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
-        storageService.getExamForStudent(liveCode.toUpperCase(), true)
+        // Live monitor doesn't need student specific shuffling, pass generic ID or empty
+        storageService.getExamForStudent(liveCode.toUpperCase(), 'monitor', true)
             .then(exam => {
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
@@ -305,3 +307,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+ 
