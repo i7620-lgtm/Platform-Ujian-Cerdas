@@ -20,7 +20,183 @@ import {
     DocumentArrowUpIcon,
     TableCellsIcon,
     UserIcon,
+    LockClosedIcon,
+    ChevronDownIcon,
+    ChevronUpIcon
 } from '../Icons';
+
+// --- SHARED COMPONENTS (Moved from Modals for Reusability) ---
+
+export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
+    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1">
+        <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
+            {Icon ? <Icon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />}
+        </div>
+        <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 leading-none mt-1">{value}</p>
+        </div>
+    </div>
+);
+
+export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; examResults: Result[] }> = ({ q, index, stats, examResults }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const difficultyColor = stats.correctRate >= 80 
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+        : stats.correctRate >= 50 
+            ? 'bg-orange-100 text-orange-700 border-orange-200' 
+            : 'bg-rose-100 text-rose-700 border-rose-200';
+
+    const difficultyLabel = stats.correctRate >= 80 ? 'Mudah' : stats.correctRate >= 50 ? 'Sedang' : 'Sulit';
+
+    const distribution = useMemo(() => {
+        const counts: Record<string, number> = {};
+        let totalAnswered = 0;
+        
+        examResults.forEach(r => {
+            const ans = r.answers[q.id];
+            if (ans) {
+                const normalizedAns = String(ans).trim(); 
+                counts[normalizedAns] = (counts[normalizedAns] || 0) + 1;
+                totalAnswered++;
+            }
+        });
+        return { counts, totalAnswered };
+    }, [examResults, q.id]);
+
+    // Determine correct answer string for comparison in generic list
+    const correctAnswerString = useMemo(() => {
+        if (q.questionType === 'MULTIPLE_CHOICE') return q.correctAnswer;
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return q.correctAnswer;
+        if (q.questionType === 'FILL_IN_THE_BLANK') return q.correctAnswer;
+        if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) {
+            const obj: Record<number, boolean> = {};
+            q.trueFalseRows.forEach((r, i) => obj[i] = r.answer);
+            return JSON.stringify(obj);
+        }
+        if (q.questionType === 'MATCHING' && q.matchingPairs) {
+            const obj: Record<number, string> = {};
+            q.matchingPairs.forEach((p, i) => obj[i] = p.right);
+            return JSON.stringify(obj);
+        }
+        return null;
+    }, [q]);
+
+    const normalize = (str: string) => str.trim().toLowerCase();
+
+    const isCorrectAnswer = (ans: string) => {
+        if (!correctAnswerString) return false;
+        // Simple comparison for exact matches (JSON strings or simple text)
+        if (ans === correctAnswerString) return true;
+        // Case insensitive for text
+        if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'MULTIPLE_CHOICE') {
+            return normalize(ans) === normalize(correctAnswerString);
+        }
+        // Set comparison for Complex MC
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(normalize(ans).split(','));
+            const cSet = new Set(normalize(correctAnswerString).split(','));
+            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        }
+        return false;
+    };
+
+    return (
+        <div className={`border rounded-2xl bg-white transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-md ring-1 ring-indigo-50 border-indigo-100' : 'border-slate-100 hover:border-indigo-100'}`}>
+            <div 
+                className="p-5 cursor-pointer flex flex-col gap-3"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex justify-between items-start">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Soal {index + 1}</span>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor}`}>
+                        {stats.correctRate}% Benar • {difficultyLabel}
+                    </span>
+                </div>
+                
+                <div className="text-sm text-slate-700 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                    <div 
+                        className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? 'bg-emerald-500' : stats.correctRate >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} 
+                        style={{ width: `${stats.correctRate}%` }}
+                    ></div>
+                </div>
+                
+                {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
+                        
+                        {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
+                            <div className="space-y-2">
+                                {q.options.map((opt, i) => {
+                                    const count = distribution.counts[opt] || 0;
+                                    const percentage = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+                                    const isCorrect = opt === q.correctAnswer;
+                                    
+                                    return (
+                                        <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : count > 0 ? 'bg-slate-50' : ''}`}>
+                                            <div className="flex items-center gap-2 z-10 w-full">
+                                                <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                                    {String.fromCharCode(65+i)}
+                                                </span>
+                                                <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
+                                            </div>
+                                            <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded-xl">
+                                {q.correctAnswer || (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') ? (
+                                    <div className="mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-xs text-indigo-700">
+                                        <span className="font-bold">Kunci Jawaban: </span> 
+                                        {q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? 
+                                            q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
+                                        q.questionType === 'MATCHING' && q.matchingPairs ?
+                                            q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
+                                            q.correctAnswer
+                                        }
+                                    </div>
+                                ) : null}
+                                <ul className="space-y-2">
+                                    {Object.entries(distribution.counts).map(([ans, count], idx) => {
+                                        const isCorrect = isCorrectAnswer(ans);
+                                        // Formatter for ugly JSON strings
+                                        let displayAns = ans;
+                                        try {
+                                            if (ans.startsWith('{')) {
+                                                const parsed = JSON.parse(ans);
+                                                displayAns = Object.entries(parsed).map(([k,v]) => `${v}`).join(', ');
+                                            }
+                                        } catch(e){}
+
+                                        return (
+                                            <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
+                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`}>"{displayAns}"</span>
+                                                </div>
+                                                <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                <div className="flex justify-center mt-1">
+                     {isExpanded ? <ChevronUpIcon className="w-4 h-4 text-slate-300"/> : <ChevronDownIcon className="w-4 h-4 text-slate-300"/>}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- REMAINING TIME COMPONENT ---
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
@@ -167,7 +343,7 @@ type ArchiveData = {
     results: Result[];
 };
 
-type ArchiveTab = 'DETAIL' | 'RESULTS' | 'ANALYSIS';
+type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS';
 
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
@@ -225,6 +401,34 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    // Calculate Question Stats for Analysis Tab
+    const questionStats = useMemo(() => {
+        if (!archiveData) return [];
+        const { exam, results } = archiveData;
+        const totalStudents = results.length;
+
+        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+            let correctCount = 0;
+            results.forEach(r => {
+                const ans = r.answers[q.id];
+                const studentAns = String(ans || '').trim().toLowerCase();
+                const correctAns = String(q.correctAnswer || '').trim().toLowerCase();
+                
+                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                    if (studentAns === correctAns) correctCount++;
+                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                     const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+                     const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+                     if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correctCount++;
+                }
+            });
+            return {
+                id: q.id,
+                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
+            };
+        });
+    }, [archiveData]);
+
     // --- UPLOAD VIEW ---
     if (!archiveData) {
         return (
@@ -260,8 +464,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 flex gap-4">
-                    {(['DETAIL', 'RESULTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
-                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'RESULTS' ? `Hasil Siswa (${totalStudents})` : 'Analisis Soal';
+                    {(['DETAIL', 'STUDENTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
+                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${totalStudents})` : 'Analisis Soal';
                         return <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>{label}</button>
                     })}
                 </div>
@@ -291,29 +495,98 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         })}
                     </div>
                 )}
-                {activeTab === 'RESULTS' && (
+                {activeTab === 'STUDENTS' && (
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50/50"><tr><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Jawaban Benar</th></tr></thead>
-                            <tbody className="divide-y divide-slate-50">{results.map(r => <tr key={r.student.studentId}><td className="px-6 py-4 font-bold text-slate-800">{r.student.fullName}</td><td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td><td className="px-6 py-4 text-center text-lg font-black text-indigo-600">{r.score}</td><td className="px-6 py-4 text-center font-bold text-slate-600">{r.correctAnswers} / {r.totalQuestions}</td></tr>)}</tbody>
+                         <table className="w-full text-left">
+                            <thead className="bg-slate-50/50">
+                                <tr>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">B/S/Total</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aktivitas</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Lokasi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {results.map(r => (
+                                    <tr key={r.student.studentId} className="hover:bg-slate-50/30">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
+                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                {r.score}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
+                                            <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {r.activityLog && r.activityLog.length > 0 ? (
+                                                <div className="group relative inline-block">
+                                                    <span className="cursor-help text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 flex items-center justify-center gap-1 w-fit mx-auto">
+                                                        <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
+                                                    </span>
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 pointer-events-none">
+                                                        <ul className="list-disc pl-3 space-y-1">
+                                                            {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
+                                                            {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">Aman</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
+                                            {exam.config.trackLocation && r.location ? (
+                                                <a 
+                                                    href={`https://www.google.com/maps?q=${r.location}`} 
+                                                    target="_blank" 
+                                                    rel="noreferrer"
+                                                    className="text-blue-600 hover:underline flex items-center justify-center gap-1"
+                                                >
+                                                    Maps ↗
+                                                </a>
+                                            ) : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
                          </table>
                     </div>
                 )}
                 {activeTab === 'ANALYSIS' && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-indigo-50 text-indigo-600"><ChartBarIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Rata-rata</p><p className="text-2xl font-black text-slate-800">{averageScore}</p></div></div>
-                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-emerald-50 text-emerald-600"><CheckCircleIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Tertinggi</p><p className="text-2xl font-black text-slate-800">{highestScore}</p></div></div>
-                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-rose-50 text-rose-600"><XMarkIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Terendah</p><p className="text-2xl font-black text-slate-800">{lowestScore}</p></div></div>
-                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4"><div className="p-3 rounded-xl bg-blue-50 text-blue-600"><UserIcon className="w-6 h-6"/></div><div><p className="text-[10px] font-black text-slate-400 uppercase">Partisipan</p><p className="text-2xl font-black text-slate-800">{totalStudents}</p></div></div>
+                             <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
+                             <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
+                             <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
+                             <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                         </div>
-                        <div className="space-y-4">
-                            {exam.questions.filter(q=>q.questionType !== 'INFO').map((q,idx) => {
-                                let correctCount = 0;
-                                results.forEach(r => { if(String(r.answers[q.id] || '').trim().toLowerCase() === String(q.correctAnswer || '').trim().toLowerCase()) correctCount++; });
-                                const correctRate = totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
-                                return (<div key={q.id} className="bg-white p-4 rounded-xl border border-slate-100"><div className="flex items-center justify-between"><div className="text-sm font-bold text-slate-700 truncate pr-4">Soal {idx+1}</div><div className="text-xs font-bold text-slate-500">{correctRate}% Benar</div></div><div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2"><div className={`h-full ${correctRate > 75 ? 'bg-emerald-500' : correctRate > 40 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{width: `${correctRate}%`}}></div></div></div>)
-                            })}
+                        
+                        <div>
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <TableCellsIcon className="w-5 h-5 text-slate-400"/>
+                                Analisis Butir Soal
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                    const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
+                                    return (
+                                        <QuestionAnalysisItem 
+                                            key={q.id} 
+                                            q={q} 
+                                            index={idx} 
+                                            stats={stats} 
+                                            examResults={results}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 )}
