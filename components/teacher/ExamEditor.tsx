@@ -207,6 +207,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
     const handleCorrectAnswerChange = (questionId: string, answer: string) => setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
+    const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
+        setQuestions(prev => prev.map(q => {
+            if (q.id === questionId) { let currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : []; if (isChecked) { if (!currentAnswers.includes(option)) currentAnswers.push(option); } else { currentAnswers = currentAnswers.filter(a => a !== option); } return { ...q, correctAnswer: currentAnswers.join(',') }; }
+            return q;
+        }));
+    };
     const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
     const createNewQuestion = (type: QuestionType): Question => {
         const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined };
@@ -223,6 +229,18 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     };
     const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages }; } return q; })); };
     const handleDeleteOption = (questionId: string, indexToRemove: number) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options && q.options.length > 1) { const optionToRemove = q.options[indexToRemove]; const newOptions = q.options.filter((_, i) => i !== indexToRemove); const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; let newCorrectAnswer = q.correctAnswer; if (q.questionType === 'MULTIPLE_CHOICE') { if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { let answers = q.correctAnswer ? q.correctAnswer.split(',') : []; answers = answers.filter(a => a !== optionToRemove); newCorrectAnswer = answers.join(','); } return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; } return q; })); };
+    
+    // --- HANDLERS FOR TRUE/FALSE ---
+    const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], text: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
+    const handleTrueFalseRowAnswerChange = (qId: string, idx: number, val: boolean) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], answer: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
+    const handleAddTrueFalseRow = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const nextNum = q.trueFalseRows.length + 1; return { ...q, trueFalseRows: [...q.trueFalseRows, { text: `Pernyataan ${nextNum}`, answer: true }] }; } return q; })); };
+    const handleDeleteTrueFalseRow = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows && q.trueFalseRows.length > 1) { const newRows = q.trueFalseRows.filter((_, i) => i !== idx); return { ...q, trueFalseRows: newRows }; } return q; })); };
+
+    // --- HANDLERS FOR MATCHING ---
+    const handleMatchingPairChange = (qId: string, idx: number, field: 'left' | 'right', value: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) { const newPairs = [...q.matchingPairs]; newPairs[idx] = { ...newPairs[idx], [field]: value }; return { ...q, matchingPairs: newPairs }; } return q; })); };
+    const handleAddMatchingPair = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] }; return q; })); };
+    const handleDeleteMatchingPair = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs && q.matchingPairs.length > 1) { const newPairs = q.matchingPairs.filter((_, i) => i !== idx); return { ...q, matchingPairs: newPairs }; } return q; })); };
+
     const renderTypeSelectionModal = () => { if (!isTypeSelectionModalOpen) return null; const types: {type: QuestionType, label: string, desc: string, icon: React.FC<any>}[] = [{ type: 'INFO', label: 'Keterangan / Info', desc: 'Hanya teks atau gambar, tanpa pertanyaan.', icon: FileTextIcon }, { type: 'MULTIPLE_CHOICE', label: 'Pilihan Ganda', desc: 'Satu jawaban benar dari beberapa opsi.', icon: ListBulletIcon }, { type: 'COMPLEX_MULTIPLE_CHOICE', label: 'Pilihan Ganda Kompleks', desc: 'Lebih dari satu jawaban benar.', icon: CheckCircleIcon }, { type: 'FILL_IN_THE_BLANK', label: 'Isian Singkat', desc: 'Jawaban teks pendek otomatis dinilai.', icon: PencilIcon }, { type: 'ESSAY', label: 'Uraian / Esai', desc: 'Jawaban panjang dinilai manual.', icon: FileWordIcon }, { type: 'TRUE_FALSE', label: 'Benar / Salah', desc: 'Memilih pernyataan benar atau salah.', icon: CheckIcon }, { type: 'MATCHING', label: 'Menjodohkan', desc: 'Menghubungkan pasangan item kiri dan kanan.', icon: ArrowLeftIcon },]; return (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60] animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden"><div className="p-4 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold text-lg text-gray-800">Pilih Tipe Soal</h3><button onClick={() => setIsTypeSelectionModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200"><XMarkIcon className="w-5 h-5"/></button></div><div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">{types.map((t) => (<button key={t.type} onClick={() => handleSelectQuestionType(t.type)} className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-md transition-all text-left group"><div className="bg-gray-100 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors"><t.icon className="w-6 h-6" /></div><div><p className="font-bold text-gray-800 group-hover:text-primary">{t.label}</p><p className="text-xs text-gray-500 mt-1">{t.desc}</p></div></button>))}</div></div></div>); };
 
     return (
@@ -261,6 +279,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
                                                 
+                                                {/* MULTIPLE CHOICE */}
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => (
@@ -273,6 +292,107 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
+
+                                                {/* COMPLEX MULTIPLE CHOICE */}
+                                                {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
+                                                    <div className="mt-6 space-y-3">
+                                                        {q.options.map((option, i) => {
+                                                            const currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : [];
+                                                            const isSelected = currentAnswers.includes(option);
+                                                            return (
+                                                                <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isSelected)}>
+                                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 bg-white group-hover/opt:border-indigo-300'}`}>
+                                                                            {isSelected && <CheckIcon className="w-3.5 h-3.5 text-white" />}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
+                                                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
+                                                    </div>
+                                                )}
+
+                                                {/* TRUE FALSE */}
+                                                {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
+                                                    <div className="mt-6 space-y-3">
+                                                        <div className="grid grid-cols-12 gap-4 mb-2 px-2">
+                                                            <div className="col-span-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pernyataan</div>
+                                                            <div className="col-span-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Jawaban Benar</div>
+                                                        </div>
+                                                        {q.trueFalseRows.map((row, i) => (
+                                                            <div key={i} className="group/row relative grid grid-cols-12 gap-4 items-start p-2 bg-slate-50/50 rounded-xl border border-transparent hover:border-slate-200 transition-all">
+                                                                <div className="col-span-8">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={row.text} 
+                                                                        onChange={(e) => handleTrueFalseRowTextChange(q.id, i, e.target.value)} 
+                                                                        className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none transition-all" 
+                                                                        placeholder={`Pernyataan ${i+1}`}
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-4 flex items-center justify-center gap-2 h-full">
+                                                                    <button 
+                                                                        onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)}
+                                                                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${row.answer ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
+                                                                    >
+                                                                        Benar
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleTrueFalseRowAnswerChange(q.id, i, false)}
+                                                                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${!row.answer ? 'bg-rose-500 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'}`}
+                                                                    >
+                                                                        Salah
+                                                                    </button>
+                                                                    <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="ml-2 text-slate-300 hover:text-rose-500 transition-colors"><TrashIcon className="w-4 h-4"/></button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <button onClick={() => handleAddTrueFalseRow(q.id)} className="mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Baris</button>
+                                                    </div>
+                                                )}
+
+                                                {/* MATCHING */}
+                                                {q.questionType === 'MATCHING' && q.matchingPairs && (
+                                                    <div className="mt-6 space-y-3">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2 px-2">
+                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kolom Kiri (Premis)</div>
+                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kolom Kanan (Jawaban Pasangan)</div>
+                                                        </div>
+                                                        {q.matchingPairs.map((pair, i) => (
+                                                            <div key={i} className="group/pair relative flex flex-col md:flex-row items-center gap-4 p-3 bg-slate-50/50 rounded-xl border border-transparent hover:border-slate-200 transition-all">
+                                                                <div className="flex-1 w-full">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={pair.left} 
+                                                                        onChange={(e) => handleMatchingPairChange(q.id, i, 'left', e.target.value)}
+                                                                        className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none transition-all" 
+                                                                        placeholder="Item Kiri"
+                                                                    />
+                                                                </div>
+                                                                <div className="text-slate-300 hidden md:block">→</div>
+                                                                <div className="flex-1 w-full flex items-center gap-3">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={pair.right} 
+                                                                        onChange={(e) => handleMatchingPairChange(q.id, i, 'right', e.target.value)}
+                                                                        className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none transition-all" 
+                                                                        placeholder="Pasangan Kanan"
+                                                                    />
+                                                                    <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="text-slate-300 hover:text-rose-500 transition-colors shrink-0"><TrashIcon className="w-4 h-4"/></button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <button onClick={() => handleAddMatchingPair(q.id)} className="mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Pasangan</button>
+                                                    </div>
+                                                )}
+
                                                  {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
                                                     <div className="mt-8 pt-4 border-t border-gray-50">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">{q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}</label>
