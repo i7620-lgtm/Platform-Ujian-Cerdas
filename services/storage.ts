@@ -1,16 +1,37 @@
+ 
+import { supabase } from '../lib/supabase';
+import type { Exam, Result, Question, TeacherProfile } from '../types';
 
-import type { Exam, Result, Question } from '../types';
-
-const KEYS = { EXAMS: 'app_exams_data', RESULTS: 'app_results_data' };
-const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
-
-async function retryOperation<T>(operation: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
-    try { return await operation(); } catch (error) {
-        if (retries <= 0) throw error;
-        await new Promise(r => setTimeout(r, delay));
-        return retryOperation(operation, retries - 1, delay * 1.5);
+// Helper: Convert Base64 to Blob for Upload
+const base64ToBlob = (base64: string): Blob => {
+    const arr = base64.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
     }
-}
+    return new Blob([u8arr], { type: mime });
+};
+
+// Helper: Convert URL to Base64 for Archiving
+const urlToBase64 = async (url: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.warn("Failed to convert image for archive:", url);
+        return url; // Fallback keep URL
+    }
+};
 
 // Helper shuffle array (Fisher-Yates)
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -55,186 +76,480 @@ const sanitizeExamForStudent = (exam: Exam): Exam => {
 };
 
 class StorageService {
-  private isOnline: boolean = navigator.onLine;
-  constructor() {
-    window.addEventListener('online', () => { this.isOnline = true; });
-    window.addEventListener('offline', () => { this.isOnline = false; });
+    private syncQueue: any[] = [];
+    private isProcessingQueue = false;
+
+    constructor() {
+        // Load Queue from LocalStorage on init
+        const savedQueue = localStorage.getItem('exam_sync_queue');
+        if (savedQueue) {
+            try { this.syncQueue = JSON.parse(savedQueue); } catch(e) {}
+        }
+        
+        // Listen to online status to process queue
+        if (typeof window !== 'undefined') {
+            window.addEventListener('online', () => this.processQueue());
+            // Try processing every 30 seconds if queue exists
+            setInterval(() => {
+                if (this.syncQueue.length > 0) this.processQueue();
+            }, 30000);
+        }
+    }
+  
+  // --- AUTH METHODS ---
+  async loginUser(username: string, password: string): Promise<TeacherProfile | null> {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password)
+        .single();
+
+      if (error || !data) return null;
+
+      return {
+          id: data.username,
+          fullName: data.full_name,
+          accountType: data.role as any,
+          school: data.school
+      };
   }
 
+  async registerUser(userData: any): Promise<TeacherProfile | null> {
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+            username: userData.username,
+            password: userData.password,
+            full_name: userData.fullName,
+            school: userData.school,
+            role: 'guru'
+        }])
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      
+      return {
+          id: data.username,
+          fullName: data.full_name,
+          accountType: data.role as any,
+          school: data.school
+      };
+  }
+
+  // --- EXAM METHODS ---
+
   async getExams(headers: Record<string, string> = {}): Promise<Record<string, Exam>> {
-    let localExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
     const requesterId = headers['x-user-id'];
-    const requesterRole = headers['x-role'];
-    const requesterSchool = headers['x-school'];
+    
+    const { data, error } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('author_id', requesterId);
 
-    if (this.isOnline) {
-      try {
-        const response = await retryOperation(() => fetch(`${API_URL}/exams`, { headers: headers as any }));
-        if (response.ok) {
-          const cloudExams: Exam[] = await response.json();
-          
-          // Sinkronisasi data cloud ke local
-          cloudExams.forEach(exam => { 
-              localExams[exam.code] = { ...exam, isSynced: true }; 
-          });
-          this.saveLocal(KEYS.EXAMS, localExams);
-
-          // Kembalikan HANYA apa yang dikirim cloud (karena cloud sudah melakukan filtering)
-          // Ini mencegah data "nyangkut" dari login guru sebelumnya di localStorage yang sama
-          const filteredMap: Record<string, Exam> = {};
-          cloudExams.forEach(e => { filteredMap[e.code] = e; });
-          return filteredMap;
-        }
-      } catch (e) { 
-          console.warn("Sync failed, fallback to local filtering."); 
-      }
+    if (error) {
+        console.error("Error fetching exams:", error);
+        return {};
     }
 
-    // Jika offline, lakukan pemfilteran manual di client agar tetap aman
-    const filteredLocal: Record<string, Exam> = {};
-    Object.values(localExams).forEach(exam => {
-        let isMatch = false;
-        if (requesterRole === 'super_admin') {
-            isMatch = true;
-        } else if (requesterRole === 'admin') {
-            isMatch = (exam.authorSchool || '').toLowerCase() === (requesterSchool || '').toLowerCase();
-        } else {
-            isMatch = String(exam.authorId) === String(requesterId);
-        }
-
-        if (isMatch) filteredLocal[exam.code] = exam;
+    const examMap: Record<string, Exam> = {};
+    data.forEach((row: any) => {
+        examMap[row.code] = {
+            code: row.code,
+            authorId: row.author_id,
+            authorSchool: row.school,
+            config: row.config,
+            questions: row.questions,
+            status: row.status,
+            createdAt: row.created_at
+        };
     });
-
-    return filteredLocal;
+    return examMap;
   }
 
   async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
-      const allExams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-      let exam = allExams[code];
+      const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('code', code)
+          .single();
+
+      if (error || !data) throw new Error("EXAM_NOT_FOUND");
       
-      if (this.isOnline) {
-          const previewParam = isPreview ? '&preview=true' : '';
-          const res = await fetch(`${API_URL}/exams?code=${code}&public=true${previewParam}`);
-          
-          if (res.status === 403) throw new Error("EXAM_IS_DRAFT");
-          if (res.status === 404) throw new Error("EXAM_NOT_FOUND");
-          
-          if (res.ok) {
-              const cloudExam = await res.json();
-              if (cloudExam) { 
-                  if (!isPreview) {
-                      allExams[cloudExam.code] = cloudExam; 
-                      this.saveLocal(KEYS.EXAMS, allExams); 
-                  }
-                  exam = cloudExam;
-              }
-          }
-      }
-      return exam ? sanitizeExamForStudent(exam) : null;
+      if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
+
+      const exam: Exam = {
+          code: data.code,
+          authorId: data.author_id,
+          authorSchool: data.school,
+          config: data.config,
+          questions: data.questions,
+          status: data.status
+      };
+
+      return sanitizeExamForStudent(exam);
   }
 
+  // LOGIKA BARU: Save Exam dengan Upload Gambar ke Bucket
   async saveExam(exam: Exam, headers: Record<string, string> = {}): Promise<void> {
-    const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-    const examToSave = { ...exam, isSynced: false, createdAt: String(exam.createdAt || new Date().toLocaleString()) };
-    exams[exam.code] = examToSave;
-    this.saveLocal(KEYS.EXAMS, exams);
+    const userId = headers['x-user-id'];
+    const school = headers['x-school'];
     
-    if (this.isOnline) {
-        try {
-            const res = await retryOperation(() => fetch(`${API_URL}/exams`, { 
-                method: 'POST', 
-                headers: { 'Content-Type':'application/json', ...headers }, 
-                body: JSON.stringify(examToSave) 
-            }));
-            if (res.ok) {
-                exams[exam.code].isSynced = true; 
-                this.saveLocal(KEYS.EXAMS, exams);
+    // Deep clone questions agar tidak memutasi state UI langsung
+    let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
+    const BUCKET_NAME = 'soal'; // Pastikan bucket ini ada di Supabase
+    const examCode = exam.code;
+
+    // Helper untuk memproses string HTML yang mengandung gambar Base64
+    const processHtmlString = async (html: string, contextId: string): Promise<string> => {
+        if (!html.includes('data:image')) return html;
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const images = doc.getElementsByTagName('img');
+        
+        for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            const src = img.getAttribute('src');
+            
+            if (src && src.startsWith('data:image')) {
+                // Upload ke Bucket
+                try {
+                    const blob = base64ToBlob(src);
+                    const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                    const filename = `${examCode}/${contextId}_${Date.now()}_${i}.${ext}`;
+                    
+                    const { data, error } = await supabase.storage
+                        .from(BUCKET_NAME)
+                        .upload(filename, blob, { upsert: true });
+
+                    if (!error && data) {
+                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                        img.setAttribute('src', publicUrlData.publicUrl);
+                        // Tambahkan atribut agar mudah dilacak saat arsip
+                        img.setAttribute('data-bucket-path', filename); 
+                    }
+                } catch (e) {
+                    console.error("Gagal upload gambar", e);
+                }
             }
-        } catch (e) { console.error("Network error saving exam:", e); }
+        }
+        return doc.body.innerHTML;
+    };
+
+    // Iterasi semua pertanyaan untuk upload gambar
+    for (const q of processedQuestions) {
+        // Proses Question Text
+        q.questionText = await processHtmlString(q.questionText, q.id);
+
+        // Proses Options (jika ada)
+        if (q.options) {
+            for (let i = 0; i < q.options.length; i++) {
+                q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
+            }
+        }
     }
+
+    const { error } = await supabase
+        .from('exams')
+        .upsert({
+            code: exam.code,
+            author_id: userId || exam.authorId,
+            school: school || exam.authorSchool,
+            config: exam.config,
+            questions: processedQuestions,
+            status: exam.status || 'PUBLISHED'
+        });
+
+    if (error) throw error;
   }
 
   async deleteExam(code: string, headers: Record<string, string> = {}): Promise<void> {
-      const exams = this.loadLocal<Record<string, Exam>>(KEYS.EXAMS) || {};
-      delete exams[code];
-      this.saveLocal(KEYS.EXAMS, exams);
-      if (this.isOnline) {
-          try { await fetch(`${API_URL}/exams?code=${code}`, { 
-              method: 'DELETE',
-              headers: headers as any
-          }); } catch (e) {}
+      // 1. Hapus Results
+      await supabase.from('results').delete().eq('exam_code', code);
+      // 2. Hapus Exam
+      await supabase.from('exams').delete().eq('code', code);
+      // 3. (Opsional) Hapus folder gambar di bucket
+      // Supabase storage JS client tidak support delete folder recursive secara native mudah, 
+      // tapi kita bisa list file di folder itu lalu delete.
+      const { data: files } = await supabase.storage.from('soal').list(code);
+      if (files && files.length > 0) {
+          const paths = files.map(f => `${code}/${f.name}`);
+          await supabase.storage.from('soal').remove(paths);
       }
   }
+
+  // --- ARCHIVE & CLEANUP METHODS ---
+
+  // Mengubah Exam menjadi JSON lengkap dengan gambar Base64 (Self-contained)
+  async getExamForArchive(code: string): Promise<Exam | null> {
+      const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('code', code)
+          .single();
+
+      if (error || !data) return null;
+
+      let examData: Exam = {
+          code: data.code,
+          authorId: data.author_id,
+          authorSchool: data.school,
+          config: data.config,
+          questions: data.questions,
+          status: data.status,
+          createdAt: data.created_at
+      };
+
+      // Helper Revert URL to Base64
+      const revertHtmlImages = async (html: string): Promise<string> => {
+          if (!html.includes('<img')) return html;
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const images = doc.getElementsByTagName('img');
+
+          for (let i = 0; i < images.length; i++) {
+              const img = images[i];
+              const src = img.getAttribute('src');
+              if (src && src.startsWith('http')) {
+                  const base64 = await urlToBase64(src);
+                  img.setAttribute('src', base64);
+                  img.removeAttribute('data-bucket-path'); // Clean metadata
+              }
+          }
+          return doc.body.innerHTML;
+      };
+
+      // Convert semua gambar kembali ke Base64
+      for (const q of examData.questions) {
+          q.questionText = await revertHtmlImages(q.questionText);
+          if (q.options) {
+              for (let i = 0; i < q.options.length; i++) {
+                  q.options[i] = await revertHtmlImages(q.options[i]);
+              }
+          }
+      }
+
+      return examData;
+  }
+
+  // Menghapus gambar fisik di bucket setelah arsip sukses
+  async cleanupExamAssets(code: string): Promise<void> {
+       const { data: files } = await supabase.storage.from('soal').list(code);
+       if (files && files.length > 0) {
+            const paths = files.map(f => `${code}/${f.name}`);
+            await supabase.storage.from('soal').remove(paths);
+       }
+       // Note: Kita tidak menghapus record exam di DB di sini, 
+       // user harus klik "Hapus" manual di dashboard jika ingin, 
+       // atau panggil deleteExam terpisah.
+  }
+
+  // --- RESULT METHODS ---
 
   async getResults(examCode?: string, className?: string, headers: Record<string, string> = {}): Promise<Result[]> {
-    if (this.isOnline) {
-        try {
-            const queryParts = [];
-            if (examCode) queryParts.push(`code=${examCode}`);
-            if (className && className !== 'ALL') queryParts.push(`class=${encodeURIComponent(className)}`);
-            const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-            const response = await fetch(`${API_URL}/results${queryString}`, { headers: headers as any });
-            if (response.ok) return await response.json();
-        } catch (e) {}
-    }
-    return [];
+    let query = supabase.from('results').select('*');
+
+    if (examCode) query = query.eq('exam_code', examCode);
+    if (className && className !== 'ALL') query = query.eq('class_name', className);
+
+    const { data, error } = await query;
+    
+    if (error) return [];
+
+    return data.map((row: any) => ({
+        student: {
+            studentId: row.student_id,
+            fullName: row.student_name,
+            class: row.class_name,
+            absentNumber: '00' 
+        },
+        examCode: row.exam_code,
+        answers: row.answers,
+        score: row.score,
+        correctAnswers: row.correct_answers,
+        totalQuestions: row.total_questions,
+        status: row.status,
+        activityLog: row.activity_log,
+        timestamp: new Date(row.updated_at).getTime(),
+        location: row.location
+    }));
   }
 
+  // UPDATED: Submit with Background Sync (Queue)
   async submitExamResult(resultPayload: any): Promise<any> {
-    if (this.isOnline) {
-        try {
-            const res = await fetch(`${API_URL}/submit-exam`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(resultPayload)
-            });
-            if (res.ok) return await res.json();
-        } catch (e) {}
+    const { examCode, student } = resultPayload;
+    
+    // Check koneksi internet
+    if (!navigator.onLine) {
+        this.addToQueue(resultPayload);
+        return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
-    return { ...resultPayload, isSynced: false };
+
+    try {
+        const { data, error } = await supabase
+            .from('results')
+            .upsert({
+                exam_code: examCode,
+                student_id: student.studentId,
+                student_name: student.fullName,
+                class_name: student.class,
+                answers: resultPayload.answers,
+                status: resultPayload.status,
+                activity_log: resultPayload.activityLog,
+                score: resultPayload.score || 0,
+                correct_answers: resultPayload.correctAnswers || 0,
+                total_questions: resultPayload.totalQuestions || 0,
+                location: resultPayload.location,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'exam_code,student_id' })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { ...resultPayload, isSynced: true };
+
+    } catch (error) {
+        // Jika error (misal server busy 429 atau 500), masuk antrean
+        console.warn("Submit failed, adding to queue:", error);
+        this.addToQueue(resultPayload);
+        return { ...resultPayload, isSynced: false };
+    }
   }
 
-  private loadLocal<T>(key: string): T | null { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
-  private saveLocal(key: string, data: any): void { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
-  
-  async syncData() { }
+  // --- QUEUE SYSTEM ---
+  private addToQueue(payload: any) {
+      // Hapus payload lama untuk siswa & exam yang sama agar tidak duplikat
+      this.syncQueue = this.syncQueue.filter(
+          item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId)
+      );
+      this.syncQueue.push({ ...payload, queuedAt: Date.now() });
+      this.saveQueue();
+      // Coba proses segera jika mungkin
+      if(navigator.onLine) this.processQueue(); 
+  }
+
+  private saveQueue() {
+      localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue));
+  }
+
+  async processQueue() {
+      if (this.isProcessingQueue || this.syncQueue.length === 0 || !navigator.onLine) return;
+      
+      this.isProcessingQueue = true;
+      const queueCopy = [...this.syncQueue];
+      const remainingQueue: any[] = [];
+
+      // Proses batch
+      for (const payload of queueCopy) {
+          try {
+             const { examCode, student } = payload;
+             const { error } = await supabase
+                .from('results')
+                .upsert({
+                    exam_code: examCode,
+                    student_id: student.studentId,
+                    student_name: student.fullName,
+                    class_name: student.class,
+                    answers: payload.answers,
+                    status: payload.status,
+                    activity_log: payload.activityLog,
+                    score: payload.score || 0,
+                    correct_answers: payload.correctAnswers || 0,
+                    total_questions: payload.totalQuestions || 0,
+                    location: payload.location,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'exam_code,student_id' });
+
+             if (error) throw error;
+          } catch (e) {
+              console.error("Queue retry failed", e);
+              remainingQueue.push(payload); // Keep in queue if failed
+          }
+      }
+
+      this.syncQueue = remainingQueue;
+      this.saveQueue();
+      this.isProcessingQueue = false;
+      
+      // Jika masih ada sisa dan online, coba lagi nanti (interval akan handle)
+  }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      if (this.isOnline) {
-          try {
-              const res = await fetch(`${API_URL}/results?code=${examCode}&studentId=${studentId}`);
-              if (res.ok) {
-                  const data = await res.json();
-                  return Array.isArray(data) ? data[0] : data;
-              }
-          } catch(e) {}
-      }
-      return null;
+      const { data, error } = await supabase
+          .from('results')
+          .select('*')
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId)
+          .single();
+
+      if (error || !data) return null;
+
+      return {
+        student: {
+            studentId: data.student_id,
+            fullName: data.student_name,
+            class: data.class_name,
+            absentNumber: '00'
+        },
+        examCode: data.exam_code,
+        answers: data.answers,
+        score: data.score,
+        correctAnswers: data.correct_answers,
+        totalQuestions: data.total_questions,
+        status: data.status,
+        activityLog: data.activity_log,
+        timestamp: new Date(data.updated_at).getTime(),
+        location: data.location
+      };
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      if (this.isOnline) {
-          try {
-              await fetch(`${API_URL}/teacher-action`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ examCode, studentId, action: 'UNLOCK' })
-              });
-          } catch(e) {}
-      }
+      const { data } = await supabase
+        .from('results')
+        .select('activity_log')
+        .eq('exam_code', examCode)
+        .eq('student_id', studentId)
+        .single();
+
+      const currentLog = (data?.activity_log as string[]) || [];
+
+      await supabase
+        .from('results')
+        .update({ 
+            status: 'in_progress', 
+            activity_log: [...currentLog, "Guru membuka kunci"] 
+        })
+        .eq('exam_code', examCode)
+        .eq('student_id', studentId);
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      if (this.isOnline) {
-          try {
-              await fetch(`${API_URL}/extend-time`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ examCode, additionalMinutes })
-              });
-          } catch(e) {}
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      if (data && data.config) {
+          const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
+          await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
       }
   }
+
+  // --- REALTIME BROADCAST METHODS (Hemat Bandwidth) ---
+  
+  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number) {
+      const channel = supabase.channel(`exam-room-${examCode}`);
+      await channel.send({
+          type: 'broadcast',
+          event: 'student_progress',
+          payload: {
+              studentId,
+              answeredCount,
+              totalQuestions,
+              timestamp: Date.now()
+          }
+      });
+  }
+  
+  async syncData() { this.processQueue(); }
 }
 
 export const storageService = new StorageService();

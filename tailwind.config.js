@@ -10,6 +10,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        code: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
         brand: {

@@ -1,402 +1,338 @@
- 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ArrowPathIcon, PencilIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string, grading?: any) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
 }
 
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, onUpdate }) => {
-    const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
+const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
+    let correctCount = 0;
+    const questions = exam.questions || [];
+    
+    questions.forEach((q: any) => {
+        const studentAnswer = answers[q.id];
+        if (!studentAnswer) return;
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+             if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+             const tArr = String(q.correctAnswer).split(',');
+             if (studentAnswer.length === tArr.length) correctCount++; 
+        }
+    });
+
+    const scorable = questions.filter((q: any) => q.questionType !== 'INFO' && q.questionType !== 'ESSAY').length;
+    const score = scorable > 0 ? Math.round((correctCount / scorable) * 100) : 0;
+    return { score, correctCount, totalQuestions: scorable };
+};
+
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
+    // LOCAL STORAGE KEY
+    const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
+    const CACHED_EXAM_KEY = `exam_def_${exam.code}`; // New Cache for Exam Definition
+
+    const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [warningMsg, setWarningMsg] = useState('');
     const [userLocation, setUserLocation] = useState<string>('');
+    const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'pending'>('saved');
+    
+    // Gunakan local exam jika ada (untuk offline refresh support)
+    const [activeExam, setActiveExam] = useState<Exam>(exam);
 
-    // Refs untuk akses data terbaru di dalam event listener tanpa stale closures
-    const answersRef = useRef(answers);
+    const answersRef = useRef<Record<string, string>>({});
     const logRef = useRef<string[]>(initialData?.activityLog || []);
     const isSubmittingRef = useRef(false);
+    const timeLeftRef = useRef(0);
+    const lastBroadcastTimeRef = useRef<number>(0);
+    
+    // --- INITIALIZE STATE FROM LOCAL STORAGE OR DB ---
+    useEffect(() => {
+        const loadState = () => {
+            // 1. Cache Exam Definition (Anti-Refresh for Questions/Images)
+            try {
+                localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam));
+            } catch (e) { console.warn("Quota exceeded for caching exam"); }
 
-    // Sync Ref dengan State
-    useEffect(() => { answersRef.current = answers; }, [answers]);
+            // 2. Load Answers
+            const localData = localStorage.getItem(STORAGE_KEY);
+            if (localData) {
+                try {
+                    const parsed = JSON.parse(localData);
+                    setAnswers(parsed.answers || {});
+                    answersRef.current = parsed.answers || {};
+                    if (parsed.logs) logRef.current = parsed.logs;
+                    return;
+                } catch(e) { console.error("Error parsing local exam data", e); }
+            }
+            
+            // Fallback ke DB
+            if (initialData?.answers) {
+                setAnswers(initialData.answers);
+                answersRef.current = initialData.answers;
+            }
+        };
+        loadState();
+    }, [STORAGE_KEY, initialData, exam]);
+
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
-    // 7. FITUR: LACAK LOKASI (Track Location)
     useEffect(() => {
         if (exam.config.trackLocation && student.class !== 'PREVIEW') {
             if ('geolocation' in navigator) {
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const loc = `${position.coords.latitude}, ${position.coords.longitude}`;
-                        setUserLocation(loc);
-                    },
-                    (error) => {
-                        console.warn("Geolocation denied or failed:", error);
-                        logRef.current.push(`[System] Gagal mengambil lokasi: ${error.message}`);
-                    },
-                    { enableHighAccuracy: true }
+                    (position) => setUserLocation(`${position.coords.latitude}, ${position.coords.longitude}`),
+                    (error) => logRef.current.push(`[System] Gagal lokasi: ${error.message}`)
                 );
             }
         }
-    }, [exam.config.trackLocation, student.class]);
+    }, []);
 
     const deadline = useMemo(() => {
-        if (student.class === 'PREVIEW') {
-            return Date.now() + (exam.config.timeLimit * 60 * 1000);
-        }
+        if (student.class === 'PREVIEW') return Date.now() + (exam.config.timeLimit * 60 * 1000);
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
-        return examStartDateTime.getTime() + (exam.config.timeLimit * 60 * 1000);
-    }, [exam.config.date, exam.config.startTime, exam.config.timeLimit, student.class]);
+        const start = new Date(`${dateStr}T${exam.config.startTime}`);
+        return start.getTime() + (exam.config.timeLimit * 60 * 1000);
+    }, [exam]);
 
-    const calculateTimeRemaining = () => {
-        const now = Date.now();
-        const difference = deadline - now;
-        return Math.max(0, Math.floor(difference / 1000));
-    };
-
-    const [timeLeft, setTimeLeft] = useState(calculateTimeRemaining());
-    const timeLeftRef = useRef(timeLeft);
-    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
-
-    // Timer Logic
+    const [timeLeft, setTimeLeft] = useState(0);
+    
     useEffect(() => {
-        const timer = setInterval(() => {
-            const remaining = calculateTimeRemaining();
-            setTimeLeft(remaining);
-            if (remaining <= 0 && student.class !== 'PREVIEW') {
-                clearInterval(timer);
+        const tick = () => {
+            const now = Date.now();
+            const diff = Math.max(0, Math.floor((deadline - now) / 1000));
+            setTimeLeft(diff);
+            timeLeftRef.current = diff;
+            if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
                 handleSubmit(true, 'completed');
             }
-        }, 1000);
+        };
+        tick();
+        const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline, student.class]);
+    }, [deadline]);
 
-    // --- BEHAVIOR DETECTION LOGIC ---
+    // --- SAVE TO LOCAL STORAGE & BROADCAST PROGRESS ---
+    const handleAnswerChange = (qId: string, val: string) => {
+        setAnswers(prev => {
+            const next = { ...prev, [qId]: val };
+            answersRef.current = next;
+            
+            // 1. Simpan ke Local Storage (Instant & Offline)
+            if (student.class !== 'PREVIEW') {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    answers: next,
+                    logs: logRef.current,
+                    lastUpdated: Date.now()
+                }));
+                setSaveStatus('saved'); 
+            }
+            return next;
+        });
+        
+        // 2. Broadcast Progress ke Guru (Conditional)
+        // Hanya jika TIDAK dalam mode skala besar (disableRealtime = false/undefined)
+        if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
+            const now = Date.now();
+            if (now - lastBroadcastTimeRef.current > 5000) {
+                broadcastProgress();
+                lastBroadcastTimeRef.current = now;
+            }
+        }
+    };
+
+    const broadcastProgress = () => {
+        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = Object.keys(answersRef.current).length;
+        
+        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ)
+            .catch(err => console.error("Broadcast failed", err));
+    };
+
     useEffect(() => {
         if (student.class === 'PREVIEW') return;
-
-        const handleVisibilityChange = () => {
+        const handleVisChange = () => {
             if (document.hidden && exam.config.detectBehavior && !isSubmittingRef.current) {
-                // 1. Log Aktivitas
-                const timestamp = new Date().toLocaleTimeString('id-ID');
-                const logEntry = `[${timestamp}] Meninggalkan halaman/tab`;
-                logRef.current.push(logEntry);
-
-                // 2. Cek Konfigurasi Keamanan
+                logRef.current.push(`[${new Date().toLocaleTimeString()}] Tab background`);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current })); 
+                
                 if (exam.config.continueWithPermission) {
-                    // KONDISI FORCE CLOSE: detectBehavior=TRUE && continueWithPermission=TRUE
                     setIsSubmitting(true);
-                    isSubmittingRef.current = true;
-                    
-                    // Beri alert blocking agar user sadar
-                    alert("PELANGGARAN TERDETEKSI!\n\nAnda meninggalkan halaman ujian saat mode keamanan tinggi aktif.\nSistem akan mengunci jawaban Anda dan menghentikan ujian ini secara otomatis.");
-                    
-                    // Eksekusi Force Submit
-                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current, userLocation);
+                    alert("PELANGGARAN: Anda meninggalkan halaman ujian. Akses dikunci.");
+                    const grading = calculateGrade(exam, answersRef.current);
+                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current, userLocation, grading);
                 } else {
-                    // Hanya Warning
-                    setWarningMsg("PERINGATAN: Dilarang meninggalkan halaman ujian! Aktivitas Anda tercatat.");
+                    setWarningMsg("PERINGATAN: Jangan tinggalkan halaman ujian!");
                     setTimeout(() => setWarningMsg(''), 5000);
                 }
             }
         };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [exam.config.detectBehavior, exam.config.continueWithPermission, student.class, userLocation]);
-
-
-    const handleAnswer = (qId: string, val: string) => {
-        const newAnswers = { ...answers, [qId]: val };
-        setAnswers(newAnswers);
-        onUpdate?.(newAnswers, timeLeft);
-    };
-
-    const handleComplexChoice = (qId: string, option: string) => {
-        const current = answers[qId] ? answers[qId].split(',') : [];
-        let updated;
-        if (current.includes(option)) {
-            updated = current.filter(o => o !== option);
-        } else {
-            updated = [...current, option];
-        }
-        handleAnswer(qId, updated.join(','));
-    };
-
-    const handleTrueFalse = (qId: string, rowIndex: number, value: boolean) => {
-        let current: Record<string, boolean> = {};
-        try { current = JSON.parse(answers[qId] || '{}'); } catch(e) { current = {}; }
-        current[rowIndex] = value;
-        handleAnswer(qId, JSON.stringify(current));
-    };
-
-    const handleMatching = (qId: string, leftItem: string, rightValue: string) => {
-        let current: Record<string, string> = {};
-        try { current = JSON.parse(answers[qId] || '{}'); } catch(e) { current = {}; }
-        current[leftItem] = rightValue;
-        handleAnswer(qId, JSON.stringify(current));
-    };
+        document.addEventListener('visibilitychange', handleVisChange);
+        return () => document.removeEventListener('visibilitychange', handleVisChange);
+    }, [exam]);
 
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto && !confirm("Kumpulkan semua jawaban sekarang?")) return;
+        if (!auto && !confirm("Kumpulkan jawaban dan selesaikan ujian?")) return;
         setIsSubmitting(true);
-        await onSubmit(answers, timeLeft, status, logRef.current, userLocation);
+        setSaveStatus('saving');
+        
+        const grading = calculateGrade(exam, answersRef.current);
+        
+        // Submit akan dihandle oleh storageService, termasuk antrean offline
+        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
+        
+        if (status === 'completed' || status === 'force_closed') {
+            localStorage.removeItem(STORAGE_KEY);
+            // Optional: Keep exam definition cache until user explicitly exits or result shown
+        }
     };
 
     const formatTime = (s: number) => {
-        const h = Math.floor(s / 3600);
-        const m = Math.floor((s % 3600) / 60);
-        const sec = s % 60;
-        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-        return `${m}:${sec.toString().padStart(2, '0')}`;
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+        return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
     };
 
     const isAnswered = (q: Question) => {
-        const val = answers[q.id];
-        if (!val) return false;
+        const v = answers[q.id];
+        if (!v) return false;
         if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try {
-                const parsed = JSON.parse(val);
-                return Object.keys(parsed).length > 0;
-            } catch(e) { return false; }
+            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
         }
-        return val !== "";
+        return v !== "";
     };
 
-    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
     const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
+    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
+    const optimizeHtml = (html: string) => {
+        return html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
+    };
+
     return (
-        <div className="min-h-screen bg-white pb-32 font-sans selection:bg-brand-100">
-            {/* Header Teroptimasi untuk Mobile & Desktop */}
-            <header className="sticky top-0 z-[60] bg-white/95 backdrop-blur-xl border-b border-slate-100 shadow-sm">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center relative">
-                    
-                    {/* Sisi Kiri: Info Ujian/Siswa */}
-                    <div className="flex items-center gap-2 sm:gap-3 z-10 overflow-hidden pr-12 sm:pr-0">
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-brand-100 shrink-0">
-                             {exam.config.subject.charAt(0)}
-                        </div>
-                        <div className="truncate">
-                            <h2 className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5 truncate">{exam.config.subject}</h2>
-                            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[120px] sm:max-w-[180px]">{student.fullName}</p>
-                        </div>
-                    </div>
-
-                    {/* Sisi Tengah: Sisa Waktu (Selalu Center & Dominan) */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
-                        <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all duration-500 shadow-sm ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse scale-105' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                            <ClockIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            <span className="font-mono font-black text-sm sm:text-base tracking-widest tabular-nums leading-none">{formatTime(timeLeft)}</span>
-                        </div>
+        <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-32">
+            <header className="fixed top-0 inset-x-0 z-[60] bg-white/80 backdrop-blur-md border-b border-slate-100 h-12 flex flex-col justify-end transition-all">
+                <div className="absolute top-0 left-0 h-0.5 bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                <div className="flex items-center justify-between px-4 sm:px-6 h-full max-w-4xl mx-auto w-full">
+                    <div className="flex items-center gap-3">
+                         <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{exam.config.subject}</span>
+                         <span className="text-[9px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 
+                            Tersimpan di Perangkat
+                         </span>
                     </div>
                     
-                    {/* Sisi Kanan: Badge Status / Ruang Kosong untuk Network Status App.tsx */}
-                    <div className="ml-auto flex items-center gap-2 z-10 pl-4">
-                        {student.class === 'PREVIEW' && (
-                            <span className="text-[8px] sm:text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 uppercase tracking-tighter sm:tracking-widest whitespace-nowrap">
-                                <span className="sm:inline hidden">Mode Pratinjau</span>
-                                <span className="sm:hidden inline">Preview</span>
-                            </span>
-                        )}
-                        {/* Ruang di sebelah kanan ini dibiarkan agak lega pada mobile 
-                            agar tidak bertabrakan dengan indikator Online/Offline dari App.tsx */}
-                        <div className="w-8 sm:w-0"></div> 
+                    <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-tight transition-colors ${timeLeft < 300 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'}`}>
+                        <ClockIcon className="w-3 h-3" />
+                        {formatTime(timeLeft)}
                     </div>
-                </div>
-
-                {/* Progress Bar di Bawah Header */}
-                <div className="absolute bottom-0 left-0 w-full h-[2.5px] bg-slate-50">
-                    <div className="h-full bg-brand-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
                 </div>
             </header>
 
             {warningMsg && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 animate-slide-in-up">
-                    <ExclamationTriangleIcon className="w-5 h-5 text-white" />
-                    <span className="text-xs font-bold">{warningMsg}</span>
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce flex items-center gap-2">
+                    <ExclamationTriangleIcon className="w-4 h-4" /> {warningMsg}
                 </div>
             )}
 
-            <main className="max-w-2xl mx-auto px-6 pt-12 space-y-16">
-                {exam.questions.map((q, idx) => {
+            <main className="max-w-3xl mx-auto px-5 sm:px-8 pt-24 space-y-12">
+                {activeExam.questions.map((q, idx) => {
+                    const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q);
-                    const questionNumber = exam.questions.slice(0, idx).filter(prevQ => prevQ.questionType !== 'INFO').length + 1;
-
+                    
                     return (
-                        <section key={q.id} className="animate-fast-fade scroll-mt-24">
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-sm ${q.questionType === 'INFO' ? 'bg-blue-600 text-white' : answered ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                    {q.questionType === 'INFO' ? 'i' : questionNumber}
-                                </span>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-0.5">
-                                        {q.questionType === 'INFO' ? 'Informasi / Bacaan' : 'Soal Ujian'}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                        {q.questionType.replace(/_/g, ' ')}
+                        <div key={q.id} id={q.id} className="scroll-mt-28 group">
+                            <div className="flex gap-4 mb-4">
+                                <div className="shrink-0 pt-0.5">
+                                    <span className={`text-sm font-black w-6 h-6 flex items-center justify-center rounded-lg transition-colors ${answered ? 'text-white bg-indigo-500' : 'text-slate-300 bg-slate-50'}`}>
+                                        {q.questionType === 'INFO' ? 'i' : num}
                                     </span>
                                 </div>
+                                <div className="flex-1 space-y-5">
+                                    <div className="prose prose-slate prose-sm max-w-none text-slate-700 font-medium leading-relaxed">
+                                        <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
+                                    </div>
+
+                                    <div>
+                                        {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
+                                            <div className="flex flex-col gap-2">
+                                                {q.options.map((opt, i) => {
+                                                    const isSelected = answers[q.id] === opt;
+                                                    return (
+                                                        <button 
+                                                            key={i} 
+                                                            onClick={() => handleAnswerChange(q.id, opt)} 
+                                                            className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 flex items-start gap-3 group/opt active:scale-[0.99] ${
+                                                                isSelected 
+                                                                ? 'border-indigo-500 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-500' 
+                                                                : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            <span className={`flex items-center justify-center w-5 h-5 rounded border text-[10px] font-bold mt-0.5 transition-colors shrink-0 ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 text-slate-400 group-hover/opt:border-indigo-300'}`}>
+                                                                {String.fromCharCode(65 + i)}
+                                                            </span>
+                                                            <div className="text-sm text-slate-600 leading-snug" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {q.questionType === 'ESSAY' && (
+                                            <textarea 
+                                                value={answers[q.id] || ''} 
+                                                onChange={e => handleAnswerChange(q.id, e.target.value)} 
+                                                className="w-full p-4 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none min-h-[120px] text-sm text-slate-700 placeholder:text-slate-300 shadow-sm transition-all" 
+                                                placeholder="Tulis jawaban..." 
+                                            />
+                                        )}
+
+                                        {q.questionType === 'FILL_IN_THE_BLANK' && (
+                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 shadow-sm transition-all">
+                                                <PencilIcon className="w-4 h-4 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    value={answers[q.id] || ''} 
+                                                    onChange={e => handleAnswerChange(q.id, e.target.value)} 
+                                                    className="w-full outline-none text-sm text-slate-700 bg-transparent placeholder:text-slate-300 font-medium" 
+                                                    placeholder="Ketik jawaban singkat..." 
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-
-                            <div className={`prose prose-slate prose-sm max-w-none mb-8 p-6 rounded-3xl transition-all ${q.questionType === 'INFO' ? 'bg-blue-50/50 border border-blue-100' : 'bg-white'}`}>
-                                <div className="text-lg font-medium text-slate-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                            </div>
-
-                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                <div className="grid grid-cols-1 gap-3.5">
-                                    {q.options.map((opt, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => handleAnswer(q.id, opt)}
-                                            className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group
-                                                ${answers[q.id] === opt 
-                                                    ? 'bg-brand-600 border-brand-600 text-white shadow-xl shadow-brand-100' 
-                                                    : 'bg-white border-slate-100 text-slate-600 hover:border-brand-200 hover:bg-brand-50/20'}`}
-                                        >
-                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all
-                                                ${answers[q.id] === opt ? 'border-white bg-white/20' : 'border-slate-200 bg-slate-50 group-hover:border-brand-300'}`}>
-                                                {answers[q.id] === opt && <div className="w-2.5 h-2.5 bg-white rounded-full"></div>}
-                                            </div>
-                                            <div className="text-sm font-bold" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
-                                <div className="grid grid-cols-1 gap-3.5">
-                                    {q.options.map((opt, i) => {
-                                        const isSelected = (answers[q.id] || "").split(',').includes(opt);
-                                        return (
-                                            <button
-                                                key={i}
-                                                onClick={() => handleComplexChoice(q.id, opt)}
-                                                className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group
-                                                    ${isSelected 
-                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' 
-                                                        : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/20'}`}
-                                            >
-                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all
-                                                    ${isSelected ? 'border-white bg-white/20' : 'border-slate-200 bg-slate-50 group-hover:border-indigo-300'}`}>
-                                                    {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
-                                                </div>
-                                                <div className="text-sm font-bold" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                <div className="space-y-4">
-                                    {q.trueFalseRows.map((row, i) => {
-                                        let current: Record<string, boolean> = {};
-                                        try { current = JSON.parse(answers[q.id] || '{}'); } catch(e) {}
-                                        const val = current[i];
-                                        return (
-                                            <div key={i} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                <p className="text-sm font-bold text-slate-700">{row.text}</p>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => handleTrueFalse(q.id, i, true)} className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${val === true ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-200 hover:text-emerald-500'}`}>Benar</button>
-                                                    <button onClick={() => handleTrueFalse(q.id, i, false)} className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${val === false ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-slate-200 text-slate-400 hover:border-rose-200 hover:text-rose-500'}`}>Salah</button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                <div className="space-y-3">
-                                    {q.matchingPairs.map((pair, i) => {
-                                        let current: Record<string, string> = {};
-                                        try { current = JSON.parse(answers[q.id] || '{}'); } catch(e) {}
-                                        const selected = current[pair.left] || "";
-                                        const rightOptions = Array.from(new Set(q.matchingPairs!.map(p => p.right)));
-                                        return (
-                                            <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                                                <div className="flex-1 p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 shadow-sm">{pair.left}</div>
-                                                <div className="hidden sm:block text-slate-300 font-black">➜</div>
-                                                <div className="flex-1 relative">
-                                                    <select 
-                                                        value={selected}
-                                                        onChange={(e) => handleMatching(q.id, pair.left, e.target.value)}
-                                                        className={`w-full p-4 appearance-none rounded-xl border-2 text-sm font-bold focus:outline-none transition-all cursor-pointer
-                                                            ${selected ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-100 text-slate-400 hover:border-brand-100'}`}
-                                                    >
-                                                        <option value="">Pilih Pasangan...</option>
-                                                        {rightOptions.map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
-                                                    </select>
-                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300"><ArrowPathIcon className="w-4 h-4 rotate-90" /></div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {q.questionType === 'FILL_IN_THE_BLANK' && (
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={answers[q.id] || ''}
-                                        onChange={(e) => handleAnswer(q.id, e.target.value)}
-                                        placeholder="Ketik jawaban singkat di sini..."
-                                        className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-3xl focus:bg-white focus:border-brand-300 outline-none transition-all text-lg font-black text-slate-700 shadow-inner"
-                                    />
-                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-200"><PencilIcon className="w-6 h-6"/></div>
-                                </div>
-                            )}
-
-                            {q.questionType === 'ESSAY' && (
-                                <textarea
-                                    value={answers[q.id] || ''}
-                                    onChange={(e) => handleAnswer(q.id, e.target.value)}
-                                    placeholder="Tulis jawaban lengkap Anda di sini..."
-                                    className="w-full p-8 bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] focus:bg-white focus:border-brand-300 outline-none transition-all text-sm font-medium min-h-[200px] leading-relaxed shadow-inner"
-                                />
-                            )}
-
-                            <div className="h-px bg-slate-100 w-full mt-16"></div>
-                        </section>
+                            
+                            {idx < activeExam.questions.length - 1 && <div className="h-px bg-slate-50 w-full my-8"></div>}
+                        </div>
                     );
                 })}
-
-                <div className="py-24 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-200">Akhir Lembar Ujian</p>
-                </div>
             </main>
 
-            <div className="fixed bottom-8 left-0 w-full px-6 flex justify-center pointer-events-none z-[70]">
-                <nav className="glass-card shadow-2xl rounded-full px-8 py-5 flex items-center gap-10 pointer-events-auto transition-all hover:scale-[1.02]">
-                    <div className="flex flex-col">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Status</p>
-                        <p className="text-sm font-black text-slate-800 tabular-nums">
-                            {answeredCount} <span className="text-slate-200">/</span> {totalQuestions}
-                        </p>
+            <div className="fixed bottom-6 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
+                <div className="bg-white/90 backdrop-blur-xl p-1.5 rounded-full shadow-2xl shadow-indigo-500/10 border border-white/50 pointer-events-auto flex items-center gap-2 pr-2">
+                    <div className="pl-4 pr-2 flex flex-col justify-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Terjawab</span>
+                        <span className="text-sm font-black text-slate-800 leading-none">{answeredCount}<span className="text-slate-300 font-light mx-0.5">/</span>{totalQuestions}</span>
                     </div>
-
-                    <div className="h-8 w-px bg-slate-200/50"></div>
-                    
                     <button 
-                        onClick={() => handleSubmit(false, 'completed')}
-                        disabled={isSubmitting}
-                        className="bg-slate-900 text-white px-10 py-3.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-black hover:shadow-2xl transition-all flex items-center gap-3 disabled:opacity-50"
+                        onClick={() => handleSubmit(false)} 
+                        disabled={isSubmitting} 
+                        className="bg-indigo-600 text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        {isSubmitting ? 'Mengirim...' : 'Kumpulkan'}
-                        <CheckCircleIcon className="w-5 h-5"/>
+                        {isSubmitting ? '...' : 'Selesai'} <CheckCircleIcon className="w-3.5 h-3.5"/>
                     </button>
-                </nav>
+                </div>
             </div>
         </div>
     );

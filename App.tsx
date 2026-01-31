@@ -1,13 +1,12 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
-import { OngoingExamModal } from './components/teacher/DashboardModals'; // Import Modal
+import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR';
@@ -33,10 +32,8 @@ const App: React.FC = () => {
         return; 
       }
       
-      // Ambil hasil sebelumnya (jika ada)
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
-      // 3. FITUR: IZINKAN KERJAKAN ULANG (Allow Retakes)
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
@@ -47,7 +44,6 @@ const App: React.FC = () => {
           }
       }
 
-      // Jika status force_closed, langsung ke halaman hasil (terkunci), kecuali preview
       if (res && res.status === 'force_closed' && !isPreview) {
           setCurrentExam(exam);
           setCurrentStudent(student);
@@ -74,44 +70,40 @@ const App: React.FC = () => {
       setView('STUDENT_EXAM');
     } catch (err: any) {
         if (err.message === 'EXAM_IS_DRAFT') {
-            alert("Ujian ini masih berupa draf. Gunakan fitur Preview dari dashboard guru.");
+            alert("Ujian ini masih berupa draf.");
         } else {
+            console.error(err);
             alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
         }
     } finally { setIsSyncing(false); }
   }, []);
 
-  // Effect to handle URL parameters (Preview & Live Monitor)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    
-    // Handle Preview
     const previewCode = params.get('preview');
     if (previewCode) {
         const dummyStudent: Student = {
             fullName: 'Mode Pratinjau',
             class: 'PREVIEW',
             absentNumber: '00',
-            studentId: 'preview_mode_' + Date.now()
+            // Format ID Konsisten: Nama-Kelas-Absen
+            studentId: `Mode Pratinjau-PREVIEW-00-${Date.now()}`
         };
         handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
 
-    // Handle Live Monitor Link (?live=CODE)
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
-        // Kita gunakan getExamForStudent dengan flag preview=true untuk mem-bypass cek draft,
-        // lalu validasi manual apakah public stream aktif.
         storageService.getExamForStudent(liveCode.toUpperCase(), true)
             .then(exam => {
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
                     setView('LIVE_MONITOR');
                 } else {
-                    alert("Akses Pantauan Ditolak.\n\nKode ujian tidak ditemukan atau fitur 'Pantauan Orang Tua' belum diaktifkan oleh guru.");
+                    alert("Akses Pantauan Ditolak.");
                     window.history.replaceState({}, '', '/');
                 }
             })
@@ -160,16 +152,17 @@ const App: React.FC = () => {
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string) => {
+  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string, grading?: any) => {
     if (!currentExam || !currentStudent) return;
     
     if (currentStudent.class === 'PREVIEW') {
-        alert("Mode Pratinjau: Jawaban Anda tidak disimpan di server.");
+        alert("Mode Pratinjau selesai.");
         resetToHome();
         return;
     }
 
-    setIsSyncing(true);
+    if (status === 'completed' || status === 'force_closed') setIsSyncing(true);
+    
     const res = await storageService.submitExamResult({
         student: currentStudent,
         examCode: currentExam.code,
@@ -177,11 +170,15 @@ const App: React.FC = () => {
         status, 
         activityLog, 
         location, 
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(grading || {})
     });
-    setStudentResult(res);
-    setView('STUDENT_RESULT');
-    setIsSyncing(false);
+    
+    if (status === 'completed' || status === 'force_closed') {
+        setStudentResult(res);
+        setView('STUDENT_RESULT');
+        setIsSyncing(false);
+    }
   };
 
   const resetToHome = () => { 
@@ -194,68 +191,68 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-brand-100 selection:text-brand-700 overflow-x-hidden antialiased">
-        {/* Network & Sync Status - Lean Design */}
-        <div className="fixed top-4 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
-            {!isOnline ? (
-                <div className="bg-rose-500 text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 animate-pulse pointer-events-auto">
-                    <NoWifiIcon className="w-3.5 h-3.5"/> Offline
+    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col">
+        
+        {/* Status Jaringan Minimalis & Elegan */}
+        <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
+            {!isOnline && (
+                <div className="bg-rose-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto ring-1 ring-white/20">
+                    <NoWifiIcon className="w-3.5 h-3.5"/> 
+                    <span>Offline Mode</span>
                 </div>
-            ) : isSyncing ? (
-                <div className="bg-white/80 backdrop-blur-md text-brand-600 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border border-brand-100 flex items-center gap-2 pointer-events-auto">
-                    <div className="w-2 h-2 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-                    Sinkronisasi...
-                </div>
-            ) : (
-                <div className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-2 pointer-events-auto opacity-50 hover:opacity-100 transition-opacity">
-                    <WifiIcon className="w-3.5 h-3.5"/> Online
+            )}
+            
+            {isSyncing && isOnline && (
+                <div className="bg-white/80 backdrop-blur-md text-indigo-600 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 flex items-center gap-2 pointer-events-auto">
+                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Menyimpan...</span>
                 </div>
             )}
         </div>
         
         {view === 'SELECTOR' && (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
-                {/* Minimalist Background Accents */}
-                <div className="absolute inset-0 -z-10 overflow-hidden">
-                    <div className="absolute -top-24 -left-24 w-96 h-96 bg-brand-50 rounded-full blur-3xl opacity-50"></div>
-                    <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+                {/* Background Decor */}
+                <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 blur-[100px]"></div>
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 blur-[100px]"></div>
                 </div>
-
-                <div className="w-full max-w-sm text-center animate-gentle-slide">
-                    <div className="inline-flex p-6 bg-white rounded-3xl shadow-xl shadow-brand-100/50 mb-8 border border-white">
-                        <LogoIcon className="w-12 h-12 text-brand-600" />
+                
+                <div className="w-full max-w-sm z-10 animate-gentle-slide">
+                    <div className="text-center mb-10">
+                        <div className="inline-flex p-4 bg-white rounded-2xl shadow-sm mb-6 border border-slate-50 ring-1 ring-slate-100">
+                            <LogoIcon className="w-10 h-10 text-indigo-600" />
+                        </div>
+                        
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-3">UjianCerdas</h1>
+                        <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                            Platform evaluasi modern.<br/>Ringan, Cepat, Terpercaya.
+                        </p>
                     </div>
-                    
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">UjianCerdas</h1>
-                    <p className="text-slate-500 text-sm font-medium mb-12 leading-relaxed px-4">
-                        Platform evaluasi digital yang elegan, ringan, dan siap diakses kapan saja.
-                    </p>
                     
                     <div className="space-y-4">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="w-full group flex items-center justify-between p-5 bg-brand-600 rounded-2xl shadow-lg shadow-brand-100 hover:bg-brand-700 hover:-translate-y-0.5 transition-all duration-300"
+                            className="w-full group relative overflow-hidden bg-slate-900 text-white p-4 rounded-xl shadow-lg shadow-slate-200 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                         >
-                            <span className="text-white font-bold text-lg ml-2">Mulai Ujian</span>
-                            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center group-hover:bg-white group-hover:text-brand-600 transition-all">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                            <div className="relative z-10 flex items-center justify-center gap-3">
+                                <span className="font-bold text-sm tracking-wide">Masuk sebagai Siswa</span>
+                                <ArrowLeftIcon className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform opacity-70" />
                             </div>
                         </button>
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="w-full group flex items-center justify-between p-5 bg-white rounded-2xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all duration-300"
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-white text-slate-600 rounded-xl border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
                         >
-                            <span className="text-slate-700 font-bold text-lg ml-2">Halaman Guru</span>
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-brand-100 group-hover:text-brand-600 transition-all">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
+                            <UserIcon className="w-4 h-4" />
+                            Area Pengajar
                         </button>
                     </div>
 
-                    <div className="mt-16 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                        v2.0 • Minimalist Edition
-                    </div>
+                    <p className="mt-12 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                        Versi 3.0 • Hemat Data
+                    </p>
                 </div>
             </div>
         )}
@@ -284,11 +281,6 @@ const App: React.FC = () => {
                 student={currentStudent} 
                 initialData={resumedResult}
                 onSubmit={handleExamSubmit}
-                onUpdate={(a, t) => {
-                    if (currentStudent.class !== 'PREVIEW') {
-                        storageService.submitExamResult({ student: currentStudent, examCode: currentExam.code, answers: a, status: 'in_progress' });
-                    }
-                }}
             />
         )}
         

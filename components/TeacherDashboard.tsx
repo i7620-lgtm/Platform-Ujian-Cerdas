@@ -1,3 +1,4 @@
+ 
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -7,12 +8,14 @@ import {
     ClockIcon,
     CalendarDaysIcon,
     XMarkIcon,
-    PencilIcon
+    PencilIcon,
+    CloudArrowUpIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
+import { storageService } from '../services/storage'; // Import service
 
 interface TeacherDashboardProps {
     teacherProfile: TeacherProfile;
@@ -50,6 +53,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         showResultToStudent: true,
         showCorrectAnswer: false,
         enablePublicStream: false,
+        disableRealtime: false, // Default false
         trackLocation: false,
         subject: 'Lainnya',
         classLevel: 'Lainnya',
@@ -125,9 +129,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             } else {
                 setView('FINISHED_EXAMS');
             }
-            
-            // Berikan sedikit delay agar jika user baru membuat exam, 
-            // mereka bisa melihat notifikasi sukses (jika ada) atau transisinya halus
             resetForm();
         }
     };
@@ -142,6 +143,39 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setGeneratedCode(''); 
         setView('UPLOAD'); 
         setResetKey(prev => prev + 1); 
+    };
+
+    // ARCHIVE LOGIC
+    const handleArchiveExam = async (exam: Exam) => {
+        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nFile JSON akan didownload ke perangkat Anda, dan gambar-gambar di cloud akan dihapus untuk menghemat ruang. Ujian ini tidak akan bisa diakses online lagi setelah ini.`)) return;
+        
+        try {
+            // 1. Get Fat Exam Object (Base64 Images)
+            const fatExam = await storageService.getExamForArchive(exam.code);
+            if (!fatExam) throw new Error("Gagal mengambil data ujian.");
+
+            // 2. Trigger Download
+            const jsonString = JSON.stringify(fatExam, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `ARSIP_${exam.config.subject.replace(/\s+/g, '_')}_${exam.code}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // 3. Cleanup Cloud
+            await storageService.cleanupExamAssets(exam.code);
+            await deleteExam(exam.code); // Hapus dari DB juga karena sudah diarsip
+            onRefreshExams();
+            
+            alert("Arsip berhasil didownload dan data cloud dibersihkan.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal mengarsipkan ujian.");
+        }
     };
 
     const openEditModal = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setIsEditModalOpen(true); };
@@ -211,7 +245,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'DRAFTS' && <DraftsView exams={draftExams} onContinueDraft={continueDraft} onDeleteDraft={handleDeleteExam} />}
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
                 {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} />}
-                {view === 'FINISHED_EXAMS' && <FinishedExamsView exams={finishedExams} onSelectExam={setSelectedFinishedExam} onDuplicateExam={handleDuplicateExam} onDeleteExam={handleDeleteExam} />}
+                {view === 'FINISHED_EXAMS' && (
+                    <FinishedExamsView 
+                        exams={finishedExams} 
+                        onSelectExam={setSelectedFinishedExam} 
+                        onDuplicateExam={handleDuplicateExam} 
+                        onDeleteExam={handleDeleteExam}
+                        onArchiveExam={handleArchiveExam} // Pass Archive Handler
+                    />
+                )}
             </main>
 
             {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}

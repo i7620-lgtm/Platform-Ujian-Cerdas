@@ -35,6 +35,7 @@ export interface ExamConfig {
   showResultToStudent: boolean;
   showCorrectAnswer: boolean;
   enablePublicStream: boolean;
+  disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
   trackLocation: boolean;
   subject: string;
   classLevel: string;

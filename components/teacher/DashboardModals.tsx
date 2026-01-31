@@ -1,8 +1,9 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon } from '../Icons';
 import { storageService } from '../../services/storage';
+import { supabase } from '../../lib/supabase';
 import { RemainingTime } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
 
@@ -22,7 +23,6 @@ const StatWidget: React.FC<{ label: string; value: string | number; color: strin
 const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; examResults: Result[] }> = ({ q, index, stats, examResults }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Logic Warna: <50 Merah (Sulit), 50-79 Oranye (Sedang), >=80 Hijau (Mudah)
     const difficultyColor = stats.correctRate >= 80 
         ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
         : stats.correctRate >= 50 
@@ -31,7 +31,6 @@ const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; e
 
     const difficultyLabel = stats.correctRate >= 80 ? 'Mudah' : stats.correctRate >= 50 ? 'Sedang' : 'Sulit';
 
-    // Menghitung Distribusi Jawaban (Distractor Analysis)
     const distribution = useMemo(() => {
         const counts: Record<string, number> = {};
         let totalAnswered = 0;
@@ -39,7 +38,7 @@ const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; e
         examResults.forEach(r => {
             const ans = r.answers[q.id];
             if (ans) {
-                const normalizedAns = String(ans).trim(); // Simplifikasi, idealnya normalisasi huruf opsi
+                const normalizedAns = String(ans).trim(); 
                 counts[normalizedAns] = (counts[normalizedAns] || 0) + 1;
                 totalAnswered++;
             }
@@ -89,7 +88,6 @@ const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; e
                                                 <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                 <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
                                             </div>
-                                            {/* Bar Background untuk visualisasi proporsi */}
                                             <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
                                         </div>
                                     )
@@ -132,42 +130,109 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
-    const [isShareModalOpen, setIsShareModalOpen] = useState(false); // State untuk Modal Share
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const processingIdsRef = useRef<Set<string>>(new Set());
+    
+    // Untuk tracking progress broadcast yang belum tersimpan di DB
+    const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
+    const fetchLatest = async () => {
+        if (!displayExam) return;
+        setIsRefreshing(true);
+        try {
+            const headers: Record<string, string> = teacherProfile ? {
+                'x-role': teacherProfile.accountType,
+                'x-user-id': teacherProfile.id,
+                'x-school': teacherProfile.school
+            } : {};
+            const data = await storageService.getResults(
+                displayExam.code, 
+                selectedClass === 'ALL' ? '' : selectedClass,
+                headers
+            );
+            setLocalResults(data);
+        } catch (e) { console.error("Fetch failed", e); }
+        finally { setIsRefreshing(false); }
+    };
+
+    useEffect(() => {
+        fetchLatest();
+    }, [displayExam, selectedClass, teacherProfile]);
+
+    // HYBRID REALTIME: DB CHANGES (Status) + BROADCAST (Progress)
     useEffect(() => {
         if (!displayExam) return;
-        let isMounted = true;
-        const fetchLatest = async () => {
-            if(!isMounted) return;
-            setIsRefreshing(true);
-            try {
-                const headers: Record<string, string> = teacherProfile ? {
-                    'x-role': teacherProfile.accountType,
-                    'x-user-id': teacherProfile.id,
-                    'x-school': teacherProfile.school
-                } : {};
-                const data = await storageService.getResults(
-                    displayExam.code, 
-                    selectedClass === 'ALL' ? '' : selectedClass,
-                    headers
-                );
-                if (isMounted) {
-                    setLocalResults(data);
-                    setLastUpdated(new Date());
+
+        const channel = supabase
+            .channel(`exam-room-${displayExam.code}`)
+            // 1. Listen DB Changes (Hanya untuk Status Akhir: Selesai/Force Closed)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` },
+                (payload) => {
+                    const newResult = payload.new as any;
+                    // Jika status berubah menjadi final, update tabel
+                    if (['completed', 'force_closed'].includes(newResult.status)) {
+                        setLocalResults(prev => {
+                            const idx = prev.findIndex(r => r.student.studentId === newResult.student_id);
+                             const convertedResult: Result = {
+                                student: { studentId: newResult.student_id, fullName: newResult.student_name, class: newResult.class_name, absentNumber: '00' },
+                                examCode: newResult.exam_code,
+                                answers: newResult.answers as Record<string, string>,
+                                score: newResult.score,
+                                correctAnswers: newResult.correct_answers,
+                                totalQuestions: newResult.total_questions,
+                                status: newResult.status,
+                                activityLog: newResult.activity_log,
+                                timestamp: new Date(newResult.updated_at).getTime(),
+                                location: newResult.location
+                            };
+                            
+                            if (idx >= 0) {
+                                const updated = [...prev];
+                                updated[idx] = convertedResult;
+                                return updated;
+                            } else {
+                                return [...prev, convertedResult];
+                            }
+                        });
+                    }
                 }
-            } catch (e) { console.error("Refresh failed", e); }
-            finally { if(isMounted) setIsRefreshing(false); }
+            )
+            // 2. Listen Broadcast (Untuk Progress Bar Realtime - Hemat DB)
+            .on('broadcast', { event: 'student_progress' }, (payload) => {
+                const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload;
+                
+                // Simpan state progress di ref agar persist saat re-render
+                broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp };
+                
+                // Update state untuk re-render UI
+                setLocalResults(prev => {
+                    const idx = prev.findIndex(r => r.student.studentId === studentId);
+                    if (idx >= 0 && prev[idx].status === 'in_progress') {
+                        // Kita hack sedikit objek result di memory dengan data terbaru dari broadcast
+                        // Tanpa mengubah struktur asli Result secara permanen di DB
+                        const updated = [...prev];
+                        updated[idx] = {
+                            ...updated[idx],
+                            answers: Array(answeredCount).fill('placeholder') as any, // Fake answers length untuk visualisasi progress bar
+                            timestamp: timestamp
+                        };
+                        return updated;
+                    }
+                    return prev;
+                });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
         };
-        fetchLatest(); 
-        const intervalId = setInterval(fetchLatest, 10000); 
-        return () => { isMounted = false; clearInterval(intervalId); };
-    }, [displayExam, selectedClass, teacherProfile]);
+    }, [displayExam]);
 
     if (!displayExam) return null;
 
@@ -200,6 +265,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     };
 
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
+    
+    // Check if large scale mode is enabled
+    const isLargeScale = displayExam.config.disableRealtime;
 
     return (
         <>
@@ -217,12 +285,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                     <div className="flex items-center gap-3 mt-1">
                                         <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />
-                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Sinkronisasi...</span>}
+                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                {!isReadOnly && displayExam.config.enablePublicStream && (
+                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
                                     <button 
                                         onClick={() => setIsShareModalOpen(true)}
                                         className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
@@ -230,7 +298,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                         <ShareIcon className="w-4 h-4"/> Akses Orang Tua
                                     </button>
                                 )}
-                                {!isReadOnly && (
+                                {!isReadOnly && !isLargeScale && (
                                     <button 
                                         onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} 
                                         className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
@@ -244,8 +312,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                Data diperbarui otomatis setiap 10 detik
+                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                {isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
@@ -291,7 +359,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                 <tbody className="divide-y divide-slate-50">
                                     {localResults.length > 0 ? localResults.map((r) => {
                                         const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length;
-                                        const answered = Object.keys(r.answers).length;
+                                        
+                                        // Prioritaskan data dari Broadcast Ref untuk progress
+                                        const broadcastData = broadcastProgressRef.current[r.student.studentId];
+                                        const answered = r.status === 'in_progress' && broadcastData 
+                                            ? broadcastData.answered 
+                                            : Object.keys(r.answers).length;
+                                            
+                                        const lastActive = r.status === 'in_progress' && broadcastData
+                                            ? broadcastData.timestamp
+                                            : r.timestamp;
+
                                         const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0;
                                         
                                         return (
@@ -327,7 +405,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                                                    {getRelativeTime(r.timestamp)}
+                                                    {getRelativeTime(lastActive)}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     {r.status === 'force_closed' && !isReadOnly && (
@@ -396,237 +474,117 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 };
 
 interface FinishedExamModalProps {
-    exam: Exam | null;
+    exam: Exam;
     teacherProfile: TeacherProfile;
     onClose: () => void;
 }
 
-type TabView = 'ANALYSIS' | 'STUDENTS';
-
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teacherProfile, onClose }) => {
     const [results, setResults] = useState<Result[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [selectedClass, setSelectedClass] = useState<string>('ALL'); // Filter Kelas
-    const [activeTab, setActiveTab] = useState<TabView>('ANALYSIS'); // Tabs
-    const [inspectingResult, setInspectingResult] = useState<Result | null>(null); // Detail Siswa
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (exam) {
-            const fetchResults = async () => {
-                setIsLoading(true);
-                try {
-                    const data = await storageService.getResults(exam.code, undefined, {
-                        'x-role': teacherProfile.accountType,
-                        'x-user-id': teacherProfile.id,
-                        'x-school': teacherProfile.school
-                    } as any);
-                    setResults(data);
-                } catch(e) {} finally { setIsLoading(false); }
-            };
-            fetchResults();
-        }
+        const fetchResults = async () => {
+            setIsLoading(true);
+            try {
+                const data = await storageService.getResults(exam.code, undefined, {
+                    'x-role': teacherProfile.accountType,
+                    'x-user-id': teacherProfile.id,
+                    'x-school': teacherProfile.school
+                });
+                setResults(data);
+            } catch (error) {
+                console.error("Failed to fetch results", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchResults();
     }, [exam, teacherProfile]);
 
-    // Derived State berdasarkan Filter Kelas
-    const filteredResults = useMemo(() => {
-        if (selectedClass === 'ALL') return results;
-        return results.filter(r => r.student.class === selectedClass);
-    }, [results, selectedClass]);
+    // Calculate Stats
+    const totalStudents = results.length;
+    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
+    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
+    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
 
-    const analytics = useMemo(() => {
-        if (!filteredResults.length || !exam) return null;
-        const validResults = filteredResults.filter(r => r.status !== 'in_progress');
-        if (validResults.length === 0) return null;
-
-        const scores = validResults.map(r => r.score);
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        const max = Math.max(...scores);
-        const min = Math.min(...scores);
-
-        const questionStats = exam.questions
-            .filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY')
-            .map(q => {
-                let correct = 0;
-                let total = 0;
-                validResults.forEach(r => {
-                    if (r.answers[q.id]) {
-                        total++;
-                        if (String(r.answers[q.id]).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct++;
-                    }
-                });
-                return { id: q.id, correctRate: total > 0 ? Math.round((correct / total) * 100) : 0 };
+    // Calculate Question Stats
+    const questionStats = useMemo(() => {
+        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+            let correctCount = 0;
+            results.forEach(r => {
+                const ans = r.answers[q.id];
+                const studentAns = String(ans || '').trim().toLowerCase();
+                const correctAns = String(q.correctAnswer || '').trim().toLowerCase();
+                
+                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                    if (studentAns === correctAns) correctCount++;
+                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                     // Check if sets match (order doesn't matter usually, but simple string compare might fail if sorted differently)
+                     // Assuming comma separated sorted for simple check or exact match
+                     const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+                     const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+                     if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correctCount++;
+                }
             });
-
-        return { avg, max, min, completedCount: validResults.length, questionStats };
-    }, [filteredResults, exam]);
-
-    if (!exam) return null;
-
-    // View Detail Siswa (Overlay di atas Modal)
-    if (inspectingResult) {
-        return (
-            <div className="fixed inset-0 bg-slate-900 z-[100] overflow-y-auto">
-                 <div className="max-w-4xl mx-auto min-h-screen bg-white shadow-2xl relative">
-                    <div className="sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
-                        <div>
-                            <h3 className="font-bold text-lg">{inspectingResult.student.fullName}</h3>
-                            <p className="text-xs text-slate-500">{inspectingResult.student.class} • Skor: {inspectingResult.score}</p>
-                        </div>
-                        <button onClick={() => setInspectingResult(null)} className="px-4 py-2 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200">Tutup Detail</button>
-                    </div>
-                    {/* Reuse StudentResultPage tapi dimodifikasi propnya jika perlu, 
-                        di sini kita gunakan apa adanya karena cukup representatif */}
-                    <div className="pointer-events-none select-none opacity-100 scale-90 origin-top">
-                        <StudentResultPage result={inspectingResult} exam={exam} onFinish={() => {}} />
-                    </div>
-                 </div>
-            </div>
-        );
-    }
+            return {
+                id: q.id,
+                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
+            };
+        });
+    }, [results, exam.questions, totalStudents]);
 
     return (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-             <div className="bg-white sm:rounded-[2.5rem] shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden border border-white">
-                
-                <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-10">
-                    <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm">
-                                <ChartBarIcon className="w-8 h-8"/>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-800 tracking-tight">Analisis Hasil Ujian</h2>
-                                <p className="text-sm text-slate-400 font-medium mt-0.5">{exam.config.subject} • {exam.code}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                             <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas:</span>
-                                <select 
-                                    value={selectedClass} 
-                                    onChange={(e) => setSelectedClass(e.target.value)} 
-                                    className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
-                                >
-                                    <option value="ALL">SEMUA KELAS</option>
-                                    {Array.from(new Set(results.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
-                        </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-white relative">
+                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Analisis Hasil Ujian</h2>
+                        <p className="text-sm text-slate-500">{exam.config.subject} • {exam.code}</p>
                     </div>
-
-                    {/* Navigation Tabs */}
-                    <div className="flex gap-1 border-b border-slate-100">
-                        <button 
-                            onClick={() => setActiveTab('ANALYSIS')} 
-                            className={`px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'ANALYSIS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Analisis Soal
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('STUDENTS')} 
-                            className={`px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'STUDENTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Daftar Siswa
-                        </button>
-                    </div>
+                    <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all">
+                        <XMarkIcon className="w-6 h-6"/>
+                    </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-8 bg-slate-50/30">
+                <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-4">
-                            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Menganalisis Data...</p>
-                        </div>
-                    ) : analytics ? (
-                        activeTab === 'ANALYSIS' ? (
-                            <div className="space-y-10 animate-fade-in">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                                    <StatWidget label="Rata-Rata" value={analytics.avg} color="bg-indigo-100" />
-                                    <StatWidget label="Tertinggi" value={analytics.max} color="bg-emerald-100" />
-                                    <StatWidget label="Terendah" value={analytics.min} color="bg-rose-100" />
-                                    <StatWidget label="Partisipan" value={analytics.completedCount} color="bg-purple-100" icon={UserIcon} />
-                                </div>
-
-                                <div>
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Analisis Butir Soal</h3>
-                                        <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div>Mudah (&gt;80%)</div>
-                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-orange-500 rounded-full"></div>Sedang (50-80%)</div>
-                                            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-rose-500 rounded-full"></div>Sulit (&lt;50%)</div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                                        {analytics.questionStats.map((s, i) => {
-                                            const q = exam.questions.find(qu => qu.id === s.id);
-                                            if (!q) return null;
-                                            return <QuestionAnalysisItem key={s.id} q={q} index={i} stats={s} examResults={filteredResults} />;
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50/50">
-                                        <tr>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Peringkat</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Siswa</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Benar / Salah</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai Akhir</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Detail</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {filteredResults.sort((a,b) => b.score - a.score).map((r, idx) => (
-                                            <tr key={r.student.studentId} className="hover:bg-indigo-50/30 transition-colors group">
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex w-8 h-8 items-center justify-center rounded-full font-bold text-xs ${idx < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                        {idx + 1}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
-                                                    <div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-bold text-slate-500">{r.student.class}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="text-xs font-medium text-slate-600">
-                                                        <span className="text-emerald-600 font-bold">{r.correctAnswers}</span> / <span className="text-rose-600 font-bold">{r.totalQuestions - r.correctAnswers}</span>
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`text-lg font-black ${r.score >= 75 ? 'text-emerald-600' : r.score >= 50 ? 'text-orange-500' : 'text-rose-600'}`}>
-                                                        {r.score}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <button 
-                                                        onClick={() => setInspectingResult(r)}
-                                                        className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm flex items-center gap-2 ml-auto"
-                                                    >
-                                                        <EyeIcon className="w-3 h-3" /> Lihat Detail
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )
+                        <div className="flex items-center justify-center h-full text-slate-400 font-bold">Memuat data...</div>
                     ) : (
-                        <div className="text-center py-20">
-                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                <ChartBarIcon className="w-10 h-10 text-slate-200" />
+                        <div className="space-y-8">
+                            {/* Summary Stats */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
+                                <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
+                                <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
+                                <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                             </div>
-                            <h3 className="text-lg font-black text-slate-400 uppercase tracking-widest">Data Tidak Cukup</h3>
-                            <p className="text-sm text-slate-300 mt-2">Belum ada siswa yang menyelesaikan ujian ini.</p>
+
+                            {/* Question Analysis */}
+                            <div>
+                                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <TableCellsIcon className="w-5 h-5 text-slate-400"/>
+                                    Analisis Butir Soal
+                                </h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                        const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
+                                        return (
+                                            <QuestionAnalysisItem 
+                                                key={q.id} 
+                                                q={q} 
+                                                index={idx} 
+                                                stats={stats} 
+                                                examResults={results}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
-             </div>
+            </div>
         </div>
     );
 };
