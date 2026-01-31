@@ -240,6 +240,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         processingIdsRef.current.add(studentId);
         try {
             await storageService.unlockStudentExam(examCode, studentId);
+            // Fix #3: Optimistic UI Update - Immediately show as unlocked locally
+            setLocalResults(prev => prev.map(r => 
+                r.student.studentId === studentId 
+                ? { ...r, status: 'in_progress' } 
+                : r
+            ));
             onAllowContinuation(studentId, examCode);
         } catch (error) { alert("Gagal."); } 
         finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); }
