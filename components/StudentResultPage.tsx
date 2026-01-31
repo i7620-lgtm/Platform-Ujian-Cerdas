@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Result, Exam } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
@@ -53,14 +54,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
                             </div>
 
-                            <div className="flex justify-center gap-8 border-t border-slate-50 pt-6">
-                                <div>
-                                    <p className="text-xl font-bold text-slate-800">{result.correctAnswers}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Benar</p>
+                            <div className="flex justify-around border-t border-slate-100 pt-6">
+                                <div className="text-center">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Benar</p>
+                                    <p className="text-4xl font-black text-emerald-500 mt-1">{result.correctAnswers}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xl font-bold text-slate-800">{result.totalQuestions}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total Soal</p>
+                                <div className="text-center">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
+                                    <p className="text-4xl font-black text-slate-800 mt-1">{result.totalQuestions}</p>
                                 </div>
                             </div>
                             
