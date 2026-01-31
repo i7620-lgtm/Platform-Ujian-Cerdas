@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -35,6 +35,7 @@ export interface ExamConfig {
   showResultToStudent: boolean;
   showCorrectAnswer: boolean;
   enablePublicStream: boolean;
+  disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
   trackLocation: boolean;
   subject: string;
   classLevel: string;
