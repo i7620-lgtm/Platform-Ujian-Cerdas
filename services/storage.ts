@@ -43,36 +43,98 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArr;
 };
 
-const sanitizeExamForStudent = (exam: Exam): Exam => {
-    let questionsToProcess = [...exam.questions];
-
-    if (exam.config.shuffleQuestions) {
-        questionsToProcess = shuffleArray(questionsToProcess);
-    }
-
-    const sanitizedQuestions = questionsToProcess.map(q => {
-        // PERBAIKAN: Kita tidak boleh menghapus kunci jawaban (correctAnswer, trueFalseRows value, matchingPairs relations)
-        // karena grading dilakukan di client-side (StudentExamPage).
-        // Kita hanya mengacak opsi tampilan (options) jika diminta.
-        
-        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-
-        if (exam.config.shuffleAnswers) {
-            if (sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                if (sanitizedQ.options && sanitizedQ.options.length > 0) {
+// Fix #2: Logic acak soal dan jawaban yang persisten
+const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
+    // Jika tidak ada studentId (misal preview), lakukan shuffle biasa
+    if (!studentId || studentId === 'monitor') {
+        let questionsToProcess = [...exam.questions];
+        if (exam.config.shuffleQuestions) {
+            questionsToProcess = shuffleArray(questionsToProcess);
+        }
+        const sanitizedQuestions = questionsToProcess.map(q => {
+            const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+            if (exam.config.shuffleAnswers) {
+                if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
                     sanitizedQ.options = shuffleArray(sanitizedQ.options);
                 }
             }
+            return sanitizedQ;
+        });
+        return { ...exam, questions: sanitizedQuestions };
+    }
+
+    // LOGIKA PERSISTEN: Cek LocalStorage untuk urutan yang sudah tersimpan
+    const STORAGE_KEY_ORDER = `exam_order_${exam.code}_${studentId}`;
+    let orderMap: { qOrder: string[]; optOrders: Record<string, string[]> } | null = null;
+    
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY_ORDER);
+        if (stored) orderMap = JSON.parse(stored);
+    } catch(e) {}
+
+    // Jika belum ada urutan tersimpan, buat baru dan simpan
+    if (!orderMap) {
+        let questionsToProcess = [...exam.questions];
+        // 1. Acak Soal
+        if (exam.config.shuffleQuestions) {
+            questionsToProcess = shuffleArray(questionsToProcess);
         }
+        const qOrder = questionsToProcess.map(q => q.id);
+        const optOrders: Record<string, string[]> = {};
 
-        // PERBAIKAN: Jangan reset jawaban True/False atau acak MatchingPairs di level objek data
-        // Pengacakan tampilan MatchingPairs akan dilakukan oleh komponen UI (StudentExamPage)
-        // agar logika pengecekan jawaban tetap valid.
+        // 2. Acak Opsi
+        questionsToProcess.forEach(q => {
+             if (exam.config.shuffleAnswers && q.options && 
+                (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
+                 const shuffledOpts = shuffleArray([...q.options]);
+                 optOrders[q.id] = shuffledOpts;
+             }
+        });
 
+        orderMap = { qOrder, optOrders };
+        // Simpan ke storage agar konsisten saat refresh
+        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch(e) {}
+    }
+
+    // REKONSTRUKSI EXAM BERDASARKAN URUTAN
+    const questionMap = new Map(exam.questions.map(q => [q.id, q]));
+    
+    // Pastikan jika soal di DB bertambah/berubah, kita tetap menampilkan yang valid
+    // Prioritaskan urutan dari storage, tapi filter ID yang valid di exam asli
+    const orderedQuestions: Question[] = [];
+    
+    // Masukkan soal sesuai urutan tersimpan
+    orderMap.qOrder.forEach(qid => {
+        const q = questionMap.get(qid);
+        if (q) {
+            orderedQuestions.push(q);
+            questionMap.delete(qid); // Tandai sudah diproses
+        }
+    });
+
+    // Jika ada soal baru yang belum ada di map (misal guru edit soal saat siswa ujian), tambahkan di akhir
+    questionMap.forEach(q => orderedQuestions.push(q));
+
+    // Proses Opsi
+    const finalQuestions = orderedQuestions.map(q => {
+        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+        
+        // Apply option order if exists and valid
+        if (orderMap?.optOrders[q.id] && sanitizedQ.options) {
+             const storedOpts = orderMap.optOrders[q.id];
+             // Pastikan opsi masih konsisten dengan soal asli (jika diedit guru)
+             const currentOptSet = new Set(sanitizedQ.options);
+             const validStoredOpts = storedOpts.filter(o => currentOptSet.has(o));
+             
+             // Jika opsi sama persis (set-wise), gunakan urutan tersimpan
+             if (validStoredOpts.length === sanitizedQ.options.length) {
+                 sanitizedQ.options = validStoredOpts;
+             }
+        }
         return sanitizedQ;
     });
 
-    return { ...exam, questions: sanitizedQuestions };
+    return { ...exam, questions: finalQuestions };
 };
 
 class StorageService {
@@ -168,7 +230,7 @@ class StorageService {
     return examMap;
   }
 
-  async getExamForStudent(code: string, isPreview = false): Promise<Exam | null> {
+  async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
       const { data, error } = await supabase
           .from('exams')
           .select('*')
@@ -188,7 +250,8 @@ class StorageService {
           status: data.status
       };
 
-      return sanitizeExamForStudent(exam);
+      // Apply persistent shuffling logic
+      return sanitizeExamForStudent(exam, studentId);
   }
 
   // LOGIKA BARU: Save Exam dengan Upload Gambar ke Bucket
