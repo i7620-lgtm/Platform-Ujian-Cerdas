@@ -295,14 +295,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                         {/* MENJODOHKAN */}
                                         {q.questionType === 'MATCHING' && q.matchingPairs && (
                                             <div className="space-y-3">
-                                                {/* Shuffle options only once visually */}
+                                                {/* Shuffle options ALWAYS for visual display (otherwise 1st option is 1st answer) */}
                                                 {(() => {
                                                     const rightOptions = useMemo(() => {
                                                         const opts = q.matchingPairs!.map(p => p.right);
-                                                        // Shuffle visual options
-                                                        for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
+                                                        // Always shuffle for matching, otherwise answers align 1:1 with questions
+                                                        for (let i = opts.length - 1; i > 0; i--) { 
+                                                            const j = Math.floor(Math.random() * (i + 1)); 
+                                                            [opts[i], opts[j]] = [opts[j], opts[i]]; 
+                                                        }
                                                         return opts;
-                                                    }, [q.id]); // Shuffle only when question changes/loads
+                                                    }, [q.id]); // Removed exam.config.shuffleAnswers dependency
 
                                                     return q.matchingPairs.map((pair, i) => {
                                                         const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
