@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -9,8 +9,6 @@ import {
     ArrowPathIcon
 } from '../Icons';
 import { compressImage } from './examUtils';
-
-// ... (Bagian import dan constant SUBJECTS, CLASSES, EXAM_TYPES tetap sama, tidak perlu diulang semua jika hanya menambah UI, tapi karena XML replace full file, saya sertakan full context yg relevan)
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -36,14 +34,11 @@ const CLASSES = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6
 
 const EXAM_TYPES = ["Kuis", "Lainnya", "Latihan", "Olimpiade", "PAS", "PTS", "TKA", "Ulangan Harian"];
 
-// ... (Helper functions execCmd, SelectionModal, TableConfigModal, VisualMathModal, WysiwygEditor tetap sama, saya potong untuk brevity di file XML ini tapi dalam praktik nyata harus disertakan penuh. Saya akan menyertakan full file content untuk keamanan)
-
 // --- HELPER FUNCTIONS ---
 const execCmd = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
 };
 
-// ... [SelectionModal Component Code] ...
 const SelectionModal: React.FC<{
     isOpen: boolean;
     title: string;
@@ -79,7 +74,6 @@ const SelectionModal: React.FC<{
     );
 };
 
-// ... [TableConfigModal Component Code] ...
 const TableConfigModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (rows: number, cols: number) => void; }> = ({ isOpen, onClose, onInsert }) => {
     const [rows, setRows] = useState(3); const [cols, setCols] = useState(3);
     if (!isOpen) return null;
@@ -97,7 +91,6 @@ const TableConfigModal: React.FC<{ isOpen: boolean; onClose: () => void; onInser
     );
 };
 
-// ... [VisualMathModal Component Code] ...
 const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (latex: string) => void; }> = ({ isOpen, onClose, onInsert }) => {
     const [tab, setTab] = useState<'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS'>('BASIC');
     const [val1, setVal1] = useState(''); const [val2, setVal2] = useState(''); const [val3, setVal3] = useState(''); 
@@ -143,7 +136,6 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
     );
 };
 
-// ... [WysiwygEditor Component Code] ...
 const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; placeholder?: string; minHeight?: string; }> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px" }) => {
     const editorRef = useRef<HTMLDivElement>(null); const fileInputRef = useRef<HTMLInputElement>(null); const savedRange = useRef<Range | null>(null);
     const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>('FORMAT'); const [activeCmds, setActiveCmds] = useState<string[]>([]); const [isInsideTable, setIsInsideTable] = useState(false); const [showMath, setShowMath] = useState(false); const [showTable, setShowTable] = useState(false);
@@ -162,11 +154,9 @@ const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; 
     return (<div className="relative group rounded-xl border border-gray-200 bg-white transition-all focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300"><style>{editorStyle}</style><div className="border-b border-gray-100 bg-gray-50/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 justify-between items-end"><div className="flex gap-1">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (<button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-1.5 text-[10px] font-bold tracking-wider rounded-t-lg transition-colors ${activeTab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 mx-1"></div><Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 mx-1"></div><Btn cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 mx-1"></div><Btn cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 mx-1"></div><Btn cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-700 rounded text-xs font-bold hover:bg-gray-100 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold hover:bg-indigo-100 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel N x N</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-600 rounded text-xs font-bold hover:bg-gray-100 transition-colors">—— Garis Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => {e.preventDefault(); setShowMath(true);}} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Builder Pro</button><span className="text-[10px] text-gray-400 italic">Untuk Limit, Integral, Matriks, dll.</span></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 flex items-center animate-fade-in"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded text-[10px] font-bold hover:bg-red-100 border border-red-100 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus Tabel</button></div>)}</div></div><div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-800 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={saveSelection} onClick={checkActiveFormats} data-placeholder={placeholder} spellCheck={false} /><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /></div>);
 };
 
-// ... [Main ExamEditor Component] ...
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
-    // ... [State Hooks] ...
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
@@ -175,11 +165,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
     
-    // ... [Effect Hooks] ...
     useEffect(() => { if (!isEditing && !generatedCode) { const timer = setTimeout(() => { if (questionsSectionRef.current) questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); return () => clearTimeout(timer); } }, [isEditing, generatedCode]);
     useEffect(() => { if (generatedCode && generatedCodeSectionRef.current) { setTimeout(() => { generatedCodeSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200); } }, [generatedCode]);
 
-    // ... [Handler Functions] ...
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
@@ -190,7 +178,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 return newConfig;
             });
         } else {
-            setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' || name === 'autoSaveInterval' ? parseInt(value) : value }));
+            setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' ? parseInt(value) : value }));
         }
     };
     const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
@@ -219,12 +207,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
     const handleCorrectAnswerChange = (questionId: string, answer: string) => setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
-    const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
-        setQuestions(prev => prev.map(q => {
-            if (q.id === questionId) { let currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : []; if (isChecked) { if (!currentAnswers.includes(option)) currentAnswers.push(option); } else { currentAnswers = currentAnswers.filter(a => a !== option); } return { ...q, correctAnswer: currentAnswers.join(',') }; }
-            return q;
-        }));
-    };
     const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
     const createNewQuestion = (type: QuestionType): Question => {
         const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined };
@@ -241,13 +223,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     };
     const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages }; } return q; })); };
     const handleDeleteOption = (questionId: string, indexToRemove: number) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options && q.options.length > 1) { const optionToRemove = q.options[indexToRemove]; const newOptions = q.options.filter((_, i) => i !== indexToRemove); const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; let newCorrectAnswer = q.correctAnswer; if (q.questionType === 'MULTIPLE_CHOICE') { if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { let answers = q.correctAnswer ? q.correctAnswer.split(',') : []; answers = answers.filter(a => a !== optionToRemove); newCorrectAnswer = answers.join(','); } return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; } return q; })); };
-    const handleMatchingPairChange = (qId: string, idx: number, field: 'left' | 'right', value: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) { const newPairs = [...q.matchingPairs]; newPairs[idx] = { ...newPairs[idx], [field]: value }; return { ...q, matchingPairs: newPairs }; } return q; })); };
-    const handleAddMatchingPair = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] }; return q; })); };
-    const handleDeleteMatchingPair = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs && q.matchingPairs.length > 1) { const newPairs = q.matchingPairs.filter((_, i) => i !== idx); return { ...q, matchingPairs: newPairs }; } return q; })); };
-    const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], text: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
-    const handleTrueFalseRowAnswerChange = (qId: string, idx: number, val: boolean) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], answer: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
-    const handleAddTrueFalseRow = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const nextNum = q.trueFalseRows.length + 1; return { ...q, trueFalseRows: [...q.trueFalseRows, { text: `Pernyataan ${nextNum}`, answer: true }] }; } return q; })); };
-    const handleDeleteTrueFalseRow = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows && q.trueFalseRows.length > 1) { const newRows = q.trueFalseRows.filter((_, i) => i !== idx); return { ...q, trueFalseRows: newRows }; } return q; })); };
     const renderTypeSelectionModal = () => { if (!isTypeSelectionModalOpen) return null; const types: {type: QuestionType, label: string, desc: string, icon: React.FC<any>}[] = [{ type: 'INFO', label: 'Keterangan / Info', desc: 'Hanya teks atau gambar, tanpa pertanyaan.', icon: FileTextIcon }, { type: 'MULTIPLE_CHOICE', label: 'Pilihan Ganda', desc: 'Satu jawaban benar dari beberapa opsi.', icon: ListBulletIcon }, { type: 'COMPLEX_MULTIPLE_CHOICE', label: 'Pilihan Ganda Kompleks', desc: 'Lebih dari satu jawaban benar.', icon: CheckCircleIcon }, { type: 'FILL_IN_THE_BLANK', label: 'Isian Singkat', desc: 'Jawaban teks pendek otomatis dinilai.', icon: PencilIcon }, { type: 'ESSAY', label: 'Uraian / Esai', desc: 'Jawaban panjang dinilai manual.', icon: FileWordIcon }, { type: 'TRUE_FALSE', label: 'Benar / Salah', desc: 'Memilih pernyataan benar atau salah.', icon: CheckIcon }, { type: 'MATCHING', label: 'Menjodohkan', desc: 'Menghubungkan pasangan item kiri dan kanan.', icon: ArrowLeftIcon },]; return (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60] animate-fade-in"><div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden"><div className="p-4 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold text-lg text-gray-800">Pilih Tipe Soal</h3><button onClick={() => setIsTypeSelectionModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200"><XMarkIcon className="w-5 h-5"/></button></div><div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">{types.map((t) => (<button key={t.type} onClick={() => handleSelectQuestionType(t.type)} className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary hover:bg-primary/5 hover:shadow-md transition-all text-left group"><div className="bg-gray-100 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors"><t.icon className="w-6 h-6" /></div><div><p className="font-bold text-gray-800 group-hover:text-primary">{t.label}</p><p className="text-xs text-gray-500 mt-1">{t.desc}</p></div></button>))}</div></div></div>); };
 
     return (
@@ -257,7 +232,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     <h2 className="text-xl font-bold text-neutral">{isEditing ? '1. Editor Soal' : '3. Editor Soal'}</h2>
                     <p className="text-sm text-gray-500 mt-1">Gunakan editor di bawah untuk membuat soal. Klik tombol tabel atau rumus untuk menyisipkan objek visual.</p>
                 </div>
-                {/* ... (Editor Area Content Sesuai Original, tidak ada perubahan logika di sini) ... */}
+                {/* EDITOR AREA */}
                 <div className="space-y-6">
                     {questions.length > 0 && (
                         <div className="relative py-2 group/insert">
@@ -268,7 +243,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     {questions.map((q, index) => {
                         const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                         return (
-                            // Render Question Card
                             <React.Fragment key={q.id}>
                                 <div id={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 group transition-all duration-300 hover:shadow-md relative overflow-visible">
                                      <div className="absolute top-4 right-4 flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
@@ -287,7 +261,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
                                                 
-                                                {/* OPTION RENDER LOGIC HERE (KEPT AS IS) */}
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => (
@@ -300,7 +273,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
-                                                {/* ... Other types (COMPLEX, TRUE_FALSE, MATCHING, etc.) kept identical ... */}
                                                  {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
                                                     <div className="mt-8 pt-4 border-t border-gray-50">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">{q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}</label>
@@ -330,17 +302,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 </div>
                 <div className="bg-white p-8 border border-gray-200 rounded-2xl shadow-sm space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-                        {/* ... Info Umum Section Kept ... */}
+                        {/* Info Umum */}
                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2"><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Umum</h4></div>
                         
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Mata Pelajaran</label><div onClick={() => setIsSubjectModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"><span className={config.subject ? 'text-slate-800' : 'text-gray-400'}>{config.subject || 'Pilih Mata Pelajaran...'}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Kelas</label><div onClick={() => setIsClassModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"><span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>{config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
 
-                        <div className="md:col-span-2 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
-                            <label className="block text-sm font-bold text-indigo-900 mb-1">Daftar Kelas Spesifik (Opsional)</label>
-                            <p className="text-xs text-indigo-500 mb-2">Masukkan nama kelas yang dipisahkan dengan koma (contoh: X-IPA-1, X-IPA-2). Sistem akan menyiapkan database terpisah untuk setiap kelas ini secara otomatis.</p>
-                            <input type="text" value={config.targetClasses?.join(', ') || ''} onChange={(e) => { const val = e.target.value; const classes = val.split(',').map(c => c.trim()).filter(c => c !== ''); setConfig(prev => ({ ...prev, targetClasses: classes })); }} className="w-full p-3 bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm font-bold text-indigo-900 placeholder:text-indigo-300" placeholder="X-IPA-1, X-IPA-2, X-IPS-1" />
-                        </div>
+                        {/* REMOVED: Target Specific Classes (Obsolete) */}
 
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Jenis Evaluasi</label><div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white hover:border-gray-300"><span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
                          <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 mb-2">Instruksi Pengerjaan</label><textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." /></div>
@@ -351,7 +319,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Pelaksanaan</label><input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Jam Mulai</label><input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
                         <div><label className="block text-sm font-bold text-gray-700 mb-2">Durasi Pengerjaan (Menit)</label><input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
-                        <div><label className="block text-sm font-bold text-gray-700 mb-2">Interval Auto-Save (Detik)</label><input type="number" name="autoSaveInterval" value={config.autoSaveInterval} onChange={handleConfigChange} className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm" /></div>
+                        {/* REMOVED: Auto Save Interval (Obsolete) */}
                         
                         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Acak Soal</span></label>
@@ -371,7 +339,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="enablePublicStream" checked={config.enablePublicStream} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Pantauan Orang Tua (Live)</span></label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                                 
-                                {/* NEW: Mode Skala Besar */}
+                                {/* Mode Skala Besar */}
                                 <label className="flex items-center p-3 rounded-xl border border-indigo-100 bg-indigo-50/50 hover:bg-indigo-50 transition-colors cursor-pointer group shadow-sm col-span-1 sm:col-span-2">
                                     <input type="checkbox" name="disableRealtime" checked={config.disableRealtime} onChange={handleConfigChange} className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300" />
                                     <div className="ml-3">
@@ -385,7 +353,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 </div>
             </div>
             
-            {/* ... Actions Section Kept ... */}
+            {/* ... Actions Section ... */}
             <div className="text-center pt-10 pb-20">
                 {isEditing ? (
                     <div className="flex justify-center items-center gap-4">
