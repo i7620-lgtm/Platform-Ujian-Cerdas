@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon } from '../Icons';
@@ -264,6 +265,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     };
 
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
+    
+    // Check if large scale mode is enabled
+    const isLargeScale = displayExam.config.disableRealtime;
 
     return (
         <>
@@ -286,7 +290,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                {!isReadOnly && displayExam.config.enablePublicStream && (
+                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
                                     <button 
                                         onClick={() => setIsShareModalOpen(true)}
                                         className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
@@ -294,7 +298,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                         <ShareIcon className="w-4 h-4"/> Akses Orang Tua
                                     </button>
                                 )}
-                                {!isReadOnly && (
+                                {!isReadOnly && !isLargeScale && (
                                     <button 
                                         onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} 
                                         className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
@@ -308,8 +312,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                Broadcast Realtime Active
+                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                {isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
