@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -16,7 +15,8 @@ import {
     DocumentDuplicateIcon,
     EyeIcon,
     XMarkIcon,
-    ShareIcon // Import ShareIcon
+    ShareIcon,
+    ArrowDownTrayIcon
 } from '../Icons';
 
 // --- REMAINING TIME COMPONENT (MODERN & ELEGANT) ---
@@ -717,12 +717,70 @@ export const UpcomingExamsView: React.FC<UpcomingExamsProps> = ({ exams, onEditE
 // --- FINISHED EXAMS VIEW ---
 interface FinishedExamsProps {
     exams: Exam[];
+    results: Result[];
     onSelectExam: (exam: Exam) => void;
     onDuplicateExam: (exam: Exam) => void;
     onDeleteExam: (exam: Exam) => void;
 }
 
-export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam }) => {
+export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, results, onSelectExam, onDuplicateExam, onDeleteExam }) => {
+    
+    const handleArchive = (exam: Exam) => {
+        // 1. Filter results for this specific exam
+        const examResults = results.filter(r => r.examCode === exam.code && r.status !== 'in_progress');
+        
+        // 2. Calculate Analytics
+        let analytics = null;
+        if (examResults.length > 0) {
+            const scores = examResults.map(r => r.score);
+            const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            const max = Math.max(...scores);
+            const min = Math.min(...scores);
+
+            const questionStats = exam.questions
+                .filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY')
+                .map(q => {
+                    let correct = 0;
+                    let total = 0;
+                    examResults.forEach(r => {
+                        if (r.answers[q.id]) {
+                            total++;
+                            if (String(r.answers[q.id]).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct++;
+                        }
+                    });
+                    return { id: q.id, correctRate: total > 0 ? Math.round((correct / total) * 100) : 0 };
+                });
+            
+            analytics = {
+                averageScore: avg,
+                highestScore: max,
+                lowestScore: min,
+                participantCount: examResults.length,
+                questionStats: questionStats
+            };
+        }
+
+        // 3. Construct Final Object
+        const archiveData = {
+            exam: exam,
+            results: examResults,
+            analytics: analytics,
+            archivedAt: new Date().toISOString()
+        };
+
+        // 4. Trigger Download
+        const blob = new Blob([JSON.stringify(archiveData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeSubject = (exam.config.subject || 'ujian').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `arsip-${safeSubject}-${exam.code}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
              <div className="flex items-center gap-2">
@@ -770,7 +828,15 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
+                            <div className="flex items-center gap-2 self-end md:self-center w-full md:w-auto">
+                                <button 
+                                    onClick={() => handleArchive(exam)}
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 hover:text-indigo-800 transition-colors font-bold shadow-sm border border-indigo-100"
+                                    title="Download Arsip JSON"
+                                >
+                                    <ArrowDownTrayIcon className="w-4 h-4" />
+                                    <span className="hidden lg:inline">Arsip</span>
+                                </button>
                                 <button 
                                     onClick={() => onDuplicateExam(exam)} 
                                     className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-colors font-bold shadow-sm border border-gray-200"
