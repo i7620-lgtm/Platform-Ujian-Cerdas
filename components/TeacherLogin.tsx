@@ -1,13 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { LogoIcon, ArrowLeftIcon, UserIcon } from './Icons';
+import React, { useState } from 'react';
+import { UserIcon, ArrowLeftIcon } from './Icons';
 import type { TeacherProfile } from '../types';
 import { storageService } from '../services/storage';
-
-declare global {
-    interface Window {
-        google: any;
-    }
-}
 
 interface TeacherLoginProps {
   onLoginSuccess: (profile: TeacherProfile) => void;
@@ -16,7 +10,7 @@ interface TeacherLoginProps {
 
 export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [school, setSchool] = useState('');
@@ -36,15 +30,13 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     setIsLoading(true);
     
     try {
+        let profile: TeacherProfile;
         if (isRegistering) {
-            const user = await storageService.registerUser({ username, password, fullName, school });
-            if (user) onLoginSuccess(user);
-            else setError("Gagal mendaftar.");
+            profile = await storageService.signUpWithEmail(email, password, fullName, school);
         } else {
-            const user = await storageService.loginUser(username, password);
-            if (user) onLoginSuccess(user);
-            else setError("Username atau Password salah.");
+            profile = await storageService.signInWithEmail(email, password);
         }
+        onLoginSuccess(profile);
     } catch (e: any) { 
         setError(e.message || 'Terjadi kesalahan sistem.'); 
     } finally { 
@@ -105,15 +97,15 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                     )}
 
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
                         <input 
-                            type="text" 
-                            value={username} 
-                            onChange={(e) => setUsername(e.target.value)} 
+                            type="email" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
                             className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-indigo-200 focus:bg-white rounded-2xl outline-none mt-1.5 text-sm font-bold text-slate-700 transition-all placeholder:text-slate-300" 
                             required 
                             disabled={isLoading} 
-                            placeholder="Username Anda"
+                            placeholder="email@sekolah.id"
                         />
                     </div>
                     
