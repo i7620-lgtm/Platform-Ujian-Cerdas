@@ -252,8 +252,11 @@ class StorageService {
         if (profile.accountType === 'super_admin') {
             // Super Admin sees ALL
         } else if (profile.accountType === 'admin_sekolah') {
-            query = query.eq('school', profile.school);
+            // Fix: Use OR to ensure admins see their own drafts/exams (by ID) AND all school exams
+            // This prevents issues where 'school' might be missing or incorrect on a draft
+            query = query.or(`school.eq.${profile.school},author_id.eq.${profile.id}`);
         } else {
+            // Guru only sees their own
             query = query.eq('author_id', profile.id);
         }
     }
