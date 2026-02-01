@@ -208,8 +208,13 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await storageService.signOut();
+    // Immediate state clear to prevent flash
     resetToHome();
+    try {
+        await storageService.signOut();
+    } catch(e) {
+        console.error("Sign out error", e);
+    }
   };
 
   if (isLoadingSession) {
@@ -295,6 +300,7 @@ const App: React.FC = () => {
         
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
             <TeacherDashboard 
+                key={teacherProfile.id} /* FIX: Force remount to prevent ghosting */
                 teacherProfile={teacherProfile} 
                 exams={exams} 
                 results={results}
