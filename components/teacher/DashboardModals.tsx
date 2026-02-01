@@ -196,7 +196,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                                 <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}
+                                {isLargeScale ? 'Database Sync Active (Hemat Data)' : 'Broadcast Realtime Active'}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
@@ -234,9 +234,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>}
+                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>}
+                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -279,26 +279,32 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col items-center gap-1.5">
-                                                        <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
+                                                {!isLargeScale && (
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col items-center gap-1.5">
+                                                            <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span>
                                                         </div>
-                                                        <span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                                                    {getRelativeTime(lastActive)}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {r.status === 'force_closed' && !isReadOnly && (
-                                                        <button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>
-                                                    )}
-                                                </td>
+                                                    </td>
+                                                )}
+                                                {!isLargeScale && (
+                                                    <td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">
+                                                        {getRelativeTime(lastActive)}
+                                                    </td>
+                                                )}
+                                                {!isLargeScale && (
+                                                    <td className="px-6 py-4 text-right">
+                                                        {r.status === 'force_closed' && !isReadOnly && (
+                                                            <button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>
+                                                        )}
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     }) : (
-                                        <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>
+                                        <tr><td colSpan={isLargeScale ? 3 : 6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>
                                     )}
                                 </tbody>
                             </table>
