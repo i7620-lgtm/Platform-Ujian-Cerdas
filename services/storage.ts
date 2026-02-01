@@ -1,5 +1,6 @@
+
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -154,7 +155,8 @@ class StorageService {
           id: session.user.id,
           fullName: profile.full_name,
           accountType: profile.role as AccountType,
-          school: profile.school
+          school: profile.school,
+          email: session.user.email
       };
   }
 
@@ -179,7 +181,8 @@ class StorageService {
           id: authData.user.id,
           fullName: fullName,
           accountType: 'guru',
-          school: school
+          school: school,
+          email: email
       };
   }
 
@@ -216,10 +219,62 @@ class StorageService {
       await supabase.auth.signOut();
   }
 
+  // --- USER MANAGEMENT (SUPER ADMIN) ---
+  
+  async getAllUsers(): Promise<UserProfile[]> {
+      // NOTE: This requires 'profiles' table to have appropriate RLS allowing read for super_admin
+      // Since we can't change RLS here, we assume the backend policy is set or we use a function.
+      // If RLS blocks this, you'll need to run this SQL in Supabase:
+      // CREATE POLICY "Super Admin View All" ON "public"."profiles" FOR SELECT USING (auth.uid() IN (SELECT id FROM profiles WHERE role = 'super_admin'));
+      
+      // Fetch profiles
+      const { data: profiles, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      
+      // We need emails. In a real scenario, joining auth.users is restricted. 
+      // For this app design, we might rely on the profile or if we can't get email, show '-'
+      // Assuming 'email' is NOT in public.profiles by default unless you put it there.
+      
+      return profiles.map((p: any) => ({
+          id: p.id,
+          fullName: p.full_name,
+          accountType: p.role as AccountType,
+          school: p.school,
+          email: '-' // Email is protected in auth.users, difficult to fetch without admin key
+      }));
+  }
+
+  async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole, school: newSchool })
+        .eq('id', userId);
+      
+      if (error) throw error;
+  }
+
   // --- EXAM METHODS ---
 
-  async getExams(): Promise<Record<string, Exam>> {
-    const { data, error } = await supabase.from('exams').select('*');
+  async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
+    let query = supabase.from('exams').select('*');
+
+    // ROLE-BASED FILTERING LOGIC
+    if (profile) {
+        if (profile.accountType === 'super_admin') {
+            // Super Admin sees ALL
+        } else if (profile.accountType === 'admin_sekolah') {
+            // Admin Sekolah sees ALL within their school
+            query = query.eq('school', profile.school);
+        } else {
+            // Guru sees ONLY their own
+            query = query.eq('author_id', profile.id);
+        }
+    } else {
+        // Fallback for public/student view logic if profile not passed, 
+        // usually student view uses getExamForStudent by ID
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error("Error fetching exams:", error);
