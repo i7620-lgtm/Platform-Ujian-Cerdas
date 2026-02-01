@@ -196,7 +196,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                                 <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Database Sync Active (Hemat Data)' : 'Broadcast Realtime Active'}
+                                {isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
