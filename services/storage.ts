@@ -248,16 +248,23 @@ class StorageService {
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
     let query = supabase.from('exams').select('*');
 
+    // REFACTOR: Percayakan filtering pada RLS di database.
+    // Frontend tidak perlu melakukan filter 'author_id' manual jika RLS sudah dikonfigurasi.
+    // Namun, untuk 'admin_sekolah' kita bantu persempit scope sekolahnya secara eksplisit
+    // agar lebih aman dan efisien, meskipun RLS juga akan memblokirnya.
+
     if (profile) {
         if (profile.accountType === 'super_admin') {
-            // Super Admin sees ALL. 
-            // Query remains simple select('*').
+            // Super Admin: No Filter (RLS allows all)
         } else if (profile.accountType === 'admin_sekolah' && profile.school) {
-            // Admin Sekolah: Matches school OR personal author_id.
-            // FIX: Added quotes around school name to handle spaces properly in PostgREST syntax
+            // Admin Sekolah: Filter by School OR Author ID (in case they created draft before assigning school)
+            // UPDATED: Menggunakan sintaks yang lebih aman
+            // Note: RLS "Admin Sekolah Select School" di atas akan menangani ini, 
+            // tapi kita tambahkan filter eksplisit untuk performa.
+            // Kita gunakan OR karena mungkin admin membuat soal pribadinya sendiri.
             query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
         } else {
-            // Guru: Only sees their own
+            // Guru: Filter by Author ID
             query = query.eq('author_id', profile.id);
         }
     }
@@ -265,9 +272,11 @@ class StorageService {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-        console.error("Error fetching exams:", error);
+        console.error("Error fetching exams from Supabase:", error);
         return {};
     }
+
+    console.log(`[Storage] Fetched ${data?.length || 0} exams for role ${profile?.accountType}`);
 
     const examMap: Record<string, Exam> = {};
     if (data) {
