@@ -1,512 +1,159 @@
+import React, { useState, useEffect, useRef } from 'react';
+import type { Student } from '../types';
+import { LogoIcon, ArrowLeftIcon, UserIcon, QrCodeIcon } from './Icons';
 
-import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType } from '../types';
-
-// Helper: Convert Base64 to Blob for Upload
-const base64ToBlob = (base64: string): Blob => {
-    const arr = base64.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-};
-
-// Helper: Convert URL to Base64 for Archiving
-const urlToBase64 = async (url: string): Promise<string> => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (error) {
-        console.warn("Failed to convert image for archive:", url);
-        return url; // Fallback keep URL
-    }
-};
-
-// Helper shuffle array (Fisher-Yates)
-const shuffleArray = <T>(array: T[]): T[] => {
-    const newArr = [...array];
-    for (let i = newArr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-    }
-    return newArr;
-};
-
-const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
-    if (!studentId || studentId === 'monitor') {
-        let questionsToProcess = [...exam.questions];
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        const sanitizedQuestions = questionsToProcess.map(q => {
-            const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-            if (exam.config.shuffleAnswers) {
-                if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
-                    sanitizedQ.options = shuffleArray(sanitizedQ.options);
-                }
-            }
-            return sanitizedQ;
-        });
-        return { ...exam, questions: sanitizedQuestions };
-    }
-
-    const STORAGE_KEY_ORDER = `exam_order_${exam.code}_${studentId}`;
-    let orderMap: { qOrder: string[]; optOrders: Record<string, string[]> } | null = null;
-    
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_ORDER);
-        if (stored) orderMap = JSON.parse(stored);
-    } catch(e) {}
-
-    if (!orderMap) {
-        let questionsToProcess = [...exam.questions];
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        const qOrder = questionsToProcess.map(q => q.id);
-        const optOrders: Record<string, string[]> = {};
-
-        questionsToProcess.forEach(q => {
-             if (exam.config.shuffleAnswers && q.options && 
-                (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
-                 const shuffledOpts = shuffleArray([...q.options]);
-                 optOrders[q.id] = shuffledOpts;
-             }
-        });
-
-        orderMap = { qOrder, optOrders };
-        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch(e) {}
-    }
-
-    const questionMap = new Map(exam.questions.map(q => [q.id, q]));
-    const orderedQuestions: Question[] = [];
-    
-    orderMap.qOrder.forEach(qid => {
-        const q = questionMap.get(qid);
-        if (q) {
-            orderedQuestions.push(q);
-            questionMap.delete(qid);
-        }
-    });
-
-    questionMap.forEach(q => orderedQuestions.push(q));
-
-    const finalQuestions = orderedQuestions.map(q => {
-        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-        
-        if (orderMap?.optOrders[q.id] && sanitizedQ.options) {
-             const storedOpts = orderMap.optOrders[q.id];
-             const currentOptSet = new Set(sanitizedQ.options);
-             const validStoredOpts = storedOpts.filter(o => currentOptSet.has(o));
-             
-             if (validStoredOpts.length === sanitizedQ.options.length) {
-                 sanitizedQ.options = validStoredOpts;
-             }
-        }
-        return sanitizedQ;
-    });
-
-    return { ...exam, questions: finalQuestions };
-};
-
-class StorageService {
-    private syncQueue: any[] = [];
-    private isProcessingQueue = false;
-
-    constructor() {
-        const savedQueue = localStorage.getItem('exam_sync_queue');
-        if (savedQueue) {
-            try { this.syncQueue = JSON.parse(savedQueue); } catch(e) {}
-        }
-        
-        if (typeof window !== 'undefined') {
-            window.addEventListener('online', () => this.processQueue());
-            setInterval(() => {
-                if (this.syncQueue.length > 0) this.processQueue();
-            }, 30000);
-        }
-    }
-  
-  // --- AUTH METHODS (NEW) ---
-  async getCurrentUser(): Promise<TeacherProfile | null> {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
-
-      const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('full_name, school, role')
-          .eq('id', session.user.id)
-          .single();
-
-      if (error || !profile) return null;
-
-      return {
-          id: session.user.id,
-          fullName: profile.full_name,
-          accountType: profile.role as AccountType,
-          school: profile.school
-      };
-  }
-
-  async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const { data: authData, error: authError } = await supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-              data: {
-                  full_name: fullName,
-                  school: school,
-                  role: 'guru'
-              }
-          }
-      });
-
-      if (authError || !authData.user) {
-          throw new Error(authError?.message || 'Gagal mendaftar. Email mungkin sudah terdaftar.');
-      }
-
-      return {
-          id: authData.user.id,
-          fullName: fullName,
-          accountType: 'guru',
-          school: school
-      };
-  }
-
-  async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error('Email atau password salah.');
-      
-      // Tunggu sebentar untuk trigger
-      await new Promise(r => setTimeout(r, 500));
-
-      let profile = await this.getCurrentUser();
-      
-      if (!profile) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-              const meta = user.user_metadata || {};
-              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
-              await supabase.from('profiles').insert({
-                  id: user.id,
-                  full_name: meta.full_name || 'Pengguna',
-                  school: meta.school || '-',
-                  role: meta.role || 'guru'
-              }).select().single();
-              
-              profile = await this.getCurrentUser();
-          }
-      }
-
-      if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
-      return profile;
-  }
-
-  async signOut() {
-      await supabase.auth.signOut();
-  }
-
-  // --- EXAM METHODS ---
-
-  async getExams(): Promise<Record<string, Exam>> {
-    const { data, error } = await supabase.from('exams').select('*');
-
-    if (error) {
-        console.error("Error fetching exams:", error);
-        return {};
-    }
-
-    const examMap: Record<string, Exam> = {};
-    data.forEach((row: any) => {
-        examMap[row.code] = {
-            code: row.code,
-            authorId: row.author_id,
-            authorSchool: row.school,
-            config: row.config,
-            questions: row.questions,
-            status: row.status,
-            createdAt: row.created_at
-        };
-    });
-    return examMap;
-  }
-
-  async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
-      if (error || !data) throw new Error("EXAM_NOT_FOUND");
-      if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
-      const exam: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status
-      };
-      return sanitizeExamForStudent(exam, studentId);
-  }
-
-  async saveExam(exam: Exam): Promise<void> {
-    let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
-    const BUCKET_NAME = 'soal';
-    const examCode = exam.code;
-
-    const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
-    
-    if (!existing) {
-        const { error: initError } = await supabase.from('exams').insert({
-            code: exam.code, 
-            author_id: exam.authorId, 
-            school: exam.authorSchool,
-            config: exam.config, 
-            questions: [], 
-            status: 'DRAFT'
-        });
-        if (initError) throw initError;
-    }
-
-    const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-        if (!html || !html.includes('data:image')) return html;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const images = doc.getElementsByTagName('img');
-        
-        for (let i = 0; i < images.length; i++) {
-            const img = images[i];
-            const src = img.getAttribute('src');
-            
-            if (src && src.startsWith('data:image')) {
-                try {
-                    const blob = base64ToBlob(src);
-                    const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
-                    const filename = `${examCode}/${contextId}_${Date.now()}_${i}.${ext}`;
-                    
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        img.setAttribute('src', publicUrlData.publicUrl);
-                        img.setAttribute('data-bucket-path', filename); 
-                    }
-                } catch (e) { console.error("Gagal upload gambar", e); }
-            }
-        }
-        return doc.body.innerHTML;
-    };
-
-    for (const q of processedQuestions) {
-        q.questionText = await processHtmlString(q.questionText, q.id);
-        if (q.options) {
-            for (let i = 0; i < q.options.length; i++) {
-                q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
-            }
-        }
-    }
-
-    const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
-        config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
-    });
-    if (error) throw error;
-  }
-
-  async deleteExam(code: string): Promise<void> {
-      await supabase.from('results').delete().eq('exam_code', code);
-      await supabase.from('exams').delete().eq('code', code);
-      const { data: files } = await supabase.storage.from('soal').list(code);
-      if (files && files.length > 0) {
-          const paths = files.map(f => `${code}/${f.name}`);
-          await supabase.storage.from('soal').remove(paths);
-      }
-  }
-
-  async getExamForArchive(code: string): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
-      if (error || !data) return null;
-
-      let examData: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status, createdAt: data.created_at
-      };
-
-      const revertHtmlImages = async (html: string): Promise<string> => {
-          if (!html.includes('<img')) return html;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const images = doc.getElementsByTagName('img');
-          for (let i = 0; i < images.length; i++) {
-              const img = images[i];
-              const src = img.getAttribute('src');
-              if (src && src.startsWith('http')) {
-                  img.setAttribute('src', await urlToBase64(src));
-                  img.removeAttribute('data-bucket-path');
-              }
-          }
-          return doc.body.innerHTML;
-      };
-
-      for (const q of examData.questions) {
-          q.questionText = await revertHtmlImages(q.questionText);
-          if (q.options) {
-              for (let i = 0; i < q.options.length; i++) {
-                  q.options[i] = await revertHtmlImages(q.options[i]);
-              }
-          }
-      }
-      return examData;
-  }
-
-  async cleanupExamAssets(code: string): Promise<void> {
-       const { data: files } = await supabase.storage.from('soal').list(code);
-       if (files && files.length > 0) {
-            await supabase.storage.from('soal').remove(files.map(f => `${code}/${f.name}`));
-       }
-  }
-
-  async getResults(examCode?: string, className?: string): Promise<Result[]> {
-    let query = supabase.from('results').select('*');
-    if (examCode) query = query.eq('exam_code', examCode);
-    if (className && className !== 'ALL') query = query.eq('class_name', className);
-    const { data, error } = await query;
-    if (error) return [];
-    return data.map((row: any) => ({
-        student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, answers: row.answers, score: row.score, correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, status: row.status, activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), location: row.location
-    }));
-  }
-
-  async submitExamResult(resultPayload: any): Promise<any> {
-    // 1. Cek Koneksi Internet
-    if (!navigator.onLine) {
-        this.addToQueue(resultPayload);
-        return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
-    }
-
-    try {
-        // 2. PERBAIKAN: Gunakan Upsert dengan data yang bersih
-        // Pastikan objek answers dikirim sebagai JSONB (Supabase menanganinya otomatis jika kolom tipe jsonb)
-        // Jika kolom tipe text, perlu JSON.stringify. Asumsi kolom adalah JSONB.
-        
-        const { error } = await supabase.from('results').upsert({
-            exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, // Ini adalah String "Nama-Kelas-No"
-            student_name: resultPayload.student.fullName,
-            class_name: resultPayload.student.class, 
-            answers: resultPayload.answers, // JSONB object
-            status: resultPayload.status,
-            activity_log: resultPayload.activityLog, 
-            score: resultPayload.score || 0, 
-            correct_answers: resultPayload.correctAnswers || 0,
-            total_questions: resultPayload.totalQuestions || 0, 
-            location: resultPayload.location, 
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'exam_code,student_id' });
-
-        if (error) throw error;
-        
-        return { ...resultPayload, isSynced: true };
-    } catch (error: any) {
-        console.error("CRITICAL DB ERROR:", error);
-        
-        // 3. DETEKSI ERROR FATAL (Supabase Policy / Schema mismatch)
-        // Jika error adalah 401 (Unauthorized - RLS) atau 400 (Bad Request - Schema), JANGAN masukkan ke queue.
-        // User harus tahu ini gagal karena konfigurasi server, bukan koneksi.
-        const isNetworkError = !error.code && error.message === 'Failed to fetch'; // Fetch error biasa
-        
-        if (isNetworkError) {
-            console.warn("Network glitch, adding to queue...");
-            this.addToQueue(resultPayload);
-            return { ...resultPayload, isSynced: false };
-        } else {
-             // ERROR CONFIG SERVER (RLS, TIPE DATA) -> LEMPAR ERROR AGAR UI TAHU
-             console.error("!!! DATA DITOLAK SERVER !!! Kemungkinan Row Level Security (RLS) aktif untuk role 'anon'. Harap buat policy INSERT/UPDATE untuk role anon di tabel 'results'.");
-             throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
-        }
-    }
-  }
-
-  private addToQueue(payload: any) {
-      this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
-      this.syncQueue.push({ ...payload, queuedAt: Date.now() });
-      this.saveQueue();
-      if(navigator.onLine) this.processQueue(); 
-  }
-
-  private saveQueue() {
-      localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue));
-  }
-
-  async processQueue() {
-      if (this.isProcessingQueue || this.syncQueue.length === 0 || !navigator.onLine) return;
-      this.isProcessingQueue = true;
-      const queueCopy = [...this.syncQueue];
-      const remainingQueue: any[] = [];
-      
-      for (const payload of queueCopy) {
-          try {
-             const { error } = await supabase.from('results').upsert({
-                exam_code: payload.examCode, student_id: payload.student.studentId, student_name: payload.student.fullName,
-                class_name: payload.student.class, answers: payload.answers, status: payload.status,
-                activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
-                total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
-             }, { onConflict: 'exam_code,student_id' });
-             
-             if (error) {
-                 // Jika error RLS/Schema saat proses queue, buang dari queue karena percuma diulang
-                 if (error.code === '42501' || error.code === 'PGRST301') { 
-                     console.error("Queue item dropped due to permission error:", error);
-                 } else {
-                     throw error; // Lempar agar masuk remainingQueue (retry nanti)
-                 }
-             }
-          } catch (e) {
-              remainingQueue.push(payload);
-          }
-      }
-      this.syncQueue = remainingQueue;
-      this.saveQueue();
-      this.isProcessingQueue = false;
-  }
-
-  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
-      if (error || !data) return null;
-      return {
-        student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
-        examCode: data.exam_code, answers: data.answers, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
-        timestamp: new Date(data.updated_at).getTime(), location: data.location
-      };
-  }
-
-  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
-      const currentLog = (data?.activity_log as string[]) || [];
-      await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
-  }
-
-  async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
-      if (data && data.config) {
-          const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
-          await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
-      }
-  }
-
-  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number) {
-      const channel = supabase.channel(`exam-room-${examCode}`);
-      await channel.send({ type: 'broadcast', event: 'student_progress', payload: { studentId, answeredCount, totalQuestions, timestamp: Date.now() } });
-  }
-  
-  async syncData() { this.processQueue(); }
+interface StudentLoginProps {
+  onLoginSuccess: (examCode: string, student: Student) => void;
+  onBack: () => void;
 }
 
-export const storageService = new StorageService();
+export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack }) => {
+  const [examCode, setExamCode] = useState('');
+  const [fullName, setFullName] = useState(() => localStorage.getItem('saved_student_fullname') || '');
+  const [studentClass, setStudentClass] = useState(() => localStorage.getItem('saved_student_class') || '');
+  const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem('saved_student_absent') || '');
+  const [error, setError] = useState('');
+  const examCodeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
+        examCodeInputRef.current.focus();
+    }
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!examCode || !fullName || !studentClass || !absentNumber) {
+      setError('Mohon lengkapi semua data identitas.');
+      return;
+    }
+    setError('');
+
+    localStorage.setItem('saved_student_fullname', fullName.trim());
+    localStorage.setItem('saved_student_class', studentClass.trim());
+    localStorage.setItem('saved_student_absent', absentNumber.trim());
+
+    // Membentuk ID unik siswa
+    const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+
+    onLoginSuccess(examCode.toUpperCase(), {
+      fullName: fullName.trim(),
+      class: studentClass.trim(),
+      absentNumber: absentNumber.trim(),
+      studentId: compositeId, 
+    });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#FAFAFA] relative overflow-hidden font-sans">
+        {/* Decorative Background Elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-50/50 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-50/50 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div className="w-full max-w-[400px] z-10 animate-gentle-slide">
+            <button 
+                onClick={onBack} 
+                className="group flex items-center gap-2 text-slate-400 hover:text-slate-800 mb-8 text-[10px] font-bold uppercase tracking-widest transition-all pl-1"
+            >
+                <ArrowLeftIcon className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+                Kembali ke Menu
+            </button>
+            
+            <div className="bg-white p-8 sm:p-10 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-white ring-1 ring-slate-100">
+                <div className="text-center mb-10">
+                    <div className="inline-flex p-3 bg-slate-50 rounded-2xl mb-4 text-indigo-600 shadow-sm border border-slate-100">
+                        <UserIcon className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Login Siswa</h2>
+                    <p className="text-slate-500 text-sm font-medium mt-2 leading-relaxed">
+                        Silakan masukkan identitas dan kode ujian<br/>yang diberikan oleh pengawas.
+                    </p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-4">
+                         <div className="relative group">
+                            <input
+                                type="text"
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                className="block w-full px-5 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl outline-none transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300 peer"
+                                placeholder=" "
+                            />
+                            <label className="absolute left-5 top-4 text-slate-400 text-sm font-medium transition-all duration-200 transform -translate-y-0 scale-100 origin-left peer-focus:-translate-y-3 peer-focus:scale-75 peer-focus:text-indigo-500 peer-[:not(:placeholder-shown)]:-translate-y-3 peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:text-slate-400 pointer-events-none">
+                                Nama Lengkap
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-3">
+                             <div className="col-span-3 relative group">
+                                <input
+                                    type="text"
+                                    value={studentClass}
+                                    onChange={(e) => setStudentClass(e.target.value)}
+                                    className="block w-full px-5 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl outline-none transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300 peer"
+                                    placeholder=" "
+                                />
+                                <label className="absolute left-5 top-4 text-slate-400 text-sm font-medium transition-all duration-200 transform -translate-y-0 scale-100 origin-left peer-focus:-translate-y-3 peer-focus:scale-75 peer-focus:text-indigo-500 peer-[:not(:placeholder-shown)]:-translate-y-3 peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:text-slate-400 pointer-events-none">
+                                    Kelas
+                                </label>
+                            </div>
+                             <div className="col-span-2 relative group">
+                                <input
+                                    type="text"
+                                    value={absentNumber}
+                                    onChange={(e) => setAbsentNumber(e.target.value)}
+                                    className="block w-full px-5 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl outline-none transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300 text-center peer"
+                                    placeholder=" "
+                                />
+                                <label className="absolute left-0 right-0 top-4 text-center text-slate-400 text-sm font-medium transition-all duration-200 transform -translate-y-0 scale-100 origin-center peer-focus:-translate-y-3 peer-focus:scale-75 peer-focus:text-indigo-500 peer-[:not(:placeholder-shown)]:-translate-y-3 peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:text-slate-400 pointer-events-none">
+                                    Absen
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                            <div className="relative bg-white rounded-2xl p-1 border border-slate-100 shadow-sm flex items-center">
+                                <div className="pl-4 text-slate-400">
+                                    <QrCodeIcon className="w-5 h-5" />
+                                </div>
+                                <input
+                                    ref={examCodeInputRef}
+                                    type="text"
+                                    value={examCode}
+                                    onChange={(e) => setExamCode(e.target.value)}
+                                    className="block w-full px-4 py-4 bg-transparent border-none focus:ring-0 outline-none text-center text-xl font-code font-bold tracking-[0.3em] text-indigo-600 uppercase placeholder:text-slate-200"
+                                    placeholder="KODE"
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Kode Ujian</p>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold text-center animate-fast-fade shadow-sm">
+                            {error}
+                        </div>
+                    )}
+                    
+                    <button 
+                        type="submit" 
+                        className="w-full bg-slate-900 text-white font-bold text-sm py-4.5 rounded-2xl hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5 transition-all active:scale-[0.98] mt-4 flex items-center justify-center gap-3 group shadow-md"
+                    >
+                        <span>Mulai Ujian</span>
+                        <ArrowLeftIcon className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform opacity-60" />
+                    </button>
+                </form>
+            </div>
+            
+            <p className="text-center text-slate-300 text-[10px] font-bold mt-8 uppercase tracking-widest">
+                Platform Ujian Cerdas V3.0
+            </p>
+        </div>
+    </div>
+  );
+};
