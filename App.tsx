@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -150,7 +151,7 @@ const App: React.FC = () => {
     if (!teacherProfile) return;
     setIsSyncing(true);
     try {
-        const examMap = await storageService.getExams();
+        const examMap = await storageService.getExams(teacherProfile);
         setExams(examMap);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
@@ -340,5 +341,5 @@ const App: React.FC = () => {
     </div>
   );
 };
- 
+
 export default App;
