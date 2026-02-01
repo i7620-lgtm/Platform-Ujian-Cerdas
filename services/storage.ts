@@ -251,11 +251,11 @@ class StorageService {
     if (profile) {
         if (profile.accountType === 'super_admin') {
             // Super Admin sees ALL. 
-            // NOTE: If RLS prevents drafts, they will simply be filtered out by DB.
+            // Query remains simple select('*').
         } else if (profile.accountType === 'admin_sekolah' && profile.school) {
             // Admin Sekolah: Matches school OR personal author_id.
-            // Using logic that ensures we get valid results even if some fields are null
-            query = query.or(`school.eq.${profile.school},author_id.eq.${profile.id}`);
+            // FIX: Added quotes around school name to handle spaces properly in PostgREST syntax
+            query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
         } else {
             // Guru: Only sees their own
             query = query.eq('author_id', profile.id);
