@@ -899,3 +899,4 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, results
         </div>
     );
 };
+ 
