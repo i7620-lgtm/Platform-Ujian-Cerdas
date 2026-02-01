@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon } from './Icons';
@@ -63,7 +62,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [warningMsg, setWarningMsg] = useState('');
     const [userLocation, setUserLocation] = useState<string>('');
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'pending'>('saved');
     const [activeExam, setActiveExam] = useState<Exam>(exam);
@@ -74,6 +72,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const timeLeftRef = useRef(0);
     const lastBroadcastTimeRef = useRef<number>(0);
     
+    // Anti-cheat refs and state
+    const violationsRef = useRef(0);
+    const blurTimestampRef = useRef<number | null>(null);
+    const [cheatingWarning, setCheatingWarning] = useState<string>('');
+
     useEffect(() => {
         const loadState = () => {
             try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch (e) { console.warn("Quota exceeded"); }
@@ -96,6 +99,92 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [STORAGE_KEY, initialData, exam]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
+    
+    const handleSubmit = useMemo(() => async (auto = false, status: ResultStatus = 'completed') => {
+        if (!auto && !confirm("Kumpulkan jawaban dan selesaikan ujian?")) return;
+        if (isSubmittingRef.current) return;
+        
+        setIsSubmitting(true);
+        setSaveStatus('saving');
+        
+        const grading = calculateGrade(exam, answersRef.current);
+        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
+        
+        if (status === 'completed' || status === 'force_closed') {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }, [exam, userLocation, onSubmit]);
+
+    // Anti-cheat useEffect
+    useEffect(() => {
+        if (student.class === 'PREVIEW' || !exam.config.detectBehavior) return;
+
+        const showWarning = (message: string) => {
+            setCheatingWarning(message);
+            setTimeout(() => setCheatingWarning(''), 5000);
+        };
+
+        const handleViolation = (type: 'soft' | 'hard', reason: string) => {
+            if (isSubmittingRef.current) return;
+            
+            logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
+
+            if (exam.config.continueWithPermission) {
+                alert("PELANGGARAN: Anda meninggalkan halaman ujian. Akses dikunci.");
+                handleSubmit(true, 'force_closed');
+                return;
+            }
+            
+            if (type === 'hard') {
+                violationsRef.current += 1;
+                const remaining = 3 - violationsRef.current;
+                if (remaining > 0) {
+                    showWarning(`PELANGGARAN SERIUS! Kesempatan tersisa: ${remaining}.`);
+                } else {
+                    alert("PELANGGARAN BATAS MAKSIMUM! Ujian dihentikan oleh sistem.");
+                    handleSubmit(true, 'force_closed');
+                }
+            } else { // soft
+                showWarning("PERINGATAN: Tetap fokus pada jendela ujian.");
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden && !isSubmittingRef.current) {
+                handleViolation('hard', 'Pindah tab atau minimize browser');
+            }
+        };
+
+        const handleBlur = () => {
+            if (!isSubmittingRef.current) {
+                blurTimestampRef.current = Date.now();
+            }
+        };
+
+        const handleFocus = () => {
+            if (blurTimestampRef.current && !isSubmittingRef.current) {
+                const duration = (Date.now() - blurTimestampRef.current) / 1000;
+                blurTimestampRef.current = null;
+
+                if (duration >= 2 && duration <= 5) {
+                    handleViolation('soft', `Fokus hilang selama ${duration.toFixed(1)} detik`);
+                } else if (duration > 5) {
+                    handleViolation('hard', `Fokus hilang selama ${duration.toFixed(1)} detik`);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleBlur);
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [exam, student, handleSubmit]);
 
     useEffect(() => {
         if (exam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
@@ -104,7 +193,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 (err) => logRef.current.push(`[System] Gagal lokasi: ${err.message}`)
             );
         }
-    }, []);
+    }, [exam.config.trackLocation, student.class]);
 
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (exam.config.timeLimit * 60 * 1000);
@@ -128,7 +217,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         tick();
         const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline]);
+    }, [deadline, handleSubmit]);
+
+    const broadcastProgress = useMemo(() => () => {
+        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
+        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
+    }, [exam]);
 
     const handleAnswerChange = (qId: string, val: string) => {
         setAnswers(prev => {
@@ -141,15 +236,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             return next;
         });
 
-        // Fix #1: Realtime Logic Update & Debounce
         if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
             const now = Date.now();
-            // Reduce throttle to 2000ms (2 seconds) for more responsive updates
             if (now - lastBroadcastTimeRef.current > 2000) {
                 broadcastProgress();
                 lastBroadcastTimeRef.current = now;
             } else {
-                // Ensure the final state is eventually sent if the user stops typing/clicking
                 if ((window as any).broadcastTimeout) clearTimeout((window as any).broadcastTimeout);
                 (window as any).broadcastTimeout = setTimeout(() => {
                     broadcastProgress();
@@ -168,51 +260,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return v.trim() !== "";
     };
 
-    const broadcastProgress = () => {
-        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
-        // Fix: Count ONLY truly answered questions based on logic, not just keys in object
-        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
-        
-        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
-    };
-
-    useEffect(() => {
-        if (student.class === 'PREVIEW') return;
-        const handleVisChange = () => {
-            if (document.hidden && exam.config.detectBehavior && !isSubmittingRef.current) {
-                logRef.current.push(`[${new Date().toLocaleTimeString()}] Tab background`);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current })); 
-                if (exam.config.continueWithPermission) {
-                    setIsSubmitting(true);
-                    alert("PELANGGARAN: Anda meninggalkan halaman ujian. Akses dikunci.");
-                    const grading = calculateGrade(exam, answersRef.current);
-                    onSubmit(answersRef.current, timeLeftRef.current, 'force_closed', logRef.current, userLocation, grading);
-                } else {
-                    setWarningMsg("PERINGATAN: Jangan tinggalkan halaman ujian!");
-                    setTimeout(() => setWarningMsg(''), 5000);
-                }
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisChange);
-        return () => document.removeEventListener('visibilitychange', handleVisChange);
-    }, [exam]);
-
-    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto && !confirm("Kumpulkan jawaban dan selesaikan ujian?")) return;
-        setIsSubmitting(true);
-        setSaveStatus('saving');
-        const grading = calculateGrade(exam, answersRef.current);
-        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
-        if (status === 'completed' || status === 'force_closed') localStorage.removeItem(STORAGE_KEY);
-    };
-
     const formatTime = (s: number) => {
         const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
         return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
     };
 
     const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
-    // UI Local Calculation
     const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
     const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
@@ -230,7 +283,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
             </header>
 
-            {warningMsg && <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce flex items-center gap-2"><ExclamationTriangleIcon className="w-4 h-4" /> {warningMsg}</div>}
+            {cheatingWarning && <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce flex items-center gap-2"><ExclamationTriangleIcon className="w-4 h-4" /> {cheatingWarning}</div>}
 
             <main className="max-w-3xl mx-auto px-5 sm:px-8 pt-24 space-y-12">
                 {activeExam.questions.map((q, idx) => {
@@ -303,17 +356,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                         {/* MENJODOHKAN */}
                                         {q.questionType === 'MATCHING' && q.matchingPairs && (
                                             <div className="space-y-3">
-                                                {/* Shuffle options ALWAYS for visual display (otherwise 1st option is 1st answer) */}
                                                 {(() => {
                                                     const rightOptions = useMemo(() => {
                                                         const opts = q.matchingPairs!.map(p => p.right);
-                                                        // Always shuffle for matching, otherwise answers align 1:1 with questions
                                                         for (let i = opts.length - 1; i > 0; i--) { 
                                                             const j = Math.floor(Math.random() * (i + 1)); 
                                                             [opts[i], opts[j]] = [opts[j], opts[i]]; 
                                                         }
                                                         return opts;
-                                                    }, [q.id]); // Removed exam.config.shuffleAnswers dependency
+                                                    }, [q.id]);
 
                                                     return q.matchingPairs.map((pair, i) => {
                                                         const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
