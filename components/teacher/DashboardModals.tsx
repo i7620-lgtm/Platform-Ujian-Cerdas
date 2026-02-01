@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon } from '../Icons';
@@ -35,15 +36,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         if (!displayExam) return;
         setIsRefreshing(true);
         try {
-            const headers: Record<string, string> = teacherProfile ? {
-                'x-role': teacherProfile.accountType,
-                'x-user-id': teacherProfile.id,
-                'x-school': teacherProfile.school
-            } : {};
+            // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
             const data = await storageService.getResults(
                 displayExam.code, 
-                selectedClass === 'ALL' ? '' : selectedClass,
-                headers
+                selectedClass === 'ALL' ? '' : selectedClass
             );
             setLocalResults(data);
         } catch (e) { console.error("Fetch failed", e); }
@@ -400,11 +396,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         const fetchResults = async () => {
             setIsLoading(true);
             try {
-                const data = await storageService.getResults(exam.code, undefined, {
-                    'x-role': teacherProfile.accountType,
-                    'x-user-id': teacherProfile.id,
-                    'x-school': teacherProfile.school
-                });
+                // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
+                const data = await storageService.getResults(exam.code, undefined);
                 setResults(data);
             } catch (error) {
                 console.error("Failed to fetch results", error);
