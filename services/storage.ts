@@ -41,7 +41,7 @@ const shuffleArray = <T>(array: T[]): T[] => {
     }
     return newArr;
 };
-
+ 
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor') {
         let questionsToProcess = [...exam.questions];
