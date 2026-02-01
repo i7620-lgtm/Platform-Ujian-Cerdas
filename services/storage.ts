@@ -41,7 +41,7 @@ const shuffleArray = <T>(array: T[]): T[] => {
     }
     return newArr;
 };
- 
+
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor') {
         let questionsToProcess = [...exam.questions];
@@ -159,20 +159,26 @@ class StorageService {
   }
 
   async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      // Mengirim metadata di opsi sign up agar Trigger Database bisa menangkapnya
+      // dan membuat baris profil secara otomatis dengan hak akses system (bypass RLS client).
+      const { data: authData, error: authError } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+              data: {
+                  full_name: fullName,
+                  school: school,
+                  role: 'guru'
+              }
+          }
+      });
+
       if (authError || !authData.user) {
           throw new Error(authError?.message || 'Gagal mendaftar. Email mungkin sudah terdaftar.');
       }
 
-      const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({ id: authData.user.id, full_name: fullName, school: school, role: 'guru' });
-      
-      if (profileError) {
-          // This is a tricky state. User is created in auth, but profile failed.
-          throw new Error('Gagal membuat profil pengguna setelah pendaftaran.');
-      }
-
+      // Kita mengembalikan objek profil optimis. 
+      // Pembuatan data di tabel 'profiles' ditangani oleh Trigger SQL.
       return {
           id: authData.user.id,
           fullName: fullName,
@@ -185,8 +191,23 @@ class StorageService {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
+      // Tunggu sebentar untuk memastikan trigger selesai (jika baru daftar dan langsung login)
+      await new Promise(r => setTimeout(r, 500));
+
       const profile = await this.getCurrentUser();
-      if (!profile) throw new Error('Gagal memuat profil pengguna setelah masuk.');
+      if (!profile) {
+          // Fallback jika profil belum ada (misal trigger gagal), kita coba ambil dari metadata user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && user.user_metadata) {
+               return {
+                   id: user.id,
+                   fullName: user.user_metadata.full_name || 'Pengguna',
+                   accountType: (user.user_metadata.role as AccountType) || 'guru',
+                   school: user.user_metadata.school || 'Sekolah'
+               };
+          }
+          throw new Error('Gagal memuat profil pengguna. Silakan coba masuk lagi.');
+      }
       
       return profile;
   }
