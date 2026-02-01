@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType } from '../types';
 
@@ -33,15 +32,15 @@ const urlToBase64 = async (url: string): Promise<string> => {
     }
 };
 
-// Helper shuffle array (Fisher-Yates)
-const shuffleArray = <T>(array: T[]): T[] => {
+// Helper shuffle array (Fisher-Yates) - Menggunakan sintaks 'function' untuk keamanan parsing
+function shuffleArray<T>(array: T[]): T[] {
     const newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
     }
     return newArr;
-};
+}
 
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor') {
@@ -392,9 +391,6 @@ class StorageService {
 
     try {
         // 2. PERBAIKAN: Gunakan Upsert dengan data yang bersih
-        // Pastikan objek answers dikirim sebagai JSONB (Supabase menanganinya otomatis jika kolom tipe jsonb)
-        // Jika kolom tipe text, perlu JSON.stringify. Asumsi kolom adalah JSONB.
-        
         const { error } = await supabase.from('results').upsert({
             exam_code: resultPayload.examCode, 
             student_id: resultPayload.student.studentId, // Ini adalah String "Nama-Kelas-No"
@@ -417,8 +413,6 @@ class StorageService {
         console.error("CRITICAL DB ERROR:", error);
         
         // 3. DETEKSI ERROR FATAL (Supabase Policy / Schema mismatch)
-        // Jika error adalah 401 (Unauthorized - RLS) atau 400 (Bad Request - Schema), JANGAN masukkan ke queue.
-        // User harus tahu ini gagal karena konfigurasi server, bukan koneksi.
         const isNetworkError = !error.code && error.message === 'Failed to fetch'; // Fetch error biasa
         
         if (isNetworkError) {
@@ -426,8 +420,7 @@ class StorageService {
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         } else {
-             // ERROR CONFIG SERVER (RLS, TIPE DATA) -> LEMPAR ERROR AGAR UI TAHU
-             console.error("!!! DATA DITOLAK SERVER !!! Kemungkinan Row Level Security (RLS) aktif untuk role 'anon'. Harap buat policy INSERT/UPDATE untuk role anon di tabel 'results'.");
+             console.error("!!! DATA DITOLAK SERVER !!! Harap cek Policy RLS di tabel 'results'.");
              throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
         }
     }
@@ -460,11 +453,10 @@ class StorageService {
              }, { onConflict: 'exam_code,student_id' });
              
              if (error) {
-                 // Jika error RLS/Schema saat proses queue, buang dari queue karena percuma diulang
                  if (error.code === '42501' || error.code === 'PGRST301') { 
                      console.error("Queue item dropped due to permission error:", error);
                  } else {
-                     throw error; // Lempar agar masuk remainingQueue (retry nanti)
+                     throw error; 
                  }
              }
           } catch (e) {
