@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -79,7 +79,7 @@ export interface Result {
     location?: string; 
 }
 
-export type AccountType = 'super_admin' | 'admin' | 'guru';
+export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru';
 
 export interface TeacherProfile {
     id: string; 
@@ -87,4 +87,10 @@ export interface TeacherProfile {
     accountType: AccountType;
     school: string;
     avatarUrl?: string;
+    email?: string; // Added for user management display
+}
+
+export interface UserProfile extends TeacherProfile {
+    email: string;
+    createdAt?: string;
 }
