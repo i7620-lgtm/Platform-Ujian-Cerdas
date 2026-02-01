@@ -250,13 +250,19 @@ class StorageService {
 
     if (profile) {
         if (profile.accountType === 'super_admin') {
-            // Super Admin sees ALL
+            // Super Admin sees ALL exams, including DRAFTS from everyone.
+            // No .eq filter applied.
         } else if (profile.accountType === 'admin_sekolah') {
+            // Admin Sekolah sees ALL exams in their school, including DRAFTS from other teachers in that school.
             query = query.eq('school', profile.school);
         } else {
+            // Regular Teachers only see their OWN exams (Drafts & Published).
             query = query.eq('author_id', profile.id);
         }
     }
+
+    // Sort by created_at descending so new drafts appear at top
+    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
 
