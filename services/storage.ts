@@ -1,5 +1,6 @@
+
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -154,7 +155,8 @@ class StorageService {
           id: session.user.id,
           fullName: profile.full_name,
           accountType: profile.role as AccountType,
-          school: profile.school
+          school: profile.school,
+          email: session.user.email
       };
   }
 
@@ -179,7 +181,8 @@ class StorageService {
           id: authData.user.id,
           fullName: fullName,
           accountType: 'guru',
-          school: school
+          school: school,
+          email: email
       };
   }
 
@@ -216,28 +219,79 @@ class StorageService {
       await supabase.auth.signOut();
   }
 
+  // --- USER MANAGEMENT (SUPER ADMIN) ---
+  
+  async getAllUsers(): Promise<UserProfile[]> {
+      const { data: profiles, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      
+      return profiles.map((p: any) => ({
+          id: p.id,
+          fullName: p.full_name,
+          accountType: p.role as AccountType,
+          school: p.school,
+          email: '-' 
+      }));
+  }
+
+  async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole, school: newSchool })
+        .eq('id', userId);
+      
+      if (error) throw error;
+  }
+
   // --- EXAM METHODS ---
 
-  async getExams(): Promise<Record<string, Exam>> {
-    const { data, error } = await supabase.from('exams').select('*');
+  async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
+    let query = supabase.from('exams').select('*');
+
+    // REFACTOR: Percayakan filtering pada RLS di database.
+    // Frontend tidak perlu melakukan filter 'author_id' manual jika RLS sudah dikonfigurasi.
+    // Namun, untuk 'admin_sekolah' kita bantu persempit scope sekolahnya secara eksplisit
+    // agar lebih aman dan efisien, meskipun RLS juga akan memblokirnya.
+
+    if (profile) {
+        if (profile.accountType === 'super_admin') {
+            // Super Admin: No Filter (RLS allows all)
+        } else if (profile.accountType === 'admin_sekolah' && profile.school) {
+            // Admin Sekolah: Filter by School OR Author ID (in case they created draft before assigning school)
+            // UPDATED: Menggunakan sintaks yang lebih aman
+            // Note: RLS "Admin Sekolah Select School" di atas akan menangani ini, 
+            // tapi kita tambahkan filter eksplisit untuk performa.
+            // Kita gunakan OR karena mungkin admin membuat soal pribadinya sendiri.
+            query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
+        } else {
+            // Guru: Filter by Author ID
+            query = query.eq('author_id', profile.id);
+        }
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-        console.error("Error fetching exams:", error);
+        console.error("Error fetching exams from Supabase:", error);
         return {};
     }
 
+    console.log(`[Storage] Fetched ${data?.length || 0} exams for role ${profile?.accountType}`);
+
     const examMap: Record<string, Exam> = {};
-    data.forEach((row: any) => {
-        examMap[row.code] = {
-            code: row.code,
-            authorId: row.author_id,
-            authorSchool: row.school,
-            config: row.config,
-            questions: row.questions,
-            status: row.status,
-            createdAt: row.created_at
-        };
-    });
+    if (data) {
+        data.forEach((row: any) => {
+            examMap[row.code] = {
+                code: row.code,
+                authorId: row.author_id,
+                authorSchool: row.school,
+                config: row.config,
+                questions: row.questions,
+                status: row.status,
+                createdAt: row.created_at
+            };
+        });
+    }
     return examMap;
   }
 
@@ -342,6 +396,27 @@ class StorageService {
           for (let i = 0; i < images.length; i++) {
               const img = images[i];
               const src = img.getAttribute('src');
+              const bucketPath = img.getAttribute('data-bucket-path');
+
+              // FIX: Try to download directly from storage using path first (bypasses CORS issues with public URL)
+              if (bucketPath) {
+                  try {
+                      const { data, error } = await supabase.storage.from('soal').download(bucketPath);
+                      if (!error && data) {
+                          const base64 = await new Promise<string>((resolve) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.readAsDataURL(data);
+                          });
+                          img.setAttribute('src', base64);
+                          img.removeAttribute('data-bucket-path');
+                          continue; // Success, skip next check
+                      }
+                  } catch (e) {
+                      console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
+                  }
+              }
+
               if (src && src.startsWith('http')) {
                   img.setAttribute('src', await urlToBase64(src));
                   img.removeAttribute('data-bucket-path');
@@ -383,20 +458,18 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    // 1. Cek Koneksi Internet
     if (!navigator.onLine) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
 
     try {
-        // 2. PERBAIKAN: Gunakan Upsert dengan data yang bersih
         const { error } = await supabase.from('results').upsert({
             exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, // Ini adalah String "Nama-Kelas-No"
+            student_id: resultPayload.student.studentId, 
             student_name: resultPayload.student.fullName,
             class_name: resultPayload.student.class, 
-            answers: resultPayload.answers, // JSONB object
+            answers: resultPayload.answers,
             status: resultPayload.status,
             activity_log: resultPayload.activityLog, 
             score: resultPayload.score || 0, 
@@ -412,8 +485,7 @@ class StorageService {
     } catch (error: any) {
         console.error("CRITICAL DB ERROR:", error);
         
-        // 3. DETEKSI ERROR FATAL (Supabase Policy / Schema mismatch)
-        const isNetworkError = !error.code && error.message === 'Failed to fetch'; // Fetch error biasa
+        const isNetworkError = !error.code && error.message === 'Failed to fetch'; 
         
         if (isNetworkError) {
             console.warn("Network glitch, adding to queue...");

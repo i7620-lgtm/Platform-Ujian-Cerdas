@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { StudentLogin } from './components/StudentLogin';
@@ -150,7 +151,7 @@ const App: React.FC = () => {
     if (!teacherProfile) return;
     setIsSyncing(true);
     try {
-        const examMap = await storageService.getExams();
+        const examMap = await storageService.getExams(teacherProfile);
         setExams(examMap);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
@@ -200,12 +201,20 @@ const App: React.FC = () => {
     setStudentResult(null); 
     setResumedResult(null);
     setTeacherProfile(null);
+    // FIX: Clear shared state to prevent data leakage/ghosting between sessions
+    setExams({});
+    setResults([]);
     window.history.replaceState({}, '', '/');
   };
 
   const handleLogout = async () => {
-    await storageService.signOut();
+    // Immediate state clear to prevent flash
     resetToHome();
+    try {
+        await storageService.signOut();
+    } catch(e) {
+        console.error("Sign out error", e);
+    }
   };
 
   if (isLoadingSession) {
@@ -291,6 +300,7 @@ const App: React.FC = () => {
         
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
             <TeacherDashboard 
+                key={teacherProfile.id} /* FIX: Force remount to prevent ghosting */
                 teacherProfile={teacherProfile} 
                 exams={exams} 
                 results={results}
@@ -340,5 +350,5 @@ const App: React.FC = () => {
     </div>
   );
 };
- 
+
 export default App;

@@ -1,4 +1,3 @@
- 
 
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
@@ -14,7 +13,7 @@ import {
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
-import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
+import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer, UserManagementView } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage'; // Perbaikan path: ../services/storage
 
@@ -72,9 +71,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [selectedFinishedExam, setSelectedFinishedExam] = useState<Exam | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
-
-    // Admin State
-    const [adminUsers, setAdminUsers] = useState<any[]>([]);
 
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
@@ -206,7 +202,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
+    
+    // UPDATED: Allow admins to see all drafts returned by storage service (scoped by DB query).
+    // Previously filtered by authorId, hiding other teachers' drafts from admins.
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
+    
     const now = new Date();
     
     const ongoingExams = publishedExams.filter((exam) => {
@@ -234,7 +234,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <div>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-black text-slate-900 tracking-tight">Dashboard Guru</h1>
-                                <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+                                    teacherProfile.accountType === 'super_admin' ? 'bg-slate-800 text-white border-slate-900' :
+                                    teacherProfile.accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                    'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                }`}>
                                     {teacherProfile.accountType.replace('_', ' ')}
                                 </span>
                             </div>
@@ -252,6 +256,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                          <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Terjadwal</button>
                          <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Selesai</button>
                          <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buka Arsip</button>
+                         {teacherProfile.accountType === 'super_admin' && (
+                            <button onClick={() => setView('ADMIN_USERS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Kelola Pengguna</button>
+                         )}
                     </nav>
                 </div>
             </header>
@@ -278,6 +285,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
+                {view === 'ADMIN_USERS' && teacherProfile.accountType === 'super_admin' && <UserManagementView />}
             </main>
 
             {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}
