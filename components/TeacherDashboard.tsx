@@ -211,7 +211,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'DRAFTS' && <DraftsView exams={draftExams} onContinueDraft={continueDraft} onDeleteDraft={handleDeleteExam} />}
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
                 {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} />}
-                {view === 'FINISHED_EXAMS' && <FinishedExamsView exams={finishedExams} onSelectExam={setSelectedFinishedExam} onDuplicateExam={handleDuplicateExam} onDeleteExam={handleDeleteExam} />}
+                {view === 'FINISHED_EXAMS' && <FinishedExamsView exams={finishedExams} results={results} onSelectExam={setSelectedFinishedExam} onDuplicateExam={handleDuplicateExam} onDeleteExam={handleDeleteExam} />}
             </main>
 
             {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}
