@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon } from '../Icons';
@@ -32,9 +31,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
-    const fetchLatest = async () => {
+    // UPDATED: Added 'silent' parameter to prevent flickering during background polling
+    const fetchLatest = async (silent = false) => {
         if (!displayExam) return;
-        setIsRefreshing(true);
+        if (!silent) setIsRefreshing(true);
         try {
             // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
             const data = await storageService.getResults(
@@ -43,71 +43,48 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
             );
             setLocalResults(data);
         } catch (e) { console.error("Fetch failed", e); }
-        finally { setIsRefreshing(false); }
+        finally { if (!silent) setIsRefreshing(false); }
     };
 
+    // 1. POLLING MECHANISM (HEARTBEAT)
+    // Refresh data every 5 seconds to ensure consistency even if WebSocket drops
     useEffect(() => {
-        fetchLatest();
+        fetchLatest(); // Initial load
+
+        const intervalId = setInterval(() => {
+            fetchLatest(true); // Silent fetch
+        }, 5000);
+
+        return () => clearInterval(intervalId);
     }, [displayExam, selectedClass, teacherProfile]);
 
-    // HYBRID REALTIME: DB CHANGES (Status) + BROADCAST (Progress)
+    // 2. HYBRID REALTIME: DB CHANGES (Status) + BROADCAST (Progress)
     useEffect(() => {
         if (!displayExam) return;
 
         const channel = supabase
             .channel(`exam-room-${displayExam.code}`)
-            // Fix #3: Listen to ALL events (INSERT/UPDATE/DELETE) to catch new logins immediately
+            // Listen to ANY change in results table for this exam
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` },
-                (payload) => {
-                    const newResult = payload.new as any;
-                    
-                    // Handle INSERT (New Student) or UPDATE
-                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                        setLocalResults(prev => {
-                            const idx = prev.findIndex(r => r.student.studentId === newResult.student_id);
-                             const convertedResult: Result = {
-                                student: { studentId: newResult.student_id, fullName: newResult.student_name, class: newResult.class_name, absentNumber: '00' },
-                                examCode: newResult.exam_code,
-                                answers: newResult.answers as Record<string, string>,
-                                score: newResult.score,
-                                correctAnswers: newResult.correct_answers,
-                                totalQuestions: newResult.total_questions,
-                                status: newResult.status,
-                                activityLog: newResult.activity_log,
-                                timestamp: new Date(newResult.updated_at).getTime(),
-                                location: newResult.location
-                            };
-                            
-                            if (idx >= 0) {
-                                // Update existing
-                                const updated = [...prev];
-                                updated[idx] = convertedResult;
-                                return updated;
-                            } else {
-                                // Add new student
-                                if (selectedClass === 'ALL' || selectedClass === newResult.class_name) {
-                                    return [...prev, convertedResult];
-                                }
-                                return prev;
-                            }
-                        });
-                    }
+                () => {
+                    // Logic disederhanakan: Jika ada perubahan DB (Insert/Update), 
+                    // langsung trigger fetch silent untuk dapat data paling akurat dari server.
+                    fetchLatest(true);
                 }
             )
-            // 2. Listen Broadcast (Untuk Progress Bar Realtime - Hemat DB)
+            // Listen Broadcast (Untuk Progress Bar Realtime - Hemat DB)
             .on('broadcast', { event: 'student_progress' }, (payload) => {
                 const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload;
                 
                 // Simpan state progress di ref agar persist saat re-render
                 broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp };
                 
-                // Update state untuk re-render UI
+                // Update state untuk re-render UI secara optimistik
                 setLocalResults(prev => {
                     const idx = prev.findIndex(r => r.student.studentId === studentId);
                     if (idx >= 0 && prev[idx].status === 'in_progress') {
-                        // Kita hack sedikit objek result di memory dengan data terbaru dari broadcast
                         const updated = [...prev];
                         updated[idx] = {
                             ...updated[idx],
@@ -131,7 +108,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     const handleUnlockClick = async (studentId: string, examCode: string) => {
         processingIdsRef.current.add(studentId);
         
-        // Fix #2: Optimistic UI Update - Immediately update UI to "in_progress"
+        // Optimistic UI Update
         setLocalResults(prev => prev.map(r => 
             r.student.studentId === studentId 
             ? { ...r, status: 'in_progress' } 
@@ -141,14 +118,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
         try {
             await storageService.unlockStudentExam(examCode, studentId);
             onAllowContinuation(studentId, examCode);
+            // Fetch latest to confirm
+            fetchLatest(true);
         } catch (error) { 
             alert("Gagal membuka kunci."); 
-            // Revert on failure (optional, but safer)
-            setLocalResults(prev => prev.map(r => 
-                r.student.studentId === studentId 
-                ? { ...r, status: 'force_closed' } 
-                : r
-            ));
+            // Revert on failure
+            fetchLatest(true);
         } 
         finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); }
     };
