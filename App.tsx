@@ -22,6 +22,24 @@ const App: React.FC = () => {
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+        try {
+            const profile = await storageService.getCurrentUser();
+            if (profile) {
+                setTeacherProfile(profile);
+                setView('TEACHER_DASHBOARD');
+            }
+        } catch (e) {
+            console.error("Session check failed", e);
+        } finally {
+            setIsLoadingSession(false);
+        }
+    };
+    checkSession();
+  }, []);
 
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
@@ -132,11 +150,7 @@ const App: React.FC = () => {
     if (!teacherProfile) return;
     setIsSyncing(true);
     try {
-        const examMap = await storageService.getExams({ 
-          'x-user-id': teacherProfile.id, 
-          'x-role': teacherProfile.accountType,
-          'x-school': teacherProfile.school 
-        });
+        const examMap = await storageService.getExams();
         setExams(examMap);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
@@ -145,11 +159,7 @@ const App: React.FC = () => {
     if (!teacherProfile) return;
     setIsSyncing(true);
     try {
-        const data = await storageService.getResults(undefined, undefined, { 
-          'x-user-id': teacherProfile.id,
-          'x-role': teacherProfile.accountType,
-          'x-school': teacherProfile.school
-        });
+        const data = await storageService.getResults();
         setResults(data);
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
@@ -189,8 +199,25 @@ const App: React.FC = () => {
     setCurrentStudent(null); 
     setStudentResult(null); 
     setResumedResult(null);
+    setTeacherProfile(null);
     window.history.replaceState({}, '', '/');
   };
+
+  const handleLogout = async () => {
+    await storageService.signOut();
+    resetToHome();
+  };
+
+  if (isLoadingSession) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                <p className="text-sm font-medium text-slate-500">Memuat sesi...</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col">
@@ -267,10 +294,18 @@ const App: React.FC = () => {
                 teacherProfile={teacherProfile} 
                 exams={exams} 
                 results={results}
-                addExam={async (e) => { await storageService.saveExam(e, { 'x-user-id': teacherProfile.id, 'x-school': teacherProfile.school }); refreshExams(); }}
-                updateExam={async (e) => { await storageService.saveExam(e, { 'x-user-id': teacherProfile.id, 'x-school': teacherProfile.school }); refreshExams(); }}
-                deleteExam={async (c) => { await storageService.deleteExam(c, { 'x-user-id': teacherProfile.id }); refreshExams(); }}
-                onLogout={resetToHome}
+                addExam={async (e) => { 
+                    const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                    await storageService.saveExam(examWithAuthor); 
+                    refreshExams(); 
+                }}
+                updateExam={async (e) => { 
+                    const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                    await storageService.saveExam(examWithAuthor); 
+                    refreshExams(); 
+                }}
+                deleteExam={async (c) => { await storageService.deleteExam(c); refreshExams(); }}
+                onLogout={handleLogout}
                 onRefreshExams={refreshExams}
                 onRefreshResults={refreshResults}
                 onAllowContinuation={async (sid, ec) => { await storageService.unlockStudentExam(ec, sid); refreshResults(); }}
@@ -305,6 +340,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;
  
+export default App;
