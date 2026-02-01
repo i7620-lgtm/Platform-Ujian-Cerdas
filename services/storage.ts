@@ -159,8 +159,6 @@ class StorageService {
   }
 
   async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      // Mengirim metadata di opsi sign up agar Trigger Database bisa menangkapnya
-      // dan membuat baris profil secara otomatis dengan hak akses system (bypass RLS client).
       const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
@@ -177,8 +175,6 @@ class StorageService {
           throw new Error(authError?.message || 'Gagal mendaftar. Email mungkin sudah terdaftar.');
       }
 
-      // Kita mengembalikan objek profil optimis. 
-      // Pembuatan data di tabel 'profiles' ditangani oleh Trigger SQL.
       return {
           id: authData.user.id,
           fullName: fullName,
@@ -191,23 +187,30 @@ class StorageService {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
-      // Tunggu sebentar untuk memastikan trigger selesai (jika baru daftar dan langsung login)
+      // Tunggu sebentar untuk trigger
       await new Promise(r => setTimeout(r, 500));
 
-      const profile = await this.getCurrentUser();
+      let profile = await this.getCurrentUser();
+      
+      // SELF-HEAL: Jika profil tidak ditemukan (trigger gagal), coba buat manual
       if (!profile) {
-          // Fallback jika profil belum ada (misal trigger gagal), kita coba ambil dari metadata user
           const { data: { user } } = await supabase.auth.getUser();
-          if (user && user.user_metadata) {
-               return {
-                   id: user.id,
-                   fullName: user.user_metadata.full_name || 'Pengguna',
-                   accountType: (user.user_metadata.role as AccountType) || 'guru',
-                   school: user.user_metadata.school || 'Sekolah'
-               };
+          if (user) {
+              const meta = user.user_metadata || {};
+              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
+              await supabase.from('profiles').insert({
+                  id: user.id,
+                  full_name: meta.full_name || 'Pengguna',
+                  school: meta.school || '-',
+                  role: meta.role || 'guru'
+              }).select().single();
+              
+              // Coba ambil lagi
+              profile = await this.getCurrentUser();
           }
-          throw new Error('Gagal memuat profil pengguna. Silakan coba masuk lagi.');
       }
+
+      if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
       
       return profile;
   }
@@ -219,7 +222,6 @@ class StorageService {
   // --- EXAM METHODS ---
 
   async getExams(): Promise<Record<string, Exam>> {
-    // RLS will enforce author_id = auth.uid()
     const { data, error } = await supabase.from('exams').select('*');
 
     if (error) {
@@ -258,6 +260,24 @@ class StorageService {
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
+    // STEP 1: PASTIKAN ROW UJIAN ADA
+    // Storage Policy membutuhkan row ujian (code & author_id) untuk verifikasi kepemilikan folder.
+    // Kita cek dulu, jika belum ada, kita buat placeholder.
+    const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
+    
+    if (!existing) {
+        const { error: initError } = await supabase.from('exams').insert({
+            code: exam.code, 
+            author_id: exam.authorId, 
+            school: exam.authorSchool,
+            config: exam.config, 
+            questions: [], // Kosong dulu agar ringan
+            status: 'DRAFT'
+        });
+        if (initError) throw initError;
+    }
+
+    // STEP 2: PROSES UPLOAD GAMBAR
     const processHtmlString = async (html: string, contextId: string): Promise<string> => {
         if (!html || !html.includes('data:image')) return html;
         const parser = new DOMParser();
@@ -295,6 +315,7 @@ class StorageService {
         }
     }
 
+    // STEP 3: SIMPAN DATA FINAL
     const { error } = await supabase.from('exams').upsert({
         code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
         config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
@@ -356,7 +377,6 @@ class StorageService {
   }
 
   async getResults(examCode?: string, className?: string): Promise<Result[]> {
-    // RLS will filter results based on the teacher's school.
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
     if (className && className !== 'ALL') query = query.eq('class_name', className);
