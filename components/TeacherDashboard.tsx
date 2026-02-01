@@ -203,9 +203,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
     
-    // Fix: Ensure drafts are personal to the author. 
-    // Super admins and School admins might fetch all school exams, but 'Drafts' tab should only show THEIR drafts.
-    const draftExams = allExams.filter(e => e.status === 'DRAFT' && e.authorId === teacherProfile.id);
+    // UPDATED: Allow admins to see all drafts returned by storage service (scoped by DB query).
+    // Previously filtered by authorId, hiding other teachers' drafts from admins.
+    const draftExams = allExams.filter(e => e.status === 'DRAFT');
     
     const now = new Date();
     
