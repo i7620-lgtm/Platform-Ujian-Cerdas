@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType } from '../types';
 
@@ -192,7 +193,6 @@ class StorageService {
 
       let profile = await this.getCurrentUser();
       
-      // SELF-HEAL: Jika profil tidak ditemukan (trigger gagal), coba buat manual
       if (!profile) {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
@@ -205,13 +205,11 @@ class StorageService {
                   role: meta.role || 'guru'
               }).select().single();
               
-              // Coba ambil lagi
               profile = await this.getCurrentUser();
           }
       }
 
       if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
-      
       return profile;
   }
 
@@ -260,9 +258,6 @@ class StorageService {
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
-    // STEP 1: PASTIKAN ROW UJIAN ADA
-    // Storage Policy membutuhkan row ujian (code & author_id) untuk verifikasi kepemilikan folder.
-    // Kita cek dulu, jika belum ada, kita buat placeholder.
     const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
     
     if (!existing) {
@@ -271,13 +266,12 @@ class StorageService {
             author_id: exam.authorId, 
             school: exam.authorSchool,
             config: exam.config, 
-            questions: [], // Kosong dulu agar ringan
+            questions: [], 
             status: 'DRAFT'
         });
         if (initError) throw initError;
     }
 
-    // STEP 2: PROSES UPLOAD GAMBAR
     const processHtmlString = async (html: string, contextId: string): Promise<string> => {
         if (!html || !html.includes('data:image')) return html;
         const parser = new DOMParser();
@@ -315,7 +309,6 @@ class StorageService {
         }
     }
 
-    // STEP 3: SIMPAN DATA FINAL
     const { error } = await supabase.from('exams').upsert({
         code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
         config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
@@ -391,23 +384,52 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
+    // 1. Cek Koneksi Internet
     if (!navigator.onLine) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
+
     try {
+        // 2. PERBAIKAN: Gunakan Upsert dengan data yang bersih
+        // Pastikan objek answers dikirim sebagai JSONB (Supabase menanganinya otomatis jika kolom tipe jsonb)
+        // Jika kolom tipe text, perlu JSON.stringify. Asumsi kolom adalah JSONB.
+        
         const { error } = await supabase.from('results').upsert({
-            exam_code: resultPayload.examCode, student_id: resultPayload.student.studentId, student_name: resultPayload.student.fullName,
-            class_name: resultPayload.student.class, answers: resultPayload.answers, status: resultPayload.status,
-            activity_log: resultPayload.activityLog, score: resultPayload.score || 0, correct_answers: resultPayload.correctAnswers || 0,
-            total_questions: resultPayload.totalQuestions || 0, location: resultPayload.location, updated_at: new Date().toISOString()
+            exam_code: resultPayload.examCode, 
+            student_id: resultPayload.student.studentId, // Ini adalah String "Nama-Kelas-No"
+            student_name: resultPayload.student.fullName,
+            class_name: resultPayload.student.class, 
+            answers: resultPayload.answers, // JSONB object
+            status: resultPayload.status,
+            activity_log: resultPayload.activityLog, 
+            score: resultPayload.score || 0, 
+            correct_answers: resultPayload.correctAnswers || 0,
+            total_questions: resultPayload.totalQuestions || 0, 
+            location: resultPayload.location, 
+            updated_at: new Date().toISOString()
         }, { onConflict: 'exam_code,student_id' });
+
         if (error) throw error;
+        
         return { ...resultPayload, isSynced: true };
-    } catch (error) {
-        console.warn("Submit failed, adding to queue:", error);
-        this.addToQueue(resultPayload);
-        return { ...resultPayload, isSynced: false };
+    } catch (error: any) {
+        console.error("CRITICAL DB ERROR:", error);
+        
+        // 3. DETEKSI ERROR FATAL (Supabase Policy / Schema mismatch)
+        // Jika error adalah 401 (Unauthorized - RLS) atau 400 (Bad Request - Schema), JANGAN masukkan ke queue.
+        // User harus tahu ini gagal karena konfigurasi server, bukan koneksi.
+        const isNetworkError = !error.code && error.message === 'Failed to fetch'; // Fetch error biasa
+        
+        if (isNetworkError) {
+            console.warn("Network glitch, adding to queue...");
+            this.addToQueue(resultPayload);
+            return { ...resultPayload, isSynced: false };
+        } else {
+             // ERROR CONFIG SERVER (RLS, TIPE DATA) -> LEMPAR ERROR AGAR UI TAHU
+             console.error("!!! DATA DITOLAK SERVER !!! Kemungkinan Row Level Security (RLS) aktif untuk role 'anon'. Harap buat policy INSERT/UPDATE untuk role anon di tabel 'results'.");
+             throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
+        }
     }
   }
 
@@ -427,6 +449,7 @@ class StorageService {
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
       const remainingQueue: any[] = [];
+      
       for (const payload of queueCopy) {
           try {
              const { error } = await supabase.from('results').upsert({
@@ -435,9 +458,16 @@ class StorageService {
                 activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
                 total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
-             if (error) throw error;
+             
+             if (error) {
+                 // Jika error RLS/Schema saat proses queue, buang dari queue karena percuma diulang
+                 if (error.code === '42501' || error.code === 'PGRST301') { 
+                     console.error("Queue item dropped due to permission error:", error);
+                 } else {
+                     throw error; // Lempar agar masuk remainingQueue (retry nanti)
+                 }
+             }
           } catch (e) {
-              console.error("Queue retry failed", e);
               remainingQueue.push(payload);
           }
       }
