@@ -222,25 +222,15 @@ class StorageService {
   // --- USER MANAGEMENT (SUPER ADMIN) ---
   
   async getAllUsers(): Promise<UserProfile[]> {
-      // NOTE: This requires 'profiles' table to have appropriate RLS allowing read for super_admin
-      // Since we can't change RLS here, we assume the backend policy is set or we use a function.
-      // If RLS blocks this, you'll need to run this SQL in Supabase:
-      // CREATE POLICY "Super Admin View All" ON "public"."profiles" FOR SELECT USING (auth.uid() IN (SELECT id FROM profiles WHERE role = 'super_admin'));
-      
-      // Fetch profiles
       const { data: profiles, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
-      
-      // We need emails. In a real scenario, joining auth.users is restricted. 
-      // For this app design, we might rely on the profile or if we can't get email, show '-'
-      // Assuming 'email' is NOT in public.profiles by default unless you put it there.
       
       return profiles.map((p: any) => ({
           id: p.id,
           fullName: p.full_name,
           accountType: p.role as AccountType,
           school: p.school,
-          email: '-' // Email is protected in auth.users, difficult to fetch without admin key
+          email: '-' 
       }));
   }
 
@@ -258,20 +248,14 @@ class StorageService {
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
     let query = supabase.from('exams').select('*');
 
-    // ROLE-BASED FILTERING LOGIC
     if (profile) {
         if (profile.accountType === 'super_admin') {
             // Super Admin sees ALL
         } else if (profile.accountType === 'admin_sekolah') {
-            // Admin Sekolah sees ALL within their school
             query = query.eq('school', profile.school);
         } else {
-            // Guru sees ONLY their own
             query = query.eq('author_id', profile.id);
         }
-    } else {
-        // Fallback for public/student view logic if profile not passed, 
-        // usually student view uses getExamForStudent by ID
     }
 
     const { data, error } = await query;
@@ -397,6 +381,27 @@ class StorageService {
           for (let i = 0; i < images.length; i++) {
               const img = images[i];
               const src = img.getAttribute('src');
+              const bucketPath = img.getAttribute('data-bucket-path');
+
+              // FIX: Try to download directly from storage using path first (bypasses CORS issues with public URL)
+              if (bucketPath) {
+                  try {
+                      const { data, error } = await supabase.storage.from('soal').download(bucketPath);
+                      if (!error && data) {
+                          const base64 = await new Promise<string>((resolve) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.readAsDataURL(data);
+                          });
+                          img.setAttribute('src', base64);
+                          img.removeAttribute('data-bucket-path');
+                          continue; // Success, skip next check
+                      }
+                  } catch (e) {
+                      console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
+                  }
+              }
+
               if (src && src.startsWith('http')) {
                   img.setAttribute('src', await urlToBase64(src));
                   img.removeAttribute('data-bucket-path');
@@ -438,20 +443,18 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    // 1. Cek Koneksi Internet
     if (!navigator.onLine) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
 
     try {
-        // 2. PERBAIKAN: Gunakan Upsert dengan data yang bersih
         const { error } = await supabase.from('results').upsert({
             exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, // Ini adalah String "Nama-Kelas-No"
+            student_id: resultPayload.student.studentId, 
             student_name: resultPayload.student.fullName,
             class_name: resultPayload.student.class, 
-            answers: resultPayload.answers, // JSONB object
+            answers: resultPayload.answers,
             status: resultPayload.status,
             activity_log: resultPayload.activityLog, 
             score: resultPayload.score || 0, 
@@ -467,8 +470,7 @@ class StorageService {
     } catch (error: any) {
         console.error("CRITICAL DB ERROR:", error);
         
-        // 3. DETEKSI ERROR FATAL (Supabase Policy / Schema mismatch)
-        const isNetworkError = !error.code && error.message === 'Failed to fetch'; // Fetch error biasa
+        const isNetworkError = !error.code && error.message === 'Failed to fetch'; 
         
         if (isNetworkError) {
             console.warn("Network glitch, adding to queue...");
