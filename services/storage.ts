@@ -250,18 +250,19 @@ class StorageService {
 
     if (profile) {
         if (profile.accountType === 'super_admin') {
-            // Super Admin sees ALL
-        } else if (profile.accountType === 'admin_sekolah') {
-            // Fix: Use OR to ensure admins see their own drafts/exams (by ID) AND all school exams
-            // This prevents issues where 'school' might be missing or incorrect on a draft
+            // Super Admin sees ALL. 
+            // NOTE: If RLS prevents drafts, they will simply be filtered out by DB.
+        } else if (profile.accountType === 'admin_sekolah' && profile.school) {
+            // Admin Sekolah: Matches school OR personal author_id.
+            // Using logic that ensures we get valid results even if some fields are null
             query = query.or(`school.eq.${profile.school},author_id.eq.${profile.id}`);
         } else {
-            // Guru only sees their own
+            // Guru: Only sees their own
             query = query.eq('author_id', profile.id);
         }
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
         console.error("Error fetching exams:", error);
@@ -269,17 +270,19 @@ class StorageService {
     }
 
     const examMap: Record<string, Exam> = {};
-    data.forEach((row: any) => {
-        examMap[row.code] = {
-            code: row.code,
-            authorId: row.author_id,
-            authorSchool: row.school,
-            config: row.config,
-            questions: row.questions,
-            status: row.status,
-            createdAt: row.created_at
-        };
-    });
+    if (data) {
+        data.forEach((row: any) => {
+            examMap[row.code] = {
+                code: row.code,
+                authorId: row.author_id,
+                authorSchool: row.school,
+                config: row.config,
+                questions: row.questions,
+                status: row.status,
+                createdAt: row.created_at
+            };
+        });
+    }
     return examMap;
   }
 
