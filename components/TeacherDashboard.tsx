@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -166,11 +167,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             if (!fatExam) throw new Error("Gagal mengambil data ujian.");
 
             // 2. Get All Results for this exam
-            const examResults = await storageService.getResults(exam.code, undefined, { 
-                'x-user-id': teacherProfile.id,
-                'x-role': teacherProfile.accountType,
-                'x-school': teacherProfile.school
-            });
+            // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
+            const examResults = await storageService.getResults(exam.code, undefined);
 
             // 3. Create comprehensive archive object
             const archivePayload = {
