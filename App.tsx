@@ -201,6 +201,9 @@ const App: React.FC = () => {
     setStudentResult(null); 
     setResumedResult(null);
     setTeacherProfile(null);
+    // FIX: Clear shared state to prevent data leakage/ghosting between sessions
+    setExams({});
+    setResults([]);
     window.history.replaceState({}, '', '/');
   };
 
