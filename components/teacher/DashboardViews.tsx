@@ -450,15 +450,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         <div className="max-w-5xl mx-auto space-y-6">
             <style>{`
                 @media print {
-                    @page { margin: 1cm; size: auto; }
+                    @page { margin: 1cm; size: portrait; }
                     body { -webkit-print-color-adjust: exact; background: white !important; }
                     .no-print { display: none !important; }
                     .print-only { display: block !important; }
                     .max-w-5xl { max-width: none !important; margin: 0 !important; }
-                    table { border-collapse: collapse; width: 100%; font-size: 11px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px 8px; }
+                    table { border-collapse: collapse; width: 100%; font-size: 10px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 4px; }
                     .page-break { page-break-before: always; }
-                    .avoid-break { page-break-inside: avoid; }
+                    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
                 }
             `}</style>
 
@@ -605,82 +605,150 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
             </div>
             
-            {/* PRINT VIEW (Enhanced with Detailed Boxes) */}
-            <div className="hidden print:block space-y-8 font-sans">
-                {/* Header Print */}
-                <div className="border-b-2 border-slate-800 pb-4 mb-8">
-                    <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{exam.config.subject}</h1>
-                    <div className="flex justify-between items-end mt-2">
+            {/* PRINT VIEW (Clean & Sequential) */}
+            <div className="hidden print:block text-slate-900">
+                {/* Global Header for First Page */}
+                <div className="border-b-2 border-slate-900 pb-2 mb-6">
+                    <h1 className="text-xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
+                    <div className="flex justify-between items-end mt-1">
                         <div>
-                            <p className="text-sm font-bold text-slate-600">Kode Ujian: <span className="font-mono text-slate-900">{exam.code}</span></p>
-                            <p className="text-sm text-slate-500">Tanggal: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p className="text-sm text-slate-500">Sekolah: {exam.authorSchool || '-'}</p>
+                            <p className="text-xs font-bold text-slate-600">Kode: <span className="font-mono text-slate-900">{exam.code}</span> | {new Date(exam.config.date).toLocaleDateString('id-ID')} | {exam.authorSchool || '-'}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm font-bold">Laporan Rekapitulasi Nilai</p>
+                            <p className="text-xs font-bold text-slate-500">Arsip Lengkap Ujian</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Print Table with Detailed Answer Grid */}
-                <table className="w-full border-collapse border border-slate-300 text-sm">
-                    <thead>
-                        <tr className="bg-slate-100">
-                            <th className="border border-slate-300 p-3 text-left font-bold text-slate-800 w-[200px]">Nama Siswa</th>
-                            <th className="border border-slate-300 p-3 text-center font-bold text-slate-800 w-[80px]">Nilai</th>
-                            <th className="border border-slate-300 p-3 text-left font-bold text-slate-800">Rincian Jawaban</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {results.map(r => {
-                            const { score } = getCalculatedStats(r, exam);
+                {/* 1. REKAPITULASI SISWA */}
+                <div className="mb-4">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">1. Rekapitulasi Hasil Siswa</h3>
+                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                        <thead>
+                            <tr className="bg-slate-100">
+                                <th className="border border-slate-300 p-2 text-left w-8">No</th>
+                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
+                                <th className="border border-slate-300 p-2 text-left w-16">Kelas</th>
+                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
+                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Grid)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {results.map((r, index) => {
+                                const { score } = getCalculatedStats(r, exam);
+                                return (
+                                    <tr key={r.student.studentId} className="avoid-break">
+                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
+                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
+                                        <td className="border border-slate-300 p-2 uppercase">{r.student.class}</td>
+                                        <td className="border border-slate-300 p-2 text-center font-bold text-sm">{score}</td>
+                                        <td className="border border-slate-300 p-1">
+                                            <div className="flex flex-wrap gap-0.5">
+                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                    const status = checkAnswerStatus(q, r.answers);
+                                                    let bgClass = 'bg-slate-200'; 
+                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300';
+                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300';
+                                                    
+                                                    return (
+                                                        <div 
+                                                            key={q.id} 
+                                                            className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold text-black border border-black/10 ${bgClass}`}
+                                                        >
+                                                            {idx + 1}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    <div className="mt-2 flex gap-4 text-[9px] text-gray-500 font-bold uppercase tracking-widest">
+                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 border border-black/10"></div> Benar</span>
+                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 border border-black/10"></div> Salah</span>
+                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 border border-black/10"></div> Kosong</span>
+                    </div>
+                </div>
+
+                <div className="page-break"></div>
+
+                {/* 2. ANALISIS SOAL */}
+                <div className="mb-4">
+                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
+                        <h1 className="text-lg font-black uppercase tracking-tight">Analisis Butir Soal</h1>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                            const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
                             return (
-                                <tr key={r.student.studentId} className="avoid-break">
-                                    <td className="border border-slate-300 p-3 align-top">
-                                        <div className="font-bold text-slate-900">{r.student.fullName}</div>
-                                        <div className="text-xs text-slate-500 mt-1 uppercase font-bold">{r.student.class}</div>
-                                    </td>
-                                    <td className="border border-slate-300 p-3 align-top text-center">
-                                        <span className="text-xl font-black text-slate-800">{score}</span>
-                                    </td>
-                                    <td className="border border-slate-300 p-3">
-                                        {/* Colored Box Grid */}
-                                        <div className="flex flex-wrap gap-1">
-                                            {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                const status = checkAnswerStatus(q, r.answers);
-                                                let bgClass = 'bg-slate-200'; // Empty/Default (Grey)
-                                                if (status === 'CORRECT') bgClass = 'bg-emerald-300'; // Correct (Green)
-                                                else if (status === 'WRONG') bgClass = 'bg-rose-300'; // Wrong (Red)
-                                                
-                                                return (
-                                                    <div 
-                                                        key={q.id} 
-                                                        className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-bold text-black border border-black/10 ${bgClass}`}
-                                                        title={`No ${idx + 1}: ${status}`}
-                                                    >
-                                                        {idx + 1}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </td>
-                                </tr>
+                                <div key={q.id} className="avoid-break border border-slate-300 rounded p-2 text-xs">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="font-bold text-slate-500">Soal {idx + 1}</span>
+                                        <span className="font-bold">{stats.correctRate}% Benar</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-700 line-clamp-2 leading-tight mb-2" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                        <div className="h-full bg-slate-800" style={{ width: `${stats.correctRate}%` }}></div>
+                                    </div>
+                                </div>
                             );
                         })}
-                    </tbody>
-                </table>
-
-                {/* Footer Print */}
-                <div className="mt-8 border-t border-slate-300 pt-4 flex justify-between items-center text-xs text-gray-500">
-                    <div>
-                        <p className="font-bold">Legenda:</p>
-                        <div className="flex gap-4 mt-1">
-                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-emerald-300 border border-black/10"></span> Benar</span>
-                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-rose-300 border border-black/10"></span> Salah</span>
-                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-slate-200 border border-black/10"></span> Kosong</span>
-                        </div>
                     </div>
-                    <p className="italic">Dicetak dari Platform Ujian Cerdas pada {new Date().toLocaleString('id-ID')}</p>
+                </div>
+
+                <div className="page-break"></div>
+
+                {/* 3. DETAIL UJIAN & KUNCI */}
+                <div>
+                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
+                        <h1 className="text-lg font-black uppercase tracking-tight">Bank Soal & Kunci Jawaban</h1>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {exam.questions.map((q, index) => {
+                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                            return (
+                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
+                                    <div className="flex gap-3">
+                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
+                                        <div className="flex-1">
+                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            
+                                            {/* Condensed Options for Print */}
+                                            {q.options && (
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                                                    {q.options.map((opt, i) => {
+                                                        const isCorrect = 
+                                                            (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
+                                                            (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
+                                                        return (
+                                                            <div key={i} className={`flex gap-1 ${isCorrect ? 'font-bold underline' : ''}`}>
+                                                                <span>{String.fromCharCode(65+i)}.</span>
+                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Key Display */}
+                                            <div className="mt-2 text-[10px] bg-slate-50 p-1 border border-slate-200 inline-block rounded px-2">
+                                                <span className="font-bold text-slate-500">Kunci: </span>
+                                                {q.questionType === 'MULTIPLE_CHOICE' ? q.correctAnswer : 
+                                                 q.questionType === 'TRUE_FALSE' ? 'Lihat Tabel Kebenaran' :
+                                                 q.questionType === 'MATCHING' ? 'Lihat Pasangan' :
+                                                 q.correctAnswer || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>
