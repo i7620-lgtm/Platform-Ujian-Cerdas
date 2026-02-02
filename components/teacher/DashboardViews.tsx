@@ -751,12 +751,18 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">B/S/Total</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">B/S/K</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aktivitas</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Lokasi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {results.map(r => (
+                                {results.map(r => {
+                                    const answeredCount = Object.keys(r.answers).length;
+                                    const emptyCount = r.totalQuestions - answeredCount;
+                                    const wrongCount = answeredCount - r.correctAnswers;
+
+                                    return (
                                     <React.Fragment key={r.student.studentId}>
                                         <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 cursor-pointer group">
                                             <td className="px-6 py-4">
@@ -774,15 +780,32 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
+                                                <span className="text-emerald-600" title="Benar">{r.correctAnswers}</span> / <span className="text-rose-600" title="Salah">{wrongCount}</span> / <span className="text-slate-400" title="Kosong">{emptyCount}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className="text-[10px] font-bold">{r.activityLog?.length || 0} Log</span>
+                                                {r.activityLog && r.activityLog.length > 0 ? (
+                                                    <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded font-bold text-[10px] border border-amber-100">{r.activityLog.length} Log</span>
+                                                ) : (
+                                                    <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-bold text-[10px] border border-emerald-100">Aman</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
+                                                {exam.config.trackLocation && r.location ? (
+                                                    <a 
+                                                        href={`https://www.google.com/maps?q=${r.location}`} 
+                                                        target="_blank" 
+                                                        rel="noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="text-blue-600 hover:underline flex items-center justify-center gap-1"
+                                                    >
+                                                        Maps ↗
+                                                    </a>
+                                                ) : '-'}
                                             </td>
                                         </tr>
                                         {expandedStudent === r.student.studentId && (
                                             <tr className="animate-fade-in bg-slate-50/50 shadow-inner">
-                                                <td colSpan={5} className="p-6">
+                                                <td colSpan={6} className="p-6">
                                                     <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                                         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 rounded"></div> Benar</span>
                                                         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
@@ -810,7 +833,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             </tr>
                                         )}
                                     </React.Fragment>
-                                ))}
+                                )})}
                             </tbody>
                          </table>
                     </div>
