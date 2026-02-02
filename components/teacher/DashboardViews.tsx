@@ -530,6 +530,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [error, setError] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
+    const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -583,6 +584,47 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const normalize = (str: string) => str.trim().toLowerCase();
+
+    const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+        const ans = studentAnswers[q.id];
+        if (!ans) return 'EMPTY';
+
+        const studentAns = normalize(String(ans));
+        const correctAns = normalize(String(q.correctAnswer || ''));
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+            const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+            return 'WRONG';
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+             try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+
+        return 'WRONG'; 
+    };
+
+    const toggleStudent = (id: string) => {
+        if (expandedStudent === id) setExpandedStudent(null);
+        else setExpandedStudent(id);
     };
 
     // Calculate Question Stats for Analysis Tab
@@ -715,23 +757,59 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {results.map(r => (
-                                    <tr key={r.student.studentId} className="hover:bg-slate-50/30">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                {r.score}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                            <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="text-[10px] font-bold">{r.activityLog?.length || 0} Log</span>
-                                        </td>
-                                    </tr>
+                                    <React.Fragment key={r.student.studentId}>
+                                        <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 cursor-pointer group">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`transition-transform duration-300 ${expandedStudent === r.student.studentId ? 'rotate-180' : ''}`}>
+                                                        <ChevronDownIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500" />
+                                                    </div>
+                                                    <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{r.student.fullName}</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                    {r.score}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
+                                                <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="text-[10px] font-bold">{r.activityLog?.length || 0} Log</span>
+                                            </td>
+                                        </tr>
+                                        {expandedStudent === r.student.studentId && (
+                                            <tr className="animate-fade-in bg-slate-50/50 shadow-inner">
+                                                <td colSpan={5} className="p-6">
+                                                    <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 rounded"></div> Benar</span>
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 gap-2">
+                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                            const status = checkAnswerStatus(q, r.answers);
+                                                            let bgClass = 'bg-slate-200'; // Empty
+                                                            if (status === 'CORRECT') bgClass = 'bg-emerald-300';
+                                                            else if (status === 'WRONG') bgClass = 'bg-rose-300';
+
+                                                            return (
+                                                                <div 
+                                                                    key={q.id}
+                                                                    title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`}
+                                                                    className={`aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
+                                                                >
+                                                                    {idx + 1}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                          </table>
