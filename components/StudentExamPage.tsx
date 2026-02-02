@@ -80,7 +80,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const blurTimestampRef = useRef<number | null>(null);
     const [cheatingWarning, setCheatingWarning] = useState<string>('');
 
-    // REPAIR: Listen to Exam Config Changes (Realtime)
+    // REPAIR: Hybrid Approach (Realtime + Polling)
+    // 1. Keep Realtime for fast updates
     useEffect(() => {
         const channel = supabase.channel(`exam-config-${exam.code}`)
             .on(
@@ -94,13 +95,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 (payload) => {
                     const newConfig = payload.new.config;
                     if (newConfig) {
-                        // Cek apakah waktu berubah
                         setActiveExam(prev => {
                             const oldLimit = prev.config.timeLimit;
                             const newLimit = newConfig.timeLimit;
                             if (newLimit > oldLimit) {
                                 const diff = newLimit - oldLimit;
-                                setTimeExtensionNotif(`Waktu ujian diperpanjang ${diff} menit!`);
+                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit! (Live)`);
                                 setTimeout(() => setTimeExtensionNotif(null), 5000);
                             }
                             return { ...prev, config: newConfig };
@@ -110,8 +110,39 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             )
             .subscribe();
 
+        // 2. Add POLLING every 15 seconds (Robust fallback)
+        const pollInterval = setInterval(async () => {
+            if (!navigator.onLine) return;
+            try {
+                const { data, error } = await supabase
+                    .from('exams')
+                    .select('config')
+                    .eq('code', exam.code)
+                    .single();
+
+                if (data && data.config) {
+                    setActiveExam(prev => {
+                        // Check specifically for time limit changes to notify user
+                        if (prev.config.timeLimit !== data.config.timeLimit) {
+                            const diff = data.config.timeLimit - prev.config.timeLimit;
+                            if (diff > 0) {
+                                setTimeExtensionNotif(`Sinkronisasi: Waktu tambah ${diff} menit!`);
+                                setTimeout(() => setTimeExtensionNotif(null), 5000);
+                            }
+                            return { ...prev, config: data.config };
+                        }
+                        // Always keep config fresh
+                        return { ...prev, config: data.config };
+                    });
+                }
+            } catch (e) {
+                // Silent fail on poll error
+            }
+        }, 15000);
+
         return () => {
             supabase.removeChannel(channel);
+            clearInterval(pollInterval);
         };
     }, [exam.code]);
 
@@ -232,7 +263,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, [activeExam.config.trackLocation, student.class]);
 
-    // REPAIR: Deadline must depend on activeExam (which updates on realtime event)
+    // REPAIR: Deadline must depend on activeExam (which updates on poll/realtime)
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
         const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
@@ -326,15 +357,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
             {/* Notification for Time Extension */}
             {timeExtensionNotif && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[80] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl shadow-emerald-200 text-sm font-bold animate-bounce flex items-center gap-3">
-                    <CheckCircleIcon className="w-5 h-5" /> 
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[80] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl shadow-emerald-200 text-sm font-bold animate-bounce flex items-center gap-3 w-max max-w-[90vw]">
+                    <CheckCircleIcon className="w-5 h-5 shrink-0" /> 
                     <span>{timeExtensionNotif}</span>
                 </div>
             )}
 
             {cheatingWarning && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100">
-                    <ExclamationTriangleIcon className="w-5 h-5" /> 
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100 w-max max-w-[90vw]">
+                    <ExclamationTriangleIcon className="w-5 h-5 shrink-0" /> 
                     <span>{cheatingWarning}</span>
                 </div>
             )}
