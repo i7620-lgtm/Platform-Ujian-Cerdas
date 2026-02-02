@@ -599,7 +599,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
                                                                 </div>
-                                                                <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 gap-2">
+                                                                
+                                                                {/* Modified Grid Container for Better Fit */}
+                                                                <div className="flex flex-wrap gap-1 mt-2">
                                                                     {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
                                                                         let bgClass = 'bg-slate-200'; // Empty
@@ -610,7 +612,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                             <div 
                                                                                 key={q.id}
                                                                                 title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`}
-                                                                                className={`aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
+                                                                                // Smaller boxes: w-6 h-6, text-[10px]
+                                                                                className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
                                                                             >
                                                                                 {idx + 1}
                                                                             </div>
