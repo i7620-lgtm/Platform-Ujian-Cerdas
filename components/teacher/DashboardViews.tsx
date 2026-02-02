@@ -811,7 +811,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
                                                         <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
                                                     </div>
-                                                    <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 gap-2">
+                                                    <div className="flex flex-wrap gap-1 mt-2">
                                                         {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                             const status = checkAnswerStatus(q, r.answers);
                                                             let bgClass = 'bg-slate-200'; // Empty
@@ -822,7 +822,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                 <div 
                                                                     key={q.id}
                                                                     title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`}
-                                                                    className={`aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
+                                                                    className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
                                                                 >
                                                                     {idx + 1}
                                                                 </div>
@@ -943,11 +943,31 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         <tbody>
                              {results.map((r, i) => (
                                 <tr key={i}>
-                                    <td className="border border-slate-300 p-2">{r.student.fullName}</td>
-                                    <td className="border border-slate-300 p-2 text-center">{r.student.class}</td>
-                                    <td className="border border-slate-300 p-2 text-center font-bold">{r.score}</td>
-                                    <td className="border border-slate-300 p-2 text-center">{r.correctAnswers} / {r.totalQuestions - r.correctAnswers} / {r.totalQuestions - Object.keys(r.answers).length}</td>
-                                    <td className="border border-slate-300 p-2 text-center">{r.activityLog && r.activityLog.length > 0 ? `${r.activityLog.length} Log` : 'Aman'}</td>
+                                    <td className="border border-slate-300 p-2">
+                                        <div className="font-bold mb-1">{r.student.fullName}</div>
+                                        {/* Added Grid for Print */}
+                                        <div className="flex flex-wrap gap-0.5">
+                                            {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                const status = checkAnswerStatus(q, r.answers);
+                                                let bgClass = 'bg-slate-200';
+                                                if (status === 'CORRECT') bgClass = 'bg-black text-white'; // High contrast for print
+                                                else if (status === 'WRONG') bgClass = 'bg-slate-400 text-white';
+
+                                                return (
+                                                    <span 
+                                                        key={q.id}
+                                                        className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-slate-300 ${bgClass}`}
+                                                    >
+                                                        {idx + 1}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </td>
+                                    <td className="border border-slate-300 p-2 text-center align-top">{r.student.class}</td>
+                                    <td className="border border-slate-300 p-2 text-center font-bold align-top">{r.score}</td>
+                                    <td className="border border-slate-300 p-2 text-center align-top">{r.correctAnswers} / {r.totalQuestions - r.correctAnswers} / {r.totalQuestions - Object.keys(r.answers).length}</td>
+                                    <td className="border border-slate-300 p-2 text-center align-top">{r.activityLog && r.activityLog.length > 0 ? `${r.activityLog.length} Log` : 'Aman'}</td>
                                 </tr>
                              ))}
                         </tbody>
