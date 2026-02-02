@@ -405,7 +405,38 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         else setExpandedStudent(id);
     };
 
-    // Calculate Question Stats for Analysis Tab
+    // Calculate Question Stats for Analysis Tab (Detailed)
+    const questionAnalysisData = useMemo(() => {
+        if (!archiveData) return [];
+        const { exam, results } = archiveData;
+        const totalStudents = results.length;
+
+        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+            let correctCount = 0;
+            const answerCounts: Record<string, number> = {};
+            
+            results.forEach(r => {
+                const ans = r.answers[q.id];
+                if (checkAnswerStatus(q, r.answers) === 'CORRECT') correctCount++;
+                if (ans) {
+                    // Normalize for distribution counting
+                    const cleanAns = String(ans).trim();
+                    answerCounts[cleanAns] = (answerCounts[cleanAns] || 0) + 1;
+                }
+            });
+
+            return {
+                id: q.id,
+                qText: q.questionText,
+                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0,
+                distribution: answerCounts,
+                totalStudents,
+                options: q.options
+            };
+        });
+    }, [archiveData]);
+
+    // Calculate Question Stats for Visual Analysis Tab (Legacy)
     const questionStats = useMemo(() => {
         if (!archiveData) return [];
         const { exam, results } = archiveData;
@@ -414,8 +445,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
             results.forEach(r => {
-                const ans = r.answers[q.id];
-                // Reuse checkAnswerStatus for consistency
                 if (checkAnswerStatus(q, r.answers) === 'CORRECT') correctCount++;
             });
             return {
@@ -675,28 +704,68 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 2. ANALISIS SOAL */}
+                {/* 2. ANALISIS STATISTIK & BUTIR SOAL */}
                 <div className="mb-4">
                     <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">Analisis Butir Soal</h1>
+                        <h1 className="text-lg font-black uppercase tracking-tight">2. Analisis Statistik & Butir Soal</h1>
                     </div>
                     
+                    {/* Kotak Statistik Utama */}
+                    <div className="mb-6 grid grid-cols-4 gap-4 border border-slate-300 rounded p-4 text-center avoid-break">
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
+                            <p className="text-xl font-black">{averageScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Tertinggi</p>
+                            <p className="text-xl font-black text-emerald-600">{highestScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Terendah</p>
+                            <p className="text-xl font-black text-rose-600">{lowestScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Partisipan</p>
+                            <p className="text-xl font-black text-blue-600">{totalStudents}</p>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
-                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                            const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
-                            return (
-                                <div key={q.id} className="avoid-break border border-slate-300 rounded p-2 text-xs">
+                        {questionAnalysisData.map((data, idx) => (
+                            <div key={data.id} className="avoid-break border border-slate-300 rounded p-3 text-xs flex flex-col gap-2">
+                                <div>
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className="font-bold text-slate-500">Soal {idx + 1}</span>
-                                        <span className="font-bold">{stats.correctRate}% Benar</span>
+                                        <span className="font-bold text-slate-600">Soal {idx + 1}</span>
+                                        <span className="font-bold text-slate-800">{data.correctRate}% Benar</span>
                                     </div>
-                                    <div className="text-[10px] text-slate-700 line-clamp-2 leading-tight mb-2" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                        <div className="h-full bg-slate-800" style={{ width: `${stats.correctRate}%` }}></div>
+                                    <div className="text-[10px] text-slate-500 line-clamp-1 italic mb-1" dangerouslySetInnerHTML={{ __html: data.qText.replace(/<[^>]+>/g, '') }}></div>
+                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
+                                        <div className={`h-full ${data.correctRate > 75 ? 'bg-emerald-500' : data.correctRate > 40 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
                                     </div>
                                 </div>
-                            );
-                        })}
+                                <div className="border-t border-slate-100 pt-2">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Distribusi Jawaban:</p>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-600">
+                                        {data.options && data.options.map((opt, i) => {
+                                            const label = String.fromCharCode(65+i);
+                                            const count = data.distribution[opt] || 0;
+                                            const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                            const isCorrect = opt === exam.questions.find(q=>q.id===data.id)?.correctAnswer;
+                                            
+                                            return (
+                                                <span key={i} className={`${isCorrect ? 'font-bold text-emerald-700' : ''}`}>
+                                                    {label}: <b>{count}</b> ({pct}%)
+                                                </span>
+                                            )
+                                        })}
+                                        {/* Fallback for non-multiple choice */}
+                                        {!data.options && Object.entries(data.distribution).slice(0, 3).map(([ans, count], i) => (
+                                            <span key={i} className="truncate max-w-[100px]">{ans}: <b>{count}</b></span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
@@ -705,7 +774,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 {/* 3. DETAIL UJIAN & KUNCI */}
                 <div>
                     <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">Bank Soal & Kunci Jawaban</h1>
+                        <h1 className="text-lg font-black uppercase tracking-tight">3. Bank Soal & Kunci Jawaban</h1>
                     </div>
                     
                     <div className="space-y-4">
@@ -718,15 +787,19 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <div className="flex-1">
                                             <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
-                                            {/* Condensed Options for Print */}
+                                            {/* Condensed Options with Green Highlight for Correct Answer */}
                                             {q.options && (
                                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
                                                     {q.options.map((opt, i) => {
                                                         const isCorrect = 
                                                             (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
                                                             (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
+                                                        
                                                         return (
-                                                            <div key={i} className={`flex gap-1 ${isCorrect ? 'font-bold underline' : ''}`}>
+                                                            <div 
+                                                                key={i} 
+                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}
+                                                            >
                                                                 <span>{String.fromCharCode(65+i)}.</span>
                                                                 <div dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
@@ -735,14 +808,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 </div>
                                             )}
 
-                                            {/* Key Display */}
-                                            <div className="mt-2 text-[10px] bg-slate-50 p-1 border border-slate-200 inline-block rounded px-2">
-                                                <span className="font-bold text-slate-500">Kunci: </span>
-                                                {q.questionType === 'MULTIPLE_CHOICE' ? q.correctAnswer : 
-                                                 q.questionType === 'TRUE_FALSE' ? 'Lihat Tabel Kebenaran' :
-                                                 q.questionType === 'MATCHING' ? 'Lihat Pasangan' :
-                                                 q.correctAnswer || '-'}
-                                            </div>
+                                            {/* Kunci Jawaban (Non-Options) */}
+                                            {!q.options && (
+                                                <div className="mt-2 text-[10px] bg-emerald-50 p-1 border border-emerald-200 inline-block rounded px-2 text-emerald-800">
+                                                    <span className="font-bold">Kunci: </span>
+                                                    {q.questionType === 'TRUE_FALSE' ? 'Lihat Tabel Kebenaran' :
+                                                     q.questionType === 'MATCHING' ? 'Lihat Pasangan' :
+                                                     q.correctAnswer || '-'}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
