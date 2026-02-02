@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -949,14 +950,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <div className="flex flex-wrap gap-0.5">
                                             {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                 const status = checkAnswerStatus(q, r.answers);
-                                                let bgClass = 'bg-slate-200';
-                                                if (status === 'CORRECT') bgClass = 'bg-black text-white'; // High contrast for print
-                                                else if (status === 'WRONG') bgClass = 'bg-slate-400 text-white';
+                                                
+                                                // Color Logic for Print
+                                                let bgClass = 'bg-gray-200 text-black'; // Empty
+                                                if (status === 'CORRECT') bgClass = 'bg-emerald-400 text-black';
+                                                else if (status === 'WRONG') bgClass = 'bg-rose-400 text-black';
 
                                                 return (
                                                     <span 
                                                         key={q.id}
-                                                        className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-slate-300 ${bgClass}`}
+                                                        className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-slate-400 ${bgClass} print:border-slate-500`}
                                                     >
                                                         {idx + 1}
                                                     </span>
