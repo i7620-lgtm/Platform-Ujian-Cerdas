@@ -7,19 +7,11 @@ import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
 
-// --- OngoingExamModal (Refined for Live Monitoring) ---
-interface OngoingExamModalProps { 
-    exam: Exam | null; 
-    teacherProfile?: TeacherProfile; 
-    onClose: () => void; 
-    onAllowContinuation: (studentId: string, examCode: string) => void; 
-    onUpdateExam?: (exam: Exam) => void; 
-    isReadOnly?: boolean; 
-}
-
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ 
-    exam, teacherProfile, onClose, onAllowContinuation, onUpdateExam, isReadOnly 
-}) => {
+// --- OngoingExamModal ---
+interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => { 
+    const { exam, onClose, teacherProfile, onAllowContinuation, onUpdateExam, isReadOnly } = props;
+    
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
@@ -27,282 +19,90 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    
     const processingIdsRef = useRef<Set<string>>(new Set());
-    // Ref for Broadcasted Progress (Realtime only, not persistent)
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
-    // FETCH FUNCTION (POLLING/INIT)
     const fetchLatest = async (silent = false) => {
         if (!displayExam) return;
         if (!silent) setIsRefreshing(true);
         try {
             const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
             setLocalResults(data);
-        } catch (e) { 
-            console.error("Fetch failed", e); 
-        } finally { 
-            if (!silent) setIsRefreshing(false); 
-        }
+        } catch (e) { console.error("Fetch failed", e); }
+        finally { if (!silent) setIsRefreshing(false); }
     };
 
-    // POLLING EFFECT (Runs every 5s regardless of Realtime)
     useEffect(() => {
-        fetchLatest(); // Initial Fetch
+        fetchLatest();
         const intervalId = setInterval(() => { fetchLatest(true); }, 5000);
         return () => clearInterval(intervalId);
-    }, [displayExam?.code, selectedClass]); // Only re-run if exam code or filter changes
+    }, [displayExam?.code, selectedClass, teacherProfile]);
 
-    // REALTIME SUBSCRIPTION EFFECT
+    // REPAIR: Listen to Exam Config Changes too (Realtime)
     useEffect(() => {
         if (!displayExam) return;
         
-        // Channel for Database Changes (For Logins & Submissions)
-        const dbChannel = supabase.channel(`exam-db-${displayExam.code}`)
+        // Listen to Results
+        const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, () => { fetchLatest(true); })
+            .on('broadcast', { event: 'student_progress' }, (payload) => { 
+                const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload; 
+                broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp }; 
+                setLocalResults(prev => { 
+                    const idx = prev.findIndex(r => r.student.studentId === studentId); 
+                    if (idx >= 0 && prev[idx].status === 'in_progress') { 
+                        const updated = [...prev]; 
+                        updated[idx] = { ...updated[idx], answers: Array(answeredCount).fill('placeholder') as any, timestamp: timestamp }; 
+                        return updated; 
+                    } 
+                    return prev; 
+                }); 
+            })
+            .subscribe();
+
+        // REPAIR: Listen to Exam Table for Config Updates (e.g., Time Limit)
+        const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
             .on(
-                'postgres_changes', 
-                { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, 
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'exams',
+                    filter: `code=eq.${displayExam.code}`
+                },
                 (payload) => {
-                    // Trigger a fetch when DB changes (New login, finish, etc)
-                    fetchLatest(true);
+                     const newConfig = payload.new.config;
+                     if (newConfig) {
+                         setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
+                     }
                 }
             )
             .subscribe();
 
-        // Channel for Broadcast (For Realtime Progress Bars)
-        // Only needed if Realtime is NOT disabled
-        let broadcastChannel: any = null;
-        if (!displayExam.config.disableRealtime) {
-            broadcastChannel = supabase.channel(`exam-room-${displayExam.code}`)
-                .on('broadcast', { event: 'student_progress' }, (payload) => { 
-                    const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload; 
-                    broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp }; 
-                    
-                    // Optimistic update for UI responsiveness
-                    setLocalResults(prev => { 
-                        const idx = prev.findIndex(r => r.student.studentId === studentId); 
-                        if (idx >= 0 && prev[idx].status === 'in_progress') { 
-                            const updated = [...prev]; 
-                            // We create a dummy answers object to reflect count visually if needed, though UI uses Ref
-                            // Actually, we trigger re-render by updating state shallowly or timestamp
-                            updated[idx] = { ...updated[idx], timestamp: timestamp }; 
-                            return updated; 
-                        } 
-                        return prev; 
-                    }); 
-                })
-                .subscribe();
-        }
-
         return () => { 
-            supabase.removeChannel(dbChannel);
-            if (broadcastChannel) supabase.removeChannel(broadcastChannel);
+            supabase.removeChannel(resultChannel);
+            supabase.removeChannel(configChannel);
         };
-    }, [displayExam?.code, displayExam?.config.disableRealtime]);
+    }, [displayExam?.code, selectedClass]);
 
     if (!displayExam) return null;
 
-    const handleUnlockClick = async (studentId: string, examCode: string) => { 
-        processingIdsRef.current.add(studentId); 
-        setLocalResults(prev => prev.map(r => r.student.studentId === studentId ? { ...r, status: 'in_progress' } : r)); 
-        try { 
-            await storageService.unlockStudentExam(examCode, studentId); 
-            onAllowContinuation(studentId, examCode); 
-            fetchLatest(true); 
-        } catch (error) { 
-            alert("Gagal membuka kunci."); 
-            fetchLatest(true); 
-        } finally { 
-            setTimeout(() => processingIdsRef.current.delete(studentId), 3000); 
-        } 
-    };
-
-    const handleAddTimeSubmit = async () => { 
-        if (!addTimeValue || typeof addTimeValue !== 'number') return; 
-        try { 
-            await storageService.extendExamTime(displayExam.code, addTimeValue); 
-            const newLimit = displayExam.config.timeLimit + addTimeValue; 
-            setDisplayExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); 
-            if(onUpdateExam) onUpdateExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); 
-            setIsAddTimeOpen(false); setAddTimeValue(''); 
-        } catch(e) { alert("Gagal."); } 
-    };
-
-    const getRelativeTime = (timestamp?: number) => { 
-        if (!timestamp) return 'Offline'; 
-        const diff = Math.floor((Date.now() - timestamp) / 1000); 
-        if (diff < 60) return `${diff}dt lalu`; 
-        return `${Math.floor(diff/60)}mnt lalu`; 
-    };
-    
+    const handleUnlockClick = async (studentId: string, examCode: string) => { processingIdsRef.current.add(studentId); setLocalResults(prev => prev.map(r => r.student.studentId === studentId ? { ...r, status: 'in_progress' } : r)); try { await storageService.unlockStudentExam(examCode, studentId); onAllowContinuation(studentId, examCode); fetchLatest(true); } catch (error) { alert("Gagal membuka kunci."); fetchLatest(true); } finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); } };
+    const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); const newLimit = displayExam.config.timeLimit + addTimeValue; setDisplayExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); if(onUpdateExam) onUpdateExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
+    const getRelativeTime = (timestamp?: number) => { if (!timestamp) return 'Offline'; const diff = Math.floor((Date.now() - timestamp) / 1000); if (diff < 60) return `${diff}dt lalu`; return `${Math.floor(diff/60)}mnt lalu`; };
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
-    const totalQuestionsConfig = displayExam.questions.filter(q=>q.questionType!=='INFO').length;
-
-    // Derived unique classes for filter
-    const uniqueClasses = Array.from(new Set(localResults.map(r => r.student.class || 'Unknown'))).sort();
 
     return (
         <>
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-                <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white">
-                    
-                    {/* Header */}
-                    <div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20 shadow-sm">
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100 relative">
-                                    <WifiIcon className="w-6 h-6"/>
-                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                                    </span>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase select-all">{displayExam.code}</span>
-                                        <RemainingTime exam={displayExam} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => fetchLatest()} className={`p-2.5 rounded-xl border transition-all ${isRefreshing ? 'bg-indigo-50 border-indigo-100 text-indigo-600' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200'}`} title="Refresh Data Manual">
-                                    <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                </button>
-                                
-                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
-                                    <button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
-                                        <ShareIcon className="w-4 h-4"/> Akses Orang Tua
-                                    </button>
-                                )}
-                                {!isReadOnly && !isLargeScale && (
-                                    <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
-                                        <PlusCircleIcon className="w-4 h-4"/> Tambah Waktu
-                                    </button>
-                                )}
-                                <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all">
-                                    <XMarkIcon className="w-6 h-6"/>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Mode Skala Besar (Hemat Data)' : 'Mode Realtime (Live Update)'}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
-                                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white">
-                                    <option value="ALL">SEMUA KELAS ({localResults.length})</option>
-                                    {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 overflow-auto p-6 bg-slate-50/30">
-                        {isAddTimeOpen && !isReadOnly && (
-                            <div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between">
-                                <div><h4 className="font-black text-lg">Tambah Durasi Ujian</h4><p className="text-white/70 text-sm">Waktu tambahan akan berlaku untuk semua siswa.</p></div>
-                                <div className="flex gap-2"><input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-24 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl outline-none text-white font-bold placeholder:text-white/50 text-center"/><button onClick={handleAddTimeSubmit} className="px-6 bg-white text-indigo-600 font-black text-sm uppercase rounded-2xl hover:bg-indigo-50 transition-colors">Tambah</button><button onClick={()=>setIsAddTimeOpen(false)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20"><XMarkIcon className="w-5 h-5"/></button></div>
-                            </div>
-                        )}
-                        
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[300px]">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50/50">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-                                            {isLargeScale ? 'Sync Terakhir' : 'Aktivitas Terakhir'}
-                                        </th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {localResults.length > 0 ? localResults.map((r) => { 
-                                        const broadcastData = broadcastProgressRef.current[r.student.studentId];
-                                        
-                                        // CRITICAL FIX: Safe access to answers for progress calculation
-                                        const safeAnswers = r.answers || {};
-                                        
-                                        // In Large Scale mode, we rely on DB answers (synced on finish/save).
-                                        // In Realtime mode, we prefer broadcast data for smooth progress bar, fall back to DB.
-                                        let answered = 0;
-                                        if (isLargeScale) {
-                                             answered = Object.keys(safeAnswers).length;
-                                        } else {
-                                             answered = (r.status === 'in_progress' && broadcastData) ? broadcastData.answered : Object.keys(safeAnswers).length;
-                                        }
-
-                                        const lastActive = (r.status === 'in_progress' && broadcastData && !isLargeScale) ? broadcastData.timestamp : r.timestamp;
-                                        const progress = totalQuestionsConfig > 0 ? Math.round((answered/totalQuestionsConfig)*100) : 0;
-                                        
-                                        return (
-                                            <tr key={r.student.studentId} className="hover:bg-slate-50/50 transition-colors animate-fade-in">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
-                                                    <div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-center">
-                                                        {r.status === 'force_closed' ? (
-                                                            <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}><LockClosedIcon className="w-3 h-3"/> Dihentikan</span>
-                                                        ) : r.status === 'completed' ? (
-                                                            <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5"><CheckCircleIcon className="w-3 h-3"/> Selesai</span>
-                                                        ) : (
-                                                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col items-center gap-1.5">
-                                                        <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
-                                                        </div>
-                                                        <span className="text-[10px] font-black text-slate-400">
-                                                            {isLargeScale && r.status === 'in_progress' ? 'Hemat Data' : `${answered}/${totalQuestionsConfig}`}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                                                    {getRelativeTime(lastActive)}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {r.status === 'force_closed' && !isReadOnly && (
-                                                        <button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">
-                                                            Buka Kunci
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ); 
-                                    }) : (
-                                        <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-300 font-medium italic">
-                                            {isRefreshing ? 'Sedang memuat data...' : 'Belum ada siswa yang masuk...'}
-                                        </td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-slate-100 hover:bg-indigo-50 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"><div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white"><div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20"><div className="flex justify-between items-start"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100"><WifiIcon className="w-6 h-6"/></div><div><h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span><RemainingTime exam={displayExam} />{isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}</div></div></div><div className="flex items-center gap-2">{!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (<button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><ShareIcon className="w-4 h-4"/> Akses Orang Tua</button>)}{!isReadOnly && !isLargeScale && (<button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><PlusCircleIcon className="w-4 h-4"/> Tambah Waktu</button>)}<button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button></div></div><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-400"><div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>{isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}</div><div className="flex items-center gap-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span><select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white"><option value="ALL">SEMUA KELAS</option>{Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}</select></div></div></div><div className="flex-1 overflow-auto p-6 bg-slate-50/30">{isAddTimeOpen && !isReadOnly && (<div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between"><div><h4 className="font-black text-lg">Tambah Durasi Ujian</h4><p className="text-white/70 text-sm">Waktu tambahan akan berlaku untuk semua siswa.</p></div><div className="flex gap-2"><input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-24 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl outline-none text-white font-bold placeholder:text-white/50 text-center"/><button onClick={handleAddTimeSubmit} className="px-6 bg-white text-indigo-600 font-black text-sm uppercase rounded-2xl hover:bg-indigo-50 transition-colors">Tambah</button><button onClick={()=>setIsAddTimeOpen(false)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20"><XMarkIcon className="w-5 h-5"/></button></div></div>)}<div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden"><table className="w-full text-left"><thead className="bg-slate-50/50"><tr><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>}</tr></thead><tbody className="divide-y divide-slate-50">{localResults.length > 0 ? localResults.map((r) => { const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; const broadcastData = broadcastProgressRef.current[r.student.studentId]; const answered = r.status === 'in_progress' && broadcastData ? broadcastData.answered : Object.keys(r.answers).length; const lastActive = r.status === 'in_progress' && broadcastData ? broadcastData.timestamp : r.timestamp; const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0; return (<tr key={r.student.studentId} className="hover:bg-slate-50/50 transition-colors"><td className="px-6 py-4"><div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div><div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div></td><td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td><td className="px-6 py-4"><div className="flex justify-center">{r.status === 'force_closed' ? (<span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}><LockClosedIcon className="w-3 h-3"/> Dihentikan</span>) : r.status === 'completed' ? (<span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5"><CheckCircleIcon className="w-3 h-3"/> Selesai</span>) : (<span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan</span>)}</div></td>{!isLargeScale && (<td className="px-6 py-4"><div className="flex flex-col items-center gap-1.5"><div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div></div><span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span></div></td>)}{!isLargeScale && (<td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">{getRelativeTime(lastActive)}</td>)}{!isLargeScale && (<td className="px-6 py-4 text-right">{r.status === 'force_closed' && !isReadOnly && (<button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>)}</td>)}</tr>); }) : (<tr><td colSpan={isLargeScale ? 3 : 6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>)}</tbody></table></div></div></div></div>{isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-slate-100 hover:bg-indigo-50 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
         </>
     );
 };
 
-// --- FinishedExamModal (Reuse existing logic with safe calculation) ---
+// --- FinishedExamModal (Updated) ---
 interface FinishedExamModalProps {
     exam: Exam;
     teacherProfile: TeacherProfile;
@@ -370,7 +170,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const normalize = (str: string) => str.trim().toLowerCase();
 
     const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
-        const ans = studentAnswers ? studentAnswers[q.id] : undefined;
+        const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
         const studentAns = normalize(String(ans));
@@ -409,7 +209,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
         
         scorableQuestions.forEach(q => {
-            const status = checkAnswerStatus(q, r.answers || {});
+            const status = checkAnswerStatus(q, r.answers);
             if (status === 'CORRECT') correct++;
             else if (status === 'EMPTY') empty++;
         });
@@ -432,7 +232,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
             results.forEach(r => {
-                if (checkAnswerStatus(q, r.answers || {}) === 'CORRECT') {
+                if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
                     correctCount++;
                 }
             });
@@ -584,7 +384,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                                     {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                                        const status = checkAnswerStatus(q, r.answers || {});
+                                                                        const status = checkAnswerStatus(q, r.answers);
                                                                         let bgClass = 'bg-slate-200'; 
                                                                         if (status === 'CORRECT') bgClass = 'bg-emerald-300';
                                                                         else if (status === 'WRONG') bgClass = 'bg-rose-300';
