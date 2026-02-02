@@ -25,11 +25,12 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
     PrinterIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    PlayIcon
 } from '../Icons';
 
 // --- SHARED COMPONENTS ---
-// (StatWidget, QuestionAnalysisItem, RemainingTime, MetaBadge components remain unchanged)
+
 export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
     <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg">
         <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600 print:bg-transparent print:p-0`}>
@@ -218,18 +219,292 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
 
 const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { if (!text || text === 'Lainnya') return null; return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>{text}</span>); };
 
-// --- CREATION VIEW, DRAFTS VIEW, ONGOING VIEW, UPCOMING VIEW, FINISHED VIEW, USER MANAGEMENT VIEW ---
-// (These are kept identical to the original file to save space in the response, assuming they were provided)
-// ... [Previous code for CreationView, DraftsView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, UserManagementView goes here] ...
-// Since I must only return files that change, and ArchiveViewer is in this file, I include the whole file structure.
-// I will output the *entire* file content including previous components as requested by instructions "Full content of file_2".
+// --- 1. CREATION VIEW ---
+export const CreationView: React.FC<{ onQuestionsGenerated: (questions: Question[]) => void }> = ({ onQuestionsGenerated }) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [textInput, setTextInput] = useState('');
+    const [activeTab, setActiveTab] = useState<'AUTO' | 'MANUAL'>('AUTO');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-export const CreationView: React.FC<any> = (props) => { /* Implementation kept same */ return <div className="max-w-4xl mx-auto p-4 bg-white rounded-xl shadow-sm border border-slate-100 text-center"><p className="text-slate-500">Komponen CreationView (Placeholder untuk keringkasan response, asumsikan konten asli tetap ada)</p></div> };
-export const DraftsView: React.FC<any> = (props) => { /* Implementation kept same */ return <div className="text-center p-4">Komponen DraftsView (Placeholder)</div> };
-export const OngoingExamsView: React.FC<any> = (props) => { /* Implementation kept same */ return <div className="text-center p-4">Komponen OngoingExamsView (Placeholder)</div> };
-export const UpcomingExamsView: React.FC<any> = (props) => { /* Implementation kept same */ return <div className="text-center p-4">Komponen UpcomingExamsView (Placeholder)</div> };
-export const FinishedExamsView: React.FC<any> = (props) => { /* Implementation kept same */ return <div className="text-center p-4">Komponen FinishedExamsView (Placeholder)</div> };
-export const UserManagementView: React.FC<any> = () => { /* Implementation kept same */ return <div className="text-center p-4">Komponen UserManagementView (Placeholder)</div> };
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setIsProcessing(true);
+            try {
+                const file = e.target.files[0];
+                const questions = await parsePdfAndAutoCrop(file); // Default to Auto Crop (AI Mode)
+                onQuestionsGenerated(questions);
+            } catch (error) {
+                console.error(error);
+                alert("Gagal memproses file. Pastikan format PDF valid.");
+            } finally {
+                setIsProcessing(false);
+            }
+        }
+    };
+
+    const handleTextSubmit = () => {
+        if (!textInput.trim()) return;
+        setIsProcessing(true);
+        try {
+            const questions = parseQuestionsFromPlainText(textInput);
+            onQuestionsGenerated(questions);
+        } catch (e) {
+            alert("Gagal memproses teks.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+            <div className="text-center space-y-4">
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">Buat Ujian Baru</h2>
+                <p className="text-slate-500 font-medium max-w-xl mx-auto">Pilih metode pembuatan soal. Gunakan AI untuk memindai PDF secara otomatis atau tempel teks soal secara manual.</p>
+            </div>
+
+            <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100 inline-flex mx-auto relative left-1/2 -translate-x-1/2">
+                <button onClick={() => setActiveTab('AUTO')} className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'AUTO' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Upload PDF (AI)</button>
+                <button onClick={() => setActiveTab('MANUAL')} className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'MANUAL' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Teks Manual</button>
+            </div>
+
+            {activeTab === 'AUTO' ? (
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-3 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/30 rounded-[2.5rem] p-12 text-center cursor-pointer transition-all group relative overflow-hidden"
+                >
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileChange} />
+                    <div className="relative z-10 space-y-4">
+                        <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-sm group-hover:scale-110 transition-transform duration-300">
+                            {isProcessing ? <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-10 h-10 text-indigo-500" />}
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">Klik untuk Upload Soal (PDF)</p>
+                            <p className="text-sm text-slate-400 mt-1">Sistem akan otomatis mendeteksi dan memotong soal bergambar.</p>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <textarea 
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        placeholder={`Contoh Format:\n1. Apa ibukota Indonesia?\nA. Bandung\nB. Jakarta\nC. Surabaya\nKunci: B`}
+                        className="w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-200 focus:bg-white outline-none text-sm font-mono leading-relaxed resize-none"
+                    />
+                    <button 
+                        onClick={handleTextSubmit}
+                        disabled={!textInput.trim() || isProcessing}
+                        className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                    >
+                        {isProcessing ? 'Memproses...' : 'Proses Teks'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- 2. DRAFTS VIEW ---
+export const DraftsView: React.FC<{ exams: Exam[]; onContinueDraft: (exam: Exam) => void; onDeleteDraft: (exam: Exam) => void }> = ({ exams, onContinueDraft, onDeleteDraft }) => {
+    if (exams.length === 0) return (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-300"><FileTextIcon className="w-10 h-10" /></div>
+            <h3 className="text-lg font-bold text-slate-700">Belum ada draf</h3>
+            <p className="text-slate-400 text-sm max-w-xs mx-auto mt-2">Mulai buat ujian baru dan simpan sebagai draf untuk menyelesaikannya nanti.</p>
+        </div>
+    );
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {exams.map(exam => (
+                <div key={exam.code} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                        <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black uppercase rounded-full tracking-wider border border-amber-100">Draf</span>
+                        <button onClick={() => onDeleteDraft(exam)} className="text-slate-300 hover:text-rose-500 transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                    </div>
+                    <h3 className="font-bold text-lg text-slate-800 mb-2 line-clamp-1 group-hover:text-indigo-600 transition-colors">{exam.config.subject || 'Tanpa Judul'}</h3>
+                    <p className="text-xs text-slate-500 mb-6 line-clamp-2">{exam.config.description || 'Tidak ada deskripsi.'}</p>
+                    <div className="flex gap-2">
+                        <button onClick={() => onContinueDraft(exam)} className="flex-1 py-2.5 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-center gap-2">
+                            <PencilIcon className="w-3.5 h-3.5" /> Lanjut Edit
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- 3. ONGOING EXAMS VIEW ---
+export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
+    if (exams.length === 0) return (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-4 text-indigo-200"><PlayIcon className="w-10 h-10" /></div>
+            <h3 className="text-lg font-bold text-slate-700">Tidak ada ujian aktif</h3>
+            <p className="text-slate-400 text-sm mt-2">Ujian yang sedang berlangsung akan muncul di sini.</p>
+        </div>
+    );
+
+    return (
+        <div className="space-y-4 animate-fade-in">
+            {exams.map(exam => {
+                const examResults = results.filter(r => r.examCode === exam.code);
+                const participants = examResults.length;
+                const avgScore = participants > 0 ? Math.round(examResults.reduce((a, b) => a + b.score, 0) / participants) : 0;
+
+                return (
+                    <div key={exam.code} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6">
+                        <div className="flex-1 w-full">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <h3 className="font-bold text-lg text-slate-800">{exam.config.subject}</h3>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black font-mono rounded">{exam.code}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-xs text-slate-500 font-medium">
+                                <span className="flex items-center gap-1"><UserIcon className="w-3.5 h-3.5"/> {participants} Peserta</span>
+                                <span className="flex items-center gap-1"><ChartBarIcon className="w-3.5 h-3.5"/> Rata-rata: {avgScore}</span>
+                                <span className="flex items-center gap-1"><ClockIcon className="w-3.5 h-3.5"/> Berakhir: {new Date(`${exam.config.date.split('T')[0]}T${exam.config.startTime}`).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <button onClick={() => onDuplicateExam(exam)} className="px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs transition-all" title="Duplikat"><DocumentDuplicateIcon className="w-4 h-4"/></button>
+                            <button onClick={() => onSelectExam(exam)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 font-bold text-xs transition-all flex items-center gap-2">
+                                <EyeIcon className="w-4 h-4"/> Pantau Live
+                            </button>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    );
+};
+
+// --- 4. UPCOMING EXAMS VIEW ---
+export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (exam: Exam) => void }> = ({ exams, onEditExam }) => {
+    if (exams.length === 0) return <div className="text-center py-20 text-slate-400 italic text-sm">Tidak ada ujian terjadwal.</div>;
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+            {exams.map(exam => (
+                <div key={exam.code} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all group">
+                    <div className="flex gap-4 items-start">
+                        <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center text-indigo-600 shrink-0">
+                            <span className="text-lg font-black leading-none">{new Date(exam.config.date).getDate()}</span>
+                            <span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleString('default', { month: 'short' })}</span>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">{exam.config.subject}</h3>
+                            <p className="text-xs text-slate-500 mb-3 flex items-center gap-2"><ClockIcon className="w-3 h-3"/> Mulai {exam.config.startTime} • {exam.config.timeLimit} Menit</p>
+                            <button onClick={() => onEditExam(exam)} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">Edit Detail</button>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- 5. FINISHED EXAMS VIEW ---
+export const FinishedExamsView: React.FC<{ exams: Exam[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; onDeleteExam: (exam: Exam) => void; onArchiveExam: (exam: Exam) => void }> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
+    if (exams.length === 0) return <div className="text-center py-20 text-slate-400 italic text-sm">Belum ada ujian yang selesai.</div>;
+
+    return (
+        <div className="space-y-4 animate-fade-in">
+            {exams.map(exam => (
+                <div key={exam.code} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group">
+                    <div className="flex-1 w-full">
+                        <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+                            {exam.config.subject}
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded border border-emerald-100">Selesai</span>
+                        </h3>
+                        <p className="text-xs text-slate-500">{new Date(exam.config.date).toLocaleDateString('id-ID', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'})}</p>
+                    </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button onClick={() => onSelectExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors">Lihat Hasil</button>
+                        <button onClick={() => onDuplicateExam(exam)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors" title="Gunakan Ulang"><DocumentDuplicateIcon className="w-5 h-5"/></button>
+                        <button onClick={() => onArchiveExam(exam)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Arsipkan & Hapus"><DocumentArrowUpIcon className="w-5 h-5"/></button>
+                        <button onClick={() => onDeleteExam(exam)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus Permanen"><TrashIcon className="w-5 h-5"/></button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- 6. USER MANAGEMENT VIEW (Super Admin) ---
+export const UserManagementView: React.FC = () => {
+    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            setIsLoading(true);
+            try {
+                const data = await storageService.getAllUsers();
+                setUsers(data);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    const handleRoleChange = async (userId: string, newRole: AccountType, newSchool: string) => {
+        if (!confirm("Ubah hak akses pengguna ini?")) return;
+        try {
+            await storageService.updateUserRole(userId, newRole, newSchool);
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, accountType: newRole, school: newSchool } : u));
+        } catch (e) {
+            alert("Gagal mengubah role.");
+        }
+    };
+
+    if (isLoading) return <div className="text-center py-20 text-slate-400 font-bold">Memuat pengguna...</div>;
+
+    return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in">
+            <div className="p-6 border-b border-slate-50">
+                <h3 className="font-bold text-lg text-slate-800">Manajemen Pengguna</h3>
+                <p className="text-xs text-slate-500">Kelola akses guru dan admin sekolah.</p>
+            </div>
+            <table className="w-full text-left">
+                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <tr>
+                        <th className="px-6 py-4">Nama</th>
+                        <th className="px-6 py-4">Sekolah</th>
+                        <th className="px-6 py-4">Role Saat Ini</th>
+                        <th className="px-6 py-4 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm">
+                    {users.map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50/50">
+                            <td className="px-6 py-4 font-bold text-slate-700">{u.fullName}</td>
+                            <td className="px-6 py-4 text-slate-600">{u.school}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${u.accountType === 'guru' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                    {u.accountType.replace('_', ' ')}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                                <select 
+                                    value={u.accountType} 
+                                    onChange={(e) => handleRoleChange(u.id, e.target.value as AccountType, u.school)}
+                                    className="bg-white border border-slate-200 text-xs font-bold rounded-lg px-2 py-1 outline-none focus:border-indigo-300"
+                                >
+                                    <option value="guru">Guru</option>
+                                    <option value="admin_sekolah">Admin Sekolah</option>
+                                </select>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
 
 
 // --- ARCHIVE VIEWER (ENHANCED) ---
