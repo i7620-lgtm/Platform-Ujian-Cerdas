@@ -390,36 +390,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         fetchResults();
     }, [exam, teacherProfile]);
 
-    // Calculate Stats
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
-
-    // Calculate Question Stats
-    const questionStats = useMemo(() => {
-        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
-            let correctCount = 0;
-            results.forEach(r => {
-                const ans = r.answers[q.id];
-                const studentAns = String(ans || '').trim().toLowerCase();
-                const correctAns = String(q.correctAnswer || '').trim().toLowerCase();
-                
-                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                    if (studentAns === correctAns) correctCount++;
-                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                     const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-                     const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
-                     if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correctCount++;
-                }
-            });
-            return {
-                id: q.id,
-                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
-            };
-        });
-    }, [results, exam.questions, totalStudents]);
-
     const normalize = (str: string) => str.trim().toLowerCase();
 
     const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
@@ -455,6 +425,49 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
         return 'WRONG'; 
     };
+
+    // Calculate Stats on the fly to match visual grid
+    const getCalculatedStats = (r: Result) => {
+        let correct = 0;
+        let empty = 0;
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        
+        scorableQuestions.forEach(q => {
+            const status = checkAnswerStatus(q, r.answers);
+            if (status === 'CORRECT') correct++;
+            else if (status === 'EMPTY') empty++;
+        });
+
+        const total = scorableQuestions.length;
+        const wrong = total - correct - empty;
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        return { correct, wrong, empty, score };
+    };
+
+    // Calculate Global Stats
+    const totalStudents = results.length;
+    // Use calculated score for averages
+    const calculatedResults = results.map(r => getCalculatedStats(r).score);
+    const averageScore = totalStudents > 0 ? Math.round(calculatedResults.reduce((acc, s) => acc + s, 0) / totalStudents) : 0;
+    const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
+    const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
+
+    // Calculate Question Stats
+    const questionStats = useMemo(() => {
+        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+            let correctCount = 0;
+            results.forEach(r => {
+                if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
+                    correctCount++;
+                }
+            });
+            return {
+                id: q.id,
+                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
+            };
+        });
+    }, [results, exam.questions, totalStudents]);
 
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
@@ -531,11 +544,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {results.map(r => {
-                                            const answeredCount = Object.keys(r.answers).length;
-                                            const emptyCount = r.totalQuestions - answeredCount;
-                                            // Asumsi: S = Total - Benar - Kosong (atau S = Terjawab - Benar)
-                                            // Kita gunakan S = Terjawab - Benar karena jika belum jawab, itu masuk Kosong.
-                                            const wrongCount = answeredCount - r.correctAnswers;
+                                            // Recalculate stats strictly for display
+                                            const { correct, wrong, empty, score } = getCalculatedStats(r);
 
                                             return (
                                                 <React.Fragment key={r.student.studentId}>
@@ -553,12 +563,12 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
                                                         <td className="px-6 py-4 text-center">
-                                                            <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                                {r.score}
+                                                            <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 bg-emerald-50' : score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                                {score}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                            <span className="text-emerald-600" title="Benar">{r.correctAnswers}</span> / <span className="text-rose-600" title="Salah">{wrongCount}</span> / <span className="text-slate-400" title="Kosong">{emptyCount}</span>
+                                                            <span className="text-emerald-600" title="Benar">{correct}</span> / <span className="text-rose-600" title="Salah">{wrong}</span> / <span className="text-slate-400" title="Kosong">{empty}</span>
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
