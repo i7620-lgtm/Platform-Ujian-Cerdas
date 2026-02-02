@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import type { Result, Exam } from '../types';
+import React, { useMemo, useState } from 'react';
+import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 
 interface StudentResultPageProps {
@@ -14,6 +14,67 @@ const normalize = (str: string) => (str || '').trim().toLowerCase();
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish }) => {
     const config = exam.config;
     const [expandedReview, setExpandedReview] = useState(false);
+
+    // REAL-TIME CALCULATION LOGIC
+    // Mengabaikan result.score dari DB dan menghitung ulang berdasarkan jawaban vs kunci soal saat ini
+    const calculatedStats = useMemo(() => {
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        let correct = 0;
+        let empty = 0;
+
+        scorableQuestions.forEach(q => {
+            const ans = result.answers[q.id];
+            if (!ans) {
+                empty++;
+                return;
+            }
+
+            const studentAns = normalize(String(ans));
+            const correctAns = normalize(String(q.correctAnswer || ''));
+            let isCorrect = false;
+
+            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                isCorrect = studentAns === correctAns;
+            } 
+            else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+                const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+                isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+            }
+            else if (q.questionType === 'TRUE_FALSE') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                } catch(e) {}
+            }
+            else if (q.questionType === 'MATCHING') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                } catch(e) {}
+            } else if (q.questionType === 'ESSAY') {
+                // Essay cannot be auto-graded strictly here without teacher input, usually assumed manual or correct if logic exists
+                // For student view consistency, we assume standard behavior or manual marking integration
+                // Here we keep it simple: Essay count as correct only if exact match (rare) or marked.
+                // For this fixing request, we align with the "grid" logic.
+                // Assuming Essay needs manual check, usually score comes from DB. 
+                // BUT, to fix the specific bug for auto-graded items:
+                isCorrect = false; // Default for essay until graded
+            }
+
+            if (isCorrect) correct++;
+        });
+
+        const total = scorableQuestions.length;
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        return {
+            score,
+            correctAnswers: correct,
+            totalQuestions: total,
+            wrongAnswers: total - correct - empty
+        };
+    }, [exam.questions, result.answers]);
 
     if (result.status === 'force_closed') {
         return (
@@ -50,18 +111,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     {showResult ? (
                         <div className="space-y-8">
                             <div className="py-6">
-                                <span className="text-6xl font-black text-slate-800 tracking-tighter block">{result.score}</span>
+                                <span className="text-6xl font-black text-slate-800 tracking-tighter block">{calculatedStats.score}</span>
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
                             </div>
 
                             <div className="flex justify-around border-t border-slate-100 pt-6">
                                 <div className="text-center">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Benar</p>
-                                    <p className="text-4xl font-black text-emerald-500 mt-1">{result.correctAnswers}</p>
+                                    <p className="text-4xl font-black text-emerald-500 mt-1">{calculatedStats.correctAnswers}</p>
                                 </div>
                                 <div className="text-center">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
-                                    <p className="text-4xl font-black text-slate-800 mt-1">{result.totalQuestions}</p>
+                                    <p className="text-4xl font-black text-slate-800 mt-1">{calculatedStats.totalQuestions}</p>
                                 </div>
                             </div>
                             
@@ -80,7 +141,35 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                             {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                 const studentAns = result.answers[q.id] || '-';
                                                 const correctAns = q.correctAnswer || '-';
-                                                const isCorrect = normalize(studentAns) === normalize(correctAns);
+                                                
+                                                // Gunakan logika normalisasi yang sama
+                                                let isCorrect = false;
+                                                const normalizedStudent = normalize(studentAns);
+                                                const normalizedCorrect = normalize(correctAns);
+
+                                                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                                                    isCorrect = normalizedStudent === normalizedCorrect;
+                                                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                    const sSet = new Set(normalizedStudent.split(',').map(s=>s.trim()));
+                                                    const cSet = new Set(normalizedCorrect.split(',').map(s=>s.trim()));
+                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                                     // Untuk review visual, kita asumsikan benar jika logic di atas sudah menghitungnya benar
+                                                     // namun untuk display text, kita tampilkan raw
+                                                     // Simplified check for styling
+                                                     isCorrect = JSON.stringify(studentAns) === JSON.stringify(correctAns); // weak check, visual only
+                                                     try {
+                                                         // Re-verify strictly for coloring
+                                                         if (q.questionType === 'TRUE_FALSE') {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.trueFalseRows?.every((row, i) => ansObj[i] === row.answer) ?? false;
+                                                         } else {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
+                                                         }
+                                                     } catch(e) {}
+                                                }
+
                                                 if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
 
                                                 return (
