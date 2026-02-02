@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -623,6 +622,25 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         return 'WRONG'; 
     };
 
+    // Strict recalculation for Archive
+    const getCalculatedStats = (r: Result, exam: Exam) => {
+        let correct = 0;
+        let empty = 0;
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        
+        scorableQuestions.forEach(q => {
+            const status = checkAnswerStatus(q, r.answers);
+            if (status === 'CORRECT') correct++;
+            else if (status === 'EMPTY') empty++;
+        });
+
+        const total = scorableQuestions.length;
+        const wrong = total - correct - empty;
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        return { correct, wrong, empty, score };
+    };
+
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
         else setExpandedStudent(id);
@@ -759,9 +777,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {results.map(r => {
-                                    const answeredCount = Object.keys(r.answers).length;
-                                    const emptyCount = r.totalQuestions - answeredCount;
-                                    const wrongCount = answeredCount - r.correctAnswers;
+                                    // Recalculate stats strictly for display in table
+                                    const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
 
                                     return (
                                     <React.Fragment key={r.student.studentId}>
@@ -776,12 +793,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             </td>
                                             <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                    {r.score}
+                                                <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 bg-emerald-50' : score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                    {score}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                <span className="text-emerald-600" title="Benar">{r.correctAnswers}</span> / <span className="text-rose-600" title="Salah">{wrongCount}</span> / <span className="text-slate-400" title="Kosong">{emptyCount}</span>
+                                                <span className="text-emerald-600" title="Benar">{correct}</span> / <span className="text-rose-600" title="Salah">{wrong}</span> / <span className="text-slate-400" title="Kosong">{empty}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 {r.activityLog && r.activityLog.length > 0 ? (
