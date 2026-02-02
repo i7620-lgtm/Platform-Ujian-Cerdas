@@ -1,8 +1,9 @@
- 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, WifiIcon } from './Icons';
 import { storageService } from '../services/storage';
+import { supabase } from '../lib/supabase';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -63,7 +64,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userLocation, setUserLocation] = useState<string>('');
+    
+    // REPAIR: ActiveExam state is now critical for updates
     const [activeExam, setActiveExam] = useState<Exam>(exam);
+    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
     const answersRef = useRef<Record<string, string>>({});
     const logRef = useRef<string[]>(initialData?.activityLog || []);
@@ -75,6 +79,72 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const violationsRef = useRef(0);
     const blurTimestampRef = useRef<number | null>(null);
     const [cheatingWarning, setCheatingWarning] = useState<string>('');
+
+    // REPAIR: Hybrid Approach (Realtime + Polling)
+    // 1. Keep Realtime for fast updates
+    useEffect(() => {
+        const channel = supabase.channel(`exam-config-${exam.code}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'exams',
+                    filter: `code=eq.${exam.code}`
+                },
+                (payload) => {
+                    const newConfig = payload.new.config;
+                    if (newConfig) {
+                        setActiveExam(prev => {
+                            const oldLimit = prev.config.timeLimit;
+                            const newLimit = newConfig.timeLimit;
+                            if (newLimit > oldLimit) {
+                                const diff = newLimit - oldLimit;
+                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit! (Live)`);
+                                setTimeout(() => setTimeExtensionNotif(null), 5000);
+                            }
+                            return { ...prev, config: newConfig };
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        // 2. Add POLLING every 15 seconds (Robust fallback)
+        const pollInterval = setInterval(async () => {
+            if (!navigator.onLine) return;
+            try {
+                const { data, error } = await supabase
+                    .from('exams')
+                    .select('config')
+                    .eq('code', exam.code)
+                    .single();
+
+                if (data && data.config) {
+                    setActiveExam(prev => {
+                        // Check specifically for time limit changes to notify user
+                        if (prev.config.timeLimit !== data.config.timeLimit) {
+                            const diff = data.config.timeLimit - prev.config.timeLimit;
+                            if (diff > 0) {
+                                setTimeExtensionNotif(`Sinkronisasi: Waktu tambah ${diff} menit!`);
+                                setTimeout(() => setTimeExtensionNotif(null), 5000);
+                            }
+                            return { ...prev, config: data.config };
+                        }
+                        // Always keep config fresh
+                        return { ...prev, config: data.config };
+                    });
+                }
+            } catch (e) {
+                // Silent fail on poll error
+            }
+        }, 15000);
+
+        return () => {
+            supabase.removeChannel(channel);
+            clearInterval(pollInterval);
+        };
+    }, [exam.code]);
 
     useEffect(() => {
         const loadState = () => {
@@ -105,17 +175,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         
         setIsSubmitting(true);
         
-        const grading = calculateGrade(exam, answersRef.current);
+        const grading = calculateGrade(activeExam, answersRef.current);
         await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
         
         if (status === 'completed' || status === 'force_closed') {
             localStorage.removeItem(STORAGE_KEY);
         }
-    }, [exam, userLocation, onSubmit]);
+    }, [activeExam, userLocation, onSubmit]);
 
     // Anti-cheat useEffect
     useEffect(() => {
-        if (student.class === 'PREVIEW' || !exam.config.detectBehavior) return;
+        if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
 
         const showWarning = (message: string) => {
             setCheatingWarning(message);
@@ -128,7 +198,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
 
-            if (exam.config.continueWithPermission) {
+            if (activeExam.config.continueWithPermission) {
                 alert("PELANGGARAN TERDETEKSI: Anda meninggalkan halaman ujian. Akses dikunci.");
                 handleSubmit(true, 'force_closed');
                 return;
@@ -182,23 +252,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [exam, student, handleSubmit]);
+    }, [activeExam, student, handleSubmit]);
 
     useEffect(() => {
-        if (exam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
+        if (activeExam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`),
                 (err) => logRef.current.push(`[System] Gagal lokasi: ${err.message}`)
             );
         }
-    }, [exam.config.trackLocation, student.class]);
+    }, [activeExam.config.trackLocation, student.class]);
 
+    // REPAIR: Deadline must depend on activeExam (which updates on poll/realtime)
     const deadline = useMemo(() => {
-        if (student.class === 'PREVIEW') return Date.now() + (exam.config.timeLimit * 60 * 1000);
-        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const start = new Date(`${dateStr}T${exam.config.startTime}`);
-        return start.getTime() + (exam.config.timeLimit * 60 * 1000);
-    }, [exam]);
+        if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
+        const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
+        const start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
+    }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
 
     const [timeLeft, setTimeLeft] = useState(0);
     
@@ -215,13 +286,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         tick();
         const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline, handleSubmit]);
+    }, [deadline, handleSubmit, student.class]);
 
     const broadcastProgress = useMemo(() => () => {
-        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
-        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
-        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
-    }, [exam]);
+        const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
+        storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
+    }, [activeExam]);
 
     const handleAnswerChange = (qId: string, val: string) => {
         setAnswers(prev => {
@@ -233,7 +304,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             return next;
         });
 
-        if (student.class !== 'PREVIEW' && !exam.config.disableRealtime) {
+        if (student.class !== 'PREVIEW' && !activeExam.config.disableRealtime) {
             const now = Date.now();
             if (now - lastBroadcastTimeRef.current > 2000) {
                 broadcastProgress();
@@ -262,8 +333,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
     };
 
-    const totalQuestions = exam.questions.filter(q => q.questionType !== 'INFO').length;
-    const answeredCount = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
+    const totalQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
+    const answeredCount = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
     const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
 
@@ -274,8 +345,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                  <div className="absolute top-0 left-0 h-[2px] bg-indigo-600 transition-all duration-700 ease-out z-10" style={{width: `${progress}%`}}></div>
                  <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 flex items-center justify-between">
                      <div>
-                         <h1 className="text-sm font-black text-slate-800 tracking-tight truncate max-w-[200px] sm:max-w-md">{exam.config.subject}</h1>
-                         <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide">{exam.code}</p>
+                         <h1 className="text-sm font-black text-slate-800 tracking-tight truncate max-w-[200px] sm:max-w-md">{activeExam.config.subject}</h1>
+                         <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide">{activeExam.code}</p>
                      </div>
                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
                          <ClockIcon className="w-4 h-4" />
@@ -284,9 +355,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                  </div>
             </header>
 
+            {/* Notification for Time Extension */}
+            {timeExtensionNotif && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[80] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl shadow-emerald-200 text-sm font-bold animate-bounce flex items-center gap-3 w-max max-w-[90vw]">
+                    <CheckCircleIcon className="w-5 h-5 shrink-0" /> 
+                    <span>{timeExtensionNotif}</span>
+                </div>
+            )}
+
             {cheatingWarning && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100">
-                    <ExclamationTriangleIcon className="w-5 h-5" /> 
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100 w-max max-w-[90vw]">
+                    <ExclamationTriangleIcon className="w-5 h-5 shrink-0" /> 
                     <span>{cheatingWarning}</span>
                 </div>
             )}

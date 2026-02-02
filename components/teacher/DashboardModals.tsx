@@ -1,22 +1,17 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
 
-interface OngoingExamModalProps {
-    exam: Exam | null;
-    teacherProfile?: TeacherProfile;
-    onClose: () => void;
-    onAllowContinuation: (studentId: string, examCode: string) => void;
-    onUpdateExam?: (exam: Exam) => void;
-    isReadOnly?: boolean;
-}
-
-export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClose, teacherProfile, onAllowContinuation, onUpdateExam, isReadOnly }) => {
+// --- OngoingExamModal ---
+interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
+export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => { 
+    const { exam, onClose, teacherProfile, onAllowContinuation, onUpdateExam, isReadOnly } = props;
+    
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [localResults, setLocalResults] = useState<Result[]>([]);
@@ -25,343 +20,95 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = ({ exam, onClos
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const processingIdsRef = useRef<Set<string>>(new Set());
-    
-    // Untuk tracking progress broadcast yang belum tersimpan di DB
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
-    // UPDATED: Added 'silent' parameter to prevent flickering during background polling
     const fetchLatest = async (silent = false) => {
         if (!displayExam) return;
         if (!silent) setIsRefreshing(true);
         try {
-            // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
-            const data = await storageService.getResults(
-                displayExam.code, 
-                selectedClass === 'ALL' ? '' : selectedClass
-            );
+            // Fetch Results
+            const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
             setLocalResults(data);
+
+            // Fetch Exam Config (Untuk sinkronisasi waktu jika guru lain mengubahnya)
+            const { data: examData } = await supabase.from('exams').select('config').eq('code', displayExam.code).single();
+            if (examData && examData.config) {
+                setDisplayExam(prev => prev ? ({ ...prev, config: examData.config }) : null);
+            }
         } catch (e) { console.error("Fetch failed", e); }
         finally { if (!silent) setIsRefreshing(false); }
     };
 
-    // 1. POLLING MECHANISM (HEARTBEAT)
-    // Refresh data every 5 seconds to ensure consistency even if WebSocket drops
     useEffect(() => {
-        fetchLatest(); // Initial load
-
-        const intervalId = setInterval(() => {
-            fetchLatest(true); // Silent fetch
-        }, 5000);
-
+        fetchLatest();
+        const intervalId = setInterval(() => { fetchLatest(true); }, 5000);
         return () => clearInterval(intervalId);
-    }, [displayExam, selectedClass, teacherProfile]);
+    }, [displayExam?.code, selectedClass, teacherProfile]);
 
-    // 2. HYBRID REALTIME: DB CHANGES (Status) + BROADCAST (Progress)
+    // REPAIR: Hybrid Realtime + Polling logic for Teacher
     useEffect(() => {
         if (!displayExam) return;
-
-        const channel = supabase
-            .channel(`exam-room-${displayExam.code}`)
-            // Listen to ANY change in results table for this exam
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` },
-                () => {
-                    // Logic disederhanakan: Jika ada perubahan DB (Insert/Update), 
-                    // langsung trigger fetch silent untuk dapat data paling akurat dari server.
-                    fetchLatest(true);
-                }
-            )
-            // Listen Broadcast (Untuk Progress Bar Realtime - Hemat DB)
-            .on('broadcast', { event: 'student_progress' }, (payload) => {
-                const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload;
-                
-                // Simpan state progress di ref agar persist saat re-render
-                broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp };
-                
-                // Update state untuk re-render UI secara optimistik
-                setLocalResults(prev => {
-                    const idx = prev.findIndex(r => r.student.studentId === studentId);
-                    if (idx >= 0 && prev[idx].status === 'in_progress') {
-                        const updated = [...prev];
-                        updated[idx] = {
-                            ...updated[idx],
-                            answers: Array(answeredCount).fill('placeholder') as any, // Fake answers length untuk visualisasi progress bar
-                            timestamp: timestamp
-                        };
-                        return updated;
-                    }
-                    return prev;
-                });
+        
+        const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, () => { fetchLatest(true); })
+            .on('broadcast', { event: 'student_progress' }, (payload) => { 
+                const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload; 
+                broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp }; 
+                setLocalResults(prev => { 
+                    const idx = prev.findIndex(r => r.student.studentId === studentId); 
+                    if (idx >= 0 && prev[idx].status === 'in_progress') { 
+                        const updated = [...prev]; 
+                        updated[idx] = { ...updated[idx], answers: Array(answeredCount).fill('placeholder') as any, timestamp: timestamp }; 
+                        return updated; 
+                    } 
+                    return prev; 
+                }); 
             })
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
+        // Listen for config changes (Realtime part)
+        const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'exams',
+                    filter: `code=eq.${displayExam.code}`
+                },
+                (payload) => {
+                     const newConfig = payload.new.config;
+                     if (newConfig) {
+                         setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
+                     }
+                }
+            )
+            .subscribe();
+
+        return () => { 
+            supabase.removeChannel(resultChannel);
+            supabase.removeChannel(configChannel);
         };
-    }, [displayExam, selectedClass]);
+    }, [displayExam?.code, selectedClass]);
 
     if (!displayExam) return null;
 
-    const handleUnlockClick = async (studentId: string, examCode: string) => {
-        processingIdsRef.current.add(studentId);
-        
-        // Optimistic UI Update
-        setLocalResults(prev => prev.map(r => 
-            r.student.studentId === studentId 
-            ? { ...r, status: 'in_progress' } 
-            : r
-        ));
-
-        try {
-            await storageService.unlockStudentExam(examCode, studentId);
-            onAllowContinuation(studentId, examCode);
-            // Fetch latest to confirm
-            fetchLatest(true);
-        } catch (error) { 
-            alert("Gagal membuka kunci."); 
-            // Revert on failure
-            fetchLatest(true);
-        } 
-        finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); }
-    };
-
-    const handleAddTimeSubmit = async () => {
-        if (!addTimeValue || typeof addTimeValue !== 'number') return;
-        try {
-            await storageService.extendExamTime(displayExam.code, addTimeValue);
-            const newLimit = displayExam.config.timeLimit + addTimeValue;
-            setDisplayExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}});
-            if(onUpdateExam) onUpdateExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}});
-            setIsAddTimeOpen(false);
-            setAddTimeValue('');
-        } catch(e) { alert("Gagal."); }
-    };
-
-    const getRelativeTime = (timestamp?: number) => {
-        if (!timestamp) return 'Offline';
-        const diff = Math.floor((Date.now() - timestamp) / 1000);
-        if (diff < 60) return `${diff}dt lalu`;
-        return `${Math.floor(diff/60)}mnt lalu`;
-    };
-
+    const handleUnlockClick = async (studentId: string, examCode: string) => { processingIdsRef.current.add(studentId); setLocalResults(prev => prev.map(r => r.student.studentId === studentId ? { ...r, status: 'in_progress' } : r)); try { await storageService.unlockStudentExam(examCode, studentId); onAllowContinuation(studentId, examCode); fetchLatest(true); } catch (error) { alert("Gagal membuka kunci."); fetchLatest(true); } finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); } };
+    const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); fetchLatest(true); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
+    const getRelativeTime = (timestamp?: number) => { if (!timestamp) return 'Offline'; const diff = Math.floor((Date.now() - timestamp) / 1000); if (diff < 60) return `${diff}dt lalu`; return `${Math.floor(diff/60)}mnt lalu`; };
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
-    
-    // Check if large scale mode is enabled
     const isLargeScale = displayExam.config.disableRealtime;
 
     return (
         <>
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-                <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white">
-                    
-                    <div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20">
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                                    <WifiIcon className="w-6 h-6"/>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span>
-                                        <RemainingTime exam={displayExam} />
-                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
-                                    <button 
-                                        onClick={() => setIsShareModalOpen(true)}
-                                        className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
-                                    >
-                                        <ShareIcon className="w-4 h-4"/> Akses Orang Tua
-                                    </button>
-                                )}
-                                {!isReadOnly && !isLargeScale && (
-                                    <button 
-                                        onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} 
-                                        className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"
-                                    >
-                                        <PlusCircleIcon className="w-4 h-4"/> Tambah Waktu
-                                    </button>
-                                )}
-                                <button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
-                                <select 
-                                    value={selectedClass} 
-                                    onChange={(e) => setSelectedClass(e.target.value)} 
-                                    className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white"
-                                >
-                                    <option value="ALL">SEMUA KELAS</option>
-                                    {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-auto p-6 bg-slate-50/30">
-                        {isAddTimeOpen && !isReadOnly && (
-                            <div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between">
-                                <div>
-                                    <h4 className="font-black text-lg">Tambah Durasi Ujian</h4>
-                                    <p className="text-white/70 text-sm">Waktu tambahan akan berlaku untuk semua siswa.</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-24 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl outline-none text-white font-bold placeholder:text-white/50 text-center"/>
-                                    <button onClick={handleAddTimeSubmit} className="px-6 bg-white text-indigo-600 font-black text-sm uppercase rounded-2xl hover:bg-indigo-50 transition-colors">Tambah</button>
-                                    <button onClick={()=>setIsAddTimeOpen(false)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20"><XMarkIcon className="w-5 h-5"/></button>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50/50">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>}
-                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>}
-                                        {!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {localResults.length > 0 ? localResults.map((r) => {
-                                        const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length;
-                                        
-                                        // Prioritaskan data dari Broadcast Ref untuk progress
-                                        const broadcastData = broadcastProgressRef.current[r.student.studentId];
-                                        const answered = r.status === 'in_progress' && broadcastData 
-                                            ? broadcastData.answered 
-                                            : Object.keys(r.answers).length;
-                                            
-                                        const lastActive = r.status === 'in_progress' && broadcastData
-                                            ? broadcastData.timestamp
-                                            : r.timestamp;
-
-                                        const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0;
-                                        
-                                        return (
-                                            <tr key={r.student.studentId} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
-                                                    <div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-center">
-                                                        {r.status === 'force_closed' ? (
-                                                            <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}>
-                                                                <LockClosedIcon className="w-3 h-3"/> Dihentikan
-                                                            </span>
-                                                        ) : r.status === 'completed' ? (
-                                                            <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5">
-                                                                <CheckCircleIcon className="w-3 h-3"/> Selesai
-                                                            </span>
-                                                        ) : (
-                                                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100">
-                                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                {!isLargeScale && (
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col items-center gap-1.5">
-                                                            <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                                <div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
-                                                            </div>
-                                                            <span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                                {!isLargeScale && (
-                                                    <td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                                                        {getRelativeTime(lastActive)}
-                                                    </td>
-                                                )}
-                                                {!isLargeScale && (
-                                                    <td className="px-6 py-4 text-right">
-                                                        {r.status === 'force_closed' && !isReadOnly && (
-                                                            <button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>
-                                                        )}
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                    }) : (
-                                        <tr><td colSpan={isLargeScale ? 3 : 6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* MODAL QR CODE AKSES ORANG TUA */}
-            {isShareModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-lg text-slate-800 tracking-tight">Akses Pantauan</h3>
-                            <button 
-                                onClick={() => setIsShareModalOpen(false)}
-                                className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                            >
-                                <XMarkIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div>
-                            <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} 
-                                alt="QR Code Live" 
-                                className="w-48 h-48 object-contain relative bg-white rounded-xl"
-                            />
-                        </div>
-
-                        <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">
-                            Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.
-                        </p>
-
-                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            <div className="flex-1 px-3 py-1 overflow-hidden">
-                                <p className="text-xs font-mono text-slate-600 truncate text-left">{liveUrl}</p>
-                            </div>
-                            <button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(liveUrl);
-                                    alert("Link berhasil disalin!");
-                                }}
-                                className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-slate-100 hover:bg-indigo-50 transition-colors"
-                                title="Salin Link"
-                            >
-                                <DocumentDuplicateIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"><div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white"><div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20"><div className="flex justify-between items-start"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100"><WifiIcon className="w-6 h-6"/></div><div><h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span><RemainingTime exam={displayExam} />{isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}</div></div></div><div className="flex items-center gap-2">{!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (<button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><ShareIcon className="w-4 h-4"/> Akses Orang Tua</button>)}{!isReadOnly && !isLargeScale && (<button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><PlusCircleIcon className="w-4 h-4"/> Tambah Waktu</button>)}<button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button></div></div><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-400"><div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>{isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}</div><div className="flex items-center gap-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span><select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white"><option value="ALL">SEMUA KELAS</option>{Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}</select></div></div></div><div className="flex-1 overflow-auto p-6 bg-slate-50/30">{isAddTimeOpen && !isReadOnly && (<div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between"><div><h4 className="font-black text-lg">Tambah Durasi Ujian</h4><p className="text-white/70 text-sm">Waktu tambahan akan berlaku untuk semua siswa.</p></div><div className="flex gap-2"><input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-24 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl outline-none text-white font-bold placeholder:text-white/50 text-center"/><button onClick={handleAddTimeSubmit} className="px-6 bg-white text-indigo-600 font-black text-sm uppercase rounded-2xl hover:bg-indigo-50 transition-colors">Tambah</button><button onClick={()=>setIsAddTimeOpen(false)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20"><XMarkIcon className="w-5 h-5"/></button></div></div>)}<div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden"><table className="w-full text-left"><thead className="bg-slate-50/50"><tr><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>}</tr></thead><tbody className="divide-y divide-slate-50">{localResults.length > 0 ? localResults.map((r) => { const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; const broadcastData = broadcastProgressRef.current[r.student.studentId]; const answered = r.status === 'in_progress' && broadcastData ? broadcastData.answered : Object.keys(r.answers).length; const lastActive = r.status === 'in_progress' && broadcastData ? broadcastData.timestamp : r.timestamp; const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0; return (<tr key={r.student.studentId} className="hover:bg-slate-50/50 transition-colors"><td className="px-6 py-4"><div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div><div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div></td><td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td><td className="px-6 py-4"><div className="flex justify-center">{r.status === 'force_closed' ? (<span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}><LockClosedIcon className="w-3 h-3"/> Dihentikan</span>) : r.status === 'completed' ? (<span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5"><CheckCircleIcon className="w-3 h-3"/> Selesai</span>) : (<span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan</span>)}</div></td>{!isLargeScale && (<td className="px-6 py-4"><div className="flex flex-col items-center gap-1.5"><div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div></div><span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span></div></td>)}{!isLargeScale && (<td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">{getRelativeTime(lastActive)}</td>)}{!isLargeScale && (<td className="px-6 py-4 text-right">{r.status === 'force_closed' && !isReadOnly && (<button onClick={() => handleUnlockClick(r.student.studentId, r.examCode)} className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all active:scale-95">Buka Kunci</button>)}</td>)}</tr>); }) : (<tr><td colSpan={isLargeScale ? 3 : 6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>)}</tbody></table></div></div></div></div>{isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-slate-100 hover:bg-indigo-50 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
         </>
     );
 };
 
+// --- FinishedExamModal (Updated) ---
 interface FinishedExamModalProps {
     exam: Exam;
     teacherProfile: TeacherProfile;
@@ -373,14 +120,36 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+    const [fixMessage, setFixMessage] = useState('');
 
     useEffect(() => {
         const fetchResults = async () => {
             setIsLoading(true);
             try {
-                // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
                 const data = await storageService.getResults(exam.code, undefined);
-                setResults(data);
+                
+                // --- AUTO RE-CALCULATION CHECK ---
+                let discrepancyCount = 0;
+                const recalculatedResults = data.map(r => {
+                    const stats = getCalculatedStats(r);
+                    if (stats.score !== r.score || stats.correct !== r.correctAnswers) {
+                        discrepancyCount++;
+                        return {
+                            ...r,
+                            score: stats.score,
+                            correctAnswers: stats.correct,
+                            totalQuestions: stats.correct + stats.wrong + stats.empty
+                        };
+                    }
+                    return r;
+                });
+
+                if (discrepancyCount > 0) {
+                    setFixMessage(`Terdeteksi ${discrepancyCount} nilai tidak sesuai (mungkin karena kunci jawaban berubah). Tampilan ini menggunakan hasil hitung ulang otomatis.`);
+                    setResults(recalculatedResults);
+                } else {
+                    setResults(data);
+                }
             } catch (error) {
                 console.error("Failed to fetch results", error);
             } finally {
@@ -390,35 +159,19 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         fetchResults();
     }, [exam, teacherProfile]);
 
-    // Calculate Stats
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
-
-    // Calculate Question Stats
-    const questionStats = useMemo(() => {
-        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
-            let correctCount = 0;
-            results.forEach(r => {
-                const ans = r.answers[q.id];
-                const studentAns = String(ans || '').trim().toLowerCase();
-                const correctAns = String(q.correctAnswer || '').trim().toLowerCase();
-                
-                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                    if (studentAns === correctAns) correctCount++;
-                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                     const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-                     const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
-                     if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correctCount++;
-                }
-            });
-            return {
-                id: q.id,
-                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
-            };
-        });
-    }, [results, exam.questions, totalStudents]);
+    const handleDownloadCorrected = () => {
+        const fixedArchive = { exam: exam, results: results };
+        const jsonString = JSON.stringify(fixedArchive, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `REKAP_NILAI_TERBARU_${exam.code}_${Date.now()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
 
     const normalize = (str: string) => str.trim().toLowerCase();
 
@@ -456,6 +209,46 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         return 'WRONG'; 
     };
 
+    const getCalculatedStats = (r: Result) => {
+        let correct = 0;
+        let empty = 0;
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        
+        scorableQuestions.forEach(q => {
+            const status = checkAnswerStatus(q, r.answers);
+            if (status === 'CORRECT') correct++;
+            else if (status === 'EMPTY') empty++;
+        });
+
+        const total = scorableQuestions.length;
+        const wrong = total - correct - empty;
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        return { correct, wrong, empty, score };
+    };
+
+    // Calculate Global Stats
+    const totalStudents = results.length;
+    const calculatedResults = results.map(r => getCalculatedStats(r).score);
+    const averageScore = totalStudents > 0 ? Math.round(calculatedResults.reduce((acc, s) => acc + s, 0) / totalStudents) : 0;
+    const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
+    const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
+
+    const questionStats = useMemo(() => {
+        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+            let correctCount = 0;
+            results.forEach(r => {
+                if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
+                    correctCount++;
+                }
+            });
+            return {
+                id: q.id,
+                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
+            };
+        });
+    }, [results, exam.questions, totalStudents]);
+
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
         else setExpandedStudent(id);
@@ -480,21 +273,30 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                 </div>
 
+                {fixMessage && (
+                    <div className="bg-amber-50 px-6 py-3 border-b border-amber-100 flex items-center justify-between gap-4 animate-slide-in-up">
+                        <div className="flex items-center gap-3 text-amber-800">
+                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
+                            <p className="text-xs font-bold">{fixMessage}</p>
+                        </div>
+                        <button onClick={handleDownloadCorrected} className="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 text-[10px] font-bold uppercase rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                             <DocumentArrowUpIcon className="w-3 h-3"/> Unduh Data Perbaikan
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
                     {isLoading ? (
                         <div className="flex items-center justify-center h-full text-slate-400 font-bold">Memuat data...</div>
                     ) : (
                         activeTab === 'ANALYSIS' ? (
                             <div className="space-y-8">
-                                {/* Summary Stats */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
                                     <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
                                     <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                                     <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                                 </div>
-
-                                {/* Question Analysis */}
                                 <div>
                                     <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                                         <TableCellsIcon className="w-5 h-5 text-slate-400"/>
@@ -531,12 +333,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {results.map(r => {
-                                            const answeredCount = Object.keys(r.answers).length;
-                                            const emptyCount = r.totalQuestions - answeredCount;
-                                            // Asumsi: S = Total - Benar - Kosong (atau S = Terjawab - Benar)
-                                            // Kita gunakan S = Terjawab - Benar karena jika belum jawab, itu masuk Kosong.
-                                            const wrongCount = answeredCount - r.correctAnswers;
-
+                                            const { correct, wrong, empty, score } = getCalculatedStats(r);
                                             return (
                                                 <React.Fragment key={r.student.studentId}>
                                                     <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/50 transition-colors cursor-pointer group">
@@ -553,12 +350,12 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
                                                         <td className="px-6 py-4 text-center">
-                                                            <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                                {r.score}
+                                                            <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 bg-emerald-50' : score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                                {score}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                            <span className="text-emerald-600" title="Benar">{r.correctAnswers}</span> / <span className="text-rose-600" title="Salah">{wrongCount}</span> / <span className="text-slate-400" title="Kosong">{emptyCount}</span>
+                                                            <span className="text-emerald-600" title="Benar">{correct}</span> / <span className="text-rose-600" title="Salah">{wrong}</span> / <span className="text-slate-400" title="Kosong">{empty}</span>
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
@@ -579,15 +376,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
                                                             {exam.config.trackLocation && r.location ? (
-                                                                <a 
-                                                                    href={`https://www.google.com/maps?q=${r.location}`} 
-                                                                    target="_blank" 
-                                                                    rel="noreferrer"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    className="text-blue-600 hover:underline flex items-center justify-center gap-1"
-                                                                >
-                                                                    Maps ↗
-                                                                </a>
+                                                                <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
                                                             ) : '-'}
                                                         </td>
                                                     </tr>
@@ -599,22 +388,13 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
                                                                 </div>
-                                                                <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 gap-2">
+                                                                <div className="flex flex-wrap gap-1 mt-2">
                                                                     {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
-                                                                        let bgClass = 'bg-slate-200'; // Empty
+                                                                        let bgClass = 'bg-slate-200'; 
                                                                         if (status === 'CORRECT') bgClass = 'bg-emerald-300';
                                                                         else if (status === 'WRONG') bgClass = 'bg-rose-300';
-
-                                                                        return (
-                                                                            <div 
-                                                                                key={q.id}
-                                                                                title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`}
-                                                                                className={`aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
-                                                                            >
-                                                                                {idx + 1}
-                                                                            </div>
-                                                                        );
+                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
                                                                     })}
                                                                 </div>
                                                             </td>

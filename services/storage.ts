@@ -248,20 +248,10 @@ class StorageService {
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
     let query = supabase.from('exams').select('*');
 
-    // REFACTOR: Percayakan filtering pada RLS di database.
-    // Frontend tidak perlu melakukan filter 'author_id' manual jika RLS sudah dikonfigurasi.
-    // Namun, untuk 'admin_sekolah' kita bantu persempit scope sekolahnya secara eksplisit
-    // agar lebih aman dan efisien, meskipun RLS juga akan memblokirnya.
-
     if (profile) {
         if (profile.accountType === 'super_admin') {
-            // Super Admin: No Filter (RLS allows all)
+            // Super Admin: No Filter
         } else if (profile.accountType === 'admin_sekolah' && profile.school) {
-            // Admin Sekolah: Filter by School OR Author ID (in case they created draft before assigning school)
-            // UPDATED: Menggunakan sintaks yang lebih aman
-            // Note: RLS "Admin Sekolah Select School" di atas akan menangani ini, 
-            // tapi kita tambahkan filter eksplisit untuk performa.
-            // Kita gunakan OR karena mungkin admin membuat soal pribadinya sendiri.
             query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
         } else {
             // Guru: Filter by Author ID
@@ -275,8 +265,6 @@ class StorageService {
         console.error("Error fetching exams from Supabase:", error);
         return {};
     }
-
-    console.log(`[Storage] Fetched ${data?.length || 0} exams for role ${profile?.accountType}`);
 
     const examMap: Record<string, Exam> = {};
     if (data) {
@@ -398,7 +386,6 @@ class StorageService {
               const src = img.getAttribute('src');
               const bucketPath = img.getAttribute('data-bucket-path');
 
-              // FIX: Try to download directly from storage using path first (bypasses CORS issues with public URL)
               if (bucketPath) {
                   try {
                       const { data, error } = await supabase.storage.from('soal').download(bucketPath);
@@ -410,7 +397,7 @@ class StorageService {
                           });
                           img.setAttribute('src', base64);
                           img.removeAttribute('data-bucket-path');
-                          continue; // Success, skip next check
+                          continue; 
                       }
                   } catch (e) {
                       console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
@@ -447,13 +434,24 @@ class StorageService {
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
     if (className && className !== 'ALL') query = query.eq('class_name', className);
+    
+    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
+    query = query.order('updated_at', { ascending: false });
+    
     const { data, error } = await query;
     if (error) return [];
+    
     return data.map((row: any) => ({
         student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, answers: row.answers, score: row.score, correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, status: row.status, activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), location: row.location
+        examCode: row.exam_code, 
+        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
+        score: row.score, 
+        correctAnswers: row.correct_answers,
+        totalQuestions: row.total_questions, 
+        status: row.status, 
+        activityLog: row.activity_log,
+        timestamp: new Date(row.updated_at).getTime(), 
+        location: row.location
     }));
   }
 
@@ -469,9 +467,9 @@ class StorageService {
             student_id: resultPayload.student.studentId, 
             student_name: resultPayload.student.fullName,
             class_name: resultPayload.student.class, 
-            answers: resultPayload.answers,
+            answers: resultPayload.answers || {}, // Ensure not null
             status: resultPayload.status,
-            activity_log: resultPayload.activityLog, 
+            activity_log: resultPayload.activityLog || [], 
             score: resultPayload.score || 0, 
             correct_answers: resultPayload.correctAnswers || 0,
             total_questions: resultPayload.totalQuestions || 0, 
@@ -492,7 +490,6 @@ class StorageService {
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         } else {
-             console.error("!!! DATA DITOLAK SERVER !!! Harap cek Policy RLS di tabel 'results'.");
              throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
         }
     }
@@ -519,7 +516,7 @@ class StorageService {
           try {
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: payload.student.studentId, student_name: payload.student.fullName,
-                class_name: payload.student.class, answers: payload.answers, status: payload.status,
+                class_name: payload.student.class, answers: payload.answers || {}, status: payload.status,
                 activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
                 total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
@@ -545,7 +542,7 @@ class StorageService {
       if (error || !data) return null;
       return {
         student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
-        examCode: data.exam_code, answers: data.answers, score: data.score, correctAnswers: data.correct_answers,
+        examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
       };
