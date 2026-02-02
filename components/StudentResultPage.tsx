@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ExclamationTriangleIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon } from './Icons';
 
 interface StudentResultPageProps {
   result: Result;
-  exam: Exam; // Need full exam object for correct answers
+  exam: Exam; 
   onFinish: () => void;
 }
 
@@ -15,139 +15,184 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
     const config = exam.config;
     const [expandedReview, setExpandedReview] = useState(false);
 
-    // TAMPILAN KHUSUS: FORCE CLOSED (KECURANGAN/PELANGGARAN)
+    // REAL-TIME CALCULATION LOGIC
+    const calculatedStats = useMemo(() => {
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        let correct = 0;
+        let empty = 0;
+
+        scorableQuestions.forEach(q => {
+            const ans = result.answers[q.id];
+            if (!ans) {
+                empty++;
+                return;
+            }
+
+            const studentAns = normalize(String(ans));
+            const correctAns = normalize(String(q.correctAnswer || ''));
+            let isCorrect = false;
+
+            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                isCorrect = studentAns === correctAns;
+            } 
+            else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+                const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+                isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+            }
+            else if (q.questionType === 'TRUE_FALSE') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                } catch(e) {}
+            }
+            else if (q.questionType === 'MATCHING') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                } catch(e) {}
+            } else if (q.questionType === 'ESSAY') {
+                isCorrect = false; // Default until graded
+            }
+
+            if (isCorrect) correct++;
+        });
+
+        const total = scorableQuestions.length;
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        return {
+            score,
+            correctAnswers: correct,
+            totalQuestions: total,
+            wrongAnswers: total - correct - empty,
+            hasDiscrepancy: score !== result.score // Check logic
+        };
+    }, [exam.questions, result.answers, result.score]);
+
     if (result.status === 'force_closed') {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#FFF1F2] p-6 font-sans">
-                <div className="w-full max-w-sm text-center animate-gentle-slide">
-                    <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-rose-200/50 border border-white relative overflow-hidden">
-                        {/* Red Accent Bar */}
-                        <div className="absolute top-0 left-0 w-full h-2 bg-rose-500"></div>
-
-                        <div className="mb-8 mt-2">
-                            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-rose-50 text-rose-500 mb-6 shadow-sm ring-4 ring-rose-50/50">
-                                <LockClosedIcon className="w-12 h-12" />
-                            </div>
-                            <h1 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Akses Terkunci</h1>
-                            <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
-                                Sistem mendeteksi aktivitas yang melanggar aturan ujian (seperti berpindah tab atau keluar aplikasi).
-                            </p>
-                        </div>
-
-                        <div className="bg-rose-50 p-5 rounded-2xl mb-8 border border-rose-100 text-left relative overflow-hidden">
-                            <div className="absolute -right-4 -top-4 text-rose-100/50 transform rotate-12">
-                                <ExclamationTriangleIcon className="w-24 h-24" />
-                            </div>
-                            <div className="relative z-10 flex items-start gap-3">
-                                <ExclamationTriangleIcon className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-1">Status: Ditangguhkan</p>
-                                    <p className="text-xs text-rose-600/80 leading-relaxed font-medium">
-                                        Jawaban Anda sejauh ini telah diamankan, namun Anda tidak dapat melanjutkan pengerjaan sendiri.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                             <p className="text-xs text-slate-400 font-medium border-t border-slate-50 pt-6">
-                                Silakan lapor ke <span className="text-slate-700 font-bold">Guru / Pengawas</span> untuk membuka kembali akses ujian Anda.
-                            </p>
-                            
-                            <button
-                                onClick={onFinish}
-                                className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all shadow-lg hover:shadow-xl active:scale-[0.98] text-xs uppercase tracking-widest"
-                            >
-                                Kembali ke Halaman Utama
-                            </button>
-                        </div>
+            <div className="min-h-screen flex items-center justify-center bg-rose-50 p-6">
+                <div className="w-full max-w-sm text-center bg-white p-8 rounded-3xl shadow-xl border border-rose-100 animate-fade-in">
+                    <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <LockClosedIcon className="w-8 h-8" />
                     </div>
+                    <h1 className="text-xl font-black text-slate-900 mb-2">Akses Terkunci</h1>
+                    <p className="text-sm text-slate-500 mb-6">
+                        Ujian dihentikan sistem karena terdeteksi aktivitas mencurigakan. Hubungi pengawas.
+                    </p>
+                    <button onClick={onFinish} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all text-sm">Kembali</button>
                 </div>
             </div>
         );
     }
 
-    // 5. FITUR: UMUMKAN NILAI OTOMATIS (Show Result to Student)
     const showResult = config.showResultToStudent;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 font-sans">
-            <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500`}>
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
-                    {/* Minimal Top Decoration */}
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-brand-500"></div>
-                    
-                    <div className="mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 mb-6">
-                            <CheckCircleIcon className="w-8 h-8" />
+        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 font-sans relative overflow-hidden">
+            {/* Elegant Discrepancy Notification */}
+            {calculatedStats.hasDiscrepancy && (
+                <div className="absolute top-6 inset-x-0 flex justify-center z-50 pointer-events-none">
+                    <div className="bg-amber-50/90 backdrop-blur-md border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 max-w-md pointer-events-auto animate-gentle-slide">
+                        <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider mb-0.5">Pembaruan Nilai</p>
+                            <p className="text-xs opacity-90">Nilai disesuaikan otomatis dengan kunci jawaban terbaru.</p>
                         </div>
-                        <h1 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">Hasil Ujian</h1>
-                        <p className="text-xs text-slate-500 font-medium">Terima kasih telah mengikuti evaluasi hari ini.</p>
+                    </div>
+                </div>
+            )}
+
+            <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
+                <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-white relative overflow-hidden">
+                    
+                    {/* Background decoration */}
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+                    
+                    <div className="mb-8">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 text-emerald-500 mb-6 shadow-sm ring-4 ring-emerald-50/50">
+                            <CheckCircleIcon className="w-10 h-10" />
+                        </div>
+                        <h1 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Ujian Selesai</h1>
+                        <p className="text-sm text-slate-500 font-medium">Jawaban Anda telah berhasil disimpan.</p>
                     </div>
                     
                     {showResult ? (
                         <div className="space-y-8">
-                            <div className="bg-brand-50/50 rounded-3xl p-8 border border-brand-100">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 mb-2">Nilai Akhir</p>
-                                <p className="text-7xl font-black text-brand-600 tracking-tighter">{result.score}</p>
+                            <div className="py-6 relative">
+                                <span className="text-7xl font-black text-slate-800 tracking-tighter block scale-100 transition-transform">{calculatedStats.score}</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
+                                {calculatedStats.hasDiscrepancy && (
+                                    <span className="absolute top-2 right-1/2 translate-x-12 flex h-3 w-3">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                    </span>
+                                )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-50 p-4 rounded-2xl">
-                                    <p className="text-xl font-bold text-slate-800">{result.correctAnswers}</p>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Benar</p>
+                            <div className="flex justify-around border-t border-slate-50 pt-8">
+                                <div className="text-center group cursor-default">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-emerald-500 transition-colors">Benar</p>
+                                    <p className="text-3xl font-black text-slate-800 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
                                 </div>
-                                <div className="bg-slate-50 p-4 rounded-2xl">
-                                    <p className="text-xl font-bold text-slate-800">{result.totalQuestions}</p>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Soal</p>
+                                <div className="text-center group cursor-default">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Total Soal</p>
+                                    <p className="text-3xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
                                 </div>
                             </div>
                             
-                            {/* 4. FITUR: TAMPILKAN KUNCI JAWABAN (Review Mode) */}
                             {config.showCorrectAnswer && (
-                                <div className="pt-6 border-t border-slate-100">
+                                <div className="pt-8">
                                     <button 
                                         onClick={() => setExpandedReview(!expandedReview)}
-                                        className="text-sm font-bold text-slate-600 hover:text-brand-600 flex items-center justify-center gap-2 mx-auto py-2 px-4 rounded-xl hover:bg-slate-50 transition-all"
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-6 py-3 rounded-xl transition-all inline-flex items-center gap-2 border border-transparent hover:border-indigo-100"
                                     >
-                                        {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan Soal'}
-                                        {expandedReview ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
+                                        {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan'}
+                                        {expandedReview ? <ChevronUpIcon className="w-3 h-3"/> : <ChevronDownIcon className="w-3 h-3"/>}
                                     </button>
 
                                     {expandedReview && (
-                                        <div className="mt-6 space-y-4 text-left">
+                                        <div className="mt-8 space-y-4 text-left border-t border-slate-50 pt-8 animate-fade-in">
                                             {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                const studentAns = result.answers[q.id] || '(Kosong)';
+                                                const studentAns = result.answers[q.id] || '-';
                                                 const correctAns = q.correctAnswer || '-';
-                                                const isCorrect = normalize(studentAns) === normalize(correctAns);
+                                                
+                                                let isCorrect = false;
+                                                const normalizedStudent = normalize(studentAns);
+                                                const normalizedCorrect = normalize(correctAns);
 
-                                                // Simplifikasi hanya untuk Multiple Choice & Isian Singkat dulu untuk UI ini
-                                                const isReviewable = ['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType);
+                                                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                                                    isCorrect = normalizedStudent === normalizedCorrect;
+                                                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                    const sSet = new Set(normalizedStudent.split(',').map(s=>s.trim()));
+                                                    const cSet = new Set(normalizedCorrect.split(',').map(s=>s.trim()));
+                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                                     isCorrect = JSON.stringify(studentAns) === JSON.stringify(correctAns); 
+                                                     try {
+                                                         if (q.questionType === 'TRUE_FALSE') {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.trueFalseRows?.every((row, i) => ansObj[i] === row.answer) ?? false;
+                                                         } else {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
+                                                         }
+                                                     } catch(e) {}
+                                                }
 
-                                                if (!isReviewable) return null; 
+                                                if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
 
                                                 return (
-                                                    <div key={q.id} className={`p-4 rounded-2xl border ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                                                        <div className="flex justify-between mb-2">
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Soal {idx + 1}</span>
-                                                            {isCorrect 
-                                                                ? <span className="text-[10px] font-black uppercase text-emerald-600 bg-white px-2 py-0.5 rounded">Benar</span>
-                                                                : <span className="text-[10px] font-black uppercase text-rose-600 bg-white px-2 py-0.5 rounded">Salah</span>
-                                                            }
+                                                    <div key={q.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors">
+                                                        <div className="flex justify-between mb-3">
+                                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Soal {idx + 1}</span>
+                                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 mb-3" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
-                                                        
-                                                        <div className="grid grid-cols-1 gap-2 text-xs">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Jawaban Kamu:</span>
-                                                                <span className={`font-bold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`} dangerouslySetInnerHTML={{__html: studentAns}}></span>
-                                                            </div>
-                                                            {!isCorrect && (
-                                                                <div className="flex flex-col mt-1">
-                                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Kunci Jawaban:</span>
-                                                                    <span className="font-bold text-slate-700" dangerouslySetInnerHTML={{__html: correctAns}}></span>
-                                                                </div>
-                                                            )}
+                                                        <div className="text-sm font-medium text-slate-800 mb-4 leading-relaxed" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                        <div className="text-xs space-y-2 bg-white p-3 rounded-xl border border-slate-100">
+                                                            <p className="flex justify-between"><span className="text-slate-400 font-bold">Jawaban Kamu:</span> <span className={isCorrect ? 'text-emerald-600 font-black' : 'text-rose-600 font-black'}>{studentAns}</span></p>
+                                                            {!isCorrect && <p className="flex justify-between border-t border-slate-50 pt-2 mt-2"><span className="text-slate-400 font-bold">Kunci Jawaban:</span> <span className="font-black text-slate-700">{correctAns}</span></p>}
                                                         </div>
                                                     </div>
                                                 );
@@ -158,21 +203,17 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                             )}
                         </div>
                     ) : (
-                        <div className="bg-slate-50 p-6 rounded-2xl mb-8">
-                            <p className="text-sm font-medium text-slate-600">Jawaban Anda berhasil disimpan. Hasil akan diumumkan oleh guru.</p>
+                        <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                            <p className="text-sm font-bold text-slate-600">Menunggu pengumuman nilai dari pengajar.</p>
                         </div>
                     )}
 
                     <button 
                         onClick={onFinish} 
-                        className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all shadow-lg active:scale-[0.98] mt-8"
+                        className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-[0.98] mt-10 text-xs uppercase tracking-widest"
                     >
-                        Tutup & Selesai
+                        Tutup Halaman
                     </button>
-                    
-                    <p className="text-[10px] text-slate-300 mt-8 font-medium">
-                        Disimpan pada: {new Date(result.timestamp || Date.now()).toLocaleTimeString()}
-                    </p>
                 </div>
             </div>
         </div>
