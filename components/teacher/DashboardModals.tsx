@@ -28,8 +28,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         if (!displayExam) return;
         if (!silent) setIsRefreshing(true);
         try {
+            // Fetch Results
             const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
             setLocalResults(data);
+
+            // Fetch Exam Config (Untuk sinkronisasi waktu jika guru lain mengubahnya)
+            const { data: examData } = await supabase.from('exams').select('config').eq('code', displayExam.code).single();
+            if (examData && examData.config) {
+                setDisplayExam(prev => prev ? ({ ...prev, config: examData.config }) : null);
+            }
         } catch (e) { console.error("Fetch failed", e); }
         finally { if (!silent) setIsRefreshing(false); }
     };
@@ -40,11 +47,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         return () => clearInterval(intervalId);
     }, [displayExam?.code, selectedClass, teacherProfile]);
 
-    // REPAIR: Listen to Exam Config Changes too (Realtime)
+    // REPAIR: Hybrid Realtime + Polling logic for Teacher
     useEffect(() => {
         if (!displayExam) return;
         
-        // Listen to Results
         const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, () => { fetchLatest(true); })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
@@ -62,7 +68,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             })
             .subscribe();
 
-        // REPAIR: Listen to Exam Table for Config Updates (e.g., Time Limit)
+        // Listen for config changes (Realtime part)
         const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
             .on(
                 'postgres_changes',
@@ -90,7 +96,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     if (!displayExam) return null;
 
     const handleUnlockClick = async (studentId: string, examCode: string) => { processingIdsRef.current.add(studentId); setLocalResults(prev => prev.map(r => r.student.studentId === studentId ? { ...r, status: 'in_progress' } : r)); try { await storageService.unlockStudentExam(examCode, studentId); onAllowContinuation(studentId, examCode); fetchLatest(true); } catch (error) { alert("Gagal membuka kunci."); fetchLatest(true); } finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); } };
-    const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); const newLimit = displayExam.config.timeLimit + addTimeValue; setDisplayExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); if(onUpdateExam) onUpdateExam({...displayExam, config: {...displayExam.config, timeLimit: newLimit}}); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
+    const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); fetchLatest(true); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
     const getRelativeTime = (timestamp?: number) => { if (!timestamp) return 'Offline'; const diff = Math.floor((Date.now() - timestamp) / 1000); if (diff < 60) return `${diff}dt lalu`; return `${Math.floor(diff/60)}mnt lalu`; };
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
