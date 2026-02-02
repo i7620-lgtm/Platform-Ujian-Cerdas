@@ -604,18 +604,84 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 )}
             </div>
-            {/* ... Print View (Kept same as logic doesn't change much for printing) ... */}
+            
+            {/* PRINT VIEW (Enhanced with Detailed Boxes) */}
             <div className="hidden print:block space-y-8 font-sans">
-                {/* Simplified Print View Content (Matching previous file logic) */}
+                {/* Header Print */}
                 <div className="border-b-2 border-slate-800 pb-4 mb-8">
                     <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{exam.config.subject}</h1>
                     <div className="flex justify-between items-end mt-2">
-                        <div><p className="text-sm font-bold text-slate-600">Kode Ujian: <span className="font-mono text-slate-900">{exam.code}</span></p><p className="text-sm text-slate-500">Tanggal: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p><p className="text-sm text-slate-500">Sekolah: {exam.authorSchool || '-'}</p></div>
-                        <div className="text-right"><p className="text-sm font-bold">Laporan Arsip Lengkap</p></div>
+                        <div>
+                            <p className="text-sm font-bold text-slate-600">Kode Ujian: <span className="font-mono text-slate-900">{exam.code}</span></p>
+                            <p className="text-sm text-slate-500">Tanggal: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <p className="text-sm text-slate-500">Sekolah: {exam.authorSchool || '-'}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-bold">Laporan Rekapitulasi Nilai</p>
+                        </div>
                     </div>
                 </div>
-                {/* ... (Print sections skipped for brevity as they are identical to previous file logic) ... */}
-                 <p className="text-center text-xs text-gray-400 italic">Dokumen ini dicetak otomatis dari Platform Ujian Cerdas.</p>
+
+                {/* Print Table with Detailed Answer Grid */}
+                <table className="w-full border-collapse border border-slate-300 text-sm">
+                    <thead>
+                        <tr className="bg-slate-100">
+                            <th className="border border-slate-300 p-3 text-left font-bold text-slate-800 w-[200px]">Nama Siswa</th>
+                            <th className="border border-slate-300 p-3 text-center font-bold text-slate-800 w-[80px]">Nilai</th>
+                            <th className="border border-slate-300 p-3 text-left font-bold text-slate-800">Rincian Jawaban</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {results.map(r => {
+                            const { score } = getCalculatedStats(r, exam);
+                            return (
+                                <tr key={r.student.studentId} className="avoid-break">
+                                    <td className="border border-slate-300 p-3 align-top">
+                                        <div className="font-bold text-slate-900">{r.student.fullName}</div>
+                                        <div className="text-xs text-slate-500 mt-1 uppercase font-bold">{r.student.class}</div>
+                                    </td>
+                                    <td className="border border-slate-300 p-3 align-top text-center">
+                                        <span className="text-xl font-black text-slate-800">{score}</span>
+                                    </td>
+                                    <td className="border border-slate-300 p-3">
+                                        {/* Colored Box Grid */}
+                                        <div className="flex flex-wrap gap-1">
+                                            {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                const status = checkAnswerStatus(q, r.answers);
+                                                let bgClass = 'bg-slate-200'; // Empty/Default (Grey)
+                                                if (status === 'CORRECT') bgClass = 'bg-emerald-300'; // Correct (Green)
+                                                else if (status === 'WRONG') bgClass = 'bg-rose-300'; // Wrong (Red)
+                                                
+                                                return (
+                                                    <div 
+                                                        key={q.id} 
+                                                        className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-bold text-black border border-black/10 ${bgClass}`}
+                                                        title={`No ${idx + 1}: ${status}`}
+                                                    >
+                                                        {idx + 1}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+
+                {/* Footer Print */}
+                <div className="mt-8 border-t border-slate-300 pt-4 flex justify-between items-center text-xs text-gray-500">
+                    <div>
+                        <p className="font-bold">Legenda:</p>
+                        <div className="flex gap-4 mt-1">
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-emerald-300 border border-black/10"></span> Benar</span>
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-rose-300 border border-black/10"></span> Salah</span>
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-slate-200 border border-black/10"></span> Kosong</span>
+                        </div>
+                    </div>
+                    <p className="italic">Dicetak dari Platform Ujian Cerdas pada {new Date().toLocaleString('id-ID')}</p>
+                </div>
             </div>
         </div>
     );
