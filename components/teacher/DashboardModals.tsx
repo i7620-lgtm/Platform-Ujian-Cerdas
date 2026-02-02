@@ -372,6 +372,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
+    const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchResults = async () => {
@@ -418,6 +419,47 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             };
         });
     }, [results, exam.questions, totalStudents]);
+
+    const normalize = (str: string) => str.trim().toLowerCase();
+
+    const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+        const ans = studentAnswers[q.id];
+        if (!ans) return 'EMPTY';
+
+        const studentAns = normalize(String(ans));
+        const correctAns = normalize(String(q.correctAnswer || ''));
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
+            const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+            return 'WRONG';
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+             try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+
+        return 'WRONG'; 
+    };
+
+    const toggleStudent = (id: string) => {
+        if (expandedStudent === id) setExpandedStudent(null);
+        else setExpandedStudent(id);
+    };
 
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -489,50 +531,89 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {results.map(r => (
-                                            <tr key={r.student.studentId} className="hover:bg-slate-50/30">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
-                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                        {r.score}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                    <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    {r.activityLog && r.activityLog.length > 0 ? (
-                                                        <div className="group relative inline-block">
-                                                            <span className="cursor-help text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 flex items-center justify-center gap-1 w-fit mx-auto">
-                                                                <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
-                                                            </span>
-                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 pointer-events-none">
-                                                                <ul className="list-disc pl-3 space-y-1">
-                                                                    {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
-                                                                    {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
-                                                                </ul>
+                                            <React.Fragment key={r.student.studentId}>
+                                                <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/50 transition-colors cursor-pointer group">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`transition-transform duration-300 ${expandedStudent === r.student.studentId ? 'rotate-180' : ''}`}>
+                                                                <ChevronDownIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{r.student.fullName}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
                                                             </div>
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">Aman</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
-                                                    {exam.config.trackLocation && r.location ? (
-                                                        <a 
-                                                            href={`https://www.google.com/maps?q=${r.location}`} 
-                                                            target="_blank" 
-                                                            rel="noreferrer"
-                                                            className="text-blue-600 hover:underline flex items-center justify-center gap-1"
-                                                        >
-                                                            Maps ↗
-                                                        </a>
-                                                    ) : '-'}
-                                                </td>
-                                            </tr>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className={`text-sm font-black px-2 py-1 rounded ${r.score >= 75 ? 'text-emerald-600 bg-emerald-50' : r.score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
+                                                            {r.score}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
+                                                        <span className="text-emerald-600">{r.correctAnswers}</span> / <span className="text-rose-600">{r.totalQuestions - r.correctAnswers}</span> / {r.totalQuestions}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        {r.activityLog && r.activityLog.length > 0 ? (
+                                                            <div className="group/log relative inline-block">
+                                                                <span className="cursor-help text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 flex items-center justify-center gap-1 w-fit mx-auto">
+                                                                    <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
+                                                                </span>
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/log:opacity-100 group-hover/log:visible transition-all z-20 pointer-events-none">
+                                                                    <ul className="list-disc pl-3 space-y-1">
+                                                                        {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
+                                                                        {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
+                                                                    </ul>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">Aman</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
+                                                        {exam.config.trackLocation && r.location ? (
+                                                            <a 
+                                                                href={`https://www.google.com/maps?q=${r.location}`} 
+                                                                target="_blank" 
+                                                                rel="noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="text-blue-600 hover:underline flex items-center justify-center gap-1"
+                                                            >
+                                                                Maps ↗
+                                                            </a>
+                                                        ) : '-'}
+                                                    </td>
+                                                </tr>
+                                                {expandedStudent === r.student.studentId && (
+                                                    <tr className="animate-fade-in bg-slate-50/50 shadow-inner">
+                                                        <td colSpan={6} className="p-6">
+                                                            <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 rounded"></div> Benar</span>
+                                                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
+                                                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
+                                                            </div>
+                                                            <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 gap-2">
+                                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                    const status = checkAnswerStatus(q, r.answers);
+                                                                    let bgClass = 'bg-slate-200'; // Empty
+                                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300';
+                                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300';
+
+                                                                    return (
+                                                                        <div 
+                                                                            key={q.id}
+                                                                            title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`}
+                                                                            className={`aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}
+                                                                        >
+                                                                            {idx + 1}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
                                         ))}
                                     </tbody>
                                 </table>
