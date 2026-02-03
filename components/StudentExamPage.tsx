@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, WifiIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 
@@ -65,7 +65,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userLocation, setUserLocation] = useState<string>('');
     
-    // REPAIR: ActiveExam state is now critical for updates
+    // NAVIGATION & VALIDATION STATES
+    const [isNavOpen, setIsNavOpen] = useState(false);
+    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
     const [activeExam, setActiveExam] = useState<Exam>(exam);
     const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
@@ -75,23 +78,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const timeLeftRef = useRef(0);
     const lastBroadcastTimeRef = useRef<number>(0);
     
-    // Anti-cheat refs and state
     const violationsRef = useRef(0);
     const blurTimestampRef = useRef<number | null>(null);
     const [cheatingWarning, setCheatingWarning] = useState<string>('');
 
-    // REPAIR: Hybrid Approach (Realtime + Polling)
-    // 1. Keep Realtime for fast updates
+    // --- REALTIME & POLLING LOGIC ---
     useEffect(() => {
         const channel = supabase.channel(`exam-config-${exam.code}`)
             .on(
                 'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'exams',
-                    filter: `code=eq.${exam.code}`
-                },
+                { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
                 (payload) => {
                     const newConfig = payload.new.config;
                     if (newConfig) {
@@ -110,19 +106,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             )
             .subscribe();
 
-        // 2. Add POLLING every 15 seconds (Robust fallback)
         const pollInterval = setInterval(async () => {
             if (!navigator.onLine) return;
             try {
-                const { data, error } = await supabase
-                    .from('exams')
-                    .select('config')
-                    .eq('code', exam.code)
-                    .single();
-
+                const { data } = await supabase.from('exams').select('config').eq('code', exam.code).single();
                 if (data && data.config) {
                     setActiveExam(prev => {
-                        // Check specifically for time limit changes to notify user
                         if (prev.config.timeLimit !== data.config.timeLimit) {
                             const diff = data.config.timeLimit - prev.config.timeLimit;
                             if (diff > 0) {
@@ -131,19 +120,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             }
                             return { ...prev, config: data.config };
                         }
-                        // Always keep config fresh
                         return { ...prev, config: data.config };
                     });
                 }
-            } catch (e) {
-                // Silent fail on poll error
-            }
+            } catch (e) {}
         }, 15000);
 
-        return () => {
-            supabase.removeChannel(channel);
-            clearInterval(pollInterval);
-        };
+        return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
     }, [exam.code]);
 
     useEffect(() => {
@@ -168,9 +151,34 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [STORAGE_KEY, initialData, exam]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
-    
-    const handleSubmit = useMemo(() => async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto && !confirm("Apakah Anda yakin ingin mengumpulkan jawaban? Aksi ini tidak dapat dibatalkan.")) return;
+
+    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
+        const v = ansMap[q.id];
+        if (!v) return false;
+        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
+        }
+        return v.trim() !== "";
+    };
+
+    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
+        if (!auto) {
+            // Manual submission validation
+            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
+            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
+
+            if (unansweredCount > 0) {
+                setHasAttemptedSubmit(true);
+                setIsNavOpen(true); // Auto open nav to show red boxes
+                
+                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi (ditandai warna merah). Yakin ingin mengumpulkan?`)) {
+                    return;
+                }
+            } else {
+                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban? Aksi ini tidak dapat dibatalkan.")) return;
+            }
+        }
+        
         if (isSubmittingRef.current) return;
         
         setIsSubmitting(true);
@@ -181,20 +189,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (status === 'completed' || status === 'force_closed') {
             localStorage.removeItem(STORAGE_KEY);
         }
-    }, [activeExam, userLocation, onSubmit]);
+    };
 
-    // Anti-cheat useEffect
+    // --- ANTI CHEAT & UTILS ---
     useEffect(() => {
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
 
-        const showWarning = (message: string) => {
-            setCheatingWarning(message);
-            setTimeout(() => setCheatingWarning(''), 5000);
-        };
+        const showWarning = (message: string) => { setCheatingWarning(message); setTimeout(() => setCheatingWarning(''), 5000); };
 
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
-            
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
 
@@ -207,63 +211,27 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             if (type === 'hard') {
                 violationsRef.current += 1;
                 const remaining = 3 - violationsRef.current;
-                if (remaining > 0) {
-                    showWarning(`PELANGGARAN! Sisa peringatan: ${remaining}.`);
-                } else {
-                    alert("PELANGGARAN BATAS MAKSIMUM! Ujian dihentikan oleh sistem.");
-                    handleSubmit(true, 'force_closed');
-                }
-            } else { 
-                showWarning("PERINGATAN: Tetap fokus pada halaman ini.");
-            }
+                if (remaining > 0) showWarning(`PELANGGARAN! Sisa peringatan: ${remaining}.`);
+                else { alert("PELANGGARAN BATAS MAKSIMUM! Ujian dihentikan oleh sistem."); handleSubmit(true, 'force_closed'); }
+            } else { showWarning("PERINGATAN: Tetap fokus pada halaman ini."); }
         };
 
-        const handleVisibilityChange = () => {
-            if (document.hidden && !isSubmittingRef.current) {
-                handleViolation('hard', 'Meninggalkan halaman ujian');
-            }
-        };
-
-        const handleBlur = () => {
-            if (!isSubmittingRef.current) {
-                blurTimestampRef.current = Date.now();
-            }
-        };
-
-        const handleFocus = () => {
-            if (blurTimestampRef.current && !isSubmittingRef.current) {
-                const duration = (Date.now() - blurTimestampRef.current) / 1000;
-                blurTimestampRef.current = null;
-
-                if (duration >= 2 && duration <= 5) {
-                    handleViolation('soft', `Fokus hilang ${duration.toFixed(1)}s`);
-                } else if (duration > 5) {
-                    handleViolation('hard', `Fokus hilang ${duration.toFixed(1)}s`);
-                }
-            }
-        };
+        const handleVisibilityChange = () => { if (document.hidden && !isSubmittingRef.current) handleViolation('hard', 'Meninggalkan halaman ujian'); };
+        const handleBlur = () => { if (!isSubmittingRef.current) blurTimestampRef.current = Date.now(); };
+        const handleFocus = () => { if (blurTimestampRef.current && !isSubmittingRef.current) { const duration = (Date.now() - blurTimestampRef.current) / 1000; blurTimestampRef.current = null; if (duration >= 2 && duration <= 5) handleViolation('soft', `Fokus hilang ${duration.toFixed(1)}s`); else if (duration > 5) handleViolation('hard', `Fokus hilang ${duration.toFixed(1)}s`); } };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('blur', handleBlur);
         window.addEventListener('focus', handleFocus);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('blur', handleBlur);
-            window.removeEventListener('focus', handleFocus);
-        };
+        return () => { document.removeEventListener('visibilitychange', handleVisibilityChange); window.removeEventListener('blur', handleBlur); window.removeEventListener('focus', handleFocus); };
     }, [activeExam, student, handleSubmit]);
 
     useEffect(() => {
         if (activeExam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`),
-                (err) => logRef.current.push(`[System] Gagal lokasi: ${err.message}`)
-            );
+            navigator.geolocation.getCurrentPosition((pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`), (err) => logRef.current.push(`[System] Gagal lokasi: ${err.message}`));
         }
     }, [activeExam.config.trackLocation, student.class]);
 
-    // REPAIR: Deadline must depend on activeExam (which updates on poll/realtime)
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
         const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
@@ -272,16 +240,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
 
     const [timeLeft, setTimeLeft] = useState(0);
-    
     useEffect(() => {
         const tick = () => {
             const now = Date.now();
             const diff = Math.max(0, Math.floor((deadline - now) / 1000));
             setTimeLeft(diff);
             timeLeftRef.current = diff;
-            if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
-                handleSubmit(true, 'completed');
-            }
+            if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) handleSubmit(true, 'completed');
         };
         tick();
         const timer = setInterval(tick, 1000);
@@ -298,34 +263,25 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setAnswers(prev => {
             const next = { ...prev, [qId]: val };
             answersRef.current = next;
-            if (student.class !== 'PREVIEW') {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: next, logs: logRef.current, lastUpdated: Date.now() }));
-            }
+            if (student.class !== 'PREVIEW') localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: next, logs: logRef.current, lastUpdated: Date.now() }));
             return next;
         });
 
         if (student.class !== 'PREVIEW' && !activeExam.config.disableRealtime) {
             const now = Date.now();
-            if (now - lastBroadcastTimeRef.current > 2000) {
-                broadcastProgress();
-                lastBroadcastTimeRef.current = now;
-            } else {
-                if ((window as any).broadcastTimeout) clearTimeout((window as any).broadcastTimeout);
-                (window as any).broadcastTimeout = setTimeout(() => {
-                    broadcastProgress();
-                    lastBroadcastTimeRef.current = Date.now();
-                }, 2000);
-            }
+            if (now - lastBroadcastTimeRef.current > 2000) { broadcastProgress(); lastBroadcastTimeRef.current = now; } 
+            else { if ((window as any).broadcastTimeout) clearTimeout((window as any).broadcastTimeout); (window as any).broadcastTimeout = setTimeout(() => { broadcastProgress(); lastBroadcastTimeRef.current = Date.now(); }, 2000); }
         }
     };
 
-    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
-        const v = ansMap[q.id];
-        if (!v) return false;
-        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
+    const scrollToQuestion = (id: string) => {
+        setIsNavOpen(false);
+        const el = document.getElementById(id);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-indigo-400');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-400'), 2000);
         }
-        return v.trim() !== "";
     };
 
     const formatTime = (s: number) => {
@@ -340,20 +296,81 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40">
-            {/* Minimal Sticky Header */}
-            <header className="fixed top-0 inset-x-0 z-[60] bg-white/90 backdrop-blur-md border-b border-slate-200/60 shadow-sm transition-all h-16 flex items-center">
+            {/* Header Ergonomis (Click-to-Expand) */}
+            <header 
+                onClick={() => setIsNavOpen(!isNavOpen)}
+                className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 h-16 flex items-center cursor-pointer select-none ${isNavOpen ? 'bg-white border-slate-200' : 'bg-white/90 backdrop-blur-md border-slate-200/60'}`}
+            >
+                 {/* Progress Bar Line */}
                  <div className="absolute top-0 left-0 h-[2px] bg-indigo-600 transition-all duration-700 ease-out z-10" style={{width: `${progress}%`}}></div>
+                 
                  <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 flex items-center justify-between">
-                     <div>
-                         <h1 className="text-sm font-black text-slate-800 tracking-tight truncate max-w-[200px] sm:max-w-md">{activeExam.config.subject}</h1>
-                         <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide">{activeExam.code}</p>
+                     <div className="flex items-center gap-3 overflow-hidden">
+                         {/* Toggle Indicator */}
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${isNavOpen ? 'bg-slate-100 text-slate-600' : 'bg-transparent text-slate-400'}`}>
+                             {isNavOpen ? <ChevronUpIcon className="w-5 h-5"/> : <ChevronDownIcon className="w-5 h-5"/>}
+                         </div>
+                         <div className="min-w-0">
+                             <h1 className="text-sm font-black text-slate-800 tracking-tight truncate">{activeExam.config.subject}</h1>
+                             <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide truncate">{isNavOpen ? 'Ketuk untuk tutup menu' : 'Ketuk header untuk navigasi'}</p>
+                         </div>
                      </div>
-                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
+                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm shrink-0 ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
                          <ClockIcon className="w-4 h-4" />
                          <span className="text-sm">{formatTime(timeLeft)}</span>
                      </div>
                  </div>
             </header>
+
+            {/* Navigation Panel (Slide Down) */}
+            <div className={`fixed top-16 left-0 w-full bg-white/95 backdrop-blur-xl z-50 border-b border-slate-200 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? 'translate-y-0 opacity-100 visible' : '-translate-y-full opacity-0 invisible'}`}>
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Peta Soal</h3>
+                        <div className="flex gap-3 text-[10px] font-bold">
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-600"></div> Terjawab</div>
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-white border border-slate-300"></div> Kosong</div>
+                        </div>
+                    </div>
+                    
+                    {/* Compact Grid - Flex Wrap */}
+                    <div className="flex flex-wrap gap-2 justify-center content-start">
+                        {activeExam.questions.map((q, idx) => {
+                            if (q.questionType === 'INFO') return null;
+                            const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
+                            const answered = isAnswered(q, answers);
+                            
+                            // Determine Color Logic
+                            let btnClass = "bg-white border-slate-200 text-slate-600 hover:border-indigo-300";
+                            if (answered) {
+                                btnClass = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                            } else if (hasAttemptedSubmit) {
+                                btnClass = "bg-rose-50 border-rose-300 text-rose-600 animate-pulse";
+                            }
+
+                            return (
+                                <button
+                                    key={q.id}
+                                    onClick={() => scrollToQuestion(q.id)}
+                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all duration-200 active:scale-90 ${btnClass}`}
+                                >
+                                    {num}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    
+                    <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+                        <p className="text-[10px] text-slate-400">Total {answeredCount} dari {totalQuestions} soal terjawab</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Backdrop Blur Overlay when Nav Open */}
+            <div 
+                className={`fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 ${isNavOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
+                onClick={() => setIsNavOpen(false)}
+            ></div>
 
             {/* Notification for Time Extension */}
             {timeExtensionNotif && (
@@ -370,17 +387,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
             )}
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-28 space-y-8">
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 space-y-8">
                 {activeExam.questions.map((q, idx) => {
                     const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q, answers);
+                    const isMissing = hasAttemptedSubmit && !answered && q.questionType !== 'INFO';
                     
                     return (
-                        <div key={q.id} id={q.id} className="scroll-mt-32 group animate-fade-in">
+                        <div key={q.id} id={q.id} className={`scroll-mt-32 group animate-fade-in transition-all duration-500 ${isMissing ? 'ring-2 ring-rose-400 rounded-[1.5rem]' : ''}`}>
                             <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm p-6 sm:p-8 hover:shadow-md transition-shadow">
                                 <div className="flex gap-5">
                                     <div className="shrink-0">
-                                        <span className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-sm ${answered ? 'text-white bg-indigo-600 shadow-indigo-200' : 'text-slate-400 bg-slate-100'}`}>
+                                        <span className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-sm ${isMissing ? 'bg-rose-100 text-rose-600' : answered ? 'text-white bg-indigo-600 shadow-indigo-200' : 'text-slate-400 bg-slate-100'}`}>
                                             {q.questionType === 'INFO' ? 'i' : num}
                                         </span>
                                     </div>
