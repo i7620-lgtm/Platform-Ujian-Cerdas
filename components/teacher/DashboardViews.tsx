@@ -766,35 +766,50 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             <style>{`
                 @media print {
                     @page { margin: 0.5cm; size: A4; }
-                    body { -webkit-print-color-adjust: exact; background: white !important; font-family: 'Inter', sans-serif; color: black !important; }
-                    .no-print { display: none !important; }
-                    .print-only { display: block !important; }
                     
-                    /* Reset Layout for Full Width */
-                    body > *:not(.print-container) { display: none !important; }
+                    /* Hide everything by default */
+                    body * {
+                        visibility: hidden;
+                    }
+                    
+                    /* Reset body style */
+                    body { 
+                        background: white !important; 
+                        color: black !important;
+                        margin: 0;
+                        padding: 0;
+                    }
+
+                    /* Make the print container visible and position it absolutely */
+                    .print-container, .print-container * {
+                        visibility: visible;
+                    }
+
                     .print-container { 
                         position: absolute; 
                         left: 0; 
                         top: 0; 
                         width: 100%; 
-                        max-width: none !important;
-                        margin: 0 !important; 
-                        padding: 0 !important; 
-                        display: block !important;
-                        background: white;
+                        margin: 0; 
+                        padding: 0;
                         z-index: 9999;
+                        background: white;
                     }
+
+                    /* Explicitly hide the interactive UI elements */
+                    .no-print { display: none !important; }
+
+                    /* Typography */
+                    body { font-family: 'Inter', sans-serif; }
+                    h1 { font-size: 16pt; margin-bottom: 4px; }
+                    h2 { font-size: 12pt; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 16px; }
+                    p, li { font-size: 10pt; line-height: 1.4; }
 
                     /* Tables */
                     table { border-collapse: collapse; width: 100%; font-size: 9px; }
                     th, td { border-bottom: 1px solid #e2e8f0; padding: 4px; text-align: left; }
                     th { border-top: 2px solid #334155; border-bottom: 2px solid #334155; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: #f8fafc !important; }
                     tr:nth-child(even) { background-color: #f8fafc !important; }
-                    
-                    /* Typography */
-                    h1 { font-size: 16pt; margin-bottom: 4px; }
-                    h2 { font-size: 12pt; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 16px; }
-                    p, li { font-size: 10pt; line-height: 1.4; }
 
                     /* Questions Layout: 2 Columns Masonry */
                     .question-grid {
@@ -807,6 +822,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         page-break-inside: avoid;
                         margin-bottom: 1rem;
                         padding-bottom: 0.5rem;
+                        display: inline-block; /* Fix for column break issues */
+                        width: 100%;
                     }
                     
                     /* Stats Grid */
