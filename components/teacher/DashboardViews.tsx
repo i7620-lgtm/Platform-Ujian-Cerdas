@@ -765,20 +765,72 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         <div className="max-w-5xl mx-auto space-y-6">
             <style>{`
                 @media print {
-                    @page { margin: 1cm; size: portrait; }
-                    body { -webkit-print-color-adjust: exact; background: white !important; }
+                    @page { margin: 0.5cm; size: A4; }
+                    body { -webkit-print-color-adjust: exact; background: white !important; font-family: 'Inter', sans-serif; color: black !important; }
                     .no-print { display: none !important; }
                     .print-only { display: block !important; }
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; }
-                    table { border-collapse: collapse; width: 100%; font-size: 10px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px; }
+                    
+                    /* Reset Layout for Full Width */
+                    body > *:not(.print-container) { display: none !important; }
+                    .print-container { 
+                        position: absolute; 
+                        left: 0; 
+                        top: 0; 
+                        width: 100%; 
+                        max-width: none !important;
+                        margin: 0 !important; 
+                        padding: 0 !important; 
+                        display: block !important;
+                        background: white;
+                        z-index: 9999;
+                    }
+
+                    /* Tables */
+                    table { border-collapse: collapse; width: 100%; font-size: 9px; }
+                    th, td { border-bottom: 1px solid #e2e8f0; padding: 4px; text-align: left; }
+                    th { border-top: 2px solid #334155; border-bottom: 2px solid #334155; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: #f8fafc !important; }
+                    tr:nth-child(even) { background-color: #f8fafc !important; }
+                    
+                    /* Typography */
+                    h1 { font-size: 16pt; margin-bottom: 4px; }
+                    h2 { font-size: 12pt; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 16px; }
+                    p, li { font-size: 10pt; line-height: 1.4; }
+
+                    /* Questions Layout: 2 Columns Masonry */
+                    .question-grid {
+                        column-count: 2;
+                        column-gap: 2rem;
+                        width: 100%;
+                    }
+                    .question-item {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                        margin-bottom: 1rem;
+                        padding-bottom: 0.5rem;
+                    }
+                    
+                    /* Stats Grid */
+                    .stats-row {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 1rem;
+                        margin-bottom: 1rem;
+                        page-break-inside: avoid;
+                    }
+                    .stat-card {
+                        border: 1px solid #cbd5e1;
+                        border-radius: 4px;
+                        padding: 8px;
+                        text-align: center;
+                    }
+
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
                 }
             `}</style>
 
             {fixMessage && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm no-print">
                     <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-amber-600" />
                     <div className="flex-1">
                         <p className="text-sm font-bold">Auto-Correction Active</p>
@@ -788,7 +840,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             )}
 
             {/* INTERACTIVE HEADER (HIDDEN ON PRINT) */}
-            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm print:hidden">
+            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm no-print">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Pratinjau Arsip: <span className="text-indigo-600">{exam.config.subject}</span></h2>
@@ -809,7 +861,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             </div>
 
             {/* INTERACTIVE CONTENT (HIDDEN ON PRINT) */}
-            <div className="animate-fade-in print:hidden">
+            <div className="animate-fade-in no-print">
                 {activeTab === 'DETAIL' && (
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
@@ -921,55 +973,52 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             </div>
             
             {/* PRINT VIEW (Clean & Sequential) */}
-            <div className="hidden print:block text-slate-900">
-                {/* Global Header for First Page */}
-                <div className="border-b-2 border-slate-900 pb-2 mb-6">
-                    <h1 className="text-xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
-                    <div className="flex justify-between items-end mt-1">
-                        <div>
-                            <p className="text-xs font-bold text-slate-600">Kode: <span className="font-mono text-slate-900">{exam.code}</span> | {new Date(exam.config.date).toLocaleDateString('id-ID')} | {exam.authorSchool || '-'}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-slate-500">Arsip Lengkap Ujian</p>
-                        </div>
+            <div className="hidden print-only print-container text-black">
+                {/* Global Header */}
+                <div className="border-b border-black pb-2 mb-4 flex justify-between items-end">
+                    <div>
+                        <h1 className="font-black uppercase tracking-tight text-xl">{exam.config.subject}</h1>
+                        <p className="text-[10pt] font-bold mt-1">
+                            Kode: {exam.code} <span className="mx-2">|</span> 
+                            {new Date(exam.config.date).toLocaleDateString('id-ID')} <span className="mx-2">|</span> 
+                            {exam.authorSchool || '-'}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[9pt] uppercase tracking-widest font-bold text-gray-600">Arsip Lengkap</p>
                     </div>
                 </div>
 
                 {/* 1. REKAPITULASI SISWA */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">1. Rekapitulasi Hasil Siswa</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                <div className="mb-4 avoid-break">
+                    <h2 className="uppercase tracking-widest text-[10pt] font-black border-l-4 border-black pl-2 mb-2">1. Rekapitulasi Hasil</h2>
+                    <table className="w-full text-[9pt]">
                         <thead>
-                            <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-left w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left w-16">Kelas</th>
-                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Grid)</th>
+                            <tr className="bg-gray-100 border-y-2 border-black">
+                                <th className="p-1 w-8 text-center">No</th>
+                                <th className="p-1 text-left">Nama Siswa</th>
+                                <th className="p-1 w-20 text-center">Kelas</th>
+                                <th className="p-1 w-12 text-center">Nilai</th>
+                                <th className="p-1 text-left">Grid Jawaban (Hitam=Benar, Putih=Salah)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {results.map((r, index) => {
                                 const { score } = getCalculatedStats(r, exam);
                                 return (
-                                    <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-2 uppercase">{r.student.class}</td>
-                                        <td className="border border-slate-300 p-2 text-center font-bold text-sm">{score}</td>
-                                        <td className="border border-slate-300 p-1">
-                                            <div className="flex flex-wrap gap-0.5">
+                                    <tr key={r.student.studentId} className="border-b border-gray-200">
+                                        <td className="p-1 text-center">{index + 1}</td>
+                                        <td className="p-1 font-bold">{r.student.fullName}</td>
+                                        <td className="p-1 text-center uppercase text-[8pt]">{r.student.class}</td>
+                                        <td className="p-1 text-center font-black">{score}</td>
+                                        <td className="p-1">
+                                            <div className="flex flex-wrap gap-px">
                                                 {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                     const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'bg-slate-200'; 
-                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300';
-                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300';
-                                                    
+                                                    // High Contrast for B&W printing
+                                                    const bgClass = status === 'CORRECT' ? 'bg-black text-white' : 'bg-white text-black border border-gray-300';
                                                     return (
-                                                        <div 
-                                                            key={q.id} 
-                                                            className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold text-black border border-black/10 ${bgClass}`}
-                                                        >
+                                                        <div key={q.id} className={`w-3 h-3 flex items-center justify-center text-[7px] font-bold ${bgClass}`}>
                                                             {idx + 1}
                                                         </div>
                                                     );
@@ -981,168 +1030,68 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             })}
                         </tbody>
                     </table>
-                    <div className="mt-2 flex gap-4 text-[9px] text-gray-500 font-bold uppercase tracking-widest">
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 border border-black/10"></div> Benar</span>
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 border border-black/10"></div> Salah</span>
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 border border-black/10"></div> Kosong</span>
-                    </div>
                 </div>
 
-                <div className="page-break"></div>
-
-                {/* 2. ANALISIS STATISTIK & BUTIR SOAL */}
-                <div className="mb-4">
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">2. Analisis Statistik & Butir Soal</h1>
-                    </div>
-                    
-                    {/* Kotak Statistik Utama */}
-                    <div className="mb-6 grid grid-cols-4 gap-4 border border-slate-300 rounded p-4 text-center avoid-break">
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
-                            <p className="text-xl font-black">{averageScore}</p>
+                {/* 2. STATISTIK */}
+                <div className="mb-4 avoid-break">
+                     <h2 className="uppercase tracking-widest text-[10pt] font-black border-l-4 border-black pl-2 mb-2">2. Statistik</h2>
+                     <div className="stats-row text-[10pt]">
+                        <div className="stat-card">
+                            <span className="block text-[8pt] uppercase font-bold text-gray-500">Rata-rata</span>
+                            <span className="block font-black text-lg">{averageScore}</span>
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Tertinggi</p>
-                            <p className="text-xl font-black text-emerald-600">{highestScore}</p>
+                        <div className="stat-card">
+                            <span className="block text-[8pt] uppercase font-bold text-gray-500">Tertinggi</span>
+                            <span className="block font-black text-lg">{highestScore}</span>
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Terendah</p>
-                            <p className="text-xl font-black text-rose-600">{lowestScore}</p>
+                        <div className="stat-card">
+                            <span className="block text-[8pt] uppercase font-bold text-gray-500">Terendah</span>
+                            <span className="block font-black text-lg">{lowestScore}</span>
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Partisipan</p>
-                            <p className="text-xl font-black text-blue-600">{totalStudents}</p>
+                        <div className="stat-card">
+                            <span className="block text-[8pt] uppercase font-bold text-gray-500">Siswa</span>
+                            <span className="block font-black text-lg">{totalStudents}</span>
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        {questionAnalysisData.map((data, idx) => (
-                            <div key={data.id} className="avoid-break border border-slate-300 rounded p-3 text-xs flex flex-col gap-2">
-                                <div>
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="font-bold text-slate-600">Soal {idx + 1}</span>
-                                        <span className="font-bold text-slate-800">{data.correctRate}% Benar</span>
-                                    </div>
-                                    <div className="text-[10px] text-slate-500 line-clamp-1 italic mb-1" dangerouslySetInnerHTML={{ __html: data.qText.replace(/<[^>]+>/g, '') }}></div>
-                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-                                        <div className={`h-full ${data.correctRate > 75 ? 'bg-emerald-500' : data.correctRate > 40 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
-                                    </div>
-                                </div>
-                                <div className="border-t border-slate-100 pt-2">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Distribusi Jawaban:</p>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-600">
-                                        {data.options && data.options.map((opt, i) => {
-                                            const label = String.fromCharCode(65+i);
-                                            const count = data.distribution[opt] || 0;
-                                            const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
-                                            const isCorrect = opt === exam.questions.find(q=>q.id===data.id)?.correctAnswer;
-                                            
-                                            return (
-                                                <span key={i} className={`${isCorrect ? 'font-bold text-emerald-700' : ''}`}>
-                                                    {label}: <b>{count}</b> ({pct}%)
-                                                </span>
-                                            )
-                                        })}
-                                        {/* Fallback for non-multiple choice */}
-                                        {!data.options && Object.entries(data.distribution).slice(0, 3).map(([ans, count], i) => (
-                                            <span key={i} className="truncate max-w-[100px]">{ans}: <b>{count}</b></span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                     </div>
                 </div>
 
-                <div className="page-break"></div>
-
-                {/* 3. DETAIL UJIAN & KUNCI */}
+                {/* 3. BANK SOAL (MASONRY LAYOUT) */}
                 <div>
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">3. Bank Soal & Kunci Jawaban</h1>
-                    </div>
-                    
-                    <div className="space-y-4">
+                    <h2 className="uppercase tracking-widest text-[10pt] font-black border-l-4 border-black pl-2 mb-4">3. Bank Soal & Kunci</h2>
+                    <div className="question-grid">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                            if (q.questionType === 'INFO') return null;
+
                             return (
-                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
-                                    <div className="flex gap-3">
-                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
+                                <div key={q.id} className="question-item">
+                                    <div className="flex gap-2 text-[10pt]">
+                                        <span className="font-black w-5 shrink-0">{questionNumber}.</span>
                                         <div className="flex-1">
-                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            {/* Question Text */}
+                                            <div className="mb-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
-                                            {/* MULTIPLE CHOICE & COMPLEX */}
+                                            {/* Options Compact */}
                                             {q.options && (
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-                                                    {q.options.map((opt, i) => {
-                                                        const isCorrect = 
-                                                            (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
-                                                            (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
-                                                        
-                                                        return (
-                                                            <div 
-                                                                key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}
-                                                            >
-                                                                <span>{String.fromCharCode(65+i)}.</span>
-                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                        )
-                                                    })}
+                                                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9pt] mb-2">
+                                                    {q.options.map((opt, i) => (
+                                                        <div key={i} className="flex gap-1">
+                                                            <span className="font-bold">{String.fromCharCode(65+i)}.</span>
+                                                            <span dangerouslySetInnerHTML={{__html: opt}}></span>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
 
-                                            {/* TRUE FALSE - Explicit Table */}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="mt-2 border border-slate-200 rounded overflow-hidden">
-                                                    <table className="w-full text-[10px]">
-                                                        <thead className="bg-slate-50">
-                                                            <tr>
-                                                                <th className="p-1.5 text-left font-bold text-slate-600">Pernyataan</th>
-                                                                <th className="p-1.5 text-center w-20 font-bold text-slate-600">Kunci</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {q.trueFalseRows.map((row, rIdx) => (
-                                                                <tr key={rIdx}>
-                                                                    <td className="p-1.5">{row.text}</td>
-                                                                    <td className={`p-1.5 text-center font-bold ${row.answer ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                        {row.answer ? 'BENAR' : 'SALAH'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {/* MATCHING - Explicit Pairs */}
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                <div className="mt-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
-                                                    <p className="font-bold text-slate-500 text-[9px] uppercase mb-1">Kunci Pasangan:</p>
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {q.matchingPairs.map((pair, pIdx) => (
-                                                            <div key={pIdx} className="flex items-center gap-2">
-                                                                <span className="font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">{pair.left}</span>
-                                                                <span className="text-slate-400 text-[9px]">●──●</span>
-                                                                <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{pair.right}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* ESSAY / ISIAN - Explicit Text */}
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
-                                                <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
-                                                    <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">
-                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban:'}
-                                                    </p>
-                                                    <div className="text-emerald-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
-                                                </div>
-                                            )}
+                                            {/* Key - Minimalist */}
+                                            <div className="mt-1 text-[8pt] border-t border-gray-200 pt-1 flex gap-2">
+                                                <span className="font-bold uppercase text-gray-500">Kunci:</span>
+                                                <span className="font-mono font-bold">
+                                                    {q.questionType === 'MULTIPLE_CHOICE' && q.options 
+                                                        ? String.fromCharCode(65 + q.options.indexOf(q.correctAnswer || '')) 
+                                                        : q.correctAnswer || '-'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
