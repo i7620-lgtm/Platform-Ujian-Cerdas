@@ -31,12 +31,12 @@ import {
 // --- SHARED COMPONENTS (Moved from Modals for Reusability) ---
 
 export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
-    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg">
-        <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600 print:bg-transparent print:p-0`}>
-            {Icon ? <Icon className="w-6 h-6 print:w-4 print:h-4" /> : <ChartBarIcon className="w-6 h-6 print:w-4 print:h-4" />}
+    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg print:p-3">
+        <div className={`p-3 rounded-xl ${color} bg-opacity-10 text-${color.split('-')[1]}-600 print:bg-transparent print:p-0 print:text-black`}>
+            {Icon ? <Icon className="w-6 h-6 print:w-5 print:h-5" /> : <ChartBarIcon className="w-6 h-6 print:w-5 print:h-5" />}
         </div>
         <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-600">{label}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-500">{label}</p>
             <p className="text-xl sm:text-2xl font-black text-slate-800 leading-none mt-1 print:text-lg">{value}</p>
         </div>
     </div>
@@ -106,48 +106,30 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
     };
 
     return (
-        <div className={`border rounded-2xl bg-white transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-md ring-1 ring-indigo-50 border-indigo-100' : 'border-slate-100 hover:border-indigo-100'} print:border-slate-200 print:rounded-lg print:break-inside-avoid`}>
+        <div className={`border rounded-2xl bg-white transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-md ring-1 ring-indigo-50 border-indigo-100' : 'border-slate-100 hover:border-indigo-100'} print:border-slate-300 print:rounded-lg print:break-inside-avoid`}>
             <div 
                 className="p-5 cursor-pointer flex flex-col gap-3 print:p-3"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex justify-between items-start">
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest print:text-slate-600">Soal {index + 1}</span>
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor} print:bg-transparent print:text-slate-700 print:border-slate-300`}>
-                        {stats.correctRate}% Benar • {difficultyLabel}
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest print:text-black print:text-[10px]">Soal {index + 1}</span>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase border ${difficultyColor} print:bg-transparent print:border-slate-400 print:text-black print:px-1 print:py-0`}>
+                        {stats.correctRate}% Benar
                     </span>
                 </div>
                 
-                <div className="text-sm text-slate-700 line-clamp-2 font-medium print:line-clamp-none print:text-xs" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                <div className="text-sm text-slate-700 line-clamp-2 font-medium print:text-xs print:line-clamp-3 print:text-black" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                 
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1 print:h-2 print:border print:border-slate-200">
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1 print:border print:border-slate-200">
                     <div 
-                        className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? 'bg-emerald-500' : stats.correctRate >= 50 ? 'bg-orange-500' : 'bg-rose-500'} print:bg-slate-600`} 
+                        className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? 'bg-emerald-500' : stats.correctRate >= 50 ? 'bg-orange-500' : 'bg-rose-500'} print:bg-black/60`} 
                         style={{ width: `${stats.correctRate}%` }}
                     ></div>
                 </div>
                 
-                <div className="hidden print:block mt-2 pt-2 border-t border-slate-100">
-                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Distribusi:</p>
-                    <div className="flex flex-wrap gap-2 text-[9px]">
-                         {q.options ? q.options.map((opt, i) => {
-                             const count = distribution.counts[opt] || 0;
-                             const isCorrect = opt === q.correctAnswer;
-                             if(count === 0 && !isCorrect) return null;
-                             return (
-                                 <span key={i} className={isCorrect ? 'font-bold text-slate-900 underline' : 'text-slate-500'}>
-                                     {String.fromCharCode(65+i)}: {count}
-                                 </span>
-                             )
-                         }) : (
-                             <span>Lihat detail di aplikasi</span>
-                         )}
-                    </div>
-                </div>
-
                 {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in print:hidden">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
+                    <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in print:mt-2 print:pt-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 print:text-black">Distribusi</p>
                         
                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
                             <div className="space-y-2">
@@ -157,32 +139,21 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                     const isCorrect = opt === q.correctAnswer;
                                     
                                     return (
-                                        <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : count > 0 ? 'bg-slate-50' : ''}`}>
+                                        <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : count > 0 ? 'bg-slate-50' : ''} print:p-1 print:border print:border-slate-200 print:bg-transparent`}>
                                             <div className="flex items-center gap-2 z-10 w-full">
-                                                <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                                <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white print:bg-black print:text-white' : 'bg-slate-200 text-slate-500 print:bg-slate-100 print:text-black'}`}>
                                                     {String.fromCharCode(65+i)}
                                                 </span>
-                                                <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
+                                                <div className="flex-1 truncate print:text-black" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <span className="font-bold text-slate-600 print:text-black">{count} ({percentage}%)</span>
                                             </div>
-                                            <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
+                                            <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'} print:hidden`} style={{ width: `${percentage}%` }}></div>
                                         </div>
                                     )
                                 })}
                             </div>
                         ) : (
-                            <div className="max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded-xl">
-                                {q.correctAnswer || (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') ? (
-                                    <div className="mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-xs text-indigo-700">
-                                        <span className="font-bold">Kunci Jawaban: </span> 
-                                        {q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? 
-                                            q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
-                                        q.questionType === 'MATCHING' && q.matchingPairs ?
-                                            q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
-                                            q.correctAnswer
-                                        }
-                                    </div>
-                                ) : null}
+                            <div className="max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded-xl print:bg-transparent print:p-0 print:border print:border-slate-200">
                                 <ul className="space-y-2">
                                     {Object.entries(distribution.counts).map(([ans, count], idx) => {
                                         const isCorrect = isCorrectAnswer(ans);
@@ -196,12 +167,12 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                         } catch(e){}
 
                                         return (
-                                            <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
+                                            <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100 print:bg-transparent print:font-bold' : 'text-slate-600 print:text-black'}`}>
                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
-                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`}>"{displayAns}"</span>
+                                                    {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0 print:text-black"/>}
+                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium print:text-black' : ''}`}>"{displayAns}"</span>
                                                 </div>
-                                                <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
+                                                <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700 print:text-black' : ''}`}>{count}</span>
                                             </li>
                                         );
                                     })}
@@ -242,7 +213,295 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
 
 const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { if (!text || text === 'Lainnya') return null; return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>{text}</span>); };
 
-// ... (Rest of the file remains same until ArchiveViewer component)
+// --- CREATION VIEW ---
+interface CreationViewProps { onQuestionsGenerated: (questions: Question[], mode: 'manual' | 'auto') => void; }
+type InputMethod = 'paste' | 'upload';
+export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated }) => {
+    const [inputMethod, setInputMethod] = useState<InputMethod>('upload');
+    const [inputText, setInputText] = useState('');
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [previewImages, setPreviewImages] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const loadPreview = async () => {
+            if (uploadedFile && uploadedFile.type === 'application/pdf') {
+                try { const images = await convertPdfToImages(uploadedFile, 1.5); setPreviewImages(images); } catch (e) { console.error("Gagal memuat pratinjau PDF:", e); setPreviewImages([]); }
+            } else { setPreviewImages([]); }
+        };
+        loadPreview();
+    }, [uploadedFile]);
+
+    const handleExtractText = async () => { if (!uploadedFile) return; setIsLoading(true); try { const text = await extractTextFromPdf(uploadedFile); setInputText(text); setInputMethod('paste'); } catch (e) { setError("Gagal mengekstrak teks dari PDF."); } finally { setIsLoading(false); } };
+    const handleDirectManualTransfer = () => { if (!inputText.trim()) { setError("Tidak ada teks untuk ditransfer."); return; } const blocks = inputText.split(/\n\s*\n/); const newQuestions: Question[] = blocks.filter(b => b.trim().length > 0).map((block, index) => ({ id: `manual-q-${Date.now()}-${index}`, questionText: block.trim(), questionType: 'ESSAY', options: [], correctAnswer: '', imageUrl: undefined, optionImages: undefined })); onQuestionsGenerated(newQuestions, 'manual'); };
+    const handleStartAnalysis = async () => { setIsLoading(true); setError(''); try { if (inputMethod === 'paste') { if (!inputText.trim()) throw new Error("Silakan tempel konten soal terlebih dahulu."); const parsedQuestions = parseQuestionsFromPlainText(inputText); if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid. Pastikan format soal menggunakan penomoran (1. Soal) dan opsi (A. Opsi)."); onQuestionsGenerated(parsedQuestions, 'auto'); } else if (inputMethod === 'upload' && uploadedFile) { if (uploadedFile.type !== 'application/pdf') throw new Error("Fitur ini hanya mendukung file PDF."); const parsedQuestions = await parsePdfAndAutoCrop(uploadedFile); if (parsedQuestions.length === 0) throw new Error("Tidak dapat menemukan soal yang valid dari PDF. Pastikan format soal jelas."); onQuestionsGenerated(parsedQuestions, 'manual'); } else { throw new Error("Silakan pilih file untuk diunggah."); } } catch (err) { setError(err instanceof Error ? err.message : 'Gagal memproses file.'); } finally { setIsLoading(false); } };
+    const handleManualCreateClick = () => { setInputText(''); setUploadedFile(null); setError(''); onQuestionsGenerated([], 'manual'); };
+
+    return (
+        <div className="max-w-4xl mx-auto animate-fade-in space-y-12">
+            <div className="space-y-8"><div className="text-center space-y-4"><h2 className="text-3xl font-bold text-neutral">Buat Ujian Baru</h2><p className="text-gray-500 max-w-2xl mx-auto">Mulai dengan mengunggah soal dalam format PDF, menempelkan teks soal, atau membuat soal secara manual. Sistem kami akan membantu Anda menyusun ujian dengan mudah.</p></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group border-gray-100 hover:border-primary/50 hover:shadow-lg bg-white`} onClick={handleManualCreateClick}><div className="flex flex-col items-center text-center space-y-3"><div className={`p-4 rounded-2xl transition-colors bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary`}><PencilIcon className="w-8 h-8" /></div><h3 className="font-bold text-lg text-neutral">Buat Manual</h3><p className="text-sm text-gray-500">Buat soal dari awal secara manual tanpa impor file atau teks.</p></div></div><div className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'upload' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`} onClick={() => setInputMethod('upload')}><div className="flex flex-col items-center text-center space-y-3"><div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'upload' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}><CloudArrowUpIcon className="w-8 h-8" /></div><h3 className="font-bold text-lg text-neutral">Unggah PDF Soal</h3><p className="text-sm text-gray-500">Sistem akan otomatis mendeteksi dan memotong soal dari file PDF Anda.</p></div></div><div className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${inputMethod === 'paste' ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-white hover:border-primary/50 hover:shadow-lg'}`} onClick={() => setInputMethod('paste')}><div className="flex flex-col items-center text-center space-y-3"><div className={`p-4 rounded-2xl transition-colors ${inputMethod === 'paste' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}><ListBulletIcon className="w-8 h-8" /></div><h3 className="font-bold text-lg text-neutral">Tempel Teks Soal</h3><p className="text-sm text-gray-500">Salin dan tempel teks soal langsung dari dokumen Word atau sumber lain.</p></div></div></div>
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-all duration-300"><div className="mb-4"><h3 className="text-lg font-bold text-neutral mb-1">{inputMethod === 'upload' ? 'Unggah File PDF' : 'Tempel Teks Soal'}</h3><p className="text-sm text-gray-500">{inputMethod === 'upload' ? 'Pilih file PDF dari perangkat Anda.' : 'Pastikan format soal jelas (nomor dan opsi).'}</p></div>
+                    {inputMethod === 'upload' ? (
+                        <div className="space-y-4">
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative">
+                                <input 
+                                    type="file" 
+                                    accept=".pdf" 
+                                    onChange={(e) => { 
+                                        if (e.target.files && e.target.files[0]) { 
+                                            const file = e.target.files[0];
+                                            if (file.size > 10 * 1024 * 1024) { // 10MB Check
+                                                setError("Ukuran file terlalu besar (Max 10MB). Harap kompres PDF Anda.");
+                                                e.target.value = '';
+                                                setUploadedFile(null);
+                                                return;
+                                            }
+                                            setError('');
+                                            setUploadedFile(file); 
+                                            setInputText(''); 
+                                        } 
+                                    }} 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                                />
+                                <div className="space-y-2 pointer-events-none">
+                                    <CloudArrowUpIcon className="w-10 h-10 text-gray-400 mx-auto" />
+                                    {uploadedFile ? (<p className="font-semibold text-primary">{uploadedFile.name}</p>) : (<><p className="text-gray-600 font-medium">Klik atau seret file PDF ke sini</p><p className="text-xs text-gray-400">Maksimal ukuran file 10MB</p></>)}
+                                </div>
+                            </div>
+                            {previewImages.length > 0 && (<div className="space-y-2"><p className="text-sm font-semibold text-gray-700">Pratinjau Halaman Pertama:</p><div className="border rounded-xl overflow-hidden max-h-[300px] overflow-y-auto bg-gray-50 p-2 text-center"><img src={previewImages[0]} alt="Preview PDF" className="max-w-full h-auto mx-auto shadow-sm rounded-lg" /></div><div className="flex justify-end"><button onClick={handleExtractText} className="text-sm text-primary hover:underline flex items-center gap-1" disabled={isLoading}><FileTextIcon className="w-4 h-4" /> Ekstrak Teks dari PDF (Jika Auto-Crop Gagal)</button></div></div>)}
+                        </div>
+                    ) : (<div className="space-y-4"><textarea value={inputText} onChange={(e) => setInputText(e.target.value)} className="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm resize-y" placeholder={`Contoh Format:\n\n1. Apa ibukota Indonesia?\nA. Bandung\nB. Jakarta\nC. Surabaya\nD. Medan\n\nKunci Jawaban: B`} />{inputText && (<div className="flex justify-end"><button onClick={handleDirectManualTransfer} className="text-sm text-secondary hover:underline flex items-center gap-1"><PencilIcon className="w-4 h-4" /> Gunakan sebagai Soal Manual (Tanpa Parsing Otomatis)</button></div>)}</div>)}
+                    {error && (<div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-xl flex items-start gap-2 border border-red-100"><span className="font-bold">Error:</span> {error}</div>)}
+                    <div className="mt-6 flex justify-end"><button onClick={handleStartAnalysis} disabled={isLoading || (!inputText && !uploadedFile)} className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all ${isLoading || (!inputText && !uploadedFile) ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-focus hover:shadow-lg transform hover:-translate-y-0.5'}`}>{isLoading ? (<><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Memproses...</>) : (<><CogIcon className="w-5 h-5" />{inputMethod === 'upload' ? 'Analisis & Crop PDF' : 'Analisis Teks'}</>)}</button></div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- DRAFTS VIEW ---
+export const DraftsView: React.FC<{ exams: Exam[]; onContinueDraft: (exam: Exam) => void; onDeleteDraft: (exam: Exam) => void; }> = ({ exams, onContinueDraft, onDeleteDraft }) => {
+    const [previewExam, setPreviewExam] = useState<Exam | null>(null);
+    return (
+        <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-gray-100 rounded-lg"><PencilIcon className="w-6 h-6 text-gray-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Draf Soal</h2><p className="text-sm text-gray-500">Lanjutkan pembuatan soal yang belum selesai.</p></div></div>
+            {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{exams.map(exam => (<div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full"><button type="button" onClick={(e) => { e.stopPropagation(); onDeleteDraft(exam); }} className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10" title="Hapus Draf"><TrashIcon className="w-4 h-4" /></button><div className="flex-1"><div className="flex items-start justify-between mb-2"><span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase tracking-wider border border-gray-200">Draft</span></div><h3 className="font-bold text-lg text-gray-800 mb-1">{exam.config.subject || "Tanpa Judul"}</h3><p className="text-sm text-gray-400 font-mono font-medium mb-3">{exam.code}</p><div className="flex flex-wrap gap-2 mb-4"><MetaBadge text={exam.config.classLevel} colorClass="bg-blue-50 text-blue-700 border-blue-100" /><MetaBadge text={exam.config.examType} colorClass="bg-purple-50 text-purple-700 border-purple-100" /></div><div className="h-px bg-gray-50 w-full mb-4"></div><div className="text-xs text-gray-500 space-y-2 mb-6"><div className="flex items-center gap-2"><CalendarDaysIcon className="w-4 h-4 text-gray-400" /><span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div><div className="flex items-center gap-2"><ListBulletIcon className="w-4 h-4 text-gray-400" /><span>{exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan</span></div></div></div><div className="flex gap-2"><button onClick={() => setPreviewExam(exam)} className="flex-1 py-2.5 px-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 hover:text-primary transition-colors flex items-center justify-center gap-2 shadow-sm" title="Preview Soal"><EyeIcon className="w-4 h-4" /> Preview</button><button onClick={() => onContinueDraft(exam)} className="flex-[2] py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"><PencilIcon className="w-4 h-4" /> Edit</button></div></div>))}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><PencilIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Belum Ada Draf</h3><p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p></div>)}
+            {previewExam && (<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up"><div className="p-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-lg text-gray-800">Preview Ujian</h3><button onClick={() => setPreviewExam(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><XMarkIcon className="w-6 h-6 text-gray-500" /></button></div><div className="p-8 flex flex-col items-center text-center"><div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-inner"><EyeIcon className="w-8 h-8" /></div><h4 className="text-xl font-bold text-gray-900 mb-1">{previewExam.config.subject || "Draf Ujian"}</h4><p className="text-sm text-gray-500 mb-6 font-mono bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{previewExam.code}</p><div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?preview=${previewExam.code}`)}&margin=10`} alt="QR Preview" className="w-40 h-40 object-contain" /></div><p className="text-xs text-gray-400 mb-4 max-w-xs">Pindai QR Code atau gunakan link di bawah untuk mencoba mengerjakan soal ini (Mode Preview).</p><div className="flex gap-3 w-full"><button onClick={() => { const url = `${window.location.origin}/?preview=${previewExam.code}`; navigator.clipboard.writeText(url); alert("Link Preview berhasil disalin!"); }} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm">Salin Link</button><a href={`/?preview=${previewExam.code}`} target="_blank" rel="noreferrer" className="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-200">Coba Sekarang</a></div></div></div></div>)}
+        </div>
+    );
+};
+
+// --- ONGOING EXAMS VIEW ---
+export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
+    return (
+        <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
+            {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { const activeCount = results.filter(r => r.examCode === exam.code).length; return (<div key={exam.code} className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-xl hover:shadow-emerald-50 hover:border-emerald-300 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
+            
+            {/* UPDATED ACTION BUTTONS - ALWAYS VISIBLE */}
+            <div className="absolute top-4 right-4 z-10 flex gap-2">
+                {exam.config.enablePublicStream && (
+                    <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/?live=${exam.code}`; navigator.clipboard.writeText(url); alert("Link Pantauan Orang Tua disalin!"); }} 
+                        className="p-2 bg-white text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg border border-slate-100 hover:border-indigo-100 transition-all shadow-sm" 
+                        title="Bagikan Link Pantauan"
+                    >
+                        <ShareIcon className="w-4 h-4" />
+                    </button>
+                )}
+                <button 
+                    type="button" 
+                    onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }} 
+                    className="p-2 bg-white text-slate-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-slate-100 hover:border-gray-200 transition-all shadow-sm" 
+                    title="Gunakan Kembali Soal"
+                >
+                    <DocumentDuplicateIcon className="w-4 h-4" />
+                </button>
+            </div>
+
+            <div className="flex justify-between items-start mb-2"><div className="flex flex-col"><span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>Sedang Berlangsung</span><h3 className="font-bold text-xl text-neutral">{exam.config.subject || exam.code}</h3><p className="text-sm font-mono text-gray-400 mt-0.5">{exam.code}</p></div></div><div className="flex flex-wrap gap-2 mt-3 mb-5"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div><div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Partisipan</span><div className="flex items-center gap-2 mt-1"><div className="flex -space-x-2">{[...Array(Math.min(3, activeCount))].map((_, i) => (<div key={i} className="w-6 h-6 rounded-full bg-emerald-200 border-2 border-white"></div>))}</div><span className="text-sm font-bold text-gray-700">{activeCount} Siswa</span></div></div><div className="text-right"><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Sisa Waktu</span><div className="mt-1"><RemainingTime exam={exam} /></div></div></div></div>)})}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Aktif</h3><p className="mt-1 text-sm text-gray-500">Saat ini tidak ada ujian yang sedang berlangsung.</p></div>)}
+        </div>
+    );
+};
+
+// --- UPCOMING EXAMS VIEW ---
+export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (exam: Exam) => void; }> = ({ exams, onEditExam }) => {
+    return (
+        <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-blue-100 rounded-lg"><CalendarDaysIcon className="w-6 h-6 text-blue-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Akan Datang</h2><p className="text-sm text-gray-500">Daftar semua ujian yang telah dijadwalkan.</p></div></div>
+            {exams.length > 0 ? (<div className="space-y-4">{exams.map(exam => (<div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 group"><div className="flex items-start gap-5"><div className="bg-blue-50 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 border border-blue-100 shrink-0"><span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span><span className="text-xl font-black leading-none">{new Date(exam.config.date).getDate()}</span></div><div><div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral">{exam.config.subject || "Tanpa Judul"}</h3><span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span></div><div className="flex flex-wrap items-center gap-2 mb-2"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div><div className="text-xs text-gray-500 flex items-center gap-3 font-medium"><span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {exam.config.startTime} WIB</span><span className="text-gray-300">•</span><span>{exam.config.timeLimit} Menit</span></div></div></div><button onClick={() => onEditExam(exam)} className="flex items-center justify-center gap-2 bg-white border-2 border-gray-100 text-gray-600 px-5 py-2.5 text-sm rounded-xl hover:border-primary hover:text-primary transition-all font-bold shadow-sm self-end md:self-center w-full md:w-auto"><PencilIcon className="w-4 h-4" /> Edit Detail</button></div>))}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><CalendarDaysIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Terjadwal</h3><p className="mt-1 text-sm text-gray-500">Buat ujian baru untuk memulai.</p></div>)}
+        </div>
+    );
+};
+
+// --- FINISHED EXAMS VIEW (UPDATED) ---
+interface FinishedExamsProps {
+    exams: Exam[];
+    onSelectExam: (exam: Exam) => void;
+    onDuplicateExam: (exam: Exam) => void;
+    onDeleteExam: (exam: Exam) => void;
+    onArchiveExam: (exam: Exam) => void; // New prop
+}
+
+export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="flex items-center gap-2"><div className="p-2 bg-purple-100 rounded-lg"><ChartBarIcon className="w-6 h-6 text-purple-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2><p className="text-sm text-gray-500">Riwayat dan hasil ujian yang telah berakhir.</p></div></div>
+            {exams.length > 0 ? (
+                <div className="space-y-4">
+                    {exams.map(exam => (
+                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-gray-300 group relative">
+                            {/* Delete Button */}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteExam(exam); }} className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" title="Hapus Data Ujian & Hasil"><TrashIcon className="w-4 h-4" /></button>
+
+                            <div className="flex items-start gap-4">
+                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100"><CheckCircleIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500 transition-colors" /></div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral">{exam.config.subject || exam.code}</h3><span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span></div>
+                                    <div className="flex flex-wrap items-center gap-2 mb-2"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div>
+                                    <div className="text-xs text-gray-400">Berakhir pada: {new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
+                                <button onClick={() => onArchiveExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 hover:text-indigo-800 transition-colors font-bold shadow-sm border border-indigo-100" title="Download Arsip & Hapus dari Cloud"><DocumentArrowUpIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Arsip</span></button>
+                                <button onClick={() => onDuplicateExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-colors font-bold shadow-sm border border-gray-200" title="Gunakan Kembali Soal"><DocumentDuplicateIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Reuse</span></button>
+                                <button onClick={() => onSelectExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black transition-all font-bold shadow-lg shadow-gray-200 transform active:scale-95"><ChartBarIcon className="w-4 h-4" /> Lihat Hasil</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ChartBarIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Belum Ada Riwayat</h3><p className="mt-1 text-sm text-gray-500">Hasil ujian yang telah selesai akan muncul di sini.</p></div>
+            )}
+        </div>
+    );
+};
+
+// --- USER MANAGEMENT VIEW (SUPER ADMIN) ---
+export const UserManagementView: React.FC = () => {
+    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+    const [newRole, setNewRole] = useState<AccountType>('guru');
+    const [newSchool, setNewSchool] = useState('');
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        try {
+            const data = await storageService.getAllUsers();
+            setUsers(data);
+        } catch (e) {
+            console.error("Gagal memuat pengguna:", e);
+            alert("Gagal memuat daftar pengguna.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleEditClick = (user: UserProfile) => {
+        setEditingUser(user);
+        setNewRole(user.accountType);
+        setNewSchool(user.school);
+    };
+
+    const handleSaveUser = async () => {
+        if (!editingUser) return;
+        try {
+            await storageService.updateUserRole(editingUser.id, newRole, newSchool);
+            setEditingUser(null);
+            fetchUsers();
+            alert("Pengguna berhasil diperbarui.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal memperbarui pengguna.");
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-slate-800 rounded-lg text-white"><UserIcon className="w-6 h-6" /></div>
+                <div><h2 className="text-2xl font-bold text-neutral">Kelola Pengguna</h2><p className="text-sm text-gray-500">Manajemen akses dan penempatan sekolah.</p></div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-50/50">
+                        <tr>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama / Email</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sekolah</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {isLoading ? (
+                             <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Memuat data pengguna...</td></tr>
+                        ) : users.length > 0 ? (
+                            users.map(user => (
+                                <tr key={user.id} className="hover:bg-slate-50/30">
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-slate-800 text-sm">{user.fullName}</div>
+                                        <div className="text-[10px] text-slate-400 mt-0.5">{user.email || '-'}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-medium text-slate-600">{user.school}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                            user.accountType === 'super_admin' ? 'bg-slate-800 text-white' : 
+                                            user.accountType === 'admin_sekolah' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
+                                        }`}>
+                                            {user.accountType.replace('_', ' ')}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button onClick={() => handleEditClick(user)} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">Edit</button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Tidak ada pengguna ditemukan.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {editingUser && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-white">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4">Edit Pengguna</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 block mb-1">Nama</label>
+                                <input type="text" value={editingUser.fullName} disabled className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 block mb-1">Role</label>
+                                <select value={newRole} onChange={(e) => setNewRole(e.target.value as AccountType)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
+                                    <option value="guru">Guru</option>
+                                    <option value="admin_sekolah">Admin Sekolah</option>
+                                    <option value="super_admin">Super Admin</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
+                                <input type="text" value={newSchool} onChange={(e) => setNewSchool(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-6 justify-end">
+                            <button onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-lg">Batal</button>
+                            <button onClick={handleSaveUser} className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-md shadow-indigo-100">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // --- ARCHIVE VIEWER (NEW & ENHANCED) ---
 interface ArchiveViewerProps {
@@ -495,44 +754,42 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         <div className="max-w-5xl mx-auto space-y-6">
             <style>{`
                 @media print {
-                    @page { margin: 10mm; size: A4; }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important;
-                        background-color: white !important;
-                        font-family: 'Inter', sans-serif;
-                    }
+                    @page { margin: 12mm; size: portrait; }
+                    body { -webkit-print-color-adjust: exact; background: white !important; font-family: 'Inter', sans-serif; }
                     .no-print { display: none !important; }
                     .print-only { display: block !important; }
                     
-                    /* Reset Layout */
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; padding: 0 !important; }
-                    .space-y-6 { space-y: 0 !important; }
+                    /* Reset Layout Constraints */
+                    .max-w-5xl, .mx-auto, .space-y-6 { max-width: none !important; margin: 0 !important; space: 0 !important; }
                     
-                    /* Typography & Spacing */
-                    h1 { font-size: 18pt; line-height: 1.2; }
-                    h2 { font-size: 14pt; margin-bottom: 0.5rem; }
-                    h3 { font-size: 12pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #0f172a; padding-bottom: 4px; margin-bottom: 12px; margin-top: 24px; }
-                    p, td, th, li { font-size: 9pt; }
+                    /* Grid & Layout Utilities */
+                    .print-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; break-inside: avoid; }
+                    .print-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+                    .print-break-avoid { break-inside: avoid; page-break-inside: avoid; }
+                    .print-page-break { page-break-before: always; }
                     
-                    /* Components */
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-                    th { background-color: #f1f5f9 !important; font-weight: 800; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.05em; color: #475569; }
-                    th, td { border: 1px solid #e2e8f0; padding: 6px 8px; }
-                    tr.even-row { background-color: #f8fafc !important; }
+                    /* High Density Text */
+                    p, div, span, td, th { font-size: 10px; line-height: 1.3; }
+                    h1 { font-size: 16px; font-weight: 900; }
+                    h2 { font-size: 14px; font-weight: 800; }
+                    h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 2px; margin-bottom: 8px; margin-top: 16px; }
+
+                    /* Borders & Aesthetics */
+                    .print-border { border: 1px solid #ddd; }
+                    .print-border-b { border-bottom: 1px solid #ddd; }
                     
-                    /* Page Breaks */
-                    .page-break { page-break-before: always; }
-                    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
-                    
-                    /* Grid Adjustments for Print */
-                    .print-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-                    .print-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+                    /* Table Optimizations */
+                    table { width: 100%; border-collapse: collapse; }
+                    th { background-color: #f0f0f0 !important; color: #000 !important; text-transform: uppercase; font-size: 9px; padding: 4px; border: 1px solid #ccc; }
+                    td { border: 1px solid #ccc; padding: 3px 5px; }
+
+                    /* Specific Component Overrides */
+                    .print-hidden { display: none !important; }
                 }
             `}</style>
 
             {fixMessage && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm print:hidden">
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm print-hidden">
                     <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-amber-600" />
                     <div className="flex-1">
                         <p className="text-sm font-bold">Auto-Correction Active</p>
@@ -542,7 +799,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             )}
 
             {/* INTERACTIVE HEADER (HIDDEN ON PRINT) */}
-            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm print:hidden">
+            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm print-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Pratinjau Arsip: <span className="text-indigo-600">{exam.config.subject}</span></h2>
@@ -563,7 +820,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             </div>
 
             {/* INTERACTIVE CONTENT (HIDDEN ON PRINT) */}
-            <div className="animate-fade-in print:hidden">
+            <div className="animate-fade-in print-hidden">
                 {activeTab === 'DETAIL' && (
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
@@ -674,61 +931,59 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
             </div>
             
-            {/* PRINT VIEW (Clean & Sequential) */}
-            <div className="hidden print:block text-slate-900">
-                {/* Global Header for First Page */}
-                <div className="border-b-2 border-slate-900 pb-2 mb-6">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h1 className="text-xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
-                            <p className="text-sm font-bold text-slate-600 mt-1">
-                                {exam.authorSchool || 'Nama Sekolah'} • {exam.config.classLevel}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                             <p className="text-sm font-bold text-slate-900">{exam.config.examType}</p>
-                             <p className="text-xs text-slate-500 font-mono mt-0.5">{exam.code} | {new Date(exam.config.date).toLocaleDateString('id-ID')}</p>
-                        </div>
+            {/* PRINT VIEW (REDESIGNED: COMPACT & ELEGANT) */}
+            <div className="hidden print:block text-slate-900 w-full">
+                {/* Official Header */}
+                <div className="flex justify-between items-end border-b-2 border-black pb-3 mb-6">
+                    <div>
+                        <h1 className="text-xl font-black uppercase tracking-tight">{exam.authorSchool || 'SEKOLAH INDONESIA'}</h1>
+                        <p className="text-xs font-bold text-slate-600 mt-1">Laporan Hasil Ujian & Bank Soal</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-lg font-black">{exam.config.subject}</p>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">Kode: {exam.code} | {new Date(exam.config.date).toLocaleDateString('id-ID')}</p>
                     </div>
                 </div>
 
-                {/* 1. REKAPITULASI SISWA */}
-                <div className="mb-8 avoid-break">
-                    <h3 className="text-sm font-bold uppercase border-b-2 border-slate-900 pb-1 mb-3">1. Rekapitulasi Hasil Siswa</h3>
+                {/* 1. REKAPITULASI SISWA (High Density) */}
+                <div className="mb-6 print-break-avoid">
+                    <h3>1. Rekapitulasi Nilai</h3>
+                    <div className="grid grid-cols-4 gap-4 mb-4 border p-2 rounded">
+                        <div className="text-center"><span className="text-[9px] text-slate-500 uppercase font-bold block">Rata-rata</span><span className="text-lg font-black">{averageScore}</span></div>
+                        <div className="text-center"><span className="text-[9px] text-slate-500 uppercase font-bold block">Tertinggi</span><span className="text-lg font-black text-emerald-700">{highestScore}</span></div>
+                        <div className="text-center"><span className="text-[9px] text-slate-500 uppercase font-bold block">Terendah</span><span className="text-lg font-black text-rose-700">{lowestScore}</span></div>
+                        <div className="text-center"><span className="text-[9px] text-slate-500 uppercase font-bold block">Siswa</span><span className="text-lg font-black">{totalStudents}</span></div>
+                    </div>
+
                     <table className="w-full text-[9px] border-collapse">
                         <thead>
-                            <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-1.5 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-1.5 text-left w-32">Nama Siswa</th>
-                                <th className="border border-slate-300 p-1.5 text-center w-12">Kelas</th>
-                                <th className="border border-slate-300 p-1.5 text-center w-10">Nilai</th>
-                                <th className="border border-slate-300 p-1.5 text-left">Rincian Jawaban (Visual)</th>
+                            <tr>
+                                <th className="w-8 text-center">No</th>
+                                <th className="text-left w-32">Nama</th>
+                                <th className="text-left w-12">Kelas</th>
+                                <th className="text-center w-10">Nilai</th>
+                                <th className="text-left">Distribusi Jawaban (■ Benar, □ Salah)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {results.map((r, index) => {
                                 const { score } = getCalculatedStats(r, exam);
                                 return (
-                                    <tr key={r.student.studentId} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                                        <td className="border border-slate-300 p-1.5 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-1.5 font-bold truncate max-w-[120px]">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-1.5 text-center uppercase">{r.student.class}</td>
-                                        <td className="border border-slate-300 p-1.5 text-center font-bold">{score}</td>
-                                        <td className="border border-slate-300 p-1">
-                                            <div className="flex flex-wrap gap-0.5">
-                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                    <tr key={r.student.studentId} className="print-break-avoid">
+                                        <td className="text-center">{index + 1}</td>
+                                        <td className="font-bold truncate max-w-[120px]">{r.student.fullName}</td>
+                                        <td>{r.student.class}</td>
+                                        <td className="text-center font-bold">{score}</td>
+                                        <td className="p-1">
+                                            <div className="flex flex-wrap gap-[1px]">
+                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q) => {
                                                     const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'bg-slate-200 text-slate-400'; 
-                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-500 text-white border-emerald-600';
-                                                    else if (status === 'WRONG') bgClass = 'bg-rose-500 text-white border-rose-600';
-                                                    
                                                     return (
                                                         <div 
                                                             key={q.id} 
-                                                            className={`w-3 h-3 flex items-center justify-center text-[6px] font-bold border ${bgClass} print-color-adjust`}
-                                                        >
-                                                            {idx + 1}
-                                                        </div>
+                                                            className={`w-2.5 h-2.5 ${status === 'CORRECT' ? 'bg-black' : status === 'WRONG' ? 'border border-black bg-white' : 'bg-gray-200'}`}
+                                                            title={status}
+                                                        ></div>
                                                     );
                                                 })}
                                             </div>
@@ -740,117 +995,81 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </table>
                 </div>
 
-                {/* 2. STATISTIK */}
-                <div className="mb-8 avoid-break">
-                    <h3 className="text-sm font-bold uppercase border-b-2 border-slate-900 pb-1 mb-3">2. Analisis Statistik</h3>
-                    
-                    <div className="print-grid-4 mb-6">
-                        <div className="border border-slate-300 p-3 rounded text-center">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata</p>
-                            <p className="text-xl font-black">{averageScore}</p>
-                        </div>
-                        <div className="border border-slate-300 p-3 rounded text-center">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Tertinggi</p>
-                            <p className="text-xl font-black text-emerald-700">{highestScore}</p>
-                        </div>
-                        <div className="border border-slate-300 p-3 rounded text-center">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Terendah</p>
-                            <p className="text-xl font-black text-rose-700">{lowestScore}</p>
-                        </div>
-                        <div className="border border-slate-300 p-3 rounded text-center">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Partisipan</p>
-                            <p className="text-xl font-black text-blue-700">{totalStudents}</p>
-                        </div>
-                    </div>
-
-                    <div className="print-grid-2">
+                {/* 2. ANALISIS BUTIR SOAL (3 Column Grid - Space Saver) */}
+                <div className="mb-6">
+                    <h3>2. Analisis Butir Soal</h3>
+                    <div className="print-grid-3">
                         {questionAnalysisData.map((data, idx) => (
-                            <div key={data.id} className="avoid-break border border-slate-200 rounded p-2 text-[9px]">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-bold">Q{idx + 1}</span>
-                                    <span className="font-bold">{data.correctRate}% Benar</span>
+                            <div key={data.id} className="print-border rounded p-2 text-[9px] print-break-avoid flex flex-col justify-between">
+                                <div>
+                                    <div className="flex justify-between mb-1">
+                                        <span className="font-bold">Soal {idx + 1}</span>
+                                        <span className="font-bold">{data.correctRate}% OK</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden mb-2">
+                                        <div className="bg-black h-full" style={{ width: `${data.correctRate}%` }}></div>
+                                    </div>
+                                    <div className="text-slate-600 line-clamp-2 mb-2 italic" dangerouslySetInnerHTML={{ __html: data.qText.replace(/<[^>]+>/g, '') }}></div>
                                 </div>
-                                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-1 border border-slate-200">
-                                    <div className={`h-full ${data.correctRate > 75 ? 'bg-emerald-500' : data.correctRate > 40 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
+                                <div className="border-t pt-1 mt-1 grid grid-cols-2 gap-x-2">
+                                     {data.options ? data.options.map((opt, i) => {
+                                         const label = String.fromCharCode(65+i);
+                                         const count = data.distribution[opt] || 0;
+                                         const isCorrect = opt === exam.questions.find(q=>q.id===data.id)?.correctAnswer;
+                                         return <div key={i} className={`flex justify-between ${isCorrect ? 'font-bold underline' : ''}`}><span>{label}</span><span>{count}</span></div>
+                                     }) : (
+                                         <span className="col-span-2 text-center text-gray-400 italic">Non-PG</span>
+                                     )}
                                 </div>
-                                <div className="text-[8px] text-slate-500 truncate">{Object.entries(data.distribution).map(([k,v]) => `${k}:${v}`).join(', ')}</div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="page-break"></div>
+                <div className="print-page-break"></div>
 
-                {/* 3. BANK SOAL */}
+                {/* 3. BANK SOAL (Compact & Elegant) */}
                 <div>
-                    <h3 className="text-sm font-bold uppercase border-b-2 border-slate-900 pb-1 mb-4">3. Bank Soal & Kunci Jawaban</h3>
-                    
+                    <h3>3. Bank Soal & Kunci</h3>
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                            const qNum = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
-                                <div key={q.id} className="avoid-break pb-3 border-b border-slate-200 last:border-0">
-                                    <div className="flex gap-3">
-                                        <div className="font-bold text-sm w-6 text-right">{q.questionType === 'INFO' ? 'i' : questionNumber}.</div>
-                                        <div className="flex-1 min-w-0">
-                                            {/* Question Text */}
-                                            <div className="text-[10px] text-slate-900 mb-2 prose prose-sm max-w-none prose-img:max-h-[300px] prose-img:w-auto" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            
-                                            {/* Options Grid */}
-                                            {q.options && (
-                                                <div className="print-grid-2 gap-x-4 gap-y-1 text-[9px] mb-2">
-                                                    {q.options.map((opt, i) => {
-                                                        const isCorrect = 
-                                                            (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
-                                                            (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
-                                                        
-                                                        return (
-                                                            <div 
-                                                                key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-400 font-bold text-emerald-900' : 'border-transparent'}`}
-                                                            >
-                                                                <span>{String.fromCharCode(65+i)}.</span>
-                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {/* Special Question Types Handling */}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="border border-slate-300 rounded overflow-hidden text-[9px] w-3/4">
-                                                    <div className="flex bg-slate-100 font-bold border-b border-slate-300">
-                                                        <div className="flex-1 p-1">Pernyataan</div>
-                                                        <div className="w-16 p-1 text-center border-l border-slate-300">Kunci</div>
-                                                    </div>
-                                                    {q.trueFalseRows.map((row, rIdx) => (
-                                                        <div key={rIdx} className="flex border-b border-slate-200 last:border-0">
-                                                            <div className="flex-1 p-1">{row.text}</div>
-                                                            <div className={`w-16 p-1 text-center font-bold border-l border-slate-200 ${row.answer ? 'text-emerald-700' : 'text-rose-700'}`}>{row.answer ? 'BENAR' : 'SALAH'}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                 <div className="text-[9px] bg-slate-50 p-1.5 rounded border border-slate-200 inline-block">
-                                                    <span className="font-bold text-slate-500 uppercase mr-2">Pasangan:</span>
-                                                    {q.matchingPairs.map((pair, pIdx) => (
-                                                        <span key={pIdx} className="mr-3 font-medium">{pair.left} → <span className="font-bold">{pair.right}</span></span>
-                                                    ))}
-                                                 </div>
-                                            )}
-
-                                            {/* Text Answer Key */}
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
-                                                <div className="mt-1 text-[9px] bg-slate-50 p-1.5 border-l-2 border-slate-400">
-                                                    <span className="font-bold uppercase text-slate-500 mr-2">Kunci:</span>
-                                                    <span className="font-mono" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></span>
-                                                </div>
-                                            )}
-                                        </div>
+                                <div key={q.id} className="print-break-avoid border-b pb-3 last:border-0">
+                                    <div className="flex gap-2 mb-1">
+                                        <span className="font-bold w-5">{q.questionType === 'INFO' ? 'i' : qNum}.</span>
+                                        <div className="flex-1 text-sm font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                     </div>
+
+                                    {/* COMPACT OPTIONS GRID */}
+                                    {q.options && (
+                                        <div className="ml-7 print-grid-2 text-xs">
+                                            {q.options.map((opt, i) => {
+                                                 const isCorrect = 
+                                                    (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
+                                                    (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
+                                                return (
+                                                    <div key={i} className={`flex gap-1 ${isCorrect ? 'font-bold' : ''}`}>
+                                                        <span>{String.fromCharCode(65+i)}.</span>
+                                                        <div dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* KEY / OTHER TYPES */}
+                                    {(!q.options || q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') && q.questionType !== 'INFO' && (
+                                        <div className="ml-7 mt-2 text-[9px] border border-slate-300 p-1.5 rounded bg-gray-50 inline-block">
+                                            <span className="font-bold uppercase mr-1">Kunci:</span>
+                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? 
+                                                q.trueFalseRows.map(r => `${r.text} (${r.answer?'B':'S'})`).join(' | ') :
+                                            q.questionType === 'MATCHING' && q.matchingPairs ?
+                                                q.matchingPairs.map(p => `${p.left}→${p.right}`).join(' | ') :
+                                                <span dangerouslySetInnerHTML={{ __html: q.correctAnswer || '-' }}></span>
+                                            }
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
