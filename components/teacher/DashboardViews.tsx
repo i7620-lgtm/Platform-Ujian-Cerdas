@@ -935,9 +935,30 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
 
-                {/* 1. REKAPITULASI SISWA */}
+                {/* 1. ANALISIS STATISTIK & REKAPITULASI SISWA (MERGED) */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">1. Rekapitulasi Hasil Siswa</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">1. Analisis Statistik & Rekapitulasi Hasil</h3>
+                    
+                    {/* Kotak Statistik Utama (Dipindahkan kesini) */}
+                    <div className="mb-6 grid grid-cols-4 gap-4 border border-slate-300 rounded p-4 text-center avoid-break bg-slate-50">
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
+                            <p className="text-xl font-black">{averageScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Tertinggi</p>
+                            <p className="text-xl font-black text-emerald-600">{highestScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Terendah</p>
+                            <p className="text-xl font-black text-rose-600">{lowestScore}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Partisipan</p>
+                            <p className="text-xl font-black text-blue-600">{totalStudents}</p>
+                        </div>
+                    </div>
+
                     <table className="w-full border-collapse border border-slate-300 text-[10px]">
                         <thead>
                             <tr className="bg-slate-100">
@@ -990,65 +1011,81 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 2. ANALISIS STATISTIK & BUTIR SOAL */}
+                {/* 2. ANALISIS BUTIR SOAL */}
                 <div className="mb-4">
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">2. Analisis Statistik & Butir Soal</h1>
-                    </div>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">2. Analisis Butir Soal</h3>
                     
-                    {/* Kotak Statistik Utama */}
-                    <div className="mb-6 grid grid-cols-4 gap-4 border border-slate-300 rounded p-4 text-center avoid-break">
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
-                            <p className="text-xl font-black">{averageScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Tertinggi</p>
-                            <p className="text-xl font-black text-emerald-600">{highestScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Terendah</p>
-                            <p className="text-xl font-black text-rose-600">{lowestScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Partisipan</p>
-                            <p className="text-xl font-black text-blue-600">{totalStudents}</p>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         {questionAnalysisData.map((data, idx) => (
-                            <div key={data.id} className="avoid-break border border-slate-300 rounded p-3 text-xs flex flex-col gap-2">
+                            <div key={data.id} className="avoid-break border border-slate-300 rounded p-3 text-xs flex flex-col gap-2 bg-white">
                                 <div>
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-bold text-slate-600">Soal {idx + 1}</span>
                                         <span className="font-bold text-slate-800">{data.correctRate}% Benar</span>
                                     </div>
-                                    <div className="text-[10px] text-slate-500 line-clamp-1 italic mb-1" dangerouslySetInnerHTML={{ __html: data.qText.replace(/<[^>]+>/g, '') }}></div>
+                                    <div className="text-[10px] text-slate-500 line-clamp-2 italic mb-1 border-b border-slate-100 pb-1" dangerouslySetInnerHTML={{ __html: data.qText }}></div>
                                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
                                         <div className={`h-full ${data.correctRate > 75 ? 'bg-emerald-500' : data.correctRate > 40 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
                                     </div>
                                 </div>
-                                <div className="border-t border-slate-100 pt-2">
+                                <div className="pt-1">
                                     <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Distribusi Jawaban:</p>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-600">
-                                        {data.options && data.options.map((opt, i) => {
-                                            const label = String.fromCharCode(65+i);
-                                            const count = data.distribution[opt] || 0;
-                                            const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
-                                            const isCorrect = opt === exam.questions.find(q=>q.id===data.id)?.correctAnswer;
-                                            
-                                            return (
-                                                <span key={i} className={`${isCorrect ? 'font-bold text-emerald-700' : ''}`}>
-                                                    {label}: <b>{count}</b> ({pct}%)
-                                                </span>
-                                            )
-                                        })}
-                                        {/* Fallback for non-multiple choice */}
-                                        {!data.options && Object.entries(data.distribution).slice(0, 3).map(([ans, count], i) => (
-                                            <span key={i} className="truncate max-w-[100px]">{ans}: <b>{count}</b></span>
-                                        ))}
-                                    </div>
+                                    
+                                    {/* Updated Distribution Rendering for All Types */}
+                                    {data.options ? (
+                                        /* Multiple Choice Grid */
+                                        <div className="grid grid-cols-2 gap-1 text-[9px]">
+                                            {data.options.map((opt, i) => {
+                                                const label = String.fromCharCode(65+i);
+                                                const count = data.distribution[opt] || 0;
+                                                const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                const isCorrect = opt === exam.questions.find(q=>q.id===data.id)?.correctAnswer;
+                                                
+                                                return (
+                                                    <div key={i} className={`flex items-center justify-between px-1.5 py-0.5 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
+                                                        <span>{label}</span>
+                                                        <span><b>{count}</b> ({pct}%)</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    ) : (
+                                        /* Generic List for other types */
+                                        <div className="flex flex-wrap gap-1 text-[9px]">
+                                            {Object.entries(data.distribution).length > 0 ? (
+                                                Object.entries(data.distribution)
+                                                    .sort(([,a], [,b]) => b - a) // Sort by count desc
+                                                    .slice(0, 6) // Limit to top 6 answers to save space
+                                                    .map(([ans, count], i) => {
+                                                        const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                        // Attempt to detect correct answer for styling
+                                                        const qObj = exam.questions.find(q=>q.id===data.id);
+                                                        let isCorrect = false;
+                                                        try {
+                                                            const normAns = normalize(ans);
+                                                            const normKey = normalize(qObj?.correctAnswer || '');
+                                                            if (qObj?.questionType === 'TRUE_FALSE') {
+                                                                 // True False usually stored as JSON, harder to match directly here without parsing, but often distribution key is raw text answer if parsing failed in analysis hook, or stringified json. 
+                                                                 // For simplicity in print, just showing counts is often enough, but let's try strict match
+                                                                 isCorrect = normAns === normKey;
+                                                            } else {
+                                                                 isCorrect = normAns === normKey;
+                                                            }
+                                                        } catch(e){}
+
+                                                        return (
+                                                            <div key={i} className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                                                <span className="truncate max-w-[80px]" title={ans}>{ans}</span>
+                                                                <span className="font-bold">: {count}</span>
+                                                            </div>
+                                                        )
+                                                    })
+                                            ) : (
+                                                <span className="text-slate-400 italic">Belum ada jawaban.</span>
+                                            )}
+                                            {Object.keys(data.distribution).length > 6 && <span className="text-slate-400 px-1">...</span>}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
