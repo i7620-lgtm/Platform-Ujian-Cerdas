@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -162,7 +161,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
                                         q.questionType === 'MATCHING' && q.matchingPairs ?
                                             q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
-                                            q.correctAnswer
+                                            <span dangerouslySetInnerHTML={{__html: q.correctAnswer || ''}}></span>
                                         }
                                     </div>
                                 ) : null}
@@ -180,9 +179,9 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
 
                                         return (
                                             <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
-                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                                                     {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
-                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`}>"{displayAns}"</span>
+                                                    <div className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                 </div>
                                                 <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
                                             </li>
@@ -1062,7 +1061,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     const label = String.fromCharCode(65+i);
                                                     const count = data.distribution[opt] || 0;
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
-                                                    const cleanOpt = stripHtml(opt);
+                                                    
+                                                    // Removed stripHtml(opt) to preserve KaTeX structure
                                                     const isCorrect = 
                                                         (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
                                                         (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
@@ -1071,7 +1071,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
                                                             <div className="flex gap-2 truncate max-w-[70%]">
                                                                 <span className="w-4 font-bold">{label}.</span>
-                                                                <span className="truncate">{cleanOpt}</span>
+                                                                <div className="truncate" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
                                                             <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
                                                         </div>
@@ -1089,7 +1089,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
                                                             
                                                             // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
-                                                            let displayAns = stripHtml(ans); // Default fallback
+                                                            let displayAns = ans; // Use raw answer by default (may contain HTML)
                                                             let isCorrect = false;
 
                                                             try {
@@ -1140,7 +1140,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                                    <span className="truncate flex-1 mr-2" title={displayAns}>{displayAns}</span>
+                                                                    {/* Render HTML content for answer display */}
+                                                                    <div className="truncate flex-1 mr-2" title={stripHtml(displayAns)} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
