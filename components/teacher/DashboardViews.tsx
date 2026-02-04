@@ -144,7 +144,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                                 <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                                                     {String.fromCharCode(65+i)}
                                                 </span>
-                                                <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <div className="flex-1 truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                 <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
                                             </div>
                                             <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
@@ -161,7 +161,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
                                         q.questionType === 'MATCHING' && q.matchingPairs ?
                                             q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
-                                            q.correctAnswer
+                                            <span dangerouslySetInnerHTML={{__html: q.correctAnswer || ''}}></span>
                                         }
                                     </div>
                                 ) : null}
@@ -179,9 +179,9 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
 
                                         return (
                                             <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
-                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                                                     {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
-                                                    <span className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`}>"{displayAns}"</span>
+                                                    <div className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''} [&_p]:inline [&_br]:hidden`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                 </div>
                                                 <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
                                             </li>
@@ -526,6 +526,13 @@ type ArchiveData = {
 
 type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS';
 
+// Helper to strip HTML tags from editor content
+const stripHtml = (html: string) => {
+   const tmp = document.createElement("DIV");
+   tmp.innerHTML = html;
+   return tmp.textContent || tmp.innerText || "";
+}
+
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
@@ -659,7 +666,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     ...r,
                     score: stats.score,
                     correctAnswers: stats.correct,
-                    totalQuestions: stats.empty + stats.wrong + stats.correct // Refresh total
+                    totalQuestions: (stats.empty || 0) + (stats.wrong || 0) + (stats.correct || 0)
                 };
             }
             return r;
@@ -698,16 +705,21 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         const totalStudents = results.length;
 
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
-            let correctCount = 0;
+            let correctCount: number = 0;
             const answerCounts: Record<string, number> = {};
             
             results.forEach(r => {
                 const ans = r.answers[q.id];
-                if (checkAnswerStatus(q, r.answers) === 'CORRECT') correctCount++;
+                const status = checkAnswerStatus(q, r.answers);
+
+                if (status === 'CORRECT') {
+                    correctCount = correctCount + 1;
+                }
+
                 if (ans) {
-                    // Normalize for distribution counting
-                    const cleanAns = String(ans).trim();
-                    answerCounts[cleanAns] = (answerCounts[cleanAns] || 0) + 1;
+                    // Keep original raw answer for parsing later in render
+                    const current = answerCounts[ans] || 0;
+                    answerCounts[ans] = current + 1;
                 }
             });
 
@@ -717,7 +729,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0,
                 distribution: answerCounts,
                 totalStudents,
-                options: q.options
+                // Pass options only for SIMPLE MULTIPLE CHOICE to trigger Bar Chart View.
+                // COMPLEX MC, MATCHING, etc will fallback to List View.
+                options: q.questionType === 'MULTIPLE_CHOICE' ? q.options : undefined
             };
         });
     }, [archiveData]);
@@ -731,7 +745,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
             results.forEach(r => {
-                if (checkAnswerStatus(q, r.answers) === 'CORRECT') correctCount++;
+                if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
+                    correctCount = correctCount + 1;
+                }
             });
             return {
                 id: q.id,
@@ -966,7 +982,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
                                 <th className="border border-slate-300 p-2 text-left w-16">Kelas</th>
                                 <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Grid)</th>
+                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1039,14 +1055,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     </div>
 
                                     <div className="pt-1 border-t border-slate-100">
-                                        {/* Updated Distribution Rendering */}
+                                        {/* Updated Distribution Rendering - Handles ALL TYPES Correctly */}
                                         {data.options ? (
-                                            /* Multiple Choice Grid */
+                                            /* Multiple Choice & Complex Grid */
                                             <div className="grid grid-cols-1 gap-1 text-[9px]">
                                                 {data.options.map((opt, i) => {
                                                     const label = String.fromCharCode(65+i);
                                                     const count = data.distribution[opt] || 0;
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                    
+                                                    // Removed stripHtml(opt) to preserve KaTeX structure
                                                     const isCorrect = 
                                                         (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
                                                         (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
@@ -1054,8 +1072,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     return (
                                                         <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
                                                             <div className="flex gap-2 truncate max-w-[70%]">
-                                                                <span className="w-4">{label}.</span>
-                                                                <span className="truncate">{opt}</span>
+                                                                <span className="w-4 font-bold">{label}.</span>
+                                                                <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
                                                             <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
                                                         </div>
@@ -1063,32 +1081,65 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 })}
                                             </div>
                                         ) : (
-                                            /* Generic List for other types */
+                                            /* Generic List for other types (MATCHING, TRUE_FALSE, ESSAY) */
                                             <div className="flex flex-col gap-1 text-[9px]">
                                                 {Object.entries(data.distribution).length > 0 ? (
                                                     Object.entries(data.distribution)
                                                         .sort(([,a], [,b]) => b - a) 
-                                                        .slice(0, 10) // Show top 10
+                                                        .slice(0, 10) // Show top 10 unique answers
                                                         .map(([ans, count], i) => {
                                                             const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                            
+                                                            // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
+                                                            let displayAns = ans; // Use raw answer by default (may contain HTML)
                                                             let isCorrect = false;
-                                                            try {
-                                                                const normAns = normalize(ans);
-                                                                const normKey = normalize(originalQ?.correctAnswer || '');
-                                                                if (originalQ?.questionType === 'TRUE_FALSE') {
-                                                                     // Simple assumption for text match or rely on manual check
-                                                                } else {
-                                                                     isCorrect = normAns === normKey;
-                                                                }
-                                                            } catch(e){}
 
-                                                            // Better formatter for answer display
-                                                            let displayAns = ans;
-                                                            try { if (ans.startsWith('{')) { const parsed = JSON.parse(ans); displayAns = Object.entries(parsed).map(([k,v]) => `${v}`).join(', '); } } catch(e){}
+                                                            try {
+                                                                if (originalQ?.questionType === 'MATCHING') {
+                                                                    // Parse JSON: {"0":"RightA", "1":"RightB"}
+                                                                    const parsed = JSON.parse(ans);
+                                                                    // Show only the right-side answers, ordered by question row index
+                                                                    const orderedValues = (originalQ.matchingPairs || []).map((_, idx) => parsed[idx] || '—');
+                                                                    displayAns = orderedValues.join(', ');
+                                                                    
+                                                                    // Check Correctness Strict
+                                                                    isCorrect = originalQ.matchingPairs?.every((pair, idx) => parsed[idx] === pair.right) ?? false;
+
+                                                                } else if (originalQ?.questionType === 'TRUE_FALSE') {
+                                                                    // Parse JSON: {"0":true, "1":false}
+                                                                    const parsed = JSON.parse(ans);
+                                                                    // Show only Benar/Salah, ordered by row
+                                                                    const orderedValues = (originalQ.trueFalseRows || []).map((_, idx) => {
+                                                                        const val = parsed[idx];
+                                                                        return val === true ? 'Benar' : (val === false ? 'Salah' : '—');
+                                                                    });
+                                                                    displayAns = orderedValues.join(', ');
+
+                                                                    // Check Correctness Strict
+                                                                    isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
+
+                                                                } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                                    // Raw answer: "Opsi A,Opsi C" (String separated by comma)
+                                                                    // We keep it as is, but maybe verify correctness
+                                                                    const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
+                                                                    const cSet = new Set(normalize(originalQ.correctAnswer || '').split(',').map(s=>s.trim()));
+                                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                                    // Clean HTML from complex answer string parts? Hard to split safely if text has commas.
+                                                                    // Assuming simple text for now or just display raw stripped
+                                                                } else {
+                                                                    // Standard Essay/FIB
+                                                                    const normAns = normalize(ans);
+                                                                    const normKey = normalize(originalQ?.correctAnswer || '');
+                                                                    isCorrect = normAns === normKey;
+                                                                }
+                                                            } catch(e) {
+                                                                // If parsing fails, use raw stripped string
+                                                            }
 
                                                             return (
-                                                                <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                                    <span className="truncate flex-1 mr-2" title={ans}>"{displayAns}"</span>
+                                                                <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                                                    {/* Render HTML content for answer display */}
+                                                                    <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
@@ -1188,7 +1239,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
                                                 <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
                                                     <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">
-                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban:'}
+                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban Singkat:'}
                                                     </p>
                                                     <div className="text-emerald-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
                                                 </div>
