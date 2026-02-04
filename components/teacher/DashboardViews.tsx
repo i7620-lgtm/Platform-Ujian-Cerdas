@@ -729,7 +729,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0,
                 distribution: answerCounts,
                 totalStudents,
-                options: q.options
+                // Pass options only for SIMPLE MULTIPLE CHOICE to trigger Bar Chart View.
+                // COMPLEX MC, MATCHING, etc will fallback to List View.
+                options: q.questionType === 'MULTIPLE_CHOICE' ? q.options : undefined
             };
         });
     }, [archiveData]);
@@ -1096,13 +1098,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                 if (originalQ?.questionType === 'MATCHING') {
                                                                     // Parse JSON: {"0":"RightA", "1":"RightB"}
                                                                     const parsed = JSON.parse(ans);
-                                                                    // Reconstruct readable: "Left1 -> RightA; Left2 -> RightB"
-                                                                    const pairStrings = Object.entries(parsed).map(([idxStr, val]) => {
-                                                                        const idx = parseInt(idxStr);
-                                                                        const leftText = originalQ.matchingPairs?.[idx]?.left || `Item ${idx+1}`;
-                                                                        return `${leftText} → ${val}`;
-                                                                    });
-                                                                    displayAns = pairStrings.join('; ');
+                                                                    // Show only the right-side answers, ordered by question row index
+                                                                    const orderedValues = (originalQ.matchingPairs || []).map((_, idx) => parsed[idx] || '—');
+                                                                    displayAns = orderedValues.join(', ');
                                                                     
                                                                     // Check Correctness Strict
                                                                     isCorrect = originalQ.matchingPairs?.every((pair, idx) => parsed[idx] === pair.right) ?? false;
@@ -1110,12 +1108,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                 } else if (originalQ?.questionType === 'TRUE_FALSE') {
                                                                     // Parse JSON: {"0":true, "1":false}
                                                                     const parsed = JSON.parse(ans);
-                                                                    const rowStrings = Object.entries(parsed).map(([idxStr, val]) => {
-                                                                        const idx = parseInt(idxStr);
-                                                                        const rowText = originalQ.trueFalseRows?.[idx]?.text || `Pernyataan ${idx+1}`;
-                                                                        return `${rowText}: ${val ? 'Benar' : 'Salah'}`;
+                                                                    // Show only Benar/Salah, ordered by row
+                                                                    const orderedValues = (originalQ.trueFalseRows || []).map((_, idx) => {
+                                                                        const val = parsed[idx];
+                                                                        return val === true ? 'Benar' : (val === false ? 'Salah' : '—');
                                                                     });
-                                                                    displayAns = rowStrings.join(' | ');
+                                                                    displayAns = orderedValues.join(', ');
 
                                                                     // Check Correctness Strict
                                                                     isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
@@ -1141,7 +1139,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                                                                     {/* Render HTML content for answer display */}
-                                                                    <div className="truncate flex-1 mr-2" title={stripHtml(displayAns)} dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                                    <div className="truncate flex-1 mr-2" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
