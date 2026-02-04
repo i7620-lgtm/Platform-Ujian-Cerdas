@@ -982,7 +982,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
                                 <th className="border border-slate-300 p-2 text-left w-16">Kelas</th>
                                 <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Grid)</th>
+                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban</th>
                             </tr>
                         </thead>
                         <tbody>
