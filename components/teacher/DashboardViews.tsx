@@ -144,7 +144,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                                 <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                                                     {String.fromCharCode(65+i)}
                                                 </span>
-                                                <div className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <div className="flex-1 truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                 <span className="font-bold text-slate-600">{count} Siswa ({percentage}%)</span>
                                             </div>
                                             <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
@@ -181,7 +181,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 p-1 rounded -mx-1 border-emerald-100' : 'text-slate-600'}`}>
                                                 <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                                                     {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
-                                                    <div className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''}`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                    <div className={`truncate italic ${isCorrect ? 'text-emerald-700 font-medium' : ''} [&_p]:inline [&_br]:hidden`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                 </div>
                                                 <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700' : ''}`}>{count} Siswa</span>
                                             </li>
@@ -1073,7 +1073,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
                                                             <div className="flex gap-2 truncate max-w-[70%]">
                                                                 <span className="w-4 font-bold">{label}.</span>
-                                                                <div className="truncate" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                                <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
                                                             <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
                                                         </div>
@@ -1139,7 +1139,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                                                                     {/* Render HTML content for answer display */}
-                                                                    <div className="truncate flex-1 mr-2" dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                                    <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
