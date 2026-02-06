@@ -27,8 +27,8 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(normalize(studentAnswer).split(',').map(s => s.trim()));
-             const correctSet = new Set(normalize(q.correctAnswer).split(',').map(s => s.trim()));
+             const studentSet = new Set(normalize(studentAnswer).split(',').map((s: string) => s.trim()));
+             const correctSet = new Set(normalize(q.correctAnswer).split(',').map((s: string) => s.trim()));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                  correctCount++;
              }
@@ -292,7 +292,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const totalQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
     const answeredCount = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-    const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
+    
+    // FIX: Handle undefined input for optimizeHtml
+    const optimizeHtml = (html: string) => (html || '').replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40">
