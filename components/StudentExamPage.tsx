@@ -14,7 +14,7 @@ import {
 } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -97,6 +97,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const lastBroadcastTimeRef = useRef<number>(0);
     const broadcastTimeoutRef = useRef<any>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
+    const isChannelSubscribedRef = useRef(false);
     
     // Sync refs
     useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -186,6 +187,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 channelRef.current = channel;
+                isChannelSubscribedRef.current = true;
+            } else {
+                isChannelSubscribedRef.current = false;
             }
         });
 
@@ -193,13 +197,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             if (channelRef.current) {
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
+                isChannelSubscribedRef.current = false;
             }
         };
     }, [exam.code, exam.config.disableRealtime]);
 
     // Broadcast Progress Logic
     const broadcastProgress = () => {
-        if (exam.config.disableRealtime || !channelRef.current) return;
+        if (exam.config.disableRealtime || !channelRef.current || !isChannelSubscribedRef.current) return;
         
         const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
@@ -213,7 +218,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 totalQuestions: totalQ,
                 timestamp: Date.now()
             }
-        }).catch(e => { /* Ignore silently */ });
+        }).catch(e => { 
+            // Silently ignore broadcast errors, it's not critical
+            console.debug("Broadcast failed", e); 
+        });
     };
 
     const handleAnswerChange = (qId: string, value: string) => {
@@ -286,7 +294,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             let msg = "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.";
             
             if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
-                msg = "Terjadi kesalahan konfigurasi database (Kolom tidak ditemukan). Namun sistem sedang mencoba perbaikan otomatis. Silakan coba tekan tombol kumpulkan sekali lagi.";
+                msg = "Data tidak sinkron dengan server (Error Skema). Sistem telah mencoba memperbaiki otomatis. Silakan tekan tombol 'Kumpulkan' sekali lagi.";
             } else if (error.message === "Offline" || !navigator.onLine) {
                 msg = "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi.";
             }
