@@ -13,6 +13,8 @@ import {
     ChevronUpIcon
 } from './Icons';
 import { storageService } from '../services/storage';
+import { supabase } from '../lib/supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -94,6 +96,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // Realtime Broadcast Refs
     const lastBroadcastTimeRef = useRef<number>(0);
     const broadcastTimeoutRef = useRef<any>(null);
+    const channelRef = useRef<RealtimeChannel | null>(null);
     
     // Sync refs
     useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -172,15 +175,45 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => clearInterval(interval);
     }, []);
 
+    // Realtime Channel Setup
+    useEffect(() => {
+        if (exam.config.disableRealtime) return;
+
+        const channel = supabase.channel(`exam-room-${exam.code}`, {
+            config: { broadcast: { self: false } }
+        });
+
+        channel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                channelRef.current = channel;
+            }
+        });
+
+        return () => {
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
+        };
+    }, [exam.code, exam.config.disableRealtime]);
+
     // Broadcast Progress Logic
     const broadcastProgress = () => {
-        if (exam.config.disableRealtime) return;
+        if (exam.config.disableRealtime || !channelRef.current) return;
         
         const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
         
-        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ)
-            .catch(e => { /* Ignore broadcast errors silently */ });
+        channelRef.current.send({
+            type: 'broadcast',
+            event: 'student_progress',
+            payload: {
+                studentId: student.studentId,
+                answeredCount: answeredQ,
+                totalQuestions: totalQ,
+                timestamp: Date.now()
+            }
+        }).catch(e => { /* Ignore silently */ });
     };
 
     const handleAnswerChange = (qId: string, value: string) => {
@@ -246,13 +279,19 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             if (status === 'completed' || status === 'force_closed') {
                 localStorage.removeItem(STORAGE_KEY);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Gagal mengirim jawaban:", error);
-            const isOffline = error.message === "Offline" || !navigator.onLine;
-            alert(isOffline 
-                ? "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi."
-                : "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi."
-            );
+            
+            // Enhanced Error Message Logic
+            let msg = "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.";
+            
+            if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
+                msg = "Terjadi kesalahan konfigurasi database (Kolom tidak ditemukan). Namun sistem sedang mencoba perbaikan otomatis. Silakan coba tekan tombol kumpulkan sekali lagi.";
+            } else if (error.message === "Offline" || !navigator.onLine) {
+                msg = "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi.";
+            }
+            
+            alert(msg);
             isSubmittingRef.current = false;
             setIsSubmitting(false);
         }
