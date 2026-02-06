@@ -12,6 +12,7 @@ import {
     ChevronDownIcon,
     ChevronUpIcon
 } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -25,6 +26,12 @@ const isAnswered = (q: Question, answers: Record<string, string>) => {
     const ans = answers[q.id];
     if (ans === undefined || ans === null || ans === '') return false;
     if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return ans.length > 0;
+    if (q.questionType === 'TRUE_FALSE') {
+        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
+    }
+    if (q.questionType === 'MATCHING') {
+        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
+    }
     return true;
 };
 
@@ -84,6 +91,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const isSubmittingRef = useRef(false);
     const userLocationRef = useRef<string | undefined>(undefined);
     
+    // Realtime Broadcast Refs
+    const lastBroadcastTimeRef = useRef<number>(0);
+    const broadcastTimeoutRef = useRef<any>(null);
+    
     // Sync refs
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
@@ -97,6 +108,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 const parsed = JSON.parse(saved);
                 if (parsed.answers) {
                     setAnswers(prev => ({ ...prev, ...parsed.answers }));
+                    answersRef.current = { ...answers, ...parsed.answers }; // Immediate sync
                 }
                 if (parsed.timeLeft) {
                     setTimeLeft(parsed.timeLeft);
@@ -160,8 +172,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => clearInterval(interval);
     }, []);
 
+    // Broadcast Progress Logic
+    const broadcastProgress = () => {
+        if (exam.config.disableRealtime) return;
+        
+        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
+        
+        storageService.sendProgressUpdate(exam.code, student.studentId, answeredQ, totalQ)
+            .catch(e => { /* Ignore broadcast errors silently */ });
+    };
+
     const handleAnswerChange = (qId: string, value: string) => {
-        setAnswers(prev => ({ ...prev, [qId]: value }));
+        setAnswers(prev => {
+            const next = { ...prev, [qId]: value };
+            answersRef.current = next; // Sync immediate for reliability
+            return next;
+        });
+
+        // Realtime Broadcast Throttle
+        const now = Date.now();
+        if (now - lastBroadcastTimeRef.current > 2000) {
+            broadcastProgress();
+            lastBroadcastTimeRef.current = now;
+        } else {
+            if (broadcastTimeoutRef.current) clearTimeout(broadcastTimeoutRef.current);
+            broadcastTimeoutRef.current = setTimeout(() => {
+                broadcastProgress();
+                lastBroadcastTimeRef.current = Date.now();
+            }, 2000);
+        }
     };
 
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
@@ -183,10 +223,23 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
         
         if (isSubmittingRef.current) return;
+        
+        // Final Save before submit
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            answers: answersRef.current,
+            timeLeft: timeLeftRef.current,
+            timestamp: Date.now()
+        }));
+
         isSubmittingRef.current = true;
         setIsSubmitting(true);
         
         try {
+            // Check online status explicitly before submit attempt
+            if (!navigator.onLine) {
+                throw new Error("Offline");
+            }
+
             const grading = calculateGrade(exam, answersRef.current);
             await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocationRef.current, grading);
             
@@ -195,7 +248,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
         } catch (error) {
             console.error("Gagal mengirim jawaban:", error);
-            alert("Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.");
+            const isOffline = error.message === "Offline" || !navigator.onLine;
+            alert(isOffline 
+                ? "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi."
+                : "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi."
+            );
             isSubmittingRef.current = false;
             setIsSubmitting(false);
         }
