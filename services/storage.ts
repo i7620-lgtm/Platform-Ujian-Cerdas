@@ -125,7 +125,6 @@ class StorageService {
           return data;
       } catch (err: any) {
           // Check for "Column not found" error (PGRST204)
-          // Message format usually: "Could not find the 'column_name' column of 'table' in the schema cache"
           if (retries > 0 && err.code === 'PGRST204') {
               const match = err.message?.match(/'([^']+)' column/);
               const missingColumn = match ? match[1] : null;
@@ -191,38 +190,77 @@ class StorageService {
   }
 
   async getExams(teacher: TeacherProfile): Promise<Record<string, Exam>> {
-    const { data, error } = await supabase
-        .from('exams')
-        .select('*');
-        
+    let query = supabase.from('exams').select('*');
+
+    // 1. DATABASE LEVEL FILTERING
+    if (teacher.accountType === 'super_admin') {
+        // No filter
+    } else if (teacher.accountType === 'admin_sekolah') {
+        query = query.eq('author_school', teacher.school);
+    } else {
+        // Default to strict owner filter
+        query = query.eq('author_id', teacher.id);
+    }
+    
+    // Order by newest first
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
     if (error) throw error;
     
     const examMap: Record<string, Exam> = {};
-    data.forEach((e: any) => {
-        examMap[e.code] = {
-            code: e.code,
-            authorId: e.author_id,
-            authorSchool: e.author_school,
-            questions: typeof e.questions === 'string' ? JSON.parse(e.questions) : e.questions,
-            config: typeof e.config === 'string' ? JSON.parse(e.config) : e.config,
-            status: e.status,
-            createdAt: e.created_at
-        };
-    });
+    if (data) {
+        data.forEach((e: any) => {
+            // 2. SECURITY CHECK (Double Filtering in JS)
+            // This prevents leaks if the DB query somehow returns data it shouldn't
+            if (teacher.accountType === 'guru' && e.author_id !== teacher.id) {
+                return; // SKIP: Not owner
+            }
+            if (teacher.accountType === 'admin_sekolah' && e.author_school !== teacher.school) {
+                return; // SKIP: Wrong school
+            }
+
+            // 3. ROBUST MAPPING (Snake Case -> Camel Case)
+            // Ensures data appears in UI even if DB columns vary slightly
+            examMap[e.code] = {
+                code: e.code,
+                authorId: e.author_id, // Vital: Map from DB column
+                authorSchool: e.author_school, // Vital: Map from DB column
+                questions: typeof e.questions === 'string' ? JSON.parse(e.questions) : e.questions,
+                config: typeof e.config === 'string' ? JSON.parse(e.config) : e.config,
+                status: e.status,
+                createdAt: e.created_at
+            };
+        });
+    }
     return examMap;
   }
 
   async saveExam(exam: Exam): Promise<void> {
+    // 1. VALIDATION
+    if (!exam.authorId) {
+        throw new Error("Gagal menyimpan: ID Guru tidak ditemukan. Silakan login ulang.");
+    }
+
+    // 2. PAYLOAD MAPPING (Camel Case -> Snake Case)
+    // Ensures data is saved to correct DB columns
     const payload = {
         code: exam.code,
-        author_id: exam.authorId,
-        author_school: exam.authorSchool,
+        author_id: exam.authorId, // Crucial for ownership
+        author_school: exam.authorSchool || '', // Crucial for school admin view
         questions: exam.questions,
         config: exam.config,
         status: exam.status,
         updated_at: new Date().toISOString()
     };
-    
+
+    // Handle creation date preservation
+    if (exam.createdAt) {
+        // @ts-ignore
+        payload.created_at = exam.createdAt; 
+    }
+
+    // 3. UPSERT
     const { error } = await supabase
         .from('exams')
         .upsert(payload, { onConflict: 'code' });
