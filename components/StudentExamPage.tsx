@@ -10,7 +10,8 @@ import {
     WifiIcon,
     NoWifiIcon,
     ChevronDownIcon,
-    ChevronUpIcon
+    ChevronUpIcon,
+    EyeIcon
 } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
@@ -85,6 +86,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [cheatWarningCount, setCheatWarningCount] = useState(0);
     
     // Refs
     const answersRef = useRef<Record<string, string>>(answers);
@@ -92,6 +94,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const logRef = useRef<string[]>(initialData?.activityLog || []);
     const isSubmittingRef = useRef(false);
     const userLocationRef = useRef<string | undefined>(undefined);
+    const cheatCountRef = useRef(0);
     
     // Realtime Broadcast Refs
     const lastBroadcastTimeRef = useRef<number>(0);
@@ -102,6 +105,67 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     // Sync refs
     useEffect(() => { answersRef.current = answers; }, [answers]);
     useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
+        if (!auto && status !== 'force_closed') {
+            // Manual submission validation
+            const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
+
+            if (unansweredCount > 0) {
+                setHasAttemptedSubmit(true);
+                setIsNavOpen(true); // Auto open nav to show red boxes
+                
+                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi (ditandai warna merah). Yakin ingin mengumpulkan?`)) {
+                    return;
+                }
+            } else {
+                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban? Aksi ini tidak dapat dibatalkan.")) return;
+            }
+        }
+        
+        if (isSubmittingRef.current) return;
+        
+        // Final Save before submit
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            answers: answersRef.current,
+            timeLeft: timeLeftRef.current,
+            timestamp: Date.now()
+        }));
+
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+        
+        try {
+            // CRITICAL FIX: Allow 'force_closed' (cheating) to proceed even if offline
+            // Only block 'completed' (manual) if offline
+            if (!navigator.onLine && status === 'completed' && !auto) {
+                throw new Error("Offline");
+            }
+
+            const grading = calculateGrade(exam, answersRef.current);
+            await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocationRef.current, grading);
+            
+            if (status === 'completed' || status === 'force_closed') {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        } catch (error: any) {
+            console.error("Gagal mengirim jawaban:", error);
+            
+            // Enhanced Error Message Logic
+            let msg = "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.";
+            
+            if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
+                msg = "Data tidak sinkron dengan server (Error Skema). Sistem telah mencoba memperbaiki otomatis. Silakan tekan tombol 'Kumpulkan' sekali lagi.";
+            } else if (error.message === "Offline" || !navigator.onLine) {
+                msg = "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi.";
+            }
+            
+            alert(msg);
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
+        }
+    };
 
     // Initialize logic
     useEffect(() => {
@@ -128,13 +192,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
              );
         }
 
-        // Behavior detection
-        const handleVisibilityChange = () => {
-             if (document.hidden && exam.config.detectBehavior) {
-                 logRef.current.push(`[${new Date().toLocaleTimeString()}] Meninggalkan tab/browser`);
+        // --- CHEAT DETECTION ENGINE ---
+        const handleViolation = () => {
+             if (!exam.config.detectBehavior) return;
+
+             const timestamp = new Date().toLocaleTimeString();
+             const msg = `[${timestamp}] Terdeteksi meninggalkan ujian (Tab Switch/Blur)`;
+             logRef.current.push(msg);
+             
+             cheatCountRef.current += 1;
+             setCheatWarningCount(prev => prev + 1);
+
+             // Jika Strict Mode aktif (continueWithPermission), langsung kunci
+             if (exam.config.continueWithPermission) {
+                 // Gunakan setTimeout untuk memastikan UI sempat render warning sebentar jika perlu, 
+                 // tapi di sini kita langsung eksekusi agar aman
+                 handleSubmit(true, 'force_closed');
              }
         };
+
+        const handleVisibilityChange = () => {
+             if (document.hidden) handleViolation();
+        };
+        
+        const handleBlur = () => {
+             // Opsional: Blur window juga bisa dianggap curang
+             if (exam.config.detectBehavior) handleViolation();
+        }
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleBlur); 
 
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
@@ -143,6 +230,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleBlur);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
@@ -219,7 +307,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 timestamp: Date.now()
             }
         }).catch(e => { 
-            // Silently ignore broadcast errors, it's not critical
             console.debug("Broadcast failed", e); 
         });
     };
@@ -242,66 +329,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 broadcastProgress();
                 lastBroadcastTimeRef.current = Date.now();
             }, 2000);
-        }
-    };
-
-    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto) {
-            // Manual submission validation
-            const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
-
-            if (unansweredCount > 0) {
-                setHasAttemptedSubmit(true);
-                setIsNavOpen(true); // Auto open nav to show red boxes
-                
-                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi (ditandai warna merah). Yakin ingin mengumpulkan?`)) {
-                    return;
-                }
-            } else {
-                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban? Aksi ini tidak dapat dibatalkan.")) return;
-            }
-        }
-        
-        if (isSubmittingRef.current) return;
-        
-        // Final Save before submit
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            answers: answersRef.current,
-            timeLeft: timeLeftRef.current,
-            timestamp: Date.now()
-        }));
-
-        isSubmittingRef.current = true;
-        setIsSubmitting(true);
-        
-        try {
-            // Check online status explicitly before submit attempt
-            if (!navigator.onLine) {
-                throw new Error("Offline");
-            }
-
-            const grading = calculateGrade(exam, answersRef.current);
-            await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocationRef.current, grading);
-            
-            if (status === 'completed' || status === 'force_closed') {
-                localStorage.removeItem(STORAGE_KEY);
-            }
-        } catch (error: any) {
-            console.error("Gagal mengirim jawaban:", error);
-            
-            // Enhanced Error Message Logic
-            let msg = "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.";
-            
-            if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
-                msg = "Data tidak sinkron dengan server (Error Skema). Sistem telah mencoba memperbaiki otomatis. Silakan tekan tombol 'Kumpulkan' sekali lagi.";
-            } else if (error.message === "Offline" || !navigator.onLine) {
-                msg = "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi.";
-            }
-            
-            alert(msg);
-            isSubmittingRef.current = false;
-            setIsSubmitting(false);
         }
     };
 
@@ -341,6 +368,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                          </button>
                     </div>
                 </div>
+                {/* Cheat Detection Banner */}
+                {exam.config.detectBehavior && (
+                    <div className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 flex items-center justify-center gap-2">
+                        <EyeIcon className="w-3 h-3 text-rose-400" />
+                        <span>Pengawasan Aktif: Jangan Tinggalkan Halaman</span>
+                        {cheatWarningCount > 0 && !exam.config.continueWithPermission && (
+                            <span className="bg-rose-500 text-white px-1.5 rounded ml-2 animate-pulse">{cheatWarningCount}x Pelanggaran</span>
+                        )}
+                    </div>
+                )}
              </header>
 
              {/* Navigation Sidebar/Drawer */}
