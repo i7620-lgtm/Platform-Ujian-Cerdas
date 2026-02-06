@@ -112,6 +112,35 @@ class StorageService {
     };
   }
 
+  // Recursive helper to handle schema mismatches dynamically
+  private async safeUpsertResult(payload: any, retries = 5): Promise<any> {
+      try {
+          const { data, error } = await supabase
+              .from('results')
+              .upsert(payload, { onConflict: 'exam_code,student_id' })
+              .select()
+              .single();
+          
+          if (error) throw error;
+          return data;
+      } catch (err: any) {
+          // Check for "Column not found" error (PGRST204)
+          // Message format usually: "Could not find the 'column_name' column of 'table' in the schema cache"
+          if (retries > 0 && err.code === 'PGRST204') {
+              const match = err.message?.match(/'([^']+)' column/);
+              const missingColumn = match ? match[1] : null;
+              
+              if (missingColumn && payload[missingColumn] !== undefined) {
+                  console.warn(`Schema mismatch: Removing missing column '${missingColumn}' and retrying...`);
+                  const newPayload = { ...payload };
+                  delete newPayload[missingColumn];
+                  return this.safeUpsertResult(newPayload, retries - 1);
+              }
+          }
+          throw err;
+      }
+  }
+
   async submitExamResult(params: {
     student: Student,
     examCode: string,
@@ -140,26 +169,25 @@ class StorageService {
         updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
-        .from('results')
-        .upsert(payload, { onConflict: 'exam_code,student_id' })
-        .select()
-        .single();
-
-    if (error) throw error;
-    
-    return {
-        student: params.student,
-        examCode: params.examCode,
-        answers: params.answers,
-        status: params.status,
-        activityLog: params.activityLog,
-        location: params.location,
-        score: params.score || 0,
-        correctAnswers: params.correctAnswers || 0,
-        totalQuestions: params.totalQuestions || 0,
-        timestamp: params.timestamp
-    };
+    try {
+        await this.safeUpsertResult(payload);
+        
+        return {
+            student: params.student,
+            examCode: params.examCode,
+            answers: params.answers,
+            status: params.status,
+            activityLog: params.activityLog,
+            location: params.location,
+            score: params.score || 0,
+            correctAnswers: params.correctAnswers || 0,
+            totalQuestions: params.totalQuestions || 0,
+            timestamp: params.timestamp
+        };
+    } catch (err: any) {
+        console.error("Final submit error after retries:", err);
+        throw err;
+    }
   }
 
   async getExams(teacher: TeacherProfile): Promise<Record<string, Exam>> {
@@ -244,6 +272,7 @@ class StorageService {
       if (error) throw error;
   }
 
+  // Not used directly anymore by StudentExamPage, but kept for compatibility
   async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number): Promise<void> {
     await supabase.channel(`exam-room-${examCode}`).send({
         type: 'broadcast',
