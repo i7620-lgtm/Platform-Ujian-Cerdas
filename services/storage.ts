@@ -254,7 +254,6 @@ class StorageService {
         } else if (profile.accountType === 'admin_sekolah' && profile.school) {
             query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
         } else {
-            // Guru: Filter by Author ID
             query = query.eq('author_id', profile.id);
         }
     }
@@ -434,24 +433,13 @@ class StorageService {
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
     if (className && className !== 'ALL') query = query.eq('class_name', className);
-    
-    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
-    query = query.order('updated_at', { ascending: false });
-    
     const { data, error } = await query;
     if (error) return [];
-    
     return data.map((row: any) => ({
         student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, 
-        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
-        score: row.score, 
-        correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, 
-        status: row.status, 
-        activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), 
-        location: row.location
+        examCode: row.exam_code, answers: row.answers, score: row.score, correctAnswers: row.correct_answers,
+        totalQuestions: row.total_questions, status: row.status, activityLog: row.activity_log,
+        timestamp: new Date(row.updated_at).getTime(), location: row.location
     }));
   }
 
@@ -467,9 +455,9 @@ class StorageService {
             student_id: resultPayload.student.studentId, 
             student_name: resultPayload.student.fullName,
             class_name: resultPayload.student.class, 
-            answers: resultPayload.answers || {}, // Ensure not null
+            answers: resultPayload.answers,
             status: resultPayload.status,
-            activity_log: resultPayload.activityLog || [], 
+            activity_log: resultPayload.activityLog, 
             score: resultPayload.score || 0, 
             correct_answers: resultPayload.correctAnswers || 0,
             total_questions: resultPayload.totalQuestions || 0, 
@@ -490,6 +478,7 @@ class StorageService {
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         } else {
+             console.error("!!! DATA DITOLAK SERVER !!! Harap cek Policy RLS di tabel 'results'.");
              throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
         }
     }
@@ -516,7 +505,7 @@ class StorageService {
           try {
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: payload.student.studentId, student_name: payload.student.fullName,
-                class_name: payload.student.class, answers: payload.answers || {}, status: payload.status,
+                class_name: payload.student.class, answers: payload.answers, status: payload.status,
                 activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
                 total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
@@ -542,7 +531,7 @@ class StorageService {
       if (error || !data) return null;
       return {
         student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
-        examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
+        examCode: data.exam_code, answers: data.answers, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
       };
@@ -552,6 +541,43 @@ class StorageService {
       const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
       const currentLog = (data?.activity_log as string[]) || [];
       await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
+  }
+
+  // --- NEW SECURITY METHODS ---
+
+  async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
+      const token = Math.floor(1000 + Math.random() * 9000).toString(); // 4 digit string
+      const { error } = await supabase
+          .from('results')
+          .update({ unlock_token: token })
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId);
+      
+      if (error) throw error;
+      return token;
+  }
+
+  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
+      const { data, error } = await supabase
+          .from('results')
+          .select('unlock_token')
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId)
+          .single();
+
+      if (error || !data) return false;
+      
+      // Check token match
+      if (data.unlock_token === token) {
+          // Consume token (set to null so it can't be used again)
+          await supabase
+              .from('results')
+              .update({ unlock_token: null })
+              .eq('exam_code', examCode)
+              .eq('student_id', studentId);
+          return true;
+      }
+      return false;
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
