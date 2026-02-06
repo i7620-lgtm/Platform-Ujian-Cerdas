@@ -226,6 +226,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return new Date(`${dateStr}T${exam.config.startTime}`).getTime() + exam.config.timeLimit * 60000 < now.getTime();
     }).sort((a,b)=>b.config.date.localeCompare(a.config.date));
 
+    // Fallback for missing accountType
+    const accountType = teacherProfile.accountType || 'guru';
+
     return (
         <div className="min-h-screen bg-[#F8FAFC]">
             <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40">
@@ -235,11 +238,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-black text-slate-900 tracking-tight">Dashboard Guru</h1>
                                 <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
-                                    teacherProfile.accountType === 'super_admin' ? 'bg-slate-800 text-white border-slate-900' :
-                                    teacherProfile.accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                    accountType === 'super_admin' ? 'bg-slate-800 text-white border-slate-900' :
+                                    accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
                                     'bg-emerald-50 text-emerald-600 border-emerald-100'
                                 }`}>
-                                    {teacherProfile.accountType.replace('_', ' ')}
+                                    {accountType.replace('_', ' ')}
                                 </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
@@ -256,7 +259,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                          <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Terjadwal</button>
                          <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Selesai</button>
                          <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buka Arsip</button>
-                         {teacherProfile.accountType === 'super_admin' && (
+                         {accountType === 'super_admin' && (
                             <button onClick={() => setView('ADMIN_USERS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Kelola Pengguna</button>
                          )}
                     </nav>
@@ -285,7 +288,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
-                {view === 'ADMIN_USERS' && teacherProfile.accountType === 'super_admin' && <UserManagementView />}
+                {view === 'ADMIN_USERS' && accountType === 'super_admin' && <UserManagementView />}
             </main>
 
             {/* Modal Live Monitor (Khusus Ujian Berlangsung) */}
