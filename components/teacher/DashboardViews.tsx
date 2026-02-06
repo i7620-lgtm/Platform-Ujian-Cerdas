@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -26,10 +25,11 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
     PrinterIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    PlayIcon
 } from '../Icons';
 
-// --- SHARED COMPONENTS (Moved from Modals for Reusability) ---
+// --- SHARED COMPONENTS ---
 
 export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => (
     <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg">
@@ -69,7 +69,6 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
         return { counts, totalAnswered };
     }, [examResults, q.id]);
 
-    // Determine correct answer string for comparison in generic list
     const correctAnswerString = useMemo(() => {
         if (q.questionType === 'MULTIPLE_CHOICE') return q.correctAnswer;
         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return q.correctAnswer;
@@ -91,13 +90,10 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
 
     const isCorrectAnswer = (ans: string) => {
         if (!correctAnswerString) return false;
-        // Simple comparison for exact matches (JSON strings or simple text)
         if (ans === correctAnswerString) return true;
-        // Case insensitive for text
         if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'MULTIPLE_CHOICE') {
             return normalize(ans) === normalize(correctAnswerString);
         }
-        // Set comparison for Complex MC
         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
             const sSet = new Set(normalize(ans).split(','));
             const cSet = new Set(normalize(correctAnswerString).split(','));
@@ -169,7 +165,6 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                 <ul className="space-y-2">
                                     {Object.entries(distribution.counts).map(([ans, count], idx) => {
                                         const isCorrect = isCorrectAnswer(ans);
-                                        // Formatter for ugly JSON strings
                                         let displayAns = ans;
                                         try {
                                             if (ans.startsWith('{')) {
@@ -202,7 +197,6 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
     );
 };
 
-// --- REMAINING TIME COMPONENT ---
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
     const calculateTimeLeft = () => {
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
@@ -223,7 +217,7 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
     return (<div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colorClass} transition-colors duration-500`}><span className="relative flex h-2 w-2"><span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span><span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}></span></span><span className="font-mono text-sm font-bold tracking-widest tabular-nums">{timeString}</span></div>);
 };
 
-const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { if (!text || text === 'Lainnya') return null; return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>{text}</span>); };
+export const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { if (!text || text === 'Lainnya') return null; return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass}`}>{text}</span>); };
 
 // --- CREATION VIEW ---
 interface CreationViewProps { onQuestionsGenerated: (questions: Question[], mode: 'manual' | 'auto') => void; }
@@ -264,7 +258,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                                     onChange={(e) => { 
                                         if (e.target.files && e.target.files[0]) { 
                                             const file = e.target.files[0];
-                                            if (file.size > 10 * 1024 * 1024) { // 10MB Check
+                                            if (file.size > 10 * 1024 * 1024) { 
                                                 setError("Ukuran file terlalu besar (Max 10MB). Harap kompres PDF Anda.");
                                                 e.target.value = '';
                                                 setUploadedFile(null);
@@ -293,966 +287,286 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
     );
 };
 
-// --- DRAFTS VIEW ---
 export const DraftsView: React.FC<{ exams: Exam[]; onContinueDraft: (exam: Exam) => void; onDeleteDraft: (exam: Exam) => void; }> = ({ exams, onContinueDraft, onDeleteDraft }) => {
     const [previewExam, setPreviewExam] = useState<Exam | null>(null);
     return (
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-gray-100 rounded-lg"><PencilIcon className="w-6 h-6 text-gray-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Draf Soal</h2><p className="text-sm text-gray-500">Lanjutkan pembuatan soal yang belum selesai.</p></div></div>
             {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{exams.map(exam => (<div key={exam.code} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full"><button type="button" onClick={(e) => { e.stopPropagation(); onDeleteDraft(exam); }} className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10" title="Hapus Draf"><TrashIcon className="w-4 h-4" /></button><div className="flex-1"><div className="flex items-start justify-between mb-2"><span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase tracking-wider border border-gray-200">Draft</span></div><h3 className="font-bold text-lg text-gray-800 mb-1">{exam.config.subject || "Tanpa Judul"}</h3><p className="text-sm text-gray-400 font-mono font-medium mb-3">{exam.code}</p><div className="flex flex-wrap gap-2 mb-4"><MetaBadge text={exam.config.classLevel} colorClass="bg-blue-50 text-blue-700 border-blue-100" /><MetaBadge text={exam.config.examType} colorClass="bg-purple-50 text-purple-700 border-purple-100" /></div><div className="h-px bg-gray-50 w-full mb-4"></div><div className="text-xs text-gray-500 space-y-2 mb-6"><div className="flex items-center gap-2"><CalendarDaysIcon className="w-4 h-4 text-gray-400" /><span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div><div className="flex items-center gap-2"><ListBulletIcon className="w-4 h-4 text-gray-400" /><span>{exam.questions.filter(q => q.questionType !== 'INFO').length} Soal Tersimpan</span></div></div></div><div className="flex gap-2"><button onClick={() => setPreviewExam(exam)} className="flex-1 py-2.5 px-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 hover:text-primary transition-colors flex items-center justify-center gap-2 shadow-sm" title="Preview Soal"><EyeIcon className="w-4 h-4" /> Preview</button><button onClick={() => onContinueDraft(exam)} className="flex-[2] py-2.5 px-4 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center gap-2 shadow-sm"><PencilIcon className="w-4 h-4" /> Edit</button></div></div>))}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><PencilIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Belum Ada Draf</h3><p className="mt-1 text-sm text-gray-500">Anda belum menyimpan draf soal apapun.</p></div>)}
-            {previewExam && (<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up"><div className="p-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-lg text-gray-800">Preview Ujian</h3><button onClick={() => setPreviewExam(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><XMarkIcon className="w-6 h-6 text-gray-500" /></button></div><div className="p-8 flex flex-col items-center text-center"><div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-inner"><EyeIcon className="w-8 h-8" /></div><h4 className="text-xl font-bold text-gray-900 mb-1">{previewExam.config.subject || "Draf Ujian"}</h4><p className="text-sm text-gray-500 mb-6 font-mono bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{previewExam.code}</p><div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?preview=${previewExam.code}`)}&margin=10`} alt="QR Preview" className="w-40 h-40 object-contain" /></div><p className="text-xs text-gray-400 mb-4 max-w-xs">Pindai QR Code atau gunakan link di bawah untuk mencoba mengerjakan soal ini (Mode Preview).</p><div className="flex gap-3 w-full"><button onClick={() => { const url = `${window.location.origin}/?preview=${previewExam.code}`; navigator.clipboard.writeText(url); alert("Link Preview berhasil disalin!"); }} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm">Salin Link</button><a href={`/?preview=${previewExam.code}`} target="_blank" rel="noreferrer" className="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-200">Coba Sekarang</a></div></div></div></div>)}
+            {previewExam && (<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up"><div className="p-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-lg text-gray-800">Preview Ujian</h3><button onClick={() => setPreviewExam(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="p-6 max-h-[60vh] overflow-y-auto"><div className="space-y-4">{previewExam.questions.map((q, i) => (<div key={i} className="bg-slate-50 p-3 rounded-lg"><p className="text-xs font-bold text-slate-500 mb-1">Soal {i+1}</p><div className="text-sm text-slate-700" dangerouslySetInnerHTML={{__html: q.questionText}}></div></div>))}</div></div><div className="p-4 border-t bg-gray-50 text-right"><button onClick={() => setPreviewExam(null)} className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900">Tutup</button></div></div></div>)}
         </div>
     );
 };
 
-// --- ONGOING EXAMS VIEW ---
-export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
-    return (
-        <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
-            {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { const activeCount = results.filter(r => r.examCode === exam.code).length; return (<div key={exam.code} className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-xl hover:shadow-emerald-50 hover:border-emerald-300 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
-            
-            {/* UPDATED ACTION BUTTONS - ALWAYS VISIBLE */}
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
-                {exam.config.enablePublicStream && (
-                    <button 
-                        type="button" 
-                        onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/?live=${exam.code}`; navigator.clipboard.writeText(url); alert("Link Pantauan Orang Tua disalin!"); }} 
-                        className="p-2 bg-white text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg border border-slate-100 hover:border-indigo-100 transition-all shadow-sm" 
-                        title="Bagikan Link Pantauan"
-                    >
-                        <ShareIcon className="w-4 h-4" />
-                    </button>
-                )}
-                <button 
-                    type="button" 
-                    onClick={(e) => { e.stopPropagation(); onDuplicateExam(exam); }} 
-                    className="p-2 bg-white text-slate-400 hover:bg-gray-50 hover:text-primary rounded-lg border border-slate-100 hover:border-gray-200 transition-all shadow-sm" 
-                    title="Gunakan Kembali Soal"
-                >
-                    <DocumentDuplicateIcon className="w-4 h-4" />
-                </button>
-            </div>
-
-            <div className="flex justify-between items-start mb-2"><div className="flex flex-col"><span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>Sedang Berlangsung</span><h3 className="font-bold text-xl text-neutral">{exam.config.subject || exam.code}</h3><p className="text-sm font-mono text-gray-400 mt-0.5">{exam.code}</p></div></div><div className="flex flex-wrap gap-2 mt-3 mb-5"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div><div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Partisipan</span><div className="flex items-center gap-2 mt-1"><div className="flex -space-x-2">{[...Array(Math.min(3, activeCount))].map((_, i) => (<div key={i} className="w-6 h-6 rounded-full bg-emerald-200 border-2 border-white"></div>))}</div><span className="text-sm font-bold text-gray-700">{activeCount} Siswa</span></div></div><div className="text-right"><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Sisa Waktu</span><div className="mt-1"><RemainingTime exam={exam} /></div></div></div></div>)})}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Aktif</h3><p className="mt-1 text-sm text-gray-500">Saat ini tidak ada ujian yang sedang berlangsung.</p></div>)}
-        </div>
-    );
-};
-
-// --- UPCOMING EXAMS VIEW ---
-export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (exam: Exam) => void; }> = ({ exams, onEditExam }) => {
-    return (
-        <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-blue-100 rounded-lg"><CalendarDaysIcon className="w-6 h-6 text-blue-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Akan Datang</h2><p className="text-sm text-gray-500">Daftar semua ujian yang telah dijadwalkan.</p></div></div>
-            {exams.length > 0 ? (<div className="space-y-4">{exams.map(exam => (<div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 group"><div className="flex items-start gap-5"><div className="bg-blue-50 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 border border-blue-100 shrink-0"><span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span><span className="text-xl font-black leading-none">{new Date(exam.config.date).getDate()}</span></div><div><div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral">{exam.config.subject || "Tanpa Judul"}</h3><span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span></div><div className="flex flex-wrap items-center gap-2 mb-2"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div><div className="text-xs text-gray-500 flex items-center gap-3 font-medium"><span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {exam.config.startTime} WIB</span><span className="text-gray-300">•</span><span>{exam.config.timeLimit} Menit</span></div></div></div><button onClick={() => onEditExam(exam)} className="flex items-center justify-center gap-2 bg-white border-2 border-gray-100 text-gray-600 px-5 py-2.5 text-sm rounded-xl hover:border-primary hover:text-primary transition-all font-bold shadow-sm self-end md:self-center w-full md:w-auto"><PencilIcon className="w-4 h-4" /> Edit Detail</button></div>))}</div>) : (<div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><CalendarDaysIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Terjadwal</h3><p className="mt-1 text-sm text-gray-500">Buat ujian baru untuk memulai.</p></div>)}
-        </div>
-    );
-};
-
-// --- FINISHED EXAMS VIEW (UPDATED) ---
-interface FinishedExamsProps {
-    exams: Exam[];
-    onSelectExam: (exam: Exam) => void;
-    onDuplicateExam: (exam: Exam) => void;
-    onDeleteExam: (exam: Exam) => void;
-    onArchiveExam: (exam: Exam) => void; // New prop
-}
-
-export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
+export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (e: Exam) => void; onDuplicateExam: (e: Exam) => void }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     return (
         <div className="space-y-6 animate-fade-in">
-             <div className="flex items-center gap-2"><div className="p-2 bg-purple-100 rounded-lg"><ChartBarIcon className="w-6 h-6 text-purple-600" /></div><div><h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2><p className="text-sm text-gray-500">Riwayat dan hasil ujian yang telah berakhir.</p></div></div>
+             <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-indigo-100 rounded-lg"><ClockIcon className="w-6 h-6 text-indigo-600" /></div>
+                <div><h2 className="text-2xl font-bold text-neutral">Ujian Berlangsung</h2><p className="text-sm text-gray-500">Pantau aktivitas siswa secara realtime.</p></div>
+            </div>
             {exams.length > 0 ? (
-                <div className="space-y-4">
-                    {exams.map(exam => (
-                        <div key={exam.code} className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-gray-300 group relative">
-                            {/* Delete Button */}
-                            <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteExam(exam); }} className="absolute top-3 right-3 p-2 bg-white text-gray-400 hover:text-red-600 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-full transition-all shadow-sm z-10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" title="Hapus Data Ujian & Hasil"><TrashIcon className="w-4 h-4" /></button>
-
-                            <div className="flex items-start gap-4">
-                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100"><CheckCircleIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500 transition-colors" /></div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral">{exam.config.subject || exam.code}</h3><span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{exam.code}</span></div>
-                                    <div className="flex flex-wrap items-center gap-2 mb-2"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" /></div>
-                                    <div className="text-xs text-gray-400">Berakhir pada: {new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {exams.map(exam => {
+                        const participantCount = new Set(results.filter(r => r.examCode === exam.code).map(r => r.student.studentId)).size;
+                         return (
+                            <div key={exam.code} className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm hover:shadow-lg transition-all relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={(e) => {e.stopPropagation(); onDuplicateExam(exam)}} className="p-2 bg-white text-slate-400 hover:text-indigo-600 rounded-full shadow-sm border border-slate-100" title="Duplikat Ujian"><DocumentDuplicateIcon className="w-4 h-4"/></button>
                                 </div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <RemainingTime exam={exam} />
+                                </div>
+                                <h3 className="font-bold text-lg text-slate-800 mb-1">{exam.config.subject}</h3>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-xs font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">{exam.code}</span>
+                                    <MetaBadge text={exam.config.classLevel} />
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-6">
+                                     <div className="flex items-center gap-1"><UserIcon className="w-4 h-4" /> {participantCount} Peserta</div>
+                                     <div className="flex items-center gap-1"><ListBulletIcon className="w-4 h-4" /> {exam.questions.length} Soal</div>
+                                </div>
+                                <button onClick={() => onSelectExam(exam)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                                    <PlayIcon className="w-4 h-4" /> Buka Live Monitor
+                                </button>
                             </div>
-                            
-                            <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
-                                <button onClick={() => onArchiveExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 hover:text-indigo-800 transition-colors font-bold shadow-sm border border-indigo-100" title="Download Arsip & Hapus dari Cloud"><DocumentArrowUpIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Arsip</span></button>
-                                <button onClick={() => onDuplicateExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-colors font-bold shadow-sm border border-gray-200" title="Gunakan Kembali Soal"><DocumentDuplicateIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Reuse</span></button>
-                                <button onClick={() => onSelectExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black transition-all font-bold shadow-lg shadow-gray-200 transform active:scale-95"><ChartBarIcon className="w-4 h-4" /> Lihat Hasil</button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100"><div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ChartBarIcon className="h-8 w-8 text-gray-300" /></div><h3 className="text-base font-bold text-gray-900">Belum Ada Riwayat</h3><p className="mt-1 text-sm text-gray-500">Hasil ujian yang telah selesai akan muncul di sini.</p></div>
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-indigo-300" /></div>
+                    <h3 className="text-base font-bold text-gray-900">Tidak Ada Ujian Berlangsung</h3>
+                    <p className="mt-1 text-sm text-gray-500">Jadwal ujian aktif akan muncul di sini.</p>
+                </div>
             )}
         </div>
     );
-};
+}
 
-// --- USER MANAGEMENT VIEW (SUPER ADMIN) ---
+export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (e: Exam) => void }> = ({ exams, onEditExam }) => {
+     return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-blue-100 rounded-lg"><CalendarDaysIcon className="w-6 h-6 text-blue-600" /></div>
+                <div><h2 className="text-2xl font-bold text-neutral">Ujian Terjadwal</h2><p className="text-sm text-gray-500">Ujian yang akan datang.</p></div>
+            </div>
+             {exams.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {exams.map(exam => (
+                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold border border-blue-100">
+                                    <CalendarDaysIcon className="w-3.5 h-3.5" />
+                                    <span>{new Date(exam.config.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} • {exam.config.startTime}</span>
+                                </div>
+                                <button onClick={() => onEditExam(exam)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><PencilIcon className="w-4 h-4"/></button>
+                            </div>
+                            <h3 className="font-bold text-lg text-slate-800 mb-1">{exam.config.subject}</h3>
+                            <p className="text-sm text-slate-500 mb-4 line-clamp-2">{exam.config.description || "Tidak ada deskripsi."}</p>
+                            <div className="flex flex-wrap gap-2 mt-auto">
+                                <MetaBadge text={exam.config.classLevel} colorClass="bg-slate-100 text-slate-600" />
+                                <MetaBadge text={exam.config.examType} colorClass="bg-slate-100 text-slate-600" />
+                            </div>
+                         </div>
+                    ))}
+                </div>
+             ) : (
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-sm text-gray-500">Tidak ada ujian terjadwal.</p>
+                </div>
+            )}
+        </div>
+     );
+}
+
+export const FinishedExamsView: React.FC<{ exams: Exam[]; onSelectExam: (e: Exam) => void; onDuplicateExam: (e: Exam) => void; onDeleteExam: (e: Exam) => void; onArchiveExam: (e: Exam) => void; }> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-emerald-100 rounded-lg"><CheckCircleIcon className="w-6 h-6 text-emerald-600" /></div>
+                <div><h2 className="text-2xl font-bold text-neutral">Ujian Selesai</h2><p className="text-sm text-gray-500">Riwayat dan hasil ujian.</p></div>
+            </div>
+            {exams.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {exams.map(exam => (
+                         <div key={exam.code} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all flex flex-col h-full">
+                            <div className="flex justify-between items-start mb-4">
+                                <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider">Selesai</span>
+                                <div className="flex gap-1">
+                                    <button onClick={() => onDuplicateExam(exam)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Gunakan Kembali"><DocumentDuplicateIcon className="w-4 h-4"/></button>
+                                    <button onClick={() => onArchiveExam(exam)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Arsipkan & Download"><DocumentArrowUpIcon className="w-4 h-4"/></button>
+                                    <button onClick={() => onDeleteExam(exam)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus"><TrashIcon className="w-4 h-4"/></button>
+                                </div>
+                            </div>
+                            <h3 className="font-bold text-lg text-slate-800 mb-1">{exam.config.subject}</h3>
+                            <p className="text-xs text-slate-400 font-mono mb-4">{new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            
+                            <div className="mt-auto pt-4 border-t border-slate-50">
+                                <button onClick={() => onSelectExam(exam)} className="w-full py-2.5 bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
+                                    <ChartBarIcon className="w-4 h-4" /> Lihat Hasil & Analisis
+                                </button>
+                            </div>
+                         </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-sm text-gray-500">Belum ada ujian yang selesai.</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export const ArchiveViewer: React.FC<{ onReuseExam: (exam: Exam) => void }> = ({ onReuseExam }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsLoading(true);
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target?.result as string);
+                if (json.exam) {
+                    onReuseExam(json.exam);
+                } else {
+                    alert("Format arsip tidak valid.");
+                }
+            } catch (err) {
+                alert("Gagal membaca file arsip.");
+            } finally {
+                setIsLoading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    return (
+        <div className="max-w-2xl mx-auto animate-fade-in py-10 text-center">
+            <div className="bg-white p-10 rounded-3xl border border-slate-100 shadow-xl">
+                <div className="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <DocumentArrowUpIcon className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 mb-3">Buka Arsip Ujian</h2>
+                <p className="text-slate-500 mb-8 max-w-md mx-auto">Unggah file JSON arsip ujian (.json) untuk menggunakan kembali soal atau melihat konfigurasi lama.</p>
+                
+                <input type="file" ref={fileInputRef} accept=".json" onChange={handleFileUpload} className="hidden" />
+                
+                <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    disabled={isLoading}
+                    className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 mx-auto"
+                >
+                    {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-5 h-5" />}
+                    <span>Pilih File Arsip</span>
+                </button>
+            </div>
+        </div>
+    );
+}
+
 export const UserManagementView: React.FC = () => {
     const [users, setUsers] = useState<UserProfile[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-    const [newRole, setNewRole] = useState<AccountType>('guru');
-    const [newSchool, setNewSchool] = useState('');
-
-    useEffect(() => {
-        fetchUsers();
-    }, []);
+    const [loading, setLoading] = useState(true);
+    const [editingUser, setEditingUser] = useState<string | null>(null);
+    const [editRole, setEditRole] = useState<AccountType>('guru');
+    const [editSchool, setEditSchool] = useState('');
 
     const fetchUsers = async () => {
-        setIsLoading(true);
+        setLoading(true);
         try {
             const data = await storageService.getAllUsers();
             setUsers(data);
         } catch (e) {
-            console.error("Gagal memuat pengguna:", e);
-            alert("Gagal memuat daftar pengguna.");
+            console.error(e);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
-    const handleEditClick = (user: UserProfile) => {
-        setEditingUser(user);
-        setNewRole(user.accountType);
-        setNewSchool(user.school);
+    useEffect(() => { fetchUsers(); }, []);
+
+    const handleEdit = (user: UserProfile) => {
+        setEditingUser(user.id);
+        setEditRole(user.accountType);
+        setEditSchool(user.school);
     };
 
-    const handleSaveUser = async () => {
-        if (!editingUser) return;
+    const handleSave = async (userId: string) => {
         try {
-            await storageService.updateUserRole(editingUser.id, newRole, newSchool);
+            await storageService.updateUserRole(userId, editRole, editSchool);
             setEditingUser(null);
             fetchUsers();
-            alert("Pengguna berhasil diperbarui.");
         } catch (e) {
-            console.error(e);
-            alert("Gagal memperbarui pengguna.");
+            alert("Gagal update user.");
         }
     };
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-slate-800 rounded-lg text-white"><UserIcon className="w-6 h-6" /></div>
-                <div><h2 className="text-2xl font-bold text-neutral">Kelola Pengguna</h2><p className="text-sm text-gray-500">Manajemen akses dan penempatan sekolah.</p></div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50/50">
-                        <tr>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama / Email</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sekolah</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                        {isLoading ? (
-                             <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Memuat data pengguna...</td></tr>
-                        ) : users.length > 0 ? (
-                            users.map(user => (
-                                <tr key={user.id} className="hover:bg-slate-50/30">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-slate-800 text-sm">{user.fullName}</div>
-                                        <div className="text-[10px] text-slate-400 mt-0.5">{user.email || '-'}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs font-medium text-slate-600">{user.school}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                            user.accountType === 'super_admin' ? 'bg-slate-800 text-white' : 
-                                            user.accountType === 'admin_sekolah' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
-                                        }`}>
-                                            {user.accountType.replace('_', ' ')}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button onClick={() => handleEditClick(user)} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">Edit</button>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Tidak ada pengguna ditemukan.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {editingUser && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-white">
-                        <h3 className="text-lg font-bold text-slate-800 mb-4">Edit Pengguna</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 block mb-1">Nama</label>
-                                <input type="text" value={editingUser.fullName} disabled className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 cursor-not-allowed" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 block mb-1">Role</label>
-                                <select value={newRole} onChange={(e) => setNewRole(e.target.value as AccountType)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
-                                    <option value="guru">Guru</option>
-                                    <option value="admin_sekolah">Admin Sekolah</option>
-                                    <option value="super_admin">Super Admin</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 block mb-1">Sekolah</label>
-                                <input type="text" value={newSchool} onChange={(e) => setNewSchool(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
-                            </div>
-                        </div>
-                        <div className="flex gap-3 mt-6 justify-end">
-                            <button onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-lg">Batal</button>
-                            <button onClick={handleSaveUser} className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-md shadow-indigo-100">Simpan</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// --- ARCHIVE VIEWER (NEW & ENHANCED) ---
-interface ArchiveViewerProps {
-    onReuseExam: (exam: Exam) => void;
-}
-
-type ArchiveData = {
-    exam: Exam;
-    results: Result[];
-};
-
-type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS';
-
-// Helper to strip HTML tags from editor content
-const stripHtml = (html: string) => {
-   const tmp = document.createElement("DIV");
-   tmp.innerHTML = html;
-   return tmp.textContent || tmp.innerText || "";
-}
-
-export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
-    const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
-    const [error, setError] = useState<string>('');
-    const [fixMessage, setFixMessage] = useState<string>('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
-    const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            processFile(e.target.files[0]);
-        }
-    };
-    
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault(); e.stopPropagation();
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            processFile(e.dataTransfer.files[0]);
-        }
-    };
-    
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault(); e.stopPropagation();
-    };
-
-    const processFile = (file: File) => {
-        setError('');
-        setFixMessage('');
-        if (file.type !== 'application/json') {
-            setError('File harus berformat .json');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const result = event.target?.result;
-                if (typeof result === 'string') {
-                    const data: ArchiveData = JSON.parse(result);
-                    if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
-                        setArchiveData(data);
-                        setActiveTab('DETAIL');
-                    } else {
-                        setError('File JSON tidak valid atau bukan format arsip lengkap.');
-                    }
-                }
-            } catch (e) {
-                setError('Gagal membaca file. Pastikan file berformat JSON yang benar.');
-            }
-        };
-        reader.onerror = () => setError('Terjadi kesalahan saat membaca file.');
-        reader.readAsText(file);
-    };
-
-    const resetView = () => {
-        setArchiveData(null); setError(''); setFixMessage('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const normalize = (str: string) => str.trim().toLowerCase();
-
-    const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
-        const ans = studentAnswers[q.id];
-        if (!ans) return 'EMPTY';
-
-        const studentAns = normalize(String(ans));
-        const correctAns = normalize(String(q.correctAnswer || ''));
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-            const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
-            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
-            return 'WRONG';
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-             try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-
-        return 'WRONG'; 
-    };
-
-    // Strict recalculation for Archive
-    const getCalculatedStats = (r: Result, exam: Exam) => {
-        let correct = 0;
-        let empty = 0;
-        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-        
-        scorableQuestions.forEach(q => {
-            const status = checkAnswerStatus(q, r.answers);
-            if (status === 'CORRECT') correct++;
-            else if (status === 'EMPTY') empty++;
-        });
-
-        const total = scorableQuestions.length;
-        const wrong = total - correct - empty;
-        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
-        
-        return { correct, wrong, empty, score };
-    };
-
-    // AUTO FIX & DOWNLOAD LOGIC
-    useEffect(() => {
-        if (!archiveData) return;
-        
-        let mismatchCount = 0;
-        const fixedResults = archiveData.results.map(r => {
-            const stats = getCalculatedStats(r, archiveData.exam);
-            
-            // Periksa apakah nilai tersimpan berbeda dengan hasil hitung ulang
-            if (stats.score !== r.score || stats.correct !== r.correctAnswers) {
-                mismatchCount++;
-                return {
-                    ...r,
-                    score: stats.score,
-                    correctAnswers: stats.correct,
-                    totalQuestions: (stats.empty || 0) + (stats.wrong || 0) + (stats.correct || 0)
-                };
-            }
-            return r;
-        });
-
-        if (mismatchCount > 0) {
-            setFixMessage(`Ditemukan ${mismatchCount} data nilai tidak sinkron. File perbaikan telah diunduh otomatis.`);
-            
-            // Update state visual dengan data yang sudah diperbaiki
-            setArchiveData(prev => prev ? ({ ...prev, results: fixedResults }) : null);
-
-            // Auto Trigger Download
-            const fixedArchive = { ...archiveData, results: fixedResults };
-            const jsonString = JSON.stringify(fixedArchive, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `CORRECTED_ARSIP_${archiveData.exam.code}_${Date.now()}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-    }, [archiveData?.exam.code]); // Run once when exam code loads (new file loaded)
-
-    const toggleStudent = (id: string) => {
-        if (expandedStudent === id) setExpandedStudent(null);
-        else setExpandedStudent(id);
-    };
-
-    // Calculate Question Stats for Analysis Tab
-    const questionAnalysisData = useMemo(() => {
-        if (!archiveData) return [];
-        const { exam, results } = archiveData;
-        const totalStudents = results.length;
-
-        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
-            let correctCount: number = 0;
-            const answerCounts: Record<string, number> = {};
-            
-            results.forEach(r => {
-                const ans = r.answers[q.id];
-                const status = checkAnswerStatus(q, r.answers);
-
-                if (status === 'CORRECT') {
-                    correctCount = correctCount + 1;
-                }
-
-                if (ans) {
-                    // Keep original raw answer for parsing later in render
-                    const current = answerCounts[ans] || 0;
-                    answerCounts[ans] = current + 1;
-                }
-            });
-
-            return {
-                id: q.id,
-                qText: q.questionText,
-                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0,
-                distribution: answerCounts,
-                totalStudents,
-                // Pass options only for SIMPLE MULTIPLE CHOICE to trigger Bar Chart View.
-                // COMPLEX MC, MATCHING, etc will fallback to List View.
-                options: q.questionType === 'MULTIPLE_CHOICE' ? q.options : undefined
-            };
-        });
-    }, [archiveData]);
-
-    // Calculate Question Stats for Visual Analysis Tab (Legacy for compatibility)
-    const questionStats = useMemo(() => {
-        if (!archiveData) return [];
-        const { exam, results } = archiveData;
-        const totalStudents = results.length;
-
-        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
-            let correctCount = 0;
-            results.forEach(r => {
-                if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
-                    correctCount = correctCount + 1;
-                }
-            });
-            return {
-                id: q.id,
-                correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
-            };
-        });
-    }, [archiveData]);
-
-    // --- UPLOAD VIEW ---
-    if (!archiveData) {
-        return (
-            <div className="max-w-4xl mx-auto text-center animate-fade-in p-8 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <div className="mb-8"><div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4"><DocumentArrowUpIcon className="w-8 h-8" /></div><h2 className="text-2xl font-bold text-slate-800">Buka Arsip Ujian</h2><p className="text-sm text-slate-500 mt-2">Pilih file arsip ujian (.json) untuk melihat detail soal, hasil siswa, dan analisisnya.</p></div>
-                <div onDrop={handleDrop} onDragOver={handleDragOver} className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:bg-slate-50 transition-colors relative cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                    <div className="space-y-2 pointer-events-none"><CloudArrowUpIcon className="w-12 h-12 text-slate-400 mx-auto" /><p className="text-slate-600 font-medium">Seret file ke sini atau klik untuk memilih</p><p className="text-xs text-slate-400">Hanya file .json yang berisi data ujian dan hasil siswa.</p></div>
-                </div>
-                {error && <div className="mt-6 p-4 bg-rose-50 text-rose-700 text-sm rounded-xl border border-rose-100"><strong>Error:</strong> {error}</div>}
-            </div>
-        );
-    }
-    
-    // --- DISPLAY VIEW ---
-    const { exam, results } = archiveData;
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
-
-    return (
-        <div className="max-w-5xl mx-auto space-y-6">
-            <style>{`
-                @media print {
-                    @page { margin: 1cm; size: portrait; }
-                    body { -webkit-print-color-adjust: exact; background: white !important; }
-                    .no-print { display: none !important; }
-                    .print-only { display: block !important; }
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; }
-                    table { border-collapse: collapse; width: 100%; font-size: 10px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px; }
-                    .page-break { page-break-before: always; }
-                    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
-                }
-            `}</style>
-
-            {fixMessage && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
-                    <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-amber-600" />
-                    <div className="flex-1">
-                        <p className="text-sm font-bold">Auto-Correction Active</p>
-                        <p className="text-xs">{fixMessage}</p>
-                    </div>
-                </div>
-            )}
-
-            {/* INTERACTIVE HEADER (HIDDEN ON PRINT) */}
-            <div className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm print:hidden">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800">Pratinjau Arsip: <span className="text-indigo-600">{exam.config.subject}</span></h2>
-                        <p className="text-sm text-slate-500 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}</p>
-                    </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 transition-all">Muat Lain</button>
-                         <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white text-slate-600 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 hover:text-slate-800 transition-all border border-slate-200 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
-                        <button onClick={() => onReuseExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
-                    </div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-4">
-                    {(['DETAIL', 'STUDENTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
-                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${totalStudents})` : 'Analisis Soal';
-                        return <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>{label}</button>
-                    })}
-                </div>
-            </div>
-
-            {/* INTERACTIVE CONTENT (HIDDEN ON PRINT) */}
-            <div className="animate-fade-in print:hidden">
-                {activeTab === 'DETAIL' && (
-                    <div className="space-y-4">
-                        {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                            return (
-                                <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                                    <div className="flex items-start gap-4">
-                                        <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500">{q.questionType === 'INFO' ? 'i' : questionNumber}</span>
-                                        <div className="flex-1 space-y-4 min-w-0">
-                                            <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer === opt ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer === opt && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
-                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 rounded-lg overflow-hidden"><table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="p-2 font-bold text-slate-600 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 text-center w-32">Jawaban</th></tr></thead><tbody>{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100"><td className="p-2">{r.text}</td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 bg-emerald-50':'text-rose-700 bg-rose-50'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 text-sm"><div className="flex-1 font-medium">{p.left}</div><div className="text-slate-300">→</div><div className="flex-1 font-bold">{p.right}</div></div>)}</div>}
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && <div className="mt-4 pt-3 border-t"><p className="text-[10px] font-bold text-slate-400 uppercase">Kunci Jawaban</p><div className="mt-1 p-3 rounded-lg bg-slate-50 text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div></div>}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-                {activeTab === 'STUDENTS' && (
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                         <table className="w-full text-left">
-                            <thead className="bg-slate-50/50">
-                                <tr>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nilai</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">B/S/K</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aktivitas</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Lokasi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {results.map(r => {
-                                    const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
-                                    return (
-                                    <React.Fragment key={r.student.studentId}>
-                                        <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 cursor-pointer group">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`transition-transform duration-300 ${expandedStudent === r.student.studentId ? 'rotate-180' : ''}`}>
-                                                        <ChevronDownIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500" />
-                                                    </div>
-                                                    <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{r.student.fullName}</div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 bg-emerald-50' : score >= 50 ? 'text-orange-600 bg-orange-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                    {score}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">
-                                                <span className="text-emerald-600" title="Benar">{correct}</span> / <span className="text-rose-600" title="Salah">{wrong}</span> / <span className="text-slate-400" title="Kosong">{empty}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {r.activityLog && r.activityLog.length > 0 ? (
-                                                    <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded font-bold text-[10px] border border-amber-100">{r.activityLog.length} Log</span>
-                                                ) : (
-                                                    <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-bold text-[10px] border border-emerald-100">Aman</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-xs text-slate-500 font-mono">
-                                                {exam.config.trackLocation && r.location ? (
-                                                    <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
-                                                ) : '-'}
-                                            </td>
-                                        </tr>
-                                        {expandedStudent === r.student.studentId && (
-                                            <tr className="animate-fade-in bg-slate-50/50 shadow-inner">
-                                                <td colSpan={6} className="p-6">
-                                                    <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 rounded"></div> Benar</span>
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 rounded"></div> Salah</span>
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 rounded"></div> Kosong</span>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-1 mt-2">
-                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                            const status = checkAnswerStatus(q, r.answers);
-                                                            let bgClass = 'bg-slate-200'; 
-                                                            if (status === 'CORRECT') bgClass = 'bg-emerald-300';
-                                                            else if (status === 'WRONG') bgClass = 'bg-rose-300';
-                                                            return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold text-slate-900 ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
-                                                        })}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                )})}
-                            </tbody>
-                         </table>
-                    </div>
-                )}
-                {activeTab === 'ANALYSIS' && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                             <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
-                             <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
-                             <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
-                             <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
-                        </div>
-                        <div><h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={results} />; })}</div></div>
-                    </div>
-                )}
+             <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-slate-800 text-white rounded-lg"><UserIcon className="w-6 h-6" /></div>
+                <div><h2 className="text-2xl font-bold text-neutral">Manajemen Pengguna</h2><p className="text-sm text-gray-500">Kelola akses dan akun pengajar.</p></div>
             </div>
             
-            {/* PRINT VIEW (Clean & Sequential) */}
-            <div className="hidden print:block text-slate-900">
-                {/* Global Header for First Page */}
-                <div className="border-b-2 border-slate-900 pb-2 mb-6">
-                    <h1 className="text-xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
-                    <div className="flex justify-between items-end mt-1">
-                        <div>
-                            <p className="text-xs font-bold text-slate-600">Kode: <span className="font-mono text-slate-900">{exam.code}</span> | {new Date(exam.config.date).toLocaleDateString('id-ID')} | {exam.authorSchool || '-'}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-slate-500">Arsip Lengkap Ujian</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 1. ANALISIS STATISTIK & REKAPITULASI SISWA (MERGED) */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">1. Analisis Statistik & Rekapitulasi Hasil</h3>
-                    
-                    {/* Kotak Statistik Utama (Dipindahkan kesini) */}
-                    <div className="mb-6 grid grid-cols-4 gap-4 border border-slate-300 rounded p-4 text-center avoid-break bg-slate-50">
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Rata-rata</p>
-                            <p className="text-xl font-black">{averageScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Tertinggi</p>
-                            <p className="text-xl font-black text-emerald-600">{highestScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Terendah</p>
-                            <p className="text-xl font-black text-rose-600">{lowestScore}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase">Partisipan</p>
-                            <p className="text-xl font-black text-blue-600">{totalStudents}</p>
-                        </div>
-                    </div>
-
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                        <thead>
-                            <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-left w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left w-16">Kelas</th>
-                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban</th>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th className="p-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Nama</th>
+                                <th className="p-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Email</th>
+                                <th className="p-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Sekolah</th>
+                                <th className="p-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Role</th>
+                                <th className="p-4 font-black text-slate-400 uppercase tracking-widest text-[10px] text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {results.map((r, index) => {
-                                const { score } = getCalculatedStats(r, exam);
-                                return (
-                                    <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-2 uppercase">{r.student.class}</td>
-                                        <td className="border border-slate-300 p-2 text-center font-bold text-sm">{score}</td>
-                                        <td className="border border-slate-300 p-1">
-                                            <div className="flex flex-wrap gap-0.5">
-                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                    const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'bg-slate-200'; 
-                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300';
-                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300';
-                                                    
-                                                    return (
-                                                        <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold text-black border border-black/10 ${bgClass}`}>
-                                                            {idx + 1}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    <div className="mt-2 flex gap-4 text-[9px] text-gray-500 font-bold uppercase tracking-widest">
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 border border-black/10"></div> Benar</span>
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 border border-black/10"></div> Salah</span>
-                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 border border-black/10"></div> Kosong</span>
-                    </div>
-                </div>
-
-                <div className="page-break"></div>
-
-                {/* 2. ANALISIS BUTIR SOAL */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">2. Analisis Butir Soal</h3>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        {questionAnalysisData.map((data, idx) => {
-                            const difficultyLabel = data.correctRate >= 80 ? 'Mudah' : data.correctRate >= 50 ? 'Sedang' : 'Sulit';
-                            const difficultyColor = data.correctRate >= 80 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                : data.correctRate >= 50 
-                                    ? 'bg-orange-50 text-orange-700 border-orange-100' 
-                                    : 'bg-rose-50 text-rose-700 border-rose-100';
-                            
-                            // Get original question to check correct answer
-                            const originalQ = exam.questions.find(q => q.id === data.id);
-
-                            return (
-                                <div key={data.id} className="avoid-break border border-slate-300 rounded p-2 text-xs flex flex-col gap-2 bg-white">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] border border-slate-200">Soal {idx + 1}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${difficultyColor}`}>{difficultyLabel}</span>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-                                            <div className={`h-full ${data.correctRate >= 80 ? 'bg-emerald-500' : data.correctRate >= 50 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
-                                        </div>
-                                        <span className="font-bold text-[10px] w-14 text-right">{data.correctRate}% Benar</span>
-                                    </div>
-
-                                    <div className="pt-1 border-t border-slate-100">
-                                        {/* Updated Distribution Rendering - Handles ALL TYPES Correctly */}
-                                        {data.options ? (
-                                            /* Multiple Choice & Complex Grid */
-                                            <div className="grid grid-cols-1 gap-1 text-[9px]">
-                                                {data.options.map((opt, i) => {
-                                                    const label = String.fromCharCode(65+i);
-                                                    const count = data.distribution[opt] || 0;
-                                                    const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
-                                                    
-                                                    // Removed stripHtml(opt) to preserve KaTeX structure
-                                                    const isCorrect = 
-                                                        (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
-                                                        (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
-                                                    
-                                                    return (
-                                                        <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
-                                                            <div className="flex gap-2 truncate max-w-[70%]">
-                                                                <span className="w-4 font-bold">{label}.</span>
-                                                                <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                            <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
-                                                        </div>
-                                                    )
-                                                })}
+                        <tbody className="divide-y divide-slate-100">
+                            {loading ? (
+                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">Memuat data...</td></tr>
+                            ) : users.map(user => (
+                                <tr key={user.id} className="hover:bg-slate-50">
+                                    <td className="p-4 font-bold text-slate-700">{user.fullName}</td>
+                                    <td className="p-4 text-slate-500">{user.email}</td>
+                                    <td className="p-4">
+                                        {editingUser === user.id ? (
+                                            <input value={editSchool} onChange={e => setEditSchool(e.target.value)} className="p-1 border rounded w-full text-xs" />
+                                        ) : <span className="text-slate-600">{user.school}</span>}
+                                    </td>
+                                    <td className="p-4">
+                                        {editingUser === user.id ? (
+                                            <select value={editRole} onChange={(e) => setEditRole(e.target.value as AccountType)} className="p-1 border rounded text-xs">
+                                                <option value="guru">Guru</option>
+                                                <option value="admin_sekolah">Admin Sekolah</option>
+                                                <option value="super_admin">Super Admin</option>
+                                            </select>
+                                        ) : (
+                                            <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${user.accountType === 'super_admin' ? 'bg-slate-800 text-white' : user.accountType === 'admin_sekolah' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                {user.accountType.replace('_', ' ')}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        {editingUser === user.id ? (
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => handleSave(user.id)} className="text-emerald-600 hover:text-emerald-700 font-bold text-xs">Simpan</button>
+                                                <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600 text-xs">Batal</button>
                                             </div>
                                         ) : (
-                                            /* Generic List for other types (MATCHING, TRUE_FALSE, ESSAY) */
-                                            <div className="flex flex-col gap-1 text-[9px]">
-                                                {Object.entries(data.distribution).length > 0 ? (
-                                                    Object.entries(data.distribution)
-                                                        .sort(([,a], [,b]) => (b as number) - (a as number)) 
-                                                        .slice(0, 10) // Show top 10 unique answers
-                                                        .map(([ans, count], i) => {
-                                                            const pct = totalStudents > 0 ? Math.round(((count as number)/totalStudents)*100) : 0;
-                                                            
-                                                            // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
-                                                            let displayAns = ans; // Use raw answer by default (may contain HTML)
-                                                            let isCorrect = false;
-
-                                                            try {
-                                                                if (originalQ?.questionType === 'MATCHING') {
-                                                                    // Parse JSON: {"0":"RightA", "1":"RightB"}
-                                                                    const parsed = JSON.parse(ans);
-                                                                    // Show only the right-side answers, ordered by question row index
-                                                                    const orderedValues = (originalQ.matchingPairs || []).map((_, idx) => parsed[idx] || '—');
-                                                                    displayAns = orderedValues.join(', ');
-                                                                    
-                                                                    // Check Correctness Strict
-                                                                    isCorrect = originalQ.matchingPairs?.every((pair, idx) => parsed[idx] === pair.right) ?? false;
-
-                                                                } else if (originalQ?.questionType === 'TRUE_FALSE') {
-                                                                    // Parse JSON: {"0":true, "1":false}
-                                                                    const parsed = JSON.parse(ans);
-                                                                    // Show only Benar/Salah, ordered by row
-                                                                    const orderedValues = (originalQ.trueFalseRows || []).map((_, idx) => {
-                                                                        const val = parsed[idx];
-                                                                        return val === true ? 'Benar' : (val === false ? 'Salah' : '—');
-                                                                    });
-                                                                    displayAns = orderedValues.join(', ');
-
-                                                                    // Check Correctness Strict
-                                                                    isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
-
-                                                                } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                                    // Raw answer: "Opsi A,Opsi C" (String separated by comma)
-                                                                    // We keep it as is, but maybe verify correctness
-                                                                    const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
-                                                                    const cSet = new Set(normalize(originalQ.correctAnswer || '').split(',').map(s=>s.trim()));
-                                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-                                                                    // Clean HTML from complex answer string parts? Hard to split safely if text has commas.
-                                                                    // Assuming simple text for now or just display raw stripped
-                                                                } else {
-                                                                    // Standard Essay/FIB
-                                                                    const normAns = normalize(ans);
-                                                                    const normKey = normalize(originalQ?.correctAnswer || '');
-                                                                    isCorrect = normAns === normKey;
-                                                                }
-                                                            } catch(e) {
-                                                                // If parsing fails, use raw stripped string
-                                                            }
-
-                                                            return (
-                                                                <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                                    {/* Render HTML content for answer display */}
-                                                                    <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
-                                                                    <span className="shrink-0 font-bold">{count} ({pct}%)</span>
-                                                                </div>
-                                                            )
-                                                        })
-                                                ) : (
-                                                    <span className="text-slate-400 italic text-center py-1">Belum ada jawaban.</span>
-                                                )}
-                                            </div>
+                                            <button onClick={() => handleEdit(user)} className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50"><PencilIcon className="w-4 h-4"/></button>
                                         )}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-
-                <div className="page-break"></div>
-
-                {/* 3. DETAIL UJIAN & KUNCI */}
-                <div>
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">3. Bank Soal & Kunci Jawaban</h1>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                            return (
-                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
-                                    <div className="flex gap-3">
-                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
-                                        <div className="flex-1">
-                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            
-                                            {/* MULTIPLE CHOICE & COMPLEX */}
-                                            {q.options && (
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-                                                    {q.options.map((opt, i) => {
-                                                        const isCorrect = 
-                                                            (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
-                                                            (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
-                                                        
-                                                        return (
-                                                            <div 
-                                                                key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}
-                                                            >
-                                                                <span>{String.fromCharCode(65+i)}.</span>
-                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {/* TRUE FALSE - Explicit Table */}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="mt-2 border border-slate-200 rounded overflow-hidden">
-                                                    <table className="w-full text-[10px]">
-                                                        <thead className="bg-slate-50">
-                                                            <tr>
-                                                                <th className="p-1.5 text-left font-bold text-slate-600">Pernyataan</th>
-                                                                <th className="p-1.5 text-center w-20 font-bold text-slate-600">Kunci</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {q.trueFalseRows.map((row, rIdx) => (
-                                                                <tr key={rIdx}>
-                                                                    <td className="p-1.5">{row.text}</td>
-                                                                    <td className={`p-1.5 text-center font-bold ${row.answer ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                        {row.answer ? 'BENAR' : 'SALAH'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {/* MATCHING - Explicit Pairs */}
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                <div className="mt-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
-                                                    <p className="font-bold text-slate-500 text-[9px] uppercase mb-1">Kunci Pasangan:</p>
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {q.matchingPairs.map((pair, pIdx) => (
-                                                            <div key={pIdx} className="flex items-center gap-2">
-                                                                <span className="font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">{pair.left}</span>
-                                                                <span className="text-slate-400 text-[9px]">●──●</span>
-                                                                <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{pair.right}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* ESSAY / ISIAN - Explicit Text */}
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
-                                                <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
-                                                    <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">
-                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban Singkat:'}
-                                                    </p>
-                                                    <div className="text-emerald-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     );
-};
+}
