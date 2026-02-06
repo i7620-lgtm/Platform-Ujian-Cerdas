@@ -17,7 +17,7 @@ class StorageService {
         return {
             id: profile.id,
             fullName: profile.full_name,
-            accountType: profile.account_type,
+            accountType: profile.account_type || 'guru',
             school: profile.school,
             email: user.email
         };
@@ -182,7 +182,7 @@ class StorageService {
       return {
           id: profile.id,
           fullName: profile.full_name,
-          accountType: profile.account_type,
+          accountType: profile.account_type || 'guru',
           school: profile.school,
           email: data.user.email
       };
@@ -274,7 +274,7 @@ class StorageService {
       return (data || []).map((p: any) => ({
           id: p.id,
           fullName: p.full_name,
-          accountType: p.account_type,
+          accountType: p.account_type || 'guru',
           school: p.school,
           email: p.email
       }));
