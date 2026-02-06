@@ -1,170 +1,173 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon } from './Icons';
-import { storageService } from '../services/storage';
-import { supabase } from '../lib/supabase';
+import { 
+    ClockIcon, 
+    ListBulletIcon, 
+    CheckCircleIcon, 
+    ArrowLeftIcon,
+    ExclamationTriangleIcon,
+    WifiIcon,
+    NoWifiIcon,
+    ChevronDownIcon,
+    ChevronUpIcon
+} from './Icons';
 
 interface StudentExamPageProps {
   exam: Exam;
   student: Student;
-  initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string, grading?: any) => void;
-  onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
+  initialData: Result | null;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status: ResultStatus, activityLog: string[], location?: string, grading?: any) => Promise<void>;
 }
 
-const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+// Helper to check if answered
+const isAnswered = (q: Question, answers: Record<string, string>) => {
+    const ans = answers[q.id];
+    if (ans === undefined || ans === null || ans === '') return false;
+    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return ans.length > 0;
+    return true;
+};
 
+// Helper to calculate grade locally
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
-    let correctCount = 0;
-    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+    let correct = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
     
-    scorableQuestions.forEach((q: any) => {
-        const studentAnswer = answers[q.id];
-        if (!studentAnswer) return;
-
+    scorableQuestions.forEach(q => {
+        const ans = answers[q.id];
+        if (!ans) return;
+        
+        const normalize = (s: string) => s.trim().toLowerCase();
+        
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(normalize(studentAnswer).split(',').map((s: string) => s.trim()));
-             const correctSet = new Set(normalize(q.correctAnswer).split(',').map((s: string) => s.trim()));
-             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                 correctCount++;
-             }
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
+            if (normalize(ans) === normalize(q.correctAnswer || '')) correct++;
+        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
+            const cSet = new Set(normalize(q.correctAnswer || '').split(',').map(s=>s.trim()));
+            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correct++;
+        } else if (q.questionType === 'TRUE_FALSE') {
             try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.trueFalseRows?.every((row: any, idx: number) => {
-                    return ansObj[idx] === row.answer;
-                });
-                if (allCorrect) correctCount++;
-            } catch (e) {}
-        }
-        else if (q.questionType === 'MATCHING') {
+                const ansObj = JSON.parse(ans);
+                if (q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer)) correct++;
+            } catch(e) {}
+        } else if (q.questionType === 'MATCHING') {
             try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.matchingPairs?.every((pair: any, idx: number) => {
-                    return ansObj[idx] === pair.right;
-                });
-                if (allCorrect) correctCount++;
-            } catch (e) {}
+                const ansObj = JSON.parse(ans);
+                if (q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right)) correct++;
+            } catch(e) {}
         }
     });
-
-    const score = scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
-    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
+    
+    return {
+        score: scorableQuestions.length > 0 ? Math.round((correct / scorableQuestions.length) * 100) : 0,
+        correctAnswers: correct,
+        totalQuestions: scorableQuestions.length
+    };
 };
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
-    const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
-    const CACHED_EXAM_KEY = `exam_def_${exam.code}`;
-
-    const [answers, setAnswers] = useState<Record<string, string>>({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [userLocation, setUserLocation] = useState<string>('');
+    const STORAGE_KEY = `exam_progress_${exam.code}_${student.studentId}`;
     
-    // NAVIGATION & VALIDATION STATES
+    // State
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
+    const [timeLeft, setTimeLeft] = useState<number>(exam.config.timeLimit * 60); // seconds
     const [isNavOpen, setIsNavOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-
-    const [activeExam, setActiveExam] = useState<Exam>(exam);
-    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
-
-    const answersRef = useRef<Record<string, string>>({});
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+    
+    // Refs
+    const answersRef = useRef<Record<string, string>>(answers);
+    const timeLeftRef = useRef<number>(timeLeft);
     const logRef = useRef<string[]>(initialData?.activityLog || []);
     const isSubmittingRef = useRef(false);
-    const timeLeftRef = useRef(0);
-    const lastBroadcastTimeRef = useRef<number>(0);
+    const userLocationRef = useRef<string | undefined>(undefined);
     
-    const violationsRef = useRef(0);
-    const blurTimestampRef = useRef<number | null>(null);
-    const [cheatingWarning, setCheatingWarning] = useState<string>('');
+    // Sync refs
+    useEffect(() => { answersRef.current = answers; }, [answers]);
+    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
-    // --- REALTIME & POLLING LOGIC ---
+    // Initialize logic
     useEffect(() => {
-        const channel = supabase.channel(`exam-config-${exam.code}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
-                (payload) => {
-                    const newConfig = payload.new.config;
-                    if (newConfig) {
-                        setActiveExam(prev => {
-                            const oldLimit = prev.config.timeLimit;
-                            const newLimit = newConfig.timeLimit;
-                            if (newLimit > oldLimit) {
-                                const diff = newLimit - oldLimit;
-                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit! (Live)`);
-                                setTimeout(() => setTimeExtensionNotif(null), 5000);
-                            }
-                            return { ...prev, config: newConfig };
-                        });
-                    }
-                }
-            )
-            .subscribe();
-
-        const pollInterval = setInterval(async () => {
-            if (!navigator.onLine) return;
+        // Load from local storage if available and newer/valid
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
             try {
-                const { data } = await supabase.from('exams').select('config').eq('code', exam.code).single();
-                if (data && data.config) {
-                    setActiveExam(prev => {
-                        if (prev.config.timeLimit !== data.config.timeLimit) {
-                            const diff = data.config.timeLimit - prev.config.timeLimit;
-                            if (diff > 0) {
-                                setTimeExtensionNotif(`Sinkronisasi: Waktu tambah ${diff} menit!`);
-                                setTimeout(() => setTimeExtensionNotif(null), 5000);
-                            }
-                            return { ...prev, config: data.config };
-                        }
-                        return { ...prev, config: data.config };
-                    });
+                const parsed = JSON.parse(saved);
+                if (parsed.answers) {
+                    setAnswers(prev => ({ ...prev, ...parsed.answers }));
                 }
-            } catch (e) {}
-        }, 15000);
-
-        return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
-    }, [exam.code]);
-
-    useEffect(() => {
-        const loadState = () => {
-            try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch (e) { console.warn("Quota exceeded"); }
-            const localData = localStorage.getItem(STORAGE_KEY);
-            if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    setAnswers(parsed.answers || {});
-                    answersRef.current = parsed.answers || {};
-                    if (parsed.logs) logRef.current = parsed.logs;
-                    return;
-                } catch(e) { }
-            }
-            if (initialData?.answers) {
-                setAnswers(initialData.answers);
-                answersRef.current = initialData.answers;
-            }
-        };
-        loadState();
-    }, [STORAGE_KEY, initialData, exam]);
-
-    useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
-
-    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
-        const v = ansMap[q.id];
-        if (!v) return false;
-        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
+                if (parsed.timeLeft) {
+                    setTimeLeft(parsed.timeLeft);
+                }
+            } catch(e) { console.error("Error loading local progress", e); }
         }
-        return v.trim() !== "";
+
+        // Location tracking
+        if (exam.config.trackLocation && navigator.geolocation) {
+             navigator.geolocation.getCurrentPosition(
+                (pos) => { userLocationRef.current = `${pos.coords.latitude},${pos.coords.longitude}`; },
+                (err) => { console.warn("Location access denied", err); }
+             );
+        }
+
+        // Behavior detection
+        const handleVisibilityChange = () => {
+             if (document.hidden && exam.config.detectBehavior) {
+                 logRef.current.push(`[${new Date().toLocaleTimeString()}] Meninggalkan tab/browser`);
+             }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    // Timer Logic
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    handleSubmit(true, 'completed'); // Auto submit
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // Auto Save Logic
+    useEffect(() => {
+        const saveToLocal = () => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                answers: answersRef.current,
+                timeLeft: timeLeftRef.current,
+                timestamp: Date.now()
+            }));
+        };
+        const interval = setInterval(saveToLocal, (exam.config.autoSaveInterval || 10) * 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleAnswerChange = (qId: string, value: string) => {
+        setAnswers(prev => ({ ...prev, [qId]: value }));
     };
 
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
         if (!auto) {
             // Manual submission validation
-            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
+            const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
             const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
 
             if (unansweredCount > 0) {
@@ -180,399 +183,296 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
         
         if (isSubmittingRef.current) return;
-        
+        isSubmittingRef.current = true;
         setIsSubmitting(true);
         
-        const grading = calculateGrade(activeExam, answersRef.current);
-        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
-        
-        if (status === 'completed' || status === 'force_closed') {
-            localStorage.removeItem(STORAGE_KEY);
-        }
-    };
-
-    // --- ANTI CHEAT & UTILS ---
-    useEffect(() => {
-        if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
-
-        const showWarning = (message: string) => { setCheatingWarning(message); setTimeout(() => setCheatingWarning(''), 5000); };
-
-        const handleViolation = (type: 'soft' | 'hard', reason: string) => {
-            if (isSubmittingRef.current) return;
-            logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
-
-            if (activeExam.config.continueWithPermission) {
-                alert("PELANGGARAN TERDETEKSI: Anda meninggalkan halaman ujian. Akses dikunci.");
-                handleSubmit(true, 'force_closed');
-                return;
-            }
+        try {
+            const grading = calculateGrade(exam, answersRef.current);
+            await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocationRef.current, grading);
             
-            if (type === 'hard') {
-                violationsRef.current += 1;
-                const remaining = 3 - violationsRef.current;
-                if (remaining > 0) showWarning(`PELANGGARAN! Sisa peringatan: ${remaining}.`);
-                else { alert("PELANGGARAN BATAS MAKSIMUM! Ujian dihentikan oleh sistem."); handleSubmit(true, 'force_closed'); }
-            } else { showWarning("PERINGATAN: Tetap fokus pada halaman ini."); }
-        };
-
-        const handleVisibilityChange = () => { if (document.hidden && !isSubmittingRef.current) handleViolation('hard', 'Meninggalkan halaman ujian'); };
-        const handleBlur = () => { if (!isSubmittingRef.current) blurTimestampRef.current = Date.now(); };
-        const handleFocus = () => { if (blurTimestampRef.current && !isSubmittingRef.current) { const duration = (Date.now() - blurTimestampRef.current) / 1000; blurTimestampRef.current = null; if (duration >= 2 && duration <= 5) handleViolation('soft', `Fokus hilang ${duration.toFixed(1)}s`); else if (duration > 5) handleViolation('hard', `Fokus hilang ${duration.toFixed(1)}s`); } };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('blur', handleBlur);
-        window.addEventListener('focus', handleFocus);
-        return () => { document.removeEventListener('visibilitychange', handleVisibilityChange); window.removeEventListener('blur', handleBlur); window.removeEventListener('focus', handleFocus); };
-    }, [activeExam, student, handleSubmit]);
-
-    useEffect(() => {
-        if (activeExam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition((pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`), (err) => logRef.current.push(`[System] Gagal lokasi: ${err.message}`));
-        }
-    }, [activeExam.config.trackLocation, student.class]);
-
-    const deadline = useMemo(() => {
-        if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
-        const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
-        const start = new Date(`${dateStr}T${activeExam.config.startTime}`);
-        return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
-    }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
-
-    const [timeLeft, setTimeLeft] = useState(0);
-    useEffect(() => {
-        const tick = () => {
-            const now = Date.now();
-            const diff = Math.max(0, Math.floor((deadline - now) / 1000));
-            setTimeLeft(diff);
-            timeLeftRef.current = diff;
-            if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) handleSubmit(true, 'completed');
-        };
-        tick();
-        const timer = setInterval(tick, 1000);
-        return () => clearInterval(timer);
-    }, [deadline, handleSubmit, student.class]);
-
-    const broadcastProgress = useMemo(() => () => {
-        const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
-        const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
-        storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
-    }, [activeExam]);
-
-    const handleAnswerChange = (qId: string, val: string) => {
-        setAnswers(prev => {
-            const next = { ...prev, [qId]: val };
-            answersRef.current = next;
-            if (student.class !== 'PREVIEW') localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: next, logs: logRef.current, lastUpdated: Date.now() }));
-            return next;
-        });
-
-        if (student.class !== 'PREVIEW' && !activeExam.config.disableRealtime) {
-            const now = Date.now();
-            if (now - lastBroadcastTimeRef.current > 2000) { broadcastProgress(); lastBroadcastTimeRef.current = now; } 
-            else { if ((window as any).broadcastTimeout) clearTimeout((window as any).broadcastTimeout); (window as any).broadcastTimeout = setTimeout(() => { broadcastProgress(); lastBroadcastTimeRef.current = Date.now(); }, 2000); }
+            if (status === 'completed' || status === 'force_closed') {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        } catch (error) {
+            console.error("Gagal mengirim jawaban:", error);
+            alert("Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.");
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
         }
     };
 
-    const scrollToQuestion = (id: string) => {
-        setIsNavOpen(false);
-        const el = document.getElementById(id);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.classList.add('ring-2', 'ring-indigo-400');
-            setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-400'), 2000);
-        }
+    const currentQuestion = exam.questions[currentQuestionIndex];
+    const formatTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
-
-    const formatTime = (s: number) => {
-        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-        return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
-    };
-
-    const totalQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
-    const answeredCount = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
-    const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-    
-    // FIX: Handle undefined input for optimizeHtml
-    const optimizeHtml = (html: string) => (html || '').replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40">
-            {/* Header Ergonomis (Click-to-Expand) */}
-            <header 
-                onClick={() => setIsNavOpen(!isNavOpen)}
-                className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 h-16 flex items-center cursor-pointer select-none ${isNavOpen ? 'bg-white border-slate-200' : 'bg-white/90 backdrop-blur-md border-slate-200/60'}`}
-            >
-                 {/* Progress Bar Line */}
-                 <div className="absolute top-0 left-0 h-[2px] bg-indigo-600 transition-all duration-700 ease-out z-10" style={{width: `${progress}%`}}></div>
-                 
-                 <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 flex items-center justify-between">
-                     <div className="flex items-center gap-3 overflow-hidden">
-                         {/* Toggle Indicator */}
-                         <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${isNavOpen ? 'bg-slate-100 text-slate-600' : 'bg-transparent text-slate-400'}`}>
-                             {isNavOpen ? <ChevronUpIcon className="w-5 h-5"/> : <ChevronDownIcon className="w-5 h-5"/>}
+        <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans">
+             {/* Header */}
+             <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+                <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                           <span className="font-black text-xs">{currentQuestionIndex + 1}</span>
+                        </div>
+                        <div>
+                             <h1 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1">{exam.config.subject}</h1>
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.fullName}</span>
+                                {!isOnline && <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 flex items-center gap-1"><NoWifiIcon className="w-3 h-3"/> Offline</span>}
+                             </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${timeLeft < 300 ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                             <ClockIcon className="w-4 h-4" />
+                             <span className="font-mono font-bold text-sm tabular-nums">{formatTime(timeLeft)}</span>
                          </div>
-                         <div className="min-w-0">
-                             <h1 className="text-sm font-black text-slate-800 tracking-tight truncate">{activeExam.config.subject}</h1>
-                             <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide truncate">{isNavOpen ? 'Ketuk untuk tutup menu' : 'Ketuk header untuk navigasi'}</p>
+                         <button onClick={() => setIsNavOpen(!isNavOpen)} className="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                             <ListBulletIcon className="w-5 h-5" />
+                         </button>
+                    </div>
+                </div>
+             </header>
+
+             {/* Navigation Sidebar/Drawer */}
+             {isNavOpen && (
+                 <div className="fixed inset-0 z-40 flex justify-end">
+                     <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsNavOpen(false)}></div>
+                     <div className="relative w-80 bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+                         <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                             <h3 className="font-bold text-slate-800">Navigasi Soal</h3>
+                             <button onClick={() => setIsNavOpen(false)} className="p-1 rounded-full hover:bg-slate-100"><ArrowLeftIcon className="w-5 h-5 rotate-180" /></button>
                          </div>
-                     </div>
-                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm shrink-0 ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
-                         <ClockIcon className="w-4 h-4" />
-                         <span className="text-sm">{formatTime(timeLeft)}</span>
+                         <div className="flex-1 overflow-y-auto p-5">
+                             <div className="grid grid-cols-5 gap-3">
+                                 {exam.questions.map((q, idx) => {
+                                     const answered = isAnswered(q, answers);
+                                     const current = idx === currentQuestionIndex;
+                                     const isWarning = hasAttemptedSubmit && !answered && q.questionType !== 'INFO';
+                                     
+                                     return (
+                                         <button 
+                                            key={q.id} 
+                                            onClick={() => { setCurrentQuestionIndex(idx); setIsNavOpen(false); }}
+                                            className={`
+                                                aspect-square rounded-xl text-xs font-bold flex items-center justify-center transition-all border
+                                                ${current ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 scale-110' : 
+                                                  isWarning ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse' :
+                                                  answered ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                                                  'bg-slate-50 text-slate-500 border-slate-200 hover:bg-white hover:border-indigo-200'}
+                                            `}
+                                         >
+                                             {idx + 1}
+                                         </button>
+                                     );
+                                 })}
+                             </div>
+                         </div>
+                         <div className="p-5 border-t border-slate-100">
+                             <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 justify-center">
+                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Diisi</div>
+                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Kosong</div>
+                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-indigo-600"></div> Aktif</div>
+                             </div>
+                             <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:bg-black transition-all disabled:opacity-50">
+                                 {isSubmitting ? 'Mengirim...' : 'Kumpulkan Jawaban'}
+                             </button>
+                         </div>
                      </div>
                  </div>
-            </header>
+             )}
 
-            {/* Navigation Panel (Slide Down) */}
-            <div className={`fixed top-16 left-0 w-full bg-white/95 backdrop-blur-xl z-50 border-b border-slate-200 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? 'translate-y-0 opacity-100 visible' : '-translate-y-full opacity-0 invisible'}`}>
-                <div className="max-w-4xl mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Peta Soal</h3>
-                        <div className="flex gap-3 text-[10px] font-bold">
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-600"></div> Terjawab</div>
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-white border border-slate-300"></div> Kosong</div>
-                        </div>
-                    </div>
-                    
-                    {/* Compact Grid - Flex Wrap */}
-                    <div className="flex flex-wrap gap-2 justify-center content-start">
-                        {activeExam.questions.map((q, idx) => {
-                            if (q.questionType === 'INFO') return null;
-                            const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
-                            const answered = isAnswered(q, answers);
-                            
-                            // Determine Color Logic
-                            let btnClass = "bg-white border-slate-200 text-slate-600 hover:border-indigo-300";
-                            if (answered) {
-                                btnClass = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
-                            } else if (hasAttemptedSubmit) {
-                                btnClass = "bg-rose-50 border-rose-300 text-rose-600 animate-pulse";
-                            }
+             {/* Main Content */}
+             <main className="flex-1 max-w-3xl mx-auto w-full p-4 md:p-6 pb-24">
+                 <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden min-h-[50vh] flex flex-col">
+                     <div className="p-6 md:p-8 flex-1">
+                         <div className="flex justify-between items-start mb-6">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Soal No. {currentQuestionIndex + 1}</span>
+                            {currentQuestion.questionType !== 'INFO' && (
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-wide ${isAnswered(currentQuestion, answers) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                    {isAnswered(currentQuestion, answers) ? 'Sudah Diisi' : 'Belum Diisi'}
+                                </span>
+                            )}
+                         </div>
+                         
+                         {/* Question Text */}
+                         <div className="prose prose-slate prose-lg max-w-none mb-8">
+                             <div dangerouslySetInnerHTML={{ __html: currentQuestion.questionText }} />
+                             {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} alt="Soal" className="rounded-xl mt-4 max-h-96 object-contain" />}
+                         </div>
 
-                            return (
-                                <button
-                                    key={q.id}
-                                    onClick={() => scrollToQuestion(q.id)}
-                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg border flex items-center justify-center text-xs font-bold transition-all duration-200 active:scale-90 ${btnClass}`}
-                                >
-                                    {num}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    
-                    <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-                        <p className="text-[10px] text-slate-400">Total {answeredCount} dari {totalQuestions} soal terjawab</p>
-                    </div>
-                </div>
-            </div>
+                         {/* Answer Input Area */}
+                         <div className="space-y-4">
+                             {/* MULTIPLE CHOICE */}
+                             {currentQuestion.questionType === 'MULTIPLE_CHOICE' && currentQuestion.options && (
+                                 <div className="grid grid-cols-1 gap-3">
+                                     {currentQuestion.options.map((opt, i) => {
+                                         const isSelected = answers[currentQuestion.id] === opt;
+                                         return (
+                                             <button 
+                                                key={i}
+                                                onClick={() => handleAnswerChange(currentQuestion.id, opt)}
+                                                className={`
+                                                    text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 group
+                                                    ${isSelected ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}
+                                                `}
+                                             >
+                                                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-300'}`}>
+                                                     <span className="text-xs font-bold">{String.fromCharCode(65 + i)}</span>
+                                                 </div>
+                                                 <div className="text-sm font-medium text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: opt }} />
+                                             </button>
+                                         )
+                                     })}
+                                 </div>
+                             )}
 
-            {/* Backdrop Blur Overlay when Nav Open */}
-            <div 
-                className={`fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 ${isNavOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
-                onClick={() => setIsNavOpen(false)}
-            ></div>
+                             {/* COMPLEX MULTIPLE CHOICE */}
+                             {currentQuestion.questionType === 'COMPLEX_MULTIPLE_CHOICE' && currentQuestion.options && (
+                                 <div className="grid grid-cols-1 gap-3">
+                                     {currentQuestion.options.map((opt, i) => {
+                                         const currentAns = answers[currentQuestion.id] ? answers[currentQuestion.id].split(',') : [];
+                                         const isSelected = currentAns.includes(opt);
+                                         
+                                         const toggle = () => {
+                                             let newAns;
+                                             if (isSelected) newAns = currentAns.filter(a => a !== opt);
+                                             else newAns = [...currentAns, opt];
+                                             handleAnswerChange(currentQuestion.id, newAns.join(','));
+                                         };
 
-            {/* Notification for Time Extension */}
-            {timeExtensionNotif && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[80] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl shadow-emerald-200 text-sm font-bold animate-bounce flex items-center gap-3 w-max max-w-[90vw]">
-                    <CheckCircleIcon className="w-5 h-5 shrink-0" /> 
-                    <span>{timeExtensionNotif}</span>
-                </div>
-            )}
+                                         return (
+                                             <button 
+                                                key={i}
+                                                onClick={toggle}
+                                                className={`
+                                                    text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 group
+                                                    ${isSelected ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}
+                                                `}
+                                             >
+                                                 <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-300'}`}>
+                                                     {isSelected && <CheckCircleIcon className="w-4 h-4" />}
+                                                 </div>
+                                                 <div className="text-sm font-medium text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: opt }} />
+                                             </button>
+                                         )
+                                     })}
+                                 </div>
+                             )}
 
-            {cheatingWarning && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100 w-max max-w-[90vw]">
-                    <ExclamationTriangleIcon className="w-5 h-5 shrink-0" /> 
-                    <span>{cheatingWarning}</span>
-                </div>
-            )}
+                             {/* TRUE FALSE */}
+                             {currentQuestion.questionType === 'TRUE_FALSE' && currentQuestion.trueFalseRows && (
+                                 <div className="space-y-2">
+                                     <div className="grid grid-cols-12 gap-2 mb-2 px-2">
+                                         <div className="col-span-8 text-[10px] font-bold text-slate-400 uppercase">Pernyataan</div>
+                                         <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase text-center">Benar</div>
+                                         <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase text-center">Salah</div>
+                                     </div>
+                                     {currentQuestion.trueFalseRows.map((row, idx) => {
+                                         const currentAns = answers[currentQuestion.id] ? JSON.parse(answers[currentQuestion.id]) : {};
+                                         const setVal = (val: boolean) => {
+                                             const newObj = { ...currentAns, [idx]: val };
+                                             handleAnswerChange(currentQuestion.id, JSON.stringify(newObj));
+                                         };
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 space-y-8">
-                {activeExam.questions.map((q, idx) => {
-                    const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
-                    const answered = isAnswered(q, answers);
-                    const isMissing = hasAttemptedSubmit && !answered && q.questionType !== 'INFO';
-                    
-                    return (
-                        <div key={q.id} id={q.id} className={`scroll-mt-32 group animate-fade-in transition-all duration-500 ${isMissing ? 'ring-2 ring-rose-400 rounded-[1.5rem]' : ''}`}>
-                            <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm p-6 sm:p-8 hover:shadow-md transition-shadow">
-                                <div className="flex gap-5">
-                                    <div className="shrink-0">
-                                        <span className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-sm ${isMissing ? 'bg-rose-100 text-rose-600' : answered ? 'text-white bg-indigo-600 shadow-indigo-200' : 'text-slate-400 bg-slate-100'}`}>
-                                            {q.questionType === 'INFO' ? 'i' : num}
-                                        </span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="prose prose-slate prose-p:text-slate-700 prose-headings:text-slate-800 prose-strong:text-slate-900 prose-img:rounded-xl prose-img:shadow-sm max-w-none font-medium leading-relaxed mb-6">
-                                            <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            {/* PILIHAN GANDA */}
-                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    {q.options.map((opt, i) => {
-                                                        const isSelected = answers[q.id] === opt;
-                                                        return (
-                                                            <button 
-                                                                key={i} 
-                                                                onClick={() => handleAnswerChange(q.id, opt)} 
-                                                                className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group/opt ${isSelected ? 'border-indigo-600 bg-indigo-50/30 shadow-sm' : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50'}`}
-                                                            >
-                                                                <span className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold transition-all shrink-0 mt-0.5 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'border-slate-200 text-slate-400 bg-slate-50 group-hover/opt:border-indigo-300'}`}>
-                                                                    {String.fromCharCode(65 + i)}
-                                                                </span>
-                                                                <div className="text-sm text-slate-600 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {/* PG KOMPLEKS */}
-                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    {q.options.map((opt, i) => {
-                                                        const currentAns = answers[q.id] ? answers[q.id].split(',') : [];
-                                                        const isSelected = currentAns.includes(opt);
-                                                        return (
-                                                            <button 
-                                                                key={i} 
-                                                                onClick={() => {
-                                                                    const newAns = isSelected ? currentAns.filter(a => a !== opt) : [...currentAns, opt];
-                                                                    handleAnswerChange(q.id, newAns.join(','));
-                                                                }} 
-                                                                className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group/opt ${isSelected ? 'border-indigo-600 bg-indigo-50/30 shadow-sm' : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50'}`}
-                                                            >
-                                                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600 shadow-sm' : 'border-slate-200 bg-slate-50 group-hover/opt:border-indigo-300'}`}>
-                                                                    {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
-                                                                </div>
-                                                                <div className="text-sm text-slate-600 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {/* BENAR SALAH */}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                                                            <tr>
-                                                                <th className="p-4 text-left">Pernyataan</th>
-                                                                <th className="p-4 text-center w-20">Benar</th>
-                                                                <th className="p-4 text-center w-20">Salah</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100 bg-white">
-                                                            {q.trueFalseRows.map((row, i) => {
-                                                                const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
-                                                                return (
-                                                                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                                                        <td className="p-4 font-medium text-slate-700">{row.text}</td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === true} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))} className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === false} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))} className="w-5 h-5 text-rose-600 focus:ring-rose-500 cursor-pointer" /></td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {/* MENJODOHKAN */}
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                <div className="space-y-3">
-                                                    {(() => {
-                                                        const rightOptions = useMemo(() => {
-                                                            const opts = q.matchingPairs!.map(p => p.right);
-                                                            for (let i = opts.length - 1; i > 0; i--) { 
-                                                                const j = Math.floor(Math.random() * (i + 1)); 
-                                                                [opts[i], opts[j]] = [opts[j], opts[i]]; 
-                                                            }
-                                                            return opts;
-                                                        }, [q.id]);
-
-                                                        return q.matchingPairs.map((pair, i) => {
-                                                            const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
-                                                            return (
-                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                                                    <div className="flex-1 font-bold text-slate-700 text-sm">{pair.left}</div>
-                                                                    <div className="hidden sm:block text-slate-300">→</div>
-                                                                    <div className="flex-1 relative">
-                                                                        <select value={currentAnsObj[i] || ''} onChange={(e) => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: e.target.value }))} className="w-full appearance-none bg-white border border-slate-200 text-slate-700 py-3 px-4 pr-10 rounded-lg text-sm font-bold focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer shadow-sm">
-                                                                            <option value="" disabled>Pilih Pasangan...</option>
-                                                                            {rightOptions.map((opt, idx) => (
-                                                                                <option key={idx} value={opt}>{opt}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500"><ChevronDownIcon className="w-4 h-4"/></div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        });
-                                                    })()}
-                                                </div>
-                                            )}
-
-                                            {/* ESSAY */}
-                                            {q.questionType === 'ESSAY' && (
-                                                <div className="relative">
-                                                    <textarea 
-                                                        value={answers[q.id] || ''} 
-                                                        onChange={e => handleAnswerChange(q.id, e.target.value)} 
-                                                        className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none min-h-[160px] text-sm text-slate-700 placeholder:text-slate-400 transition-all resize-y" 
-                                                        placeholder="Tulis jawaban lengkap Anda di sini..." 
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* ISIAN SINGKAT */}
-                                            {q.questionType === 'FILL_IN_THE_BLANK' && (
-                                                <div className="relative group/input">
-                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                        <PencilIcon className="w-5 h-5 text-slate-400 group-focus-within/input:text-indigo-500 transition-colors" />
-                                                    </div>
-                                                    <input 
-                                                        type="text" 
-                                                        value={answers[q.id] || ''} 
-                                                        onChange={e => handleAnswerChange(q.id, e.target.value)} 
-                                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm font-bold text-slate-800 placeholder:text-slate-400 transition-all" 
-                                                        placeholder="Ketik jawaban singkat..." 
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </main>
-
-            <div className="fixed bottom-8 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
-                <div className="bg-white p-2 rounded-[1.2rem] shadow-2xl shadow-slate-300/50 border border-white ring-1 ring-slate-100 pointer-events-auto flex items-center gap-4 transition-transform hover:scale-105">
-                    <div className="pl-4 flex flex-col justify-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-slate-800">{answeredCount}</span>
-                            <span className="text-xs font-bold text-slate-400">/ {totalQuestions}</span>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={() => handleSubmit(false)} 
-                        disabled={isSubmitting} 
-                        className="bg-slate-900 text-white pl-6 pr-6 py-3 rounded-xl font-bold text-xs hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed group"
-                    >
-                        <span>{isSubmitting ? 'Mengirim...' : 'Selesai'}</span>
-                        <CheckCircleIcon className="w-4 h-4 group-hover:text-emerald-300 transition-colors"/>
-                    </button>
-                </div>
-            </div>
+                                         return (
+                                             <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                 <div className="col-span-8 text-sm font-medium text-slate-700">{row.text}</div>
+                                                 <div className="col-span-2 flex justify-center">
+                                                     <button onClick={() => setVal(true)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${currentAns[idx] === true ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'}`}>B</button>
+                                                 </div>
+                                                 <div className="col-span-2 flex justify-center">
+                                                     <button onClick={() => setVal(false)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${currentAns[idx] === false ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-slate-300'}`}>S</button>
+                                                 </div>
+                                             </div>
+                                         )
+                                     })}
+                                 </div>
+                             )}
+                             
+                             {/* ESSAY & FILL IN THE BLANK */}
+                             {(currentQuestion.questionType === 'ESSAY' || currentQuestion.questionType === 'FILL_IN_THE_BLANK') && (
+                                 <textarea
+                                    value={answers[currentQuestion.id] || ''}
+                                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all min-h-[150px] text-sm font-medium text-slate-800 leading-relaxed resize-y"
+                                    placeholder={currentQuestion.questionType === 'ESSAY' ? "Tulis jawaban uraian Anda di sini..." : "Tulis jawaban singkat di sini..."}
+                                 />
+                             )}
+                             
+                             {/* MATCHING */}
+                             {currentQuestion.questionType === 'MATCHING' && currentQuestion.matchingPairs && (
+                                 <div className="space-y-4">
+                                     <p className="text-xs text-slate-500 italic">Pasangkan item kiri dengan item kanan yang sesuai.</p>
+                                     {currentQuestion.matchingPairs.map((pair, idx) => {
+                                          const currentAns = answers[currentQuestion.id] ? JSON.parse(answers[currentQuestion.id]) : {};
+                                          const onChange = (val: string) => {
+                                              const newObj = { ...currentAns, [idx]: val };
+                                              handleAnswerChange(currentQuestion.id, JSON.stringify(newObj));
+                                          };
+                                          return (
+                                              <div key={idx} className="flex flex-col md:flex-row gap-2 md:items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                  <div className="flex-1 text-sm font-bold text-slate-700 bg-white p-2 rounded border border-slate-200">{pair.left}</div>
+                                                  <div className="text-slate-400 hidden md:block">→</div>
+                                                  <input 
+                                                    type="text" 
+                                                    value={currentAns[idx] || ''} 
+                                                    onChange={e => onChange(e.target.value)}
+                                                    className="flex-1 p-2 text-sm border border-slate-200 rounded focus:border-indigo-500 outline-none"
+                                                    placeholder="Tulis pasangan..."
+                                                  />
+                                              </div>
+                                          )
+                                     })}
+                                 </div>
+                             )}
+                             
+                             {currentQuestion.questionType === 'INFO' && (
+                                 <div className="text-center p-8 bg-blue-50 rounded-xl text-blue-600 font-bold text-sm">
+                                     Ini adalah informasi. Silakan baca dengan seksama dan lanjutkan ke soal berikutnya.
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                     
+                     {/* Footer Navigation */}
+                     <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                         <button 
+                            onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                            disabled={currentQuestionIndex === 0}
+                            className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm shadow-sm"
+                         >
+                             <ArrowLeftIcon className="w-4 h-4" /> Sebelumnya
+                         </button>
+                         
+                         {currentQuestionIndex === exam.questions.length - 1 ? (
+                             <button 
+                                onClick={() => handleSubmit(false)}
+                                disabled={isSubmitting}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all text-sm shadow-lg shadow-indigo-200 disabled:opacity-70"
+                             >
+                                 {isSubmitting ? 'Mengirim...' : 'Selesai & Kumpulkan'} <CheckCircleIcon className="w-4 h-4" />
+                             </button>
+                         ) : (
+                             <button 
+                                onClick={() => setCurrentQuestionIndex(prev => Math.min(exam.questions.length - 1, prev + 1))}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-slate-900 hover:bg-black transition-all text-sm shadow-lg shadow-slate-200"
+                             >
+                                 Selanjutnya <ArrowLeftIcon className="w-4 h-4 rotate-180" />
+                             </button>
+                         )}
+                     </div>
+                 </div>
+                 
+                 <div className="mt-8 text-center">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">UjianCerdas • Secure Exam Environment</p>
+                 </div>
+             </main>
         </div>
     );
 };
