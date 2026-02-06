@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Student } from '../types';
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon } from './Icons';
