@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Student } from '../types';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon } from './Icons';
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentLoginProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -15,6 +16,12 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem('saved_student_absent') || '');
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
+  
+  // Session Security States
+  const [isLocked, setIsLocked] = useState(false);
+  const [unlockToken, setUnlockToken] = useState('');
+  const [isLoadingCheck, setIsLoadingCheck] = useState(false);
+
   const examCodeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -23,7 +30,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!examCode || !fullName || !studentClass || !absentNumber) {
       setError('Mohon lengkapi semua data identitas.');
@@ -35,15 +42,115 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
 
-    const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+    // NEW ID FORMAT: Nama-Kelas-Absen-KodeUjian
+    // Ensures ID is unique per exam session
+    const cleanExamCode = examCode.trim().toUpperCase();
+    const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}-${cleanExamCode}`;
 
-    onLoginSuccess(examCode.toUpperCase(), {
-      fullName: fullName.trim(),
-      class: studentClass.trim(),
-      absentNumber: absentNumber.trim(),
-      studentId: compositeId, 
-    });
+    setIsLoadingCheck(true);
+    try {
+        const localKey = `exam_local_${cleanExamCode}_${compositeId}`;
+        const hasLocalData = localStorage.getItem(localKey);
+        
+        // Security Check: If no local data found (New Device/Incognito), check Server Status
+        if (!hasLocalData) {
+            const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
+            if (remoteResult && remoteResult.status === 'in_progress') {
+                // Session exists on another device -> Lock it
+                setIsLocked(true);
+                setIsLoadingCheck(false);
+                return;
+            }
+        }
+    } catch (e) {
+        console.error("Session check error", e);
+    }
+    setIsLoadingCheck(false);
+
+    proceedLogin(cleanExamCode, compositeId);
   };
+
+  const proceedLogin = (code: string, id: string) => {
+      onLoginSuccess(code, {
+          fullName: fullName.trim(),
+          class: studentClass.trim(),
+          absentNumber: absentNumber.trim(),
+          studentId: id,
+      });
+  };
+
+  const handleUnlockSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!unlockToken || unlockToken.length < 4) {
+          setError("Masukkan kode token 4 digit.");
+          return;
+      }
+      
+      setIsLoadingCheck(true);
+      setError('');
+      
+      try {
+          const cleanExamCode = examCode.trim().toUpperCase();
+          const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}-${cleanExamCode}`;
+          
+          const isValid = await storageService.verifyUnlockToken(cleanExamCode, compositeId, unlockToken);
+          
+          if (isValid) {
+              setIsLocked(false);
+              proceedLogin(cleanExamCode, compositeId);
+          } else {
+              setError("Kode Token Salah atau Kadaluarsa.");
+          }
+      } catch (e) {
+          setError("Gagal memverifikasi token. Periksa koneksi.");
+      } finally {
+          setIsLoadingCheck(false);
+      }
+  };
+
+  if (isLocked) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] font-sans">
+            <div className="w-full max-w-[380px] px-6">
+                <div className="bg-white p-8 rounded-3xl shadow-xl border border-rose-100 text-center animate-gentle-slide">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 ring-4 ring-rose-50/50">
+                        <LockClosedIcon className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-800 mb-2">Sesi Terkunci</h2>
+                    <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                        Akun <strong>{fullName}</strong> sedang aktif mengerjakan ujian ini di perangkat lain. 
+                        <br/><br/>
+                        Minta <strong>Kode Token</strong> kepada Guru Pengawas untuk melanjutkan di perangkat ini.
+                    </p>
+
+                    <form onSubmit={handleUnlockSubmit} className="space-y-4">
+                        <input 
+                            type="text" 
+                            value={unlockToken}
+                            onChange={(e) => setUnlockToken(e.target.value)}
+                            className="w-full text-center text-2xl font-mono font-bold tracking-[0.5em] py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-rose-400 focus:bg-white outline-none transition-all uppercase"
+                            placeholder="0000"
+                            maxLength={4}
+                            autoFocus
+                        />
+                        
+                        {error && <p className="text-xs font-bold text-rose-500 animate-pulse">{error}</p>}
+
+                        <button 
+                            type="submit" 
+                            disabled={isLoadingCheck}
+                            className="w-full bg-rose-500 text-white font-bold py-3.5 rounded-xl hover:bg-rose-600 transition-all shadow-lg shadow-rose-200 disabled:opacity-70"
+                        >
+                            {isLoadingCheck ? 'Memeriksa...' : 'Buka Kunci'}
+                        </button>
+                    </form>
+                    
+                    <button onClick={() => { setIsLocked(false); setError(''); }} className="mt-6 text-xs font-bold text-slate-400 hover:text-slate-600">Batal / Kembali</button>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-800">
@@ -170,12 +277,19 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     )}
                     
                     <button 
-                        type="submit" 
-                        className="w-full bg-slate-900 text-white font-bold text-sm h-[56px] rounded-2xl hover:bg-black hover:shadow-xl hover:shadow-slate-200 transition-all active:scale-[0.98] mt-6 flex items-center justify-center gap-3 group relative overflow-hidden"
+                        type="submit"
+                        disabled={isLoadingCheck} 
+                        className="w-full bg-slate-900 text-white font-bold text-sm h-[56px] rounded-2xl hover:bg-black hover:shadow-xl hover:shadow-slate-200 transition-all active:scale-[0.98] mt-6 flex items-center justify-center gap-3 group relative overflow-hidden disabled:opacity-70"
                     >
-                        <span className="relative z-10">Mulai Mengerjakan</span>
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                        <CheckCircleIcon className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300 transition-colors relative z-10" />
+                        {isLoadingCheck ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                            <>
+                                <span className="relative z-10">Mulai Mengerjakan</span>
+                                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                                <CheckCircleIcon className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300 transition-colors relative z-10" />
+                            </>
+                        )}
                     </button>
                 </form>
             </div>
