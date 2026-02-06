@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, TeacherProfile, Student, AccountType, UserProfile, ResultStatus } from '../types';
+import type { Exam, Result, TeacherProfile, Student, UserProfile, AccountType, ResultStatus } from '../types';
 
 class StorageService {
   async getCurrentUser(): Promise<TeacherProfile | null> {
@@ -19,7 +19,7 @@ class StorageService {
       id: profile.id,
       fullName: profile.full_name,
       school: profile.school,
-      accountType: profile.account_type,
+      accountType: profile.account_type || 'guru',
       email: session.user.email
     };
   }
@@ -40,7 +40,7 @@ class StorageService {
       id: profile.id,
       fullName: profile.full_name,
       school: profile.school,
-      accountType: profile.account_type,
+      accountType: profile.account_type || 'guru',
       email: data.session.user.email
     };
   }
@@ -276,7 +276,7 @@ class StorageService {
           fullName: p.full_name,
           email: p.email,
           school: p.school,
-          accountType: p.account_type,
+          accountType: p.account_type || 'guru',
           createdAt: p.created_at
       }));
   }
