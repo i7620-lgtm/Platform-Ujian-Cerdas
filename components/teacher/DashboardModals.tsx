@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -19,7 +19,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null); // NEW STATE for Token
+    const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -30,11 +30,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         if (!displayExam) return;
         if (!silent) setIsRefreshing(true);
         try {
-            // Fetch Results
             const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
             setLocalResults(data);
 
-            // Fetch Exam Config (Untuk sinkronisasi waktu jika guru lain mengubahnya)
             const { data: examData } = await supabase.from('exams').select('config').eq('code', displayExam.code).single();
             if (examData && examData.config) {
                 setDisplayExam(prev => prev ? ({ ...prev, config: examData.config }) : null);
@@ -49,7 +47,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         return () => clearInterval(intervalId);
     }, [displayExam?.code, selectedClass, teacherProfile]);
 
-    // REPAIR: Hybrid Realtime + Polling logic for Teacher
     useEffect(() => {
         if (!displayExam) return;
         
@@ -70,17 +67,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             })
             .subscribe();
 
-        // Listen for config changes (Realtime part)
         const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'exams',
-                    filter: `code=eq.${displayExam.code}`
-                },
-                (payload) => {
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
                      const newConfig = payload.new.config;
                      if (newConfig) {
                          setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
@@ -97,11 +85,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     if (!displayExam) return null;
 
-    // NEW: Handle Generate Token
     const handleGenerateToken = async (studentId: string, studentName: string) => {
         if (processingIdsRef.current.has(studentId)) return;
         processingIdsRef.current.add(studentId);
-        
         try {
             const token = await storageService.generateUnlockToken(displayExam.code, studentId);
             setGeneratedTokenData({ name: studentName, token });
@@ -112,32 +98,274 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         }
     };
 
-    const handleUnlockClick = async (studentId: string, examCode: string) => { processingIdsRef.current.add(studentId); setLocalResults(prev => prev.map(r => r.student.studentId === studentId ? { ...r, status: 'in_progress' } : r)); try { await storageService.unlockStudentExam(examCode, studentId); onAllowContinuation(studentId, examCode); fetchLatest(true); } catch (error) { alert("Gagal membuka kunci."); fetchLatest(true); } finally { setTimeout(() => processingIdsRef.current.delete(studentId), 3000); } };
     const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); fetchLatest(true); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
-    const getRelativeTime = (timestamp?: number) => { if (!timestamp) return 'Offline'; const diff = Math.floor((Date.now() - timestamp) / 1000); if (diff < 60) return `${diff}dt lalu`; return `${Math.floor(diff/60)}mnt lalu`; };
+    
+    const getRelativeTime = (timestamp?: number) => { 
+        if (!timestamp) return '-'; 
+        const diff = Math.floor((Date.now() - timestamp) / 1000); 
+        if (diff < 60) return 'Baru saja';
+        if (diff < 3600) return `${Math.floor(diff/60)}m lalu`; 
+        return `${Math.floor(diff/3600)}j lalu`; 
+    };
+    
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
 
     return (
         <>
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"><div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[85vh] flex flex-col overflow-hidden relative border border-white"><div className="px-8 py-6 border-b border-slate-100 flex flex-col gap-6 bg-white sticky top-0 z-20"><div className="flex justify-between items-start"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100"><WifiIcon className="w-6 h-6"/></div><div><h2 className="text-xl font-black text-slate-800 tracking-tight">Live Monitoring</h2><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span><RemainingTime exam={displayExam} />{isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Memuat...</span>}</div></div></div><div className="flex items-center gap-2">{!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (<button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><ShareIcon className="w-4 h-4"/> Akses Orang Tua</button>)}{!isReadOnly && !isLargeScale && (<button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100"><PlusCircleIcon className="w-4 h-4"/> Tambah Waktu</button>)}<button onClick={onClose} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all"><XMarkIcon className="w-6 h-6"/></button></div></div><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-400"><div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>{isLargeScale ? 'Database Sync Active' : 'Broadcast Realtime Active'}</div><div className="flex items-center gap-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span><select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer hover:bg-white"><option value="ALL">SEMUA KELAS</option>{Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}</select></div></div></div><div className="flex-1 overflow-auto p-6 bg-slate-50/30">{isAddTimeOpen && !isReadOnly && (<div className="mb-6 p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white animate-slide-in-up flex items-center justify-between"><div><h4 className="font-black text-lg">Tambah Durasi Ujian</h4><p className="text-white/70 text-sm">Waktu tambahan akan berlaku untuk semua siswa.</p></div><div className="flex gap-2"><input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-24 px-4 py-3 bg-white/20 border border-white/30 rounded-2xl outline-none text-white font-bold placeholder:text-white/50 text-center"/><button onClick={handleAddTimeSubmit} className="px-6 bg-white text-indigo-600 font-black text-sm uppercase rounded-2xl hover:bg-indigo-50 transition-colors">Tambah</button><button onClick={()=>setIsAddTimeOpen(false)} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20"><XMarkIcon className="w-5 h-5"/></button></div></div>)}<div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden"><table className="w-full text-left"><thead className="bg-slate-50/50"><tr><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Siswa</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kelas</th><th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progres</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terakhir Aktif</th>}{!isLargeScale && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>}</tr></thead><tbody className="divide-y divide-slate-50">{localResults.length > 0 ? localResults.map((r) => { const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; const broadcastData = broadcastProgressRef.current[r.student.studentId]; const answered = r.status === 'in_progress' && broadcastData ? broadcastData.answered : Object.keys(r.answers).length; const lastActive = r.status === 'in_progress' && broadcastData ? broadcastData.timestamp : r.timestamp; const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0; return (<tr key={r.student.studentId} className="hover:bg-slate-50/50 transition-colors"><td className="px-6 py-4"><div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div><div className="text-[10px] text-slate-300 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div></td><td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{r.student.class}</td><td className="px-6 py-4"><div className="flex justify-center">{r.status === 'force_closed' ? (<span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-rose-100" title={r.activityLog?.slice(-1)[0]}><LockClosedIcon className="w-3 h-3"/> Dihentikan</span>) : r.status === 'completed' ? (<span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5"><CheckCircleIcon className="w-3 h-3"/> Selesai</span>) : (<span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 ring-1 ring-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Mengerjakan</span>)}</div></td>{!isLargeScale && (<td className="px-6 py-4"><div className="flex flex-col items-center gap-1.5"><div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div></div><span className="text-[10px] font-black text-slate-400">{answered}/{totalQ} Soal</span></div></td>)}{!isLargeScale && (<td className="px-6 py-4 text-center text-[10px] font-mono font-bold text-slate-400">{getRelativeTime(lastActive)}</td>)}{!isLargeScale && (<td className="px-6 py-4 text-right">{(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (<button onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} className="px-4 py-2 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase rounded-xl hover:bg-indigo-100 hover:text-indigo-800 transition-all border border-indigo-200">Buat Token</button>)}</td>)}</tr>); }) : (<tr><td colSpan={isLargeScale ? 3 : 6} className="px-6 py-20 text-center text-slate-300 font-medium italic">Belum ada aktivitas siswa...</td></tr>)}</tbody></table></div></div></div></div>
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
+                <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white">
+                    {/* Header Modal */}
+                    <div className="px-6 py-5 border-b border-slate-100 flex flex-col gap-4 bg-white sticky top-0 z-20 shadow-sm">
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                                    <SignalIcon className="w-5 h-5"/>
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-black text-slate-800 tracking-tight">Live Monitoring</h2>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 tracking-widest uppercase">{displayExam.code}</span>
+                                        <RemainingTime exam={displayExam} />
+                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 animate-pulse">Sync...</span>}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
+                                    <button onClick={() => setIsShareModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
+                                        <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
+                                    </button>
+                                )}
+                                {!isReadOnly && !isLargeScale && (
+                                    <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
+                                        <PlusCircleIcon className="w-4 h-4"/> <span className="hidden sm:inline">Waktu</span>
+                                    </button>
+                                )}
+                                <button onClick={onClose} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all border border-transparent hover:border-rose-100">
+                                    <XMarkIcon className="w-5 h-5"/>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                {isLargeScale ? 'Sync Mode (Hemat Data)' : 'Realtime Mode'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
+                                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-sm">
+                                    <option value="ALL">SEMUA KELAS</option>
+                                    {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content Area */}
+                    <div className="flex-1 overflow-auto bg-slate-50/50 p-4 sm:p-6 relative">
+                        {isAddTimeOpen && !isReadOnly && (
+                            <div className="mb-6 p-5 bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-200 text-white animate-slide-in-up flex items-center justify-between sticky top-0 z-30 mx-1">
+                                <div>
+                                    <h4 className="font-black text-sm uppercase tracking-wide">Tambah Waktu</h4>
+                                    <p className="text-white/70 text-xs">Berlaku untuk semua siswa.</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input type="number" placeholder="Menit" value={addTimeValue} onChange={e=>setAddTimeValue(parseInt(e.target.value))} className="w-20 px-3 py-2 bg-white/20 border border-white/30 rounded-xl outline-none text-white font-bold placeholder:text-white/50 text-center text-sm"/>
+                                    <button onClick={handleAddTimeSubmit} className="px-4 py-2 bg-white text-indigo-600 font-black text-xs uppercase rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">Simpan</button>
+                                    <button onClick={()=>setIsAddTimeOpen(false)} className="p-2 bg-white/10 rounded-xl hover:bg-white/20"><XMarkIcon className="w-4 h-4"/></button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TABEL LIVE MONITOR - DESAIN BARU */}
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden min-h-[300px] flex flex-col">
+                            <div className="overflow-x-auto custom-scrollbar flex-1">
+                                <table className="w-full min-w-[900px] text-left border-collapse">
+                                    <thead className="bg-slate-50/80 backdrop-blur-md text-slate-500 sticky top-0 z-10 border-b border-slate-100">
+                                        <tr>
+                                            {/* Kolom 1: Siswa */}
+                                            <th className="px-5 py-4 w-64">
+                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <UserIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Identitas Siswa</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 2: Kelas */}
+                                            <th className="px-5 py-4 w-32">
+                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <ListBulletIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Kelas</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 3: Status */}
+                                            <th className="px-5 py-4 text-center w-32">
+                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <div className="w-3 h-3 rounded-full border-2 border-slate-300 sm:hidden"></div>
+                                                    <span className="hidden sm:inline">Status</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 4: Progress */}
+                                            <th className="px-5 py-4 text-center w-40">
+                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <ChartBarIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Progres</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 5: Terakhir Aktif */}
+                                            <th className="px-5 py-4 text-center w-32">
+                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <ClockIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Aktif</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 6: Lokasi (BARU) */}
+                                            <th className="px-5 py-4 text-center w-32">
+                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <SignalIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Lokasi</span>
+                                                </div>
+                                            </th>
+                                            {/* Kolom 7: Aksi */}
+                                            <th className="px-5 py-4 text-right w-32">
+                                                <div className="flex items-center justify-end gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                    <LockClosedIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Aksi</span>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {localResults.length > 0 ? localResults.map((r) => { 
+                                            const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; 
+                                            const broadcastData = broadcastProgressRef.current[r.student.studentId]; 
+                                            
+                                            // Logic Progress & Timestamp
+                                            const answered = r.status === 'in_progress' && broadcastData ? broadcastData.answered : Object.keys(r.answers).length; 
+                                            const lastActive = r.status === 'in_progress' && broadcastData ? broadcastData.timestamp : r.timestamp; 
+                                            const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0; 
+                                            
+                                            return (
+                                                <tr key={r.student.studentId} className="hover:bg-slate-50/80 transition-colors group">
+                                                    {/* 1. Siswa */}
+                                                    <td className="px-5 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100 shadow-sm">
+                                                                {r.student.fullName.charAt(0)}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-slate-800 text-sm">{r.student.fullName}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono tracking-wide">#{r.student.studentId.split('-').pop()}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {/* 2. Kelas */}
+                                                    <td className="px-5 py-3">
+                                                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200">{r.student.class}</span>
+                                                    </td>
+                                                    {/* 3. Status */}
+                                                    <td className="px-5 py-3">
+                                                        <div className="flex justify-center">
+                                                            {r.status === 'force_closed' ? (
+                                                                <span className="px-2.5 py-1 bg-rose-50 text-rose-600 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-rose-100" title={r.activityLog?.slice(-1)[0]}>
+                                                                    <LockClosedIcon className="w-3 h-3"/> Locked
+                                                                </span>
+                                                            ) : r.status === 'completed' ? (
+                                                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-slate-200">
+                                                                    <CheckCircleIcon className="w-3 h-3"/> Selesai
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-emerald-100 shadow-sm">
+                                                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Online
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    {/* 4. Progress */}
+                                                    <td className="px-5 py-3">
+                                                        {isLargeScale ? (
+                                                            <div className="text-center text-[10px] text-slate-400 italic">Hidden</div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
+                                                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                                                    <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
+                                                                </div>
+                                                                <span className="text-[9px] font-bold text-slate-500">{answered} / {totalQ} Soal ({progress}%)</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    {/* 5. Last Active */}
+                                                    <td className="px-5 py-3 text-center">
+                                                        {isLargeScale ? (
+                                                            <span className="text-[10px] text-slate-300">-</span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                                                {getRelativeTime(lastActive)}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    {/* 6. Lokasi (NEW) */}
+                                                    <td className="px-5 py-3 text-center">
+                                                        {r.location ? (
+                                                            <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-blue-100">
+                                                                Maps ↗
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-300 italic">N/A</span>
+                                                        )}
+                                                    </td>
+                                                    {/* 7. Aksi */}
+                                                    <td className="px-5 py-3 text-right">
+                                                        {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
+                                                            <button 
+                                                                onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
+                                                                className="px-3 py-1.5 bg-white text-indigo-600 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 hover:text-indigo-700 transition-all border border-indigo-200 shadow-sm active:scale-95 whitespace-nowrap"
+                                                            >
+                                                                Buat Token
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ); 
+                                        }) : (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-20 text-center">
+                                                    <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
+                                                        <UserIcon className="w-8 h-8 opacity-20"/>
+                                                        <span className="text-sm font-medium italic">Belum ada siswa yang bergabung...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 font-medium flex justify-between items-center sticky bottom-0">
+                                <span>Total: {localResults.length} Siswa</span>
+                                <span>Updated: {new Date().toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             {/* Generated Token Modal */}
             {generatedTokenData && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
                     <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border border-white relative animate-slide-in-up">
-                        <button onClick={() => setGeneratedTokenData(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 rounded-full"><XMarkIcon className="w-5 h-5"/></button>
+                        <button onClick={() => setGeneratedTokenData(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
                         <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-emerald-50/50">
                             <LockClosedIcon className="w-8 h-8" />
                         </div>
                         <h3 className="text-lg font-black text-slate-800 mb-1">Kode Akses Dibuat!</h3>
-                        <p className="text-xs text-slate-500 mb-6">Berikan kode ini kepada <strong>{generatedTokenData.name}</strong> untuk membuka sesi.</p>
+                        <p className="text-xs text-slate-500 mb-6 px-4">Berikan kode ini kepada <strong>{generatedTokenData.name}</strong> untuk membuka sesi ujian.</p>
                         
-                        <div className="bg-slate-50 border-2 border-slate-200 rounded-xl py-4 mb-6">
-                            <span className="text-4xl font-mono font-black tracking-[0.2em] text-slate-800">{generatedTokenData.token}</span>
+                        <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl py-5 mb-6 shadow-inner">
+                            <span className="text-4xl font-mono font-black tracking-[0.25em] text-slate-800">{generatedTokenData.token}</span>
                         </div>
                         
-                        <button onClick={() => setGeneratedTokenData(null)} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all">Tutup</button>
+                        <button onClick={() => setGeneratedTokenData(null)} className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider">Tutup</button>
                     </div>
                 </div>
             )}
