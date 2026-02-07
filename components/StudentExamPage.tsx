@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon } from './Icons';
@@ -84,28 +83,34 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     // --- REALTIME & POLLING LOGIC (Robust Time Sync) ---
     useEffect(() => {
-        const channel = supabase.channel(`exam-config-${exam.code}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
-                (payload) => {
-                    const newConfig = payload.new.config;
-                    if (newConfig) {
-                        setActiveExam(prev => {
-                            const oldLimit = prev.config.timeLimit;
-                            const newLimit = newConfig.timeLimit;
-                            if (newLimit > oldLimit) {
-                                const diff = newLimit - oldLimit;
-                                setTimeExtensionNotif(`Waktu diperpanjang +${diff} menit!`);
-                                setTimeout(() => setTimeExtensionNotif(null), 5000);
-                            }
-                            return { ...prev, config: newConfig };
-                        });
-                    }
-                }
-            )
-            .subscribe();
+        let channel: any = null;
 
+        // Hanya aktifkan WebSocket jika Mode Skala Besar dimatikan
+        if (!exam.config.disableRealtime) {
+            channel = supabase.channel(`exam-config-${exam.code}`)
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
+                    (payload) => {
+                        const newConfig = payload.new.config;
+                        if (newConfig) {
+                            setActiveExam(prev => {
+                                const oldLimit = prev.config.timeLimit;
+                                const newLimit = newConfig.timeLimit;
+                                if (newLimit > oldLimit) {
+                                    const diff = newLimit - oldLimit;
+                                    setTimeExtensionNotif(`Waktu diperpanjang +${diff} menit!`);
+                                    setTimeout(() => setTimeExtensionNotif(null), 5000);
+                                }
+                                return { ...prev, config: newConfig };
+                            });
+                        }
+                    }
+                )
+                .subscribe();
+        }
+
+        // Polling via HTTP selalu berjalan (sebagai cadangan atau metode utama di Sync Mode)
         const pollInterval = setInterval(async () => {
             if (!navigator.onLine) return;
             try {
@@ -124,10 +129,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     });
                 }
             } catch (e) {}
-        }, 15000);
+        }, 15000); // Cek setiap 15 detik
 
-        return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
-    }, [exam.code]);
+        return () => { 
+            if (channel) supabase.removeChannel(channel); 
+            clearInterval(pollInterval); 
+        };
+    }, [exam.code, exam.config.disableRealtime]);
 
     // LOAD STATE FROM INDEXED DB (Async)
     useEffect(() => {
