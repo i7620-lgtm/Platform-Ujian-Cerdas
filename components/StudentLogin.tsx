@@ -76,36 +76,29 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       const cleanExamCode = examCode.toUpperCase().trim();
       const compositeId = `${fullName.trim()}-${className.trim()}-${absentNumber.trim()}`;
       
-      // Return promise to allow button loading state
-      return storageService.verifyUnlockToken(cleanExamCode, compositeId, token)
-        .then((verified) => {
-            if (verified) {
-                // Construct data again
-                const studentData: Student = {
-                    fullName: fullName.trim(),
-                    class: className.trim(),
-                    absentNumber: absentNumber.trim(),
-                    studentId: compositeId
-                };
-                
-                // DIRECT RESUME: Bypass login form
-                // Panggil onLoginSuccess langsung karena status di DB sudah 'in_progress'
-                onLoginSuccess(cleanExamCode, studentData);
-            } else {
-                alert("Token salah.");
-                throw new Error("Invalid token");
-            }
-        })
-        .catch((e) => {
-            if (e.message !== "Invalid token") alert("Gagal verifikasi token.");
-            throw e;
-        });
+      try {
+          const verified = await storageService.verifyUnlockToken(cleanExamCode, compositeId, token);
+          if (verified) {
+             const studentData: Student = {
+                fullName: fullName.trim(),
+                class: className.trim(),
+                absentNumber: absentNumber.trim(),
+                studentId: compositeId
+             };
+             setIsLocked(false);
+             onLoginSuccess(cleanExamCode, studentData);
+          } else {
+             alert("Token salah.");
+          }
+      } catch(e) {
+          alert("Gagal verifikasi token.");
+      }
   };
 
   if (isLocked) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-rose-50 p-6 font-sans">
-              <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center border border-rose-100 animate-fade-in">
+              <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center border border-rose-100">
                   <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <LockClosedIcon className="w-8 h-8"/>
                   </div>
@@ -214,37 +207,21 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   );
 };
 
-// Updated UnlockForm with Loading State
-const UnlockForm: React.FC<{ onUnlock: (token: string) => Promise<void>; onCancel: () => void }> = ({ onUnlock, onCancel }) => {
+const UnlockForm: React.FC<{ onUnlock: (token: string) => void; onCancel: () => void }> = ({ onUnlock, onCancel }) => {
     const [token, setToken] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleUnlock = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        try {
-            await onUnlock(token);
-        } catch (error) {
-            setIsSubmitting(false);
-        }
-    };
-
     return (
-        <form onSubmit={handleUnlock} className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); onUnlock(token); }} className="space-y-3">
             <input 
                 type="text" 
                 value={token} 
                 onChange={e => setToken(e.target.value)} 
-                className="w-full text-center text-lg font-mono font-bold tracking-[0.2em] py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-rose-400 focus:bg-white outline-none uppercase transition-all" 
+                className="w-full text-center text-lg font-mono font-bold tracking-[0.2em] py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-rose-400 focus:bg-white outline-none uppercase" 
                 placeholder="TOKEN" 
                 maxLength={6} 
-                disabled={isSubmitting}
             />
             <div className="flex gap-2">
-                <button type="button" onClick={onCancel} disabled={isSubmitting} className="flex-1 py-3 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50">Batal</button>
-                <button type="submit" disabled={isSubmitting || token.length < 4} className="flex-1 py-3 text-xs font-bold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
-                    {isSubmitting ? 'Memproses...' : 'Buka'}
-                </button>
+                <button type="button" onClick={onCancel} className="flex-1 py-3 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200">Batal</button>
+                <button type="submit" className="flex-1 py-3 text-xs font-bold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-lg shadow-rose-200">Buka</button>
             </div>
         </form>
     );
