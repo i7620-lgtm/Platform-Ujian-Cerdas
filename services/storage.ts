@@ -43,6 +43,27 @@ function shuffleArray<T>(array: T[]): T[] {
     return newArr;
 }
 
+// --- INDEXED DB HELPER ---
+const DB_NAME = 'UjianCerdasDB';
+const DB_VERSION = 1;
+const STORE_PROGRESS = 'exam_progress';
+
+const initDB = (): Promise<IDBDatabase> => {
+    if (typeof window === 'undefined' || !window.indexedDB) return Promise.reject("IndexedDB not supported");
+    
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_PROGRESS)) {
+                db.createObjectStore(STORE_PROGRESS, { keyPath: 'key' });
+            }
+        };
+    });
+};
+
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor') {
         let questionsToProcess = [...exam.questions];
@@ -137,6 +158,53 @@ class StorageService {
             }, 30000);
         }
     }
+
+  // --- INDEXED DB METHODS (LOCAL PROGRESS) ---
+  
+  async saveLocalProgress(key: string, data: any): Promise<void> {
+      try {
+          const db = await initDB();
+          return new Promise((resolve, reject) => {
+              const tx = db.transaction(STORE_PROGRESS, 'readwrite');
+              const store = tx.objectStore(STORE_PROGRESS);
+              store.put({ key, data, updatedAt: Date.now() });
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+          });
+      } catch(e) { 
+          // Fallback to LocalStorage if IDB fails
+          try { localStorage.setItem(key, JSON.stringify(data)); } catch(err) {}
+      }
+  }
+
+  async getLocalProgress(key: string): Promise<any | null> {
+      try {
+          const db = await initDB();
+          return new Promise((resolve, reject) => {
+              const tx = db.transaction(STORE_PROGRESS, 'readonly');
+              const store = tx.objectStore(STORE_PROGRESS);
+              const req = store.get(key);
+              req.onsuccess = () => resolve(req.result ? req.result.data : null);
+              req.onerror = () => reject(req.error);
+          });
+      } catch(e) { 
+          // Fallback to LocalStorage
+          try { 
+              const item = localStorage.getItem(key);
+              return item ? JSON.parse(item) : null;
+          } catch(err) { return null; }
+      }
+  }
+
+  async clearLocalProgress(key: string): Promise<void> {
+      try {
+          const db = await initDB();
+          const tx = db.transaction(STORE_PROGRESS, 'readwrite');
+          tx.objectStore(STORE_PROGRESS).delete(key);
+      } catch(e) {
+          localStorage.removeItem(key);
+      }
+  }
   
   // --- AUTH METHODS ---
   async getCurrentUser(): Promise<TeacherProfile | null> {
