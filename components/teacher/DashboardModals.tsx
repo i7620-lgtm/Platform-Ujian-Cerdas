@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
@@ -137,7 +136,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                         <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
                                     </button>
                                 )}
-                                {!isReadOnly && !isLargeScale && (
+                                {!isReadOnly && (
                                     <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
                                         <PlusCircleIcon className="w-4 h-4"/> <span className="hidden sm:inline">Waktu</span>
                                     </button>
@@ -285,7 +284,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     {/* 4. Progress */}
                                                     <td className="px-5 py-3">
                                                         {isLargeScale ? (
-                                                            <div className="text-center text-[10px] text-slate-400 italic">Hidden</div>
+                                                            <div className="text-center text-[10px] text-slate-400 italic">-</div>
                                                         ) : (
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
                                                                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -178,7 +177,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 
                 // Jika Mode Skala Besar (disableRealtime) diaktifkan, matikan fitur realtime-heavy
                 if (name === 'disableRealtime' && checked) {
-                    newConfig.continueWithPermission = false;
                     newConfig.enablePublicStream = false;
                 }
 
@@ -454,14 +452,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-slate-50 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-primary transition-colors">Deteksi Pindah Tab</span></label>
                            {config.detectBehavior && (
-                            <label className={`flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group ${config.disableRealtime ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-rose-50 text-rose-700'}`}>
+                            <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 text-rose-700">
                                 <input 
                                     type="checkbox" 
                                     name="continueWithPermission" 
                                     checked={config.continueWithPermission} 
                                     onChange={handleConfigChange} 
-                                    disabled={config.disableRealtime}
-                                    className={`h-4 w-4 rounded border-rose-300 ${config.disableRealtime ? 'text-gray-400 focus:ring-0 cursor-not-allowed' : 'text-rose-600 focus:ring-rose-500'}`} 
+                                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500" 
                                 />
                                 <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
                             </label>
