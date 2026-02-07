@@ -307,7 +307,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </td>
                                                     {/* 6. Lokasi (NEW) */}
                                                     <td className="px-5 py-3 text-center">
-                                                        {r.location ? (
+                                                        {!displayExam.config.trackLocation ? (
+                                                            <span className="text-[10px] text-slate-300 font-bold">-</span>
+                                                        ) : r.location ? (
                                                             <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-blue-100">
                                                                 Maps ↗
                                                             </a>
