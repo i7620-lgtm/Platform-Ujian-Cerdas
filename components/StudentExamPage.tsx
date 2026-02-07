@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { 
     ClockIcon, 
@@ -7,15 +7,12 @@ import {
     CheckCircleIcon, 
     ArrowLeftIcon,
     ExclamationTriangleIcon,
-    WifiIcon,
     NoWifiIcon,
     ChevronDownIcon,
     ChevronUpIcon,
     EyeIcon
 } from './Icons';
-import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
-import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -24,21 +21,7 @@ interface StudentExamPageProps {
   onSubmit: (answers: Record<string, string>, timeLeft: number, status: ResultStatus, activityLog: string[], location?: string, grading?: any) => Promise<void>;
 }
 
-// Helper to check if answered
-const isAnswered = (q: Question, answers: Record<string, string>) => {
-    const ans = answers[q.id];
-    if (ans === undefined || ans === null || ans === '') return false;
-    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return ans.length > 0;
-    if (q.questionType === 'TRUE_FALSE') {
-        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
-    }
-    if (q.questionType === 'MATCHING') {
-        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
-    }
-    return true;
-};
-
-// Helper to calculate grade locally
+// Helper: Calculate Grade Locally
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correct = 0;
     const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
@@ -75,61 +58,122 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     };
 };
 
+const isAnswered = (q: Question, answers: Record<string, string>) => {
+    const ans = answers[q.id];
+    if (ans === undefined || ans === null || ans === '') return false;
+    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return ans.length > 0;
+    if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
+    }
+    return true;
+};
+
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
     const STORAGE_KEY = `exam_progress_${exam.code}_${student.studentId}`;
     
-    // State
+    // --- STATE ---
+    const [activeExam, setActiveExam] = useState<Exam>(exam);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
-    const [timeLeft, setTimeLeft] = useState<number>(exam.config.timeLimit * 60); // seconds
     const [isNavOpen, setIsNavOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [cheatWarningCount, setCheatWarningCount] = useState(0);
-    
-    // Refs
-    const answersRef = useRef<Record<string, string>>(answers);
-    const timeLeftRef = useRef<number>(timeLeft);
-    const logRef = useRef<string[]>(initialData?.activityLog || []);
-    const isSubmittingRef = useRef(false);
-    const userLocationRef = useRef<string | undefined>(undefined);
-    const cheatCountRef = useRef(0);
-    
-    // Realtime Broadcast Refs
-    const lastBroadcastTimeRef = useRef<number>(0);
-    const broadcastTimeoutRef = useRef<any>(null);
-    const channelRef = useRef<RealtimeChannel | null>(null);
-    const isChannelSubscribedRef = useRef(false);
-    
-    // Sync refs
-    useEffect(() => { answersRef.current = answers; }, [answers]);
-    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
+    // --- REFS ---
+    const answersRef = useRef<Record<string, string>>(answers);
+    const logRef = useRef<string[]>(initialData?.activityLog || []);
+    const userLocationRef = useRef<string | undefined>(undefined);
+    const isSubmittingRef = useRef(false);
+    const channelRef = useRef<any>(null);
+    const lastBroadcastTimeRef = useRef<number>(0);
+
+    // Sync Refs
+    useEffect(() => { answersRef.current = answers; }, [answers]);
+
+    // --- TIME SYNC LOGIC (CORRECTED) ---
+    // Calculate deadline based on Absolute Start Time + Limit
+    const deadline = useMemo(() => {
+        // Handle "Preview" mode or dateless exams gracefully
+        if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
+
+        const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
+        const start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
+    }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
+
+    const [timeLeft, setTimeLeft] = useState<number>(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const now = Date.now();
+            const diff = Math.floor((deadline - now) / 1000);
+            
+            if (diff <= 0) {
+                setTimeLeft(0);
+                if (!isSubmittingRef.current && student.class !== 'PREVIEW') {
+                    handleSubmit(true, 'completed');
+                }
+                clearInterval(timer);
+            } else {
+                setTimeLeft(diff);
+            }
+        }, 1000);
+        
+        // Initial tick
+        const now = Date.now();
+        setTimeLeft(Math.max(0, Math.floor((deadline - now) / 1000)));
+
+        return () => clearInterval(timer);
+    }, [deadline]);
+
+    // --- REALTIME CONFIG LISTENER (ADD TIME FEATURE) ---
+    useEffect(() => {
+        const channel = supabase.channel(`exam-config-${exam.code}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
+                (payload) => {
+                    const newConfig = payload.new.config;
+                    if (newConfig) {
+                        setActiveExam(prev => {
+                            const oldLimit = prev.config.timeLimit;
+                            const newLimit = newConfig.timeLimit;
+                            if (newLimit > oldLimit) {
+                                const diff = newLimit - oldLimit;
+                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit!`);
+                                setTimeout(() => setTimeExtensionNotif(null), 5000);
+                            }
+                            return { ...prev, config: newConfig };
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [exam.code]);
+
+    // --- SUBMISSION ---
     const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
         if (!auto && status !== 'force_closed') {
-            // Manual submission validation
-            const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
             const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
 
             if (unansweredCount > 0) {
-                setHasAttemptedSubmit(true);
-                setIsNavOpen(true); // Auto open nav to show red boxes
-                
-                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi (ditandai warna merah). Yakin ingin mengumpulkan?`)) {
-                    return;
-                }
+                setIsNavOpen(true);
+                if (!confirm(`Masih ada ${unansweredCount} soal belum diisi. Yakin kumpulkan?`)) return;
             } else {
-                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban? Aksi ini tidak dapat dibatalkan.")) return;
+                 if (!confirm("Kumpulkan jawaban sekarang?")) return;
             }
         }
         
         if (isSubmittingRef.current) return;
         
-        // Final Save before submit
+        // Save final state locally
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             answers: answersRef.current,
-            timeLeft: timeLeftRef.current,
             timestamp: Date.now()
         }));
 
@@ -137,92 +181,69 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setIsSubmitting(true);
         
         try {
-            // CRITICAL FIX: Allow 'force_closed' (cheating) to proceed even if offline
-            // Only block 'completed' (manual) if offline
+            // Force Close (Cheating) allows offline submit
             if (!navigator.onLine && status === 'completed' && !auto) {
                 throw new Error("Offline");
             }
 
-            const grading = calculateGrade(exam, answersRef.current);
-            await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocationRef.current, grading);
+            const grading = calculateGrade(activeExam, answersRef.current);
+            await onSubmit(answersRef.current, timeLeft, status, logRef.current, userLocationRef.current, grading);
             
             if (status === 'completed' || status === 'force_closed') {
                 localStorage.removeItem(STORAGE_KEY);
             }
         } catch (error: any) {
-            console.error("Gagal mengirim jawaban:", error);
-            
-            // Enhanced Error Message Logic
-            let msg = "Gagal mengirim jawaban. Pastikan koneksi internet Anda stabil, lalu coba lagi.";
-            
-            if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
-                msg = "Data tidak sinkron dengan server (Error Skema). Sistem telah mencoba memperbaiki otomatis. Silakan tekan tombol 'Kumpulkan' sekali lagi.";
-            } else if (error.message === "Offline" || !navigator.onLine) {
-                msg = "Koneksi internet terputus. Pastikan Anda online, lalu coba tekan tombol kumpulkan lagi.";
-            }
-            
+            console.error("Submit failed:", error);
+            let msg = "Gagal mengirim. Periksa koneksi.";
+            if (error.message === "Offline") msg = "Koneksi terputus. Pastikan online untuk mengumpulkan.";
             alert(msg);
             isSubmittingRef.current = false;
             setIsSubmitting(false);
         }
     };
 
-    // Initialize logic
+    // --- INITIALIZATION & EFFECTS ---
     useEffect(() => {
-        // Load from local storage if available and newer/valid
+        // Load Local
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
                 if (parsed.answers) {
                     setAnswers(prev => ({ ...prev, ...parsed.answers }));
-                    answersRef.current = { ...answers, ...parsed.answers }; // Immediate sync
+                    answersRef.current = { ...answers, ...parsed.answers };
                 }
-                if (parsed.timeLeft) {
-                    setTimeLeft(parsed.timeLeft);
-                }
-            } catch(e) { console.error("Error loading local progress", e); }
+            } catch(e) {}
         }
 
-        // Location tracking
-        if (exam.config.trackLocation && navigator.geolocation) {
+        // Location
+        if (activeExam.config.trackLocation && navigator.geolocation) {
              navigator.geolocation.getCurrentPosition(
                 (pos) => { userLocationRef.current = `${pos.coords.latitude},${pos.coords.longitude}`; },
-                (err) => { console.warn("Location access denied", err); }
+                (err) => { console.warn("Loc failed", err); }
              );
         }
 
-        // --- CHEAT DETECTION ENGINE ---
+        // --- ANTI CHEAT ---
         const handleViolation = () => {
-             if (!exam.config.detectBehavior) return;
+             if (!activeExam.config.detectBehavior || student.class === 'PREVIEW') return;
 
              const timestamp = new Date().toLocaleTimeString();
-             const msg = `[${timestamp}] Terdeteksi meninggalkan ujian (Tab Switch/Blur)`;
+             const msg = `[${timestamp}] Meninggalkan ujian (Tab Switch/Blur)`;
              logRef.current.push(msg);
-             
-             cheatCountRef.current += 1;
              setCheatWarningCount(prev => prev + 1);
 
-             // Jika Strict Mode aktif (continueWithPermission), langsung kunci
-             if (exam.config.continueWithPermission) {
-                 // Gunakan setTimeout untuk memastikan UI sempat render warning sebentar jika perlu, 
-                 // tapi di sini kita langsung eksekusi agar aman
+             if (activeExam.config.continueWithPermission) {
                  handleSubmit(true, 'force_closed');
              }
         };
 
-        const handleVisibilityChange = () => {
-             if (document.hidden) handleViolation();
-        };
-        
-        const handleBlur = () => {
-             // Opsional: Blur window juga bisa dianggap curang
-             if (exam.config.detectBehavior) handleViolation();
-        }
+        const handleVisibilityChange = () => { if (document.hidden) handleViolation(); };
+        const handleBlur = () => { if (activeExam.config.detectBehavior) handleViolation(); };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('blur', handleBlur); 
-
+        
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
         window.addEventListener('online', handleOnline);
@@ -236,108 +257,56 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         };
     }, []);
 
-    // Timer Logic
+    // --- AUTO SAVE ---
     useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmit(true, 'completed'); // Auto submit
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    // Auto Save Logic
-    useEffect(() => {
-        const saveToLocal = () => {
+        const interval = setInterval(() => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 answers: answersRef.current,
-                timeLeft: timeLeftRef.current,
                 timestamp: Date.now()
             }));
-        };
-        const interval = setInterval(saveToLocal, (exam.config.autoSaveInterval || 10) * 1000);
+        }, 10000);
         return () => clearInterval(interval);
     }, []);
 
-    // Realtime Channel Setup
+    // --- REALTIME PROGRESS BROADCAST ---
     useEffect(() => {
-        if (exam.config.disableRealtime) return;
+        if (activeExam.config.disableRealtime) return;
+        const channel = supabase.channel(`exam-room-${activeExam.code}`, { config: { broadcast: { self: false } } });
+        channel.subscribe(status => { if (status === 'SUBSCRIBED') channelRef.current = channel; });
+        return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
+    }, [activeExam.code]);
 
-        const channel = supabase.channel(`exam-room-${exam.code}`, {
-            config: { broadcast: { self: false } }
-        });
-
-        channel.subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                channelRef.current = channel;
-                isChannelSubscribedRef.current = true;
-            } else {
-                isChannelSubscribedRef.current = false;
-            }
-        });
-
-        return () => {
-            if (channelRef.current) {
-                supabase.removeChannel(channelRef.current);
-                channelRef.current = null;
-                isChannelSubscribedRef.current = false;
-            }
-        };
-    }, [exam.code, exam.config.disableRealtime]);
-
-    // Broadcast Progress Logic
     const broadcastProgress = () => {
-        if (exam.config.disableRealtime || !channelRef.current || !isChannelSubscribedRef.current) return;
-        
-        const totalQ = exam.questions.filter(q => q.questionType !== 'INFO').length;
-        const answeredQ = exam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
-        
+        if (activeExam.config.disableRealtime || !channelRef.current) return;
+        const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
         channelRef.current.send({
             type: 'broadcast',
             event: 'student_progress',
-            payload: {
-                studentId: student.studentId,
-                answeredCount: answeredQ,
-                totalQuestions: totalQ,
-                timestamp: Date.now()
-            }
-        }).catch(e => { 
-            console.debug("Broadcast failed", e); 
-        });
+            payload: { studentId: student.studentId, answeredCount: answeredQ, totalQuestions: totalQ, timestamp: Date.now() }
+        }).catch(() => {});
     };
 
     const handleAnswerChange = (qId: string, value: string) => {
         setAnswers(prev => {
             const next = { ...prev, [qId]: value };
-            answersRef.current = next; // Sync immediate for reliability
+            answersRef.current = next;
             return next;
         });
 
-        // Realtime Broadcast Throttle
         const now = Date.now();
-        if (now - lastBroadcastTimeRef.current > 2000) {
+        if (now - lastBroadcastTimeRef.current > 3000) {
             broadcastProgress();
             lastBroadcastTimeRef.current = now;
-        } else {
-            if (broadcastTimeoutRef.current) clearTimeout(broadcastTimeoutRef.current);
-            broadcastTimeoutRef.current = setTimeout(() => {
-                broadcastProgress();
-                lastBroadcastTimeRef.current = Date.now();
-            }, 2000);
         }
     };
 
-    const currentQuestion = exam.questions[currentQuestionIndex];
-    const formatTime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const currentQuestion = activeExam.questions[currentQuestionIndex];
+    const formatTime = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -350,7 +319,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                            <span className="font-black text-xs">{currentQuestionIndex + 1}</span>
                         </div>
                         <div>
-                             <h1 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1">{exam.config.subject}</h1>
+                             <h1 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1">{activeExam.config.subject}</h1>
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.fullName}</span>
                                 {!isOnline && <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 flex items-center gap-1"><NoWifiIcon className="w-3 h-3"/> Offline</span>}
@@ -368,19 +337,26 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                          </button>
                     </div>
                 </div>
-                {/* Cheat Detection Banner */}
-                {exam.config.detectBehavior && (
-                    <div className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 flex items-center justify-center gap-2">
-                        <EyeIcon className="w-3 h-3 text-rose-400" />
-                        <span>Pengawasan Aktif: Jangan Tinggalkan Halaman</span>
-                        {cheatWarningCount > 0 && !exam.config.continueWithPermission && (
-                            <span className="bg-rose-500 text-white px-1.5 rounded ml-2 animate-pulse">{cheatWarningCount}x Pelanggaran</span>
-                        )}
-                    </div>
-                )}
+                {/* Notifications Banner */}
+                <div className="flex flex-col">
+                    {activeExam.config.detectBehavior && (
+                        <div className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 flex items-center justify-center gap-2">
+                            <EyeIcon className="w-3 h-3 text-rose-400" />
+                            <span>Pengawasan Aktif</span>
+                            {cheatWarningCount > 0 && !activeExam.config.continueWithPermission && (
+                                <span className="bg-rose-500 text-white px-1.5 rounded ml-2 animate-pulse">{cheatWarningCount}x Pelanggaran</span>
+                            )}
+                        </div>
+                    )}
+                    {timeExtensionNotif && (
+                        <div className="bg-emerald-500 text-white text-xs font-bold text-center py-2 animate-slide-in-up">
+                            {timeExtensionNotif}
+                        </div>
+                    )}
+                </div>
              </header>
 
-             {/* Navigation Sidebar/Drawer */}
+             {/* Navigation Drawer */}
              {isNavOpen && (
                  <div className="fixed inset-0 z-40 flex justify-end">
                      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsNavOpen(false)}></div>
@@ -391,11 +367,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                          </div>
                          <div className="flex-1 overflow-y-auto p-5">
                              <div className="grid grid-cols-5 gap-3">
-                                 {exam.questions.map((q, idx) => {
+                                 {activeExam.questions.map((q, idx) => {
                                      const answered = isAnswered(q, answers);
                                      const current = idx === currentQuestionIndex;
-                                     const isWarning = hasAttemptedSubmit && !answered && q.questionType !== 'INFO';
-                                     
                                      return (
                                          <button 
                                             key={q.id} 
@@ -403,7 +377,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             className={`
                                                 aspect-square rounded-xl text-xs font-bold flex items-center justify-center transition-all border
                                                 ${current ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 scale-110' : 
-                                                  isWarning ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse' :
                                                   answered ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
                                                   'bg-slate-50 text-slate-500 border-slate-200 hover:bg-white hover:border-indigo-200'}
                                             `}
@@ -415,11 +388,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                              </div>
                          </div>
                          <div className="p-5 border-t border-slate-100">
-                             <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 justify-center">
-                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Diisi</div>
-                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Kosong</div>
-                                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-indigo-600"></div> Aktif</div>
-                             </div>
                              <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:bg-black transition-all disabled:opacity-50">
                                  {isSubmitting ? 'Mengirim...' : 'Kumpulkan Jawaban'}
                              </button>
@@ -591,7 +559,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                              <ArrowLeftIcon className="w-4 h-4" /> Sebelumnya
                          </button>
                          
-                         {currentQuestionIndex === exam.questions.length - 1 ? (
+                         {currentQuestionIndex === activeExam.questions.length - 1 ? (
                              <button 
                                 onClick={() => handleSubmit(false)}
                                 disabled={isSubmitting}
@@ -601,7 +569,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                              </button>
                          ) : (
                              <button 
-                                onClick={() => setCurrentQuestionIndex(prev => Math.min(exam.questions.length - 1, prev + 1))}
+                                onClick={() => setCurrentQuestionIndex(prev => Math.min(activeExam.questions.length - 1, prev + 1))}
                                 className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-slate-900 hover:bg-black transition-all text-sm shadow-lg shadow-slate-200"
                              >
                                  Selanjutnya <ArrowLeftIcon className="w-4 h-4 rotate-180" />
