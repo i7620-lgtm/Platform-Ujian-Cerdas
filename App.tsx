@@ -194,6 +194,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleResumeFromLock = () => {
+      if (studentResult) {
+          const unlockedResult = { ...studentResult, status: 'in_progress' } as Result;
+          setStudentResult(unlockedResult);
+          setResumedResult(unlockedResult);
+          setView('STUDENT_EXAM');
+      }
+  };
+
   const resetToHome = () => { 
     setView('SELECTOR'); 
     setCurrentExam(null); 
@@ -336,6 +345,7 @@ const App: React.FC = () => {
                 result={studentResult} 
                 exam={currentExam} 
                 onFinish={resetToHome} 
+                onResume={handleResumeFromLock}
             />
         )}
 
