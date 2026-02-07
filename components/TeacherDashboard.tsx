@@ -32,10 +32,18 @@ interface TeacherDashboardProps {
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
 
+// Helper to strip HTML for Excel export
+const stripHtml = (html: string) => {
+   const tmp = document.createElement("DIV");
+   tmp.innerHTML = html;
+   return tmp.textContent || tmp.innerText || "";
+}
+
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
     teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
+    const [isLoadingArchive, setIsLoadingArchive] = useState(false);
     
     // Editor State
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -153,38 +161,109 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setResetKey(prev => prev + 1);
     };
 
-    // ARCHIVE LOGIC
+    // ARCHIVE & EXCEL LOGIC
     const handleArchiveExam = async (exam: Exam) => {
-        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nFile JSON (termasuk hasil siswa) akan diunduh, dan aset cloud akan dihapus. Ujian tidak bisa diakses online lagi.`)) return;
+        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nSistem akan mengunduh file JSON (Database) dan Excel (Laporan). Data di cloud akan dihapus agar hemat kuota.`)) return;
         
+        setIsLoadingArchive(true);
         try {
-            // 1. Get Fat Exam Object (Base64 Images)
+            // 1. Get Fat Exam Object (Base64 Images) for JSON Backup
             const fatExam = await storageService.getExamForArchive(exam.code);
             if (!fatExam) throw new Error("Gagal mengambil data ujian.");
 
             // 2. Get All Results for this exam
-            // FIX: storageService.getResults expects 0-2 arguments. RLS on Supabase handles filtering.
             const examResults = await storageService.getResults(exam.code, undefined);
 
-            // 3. Create comprehensive archive object
+            // 3. Create comprehensive archive object (JSON)
             const archivePayload = {
                 exam: fatExam,
                 results: examResults
             };
 
-            // 4. Trigger Download
+            // 4. Download JSON
             const jsonString = JSON.stringify(archivePayload, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `ARSIP_LENGKAP_${exam.config.subject.replace(/\s+/g, '_')}_${exam.code}.json`;
+            link.download = `ARSIP_DB_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.json`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            // 5. Cleanup Cloud
+            // 5. GENERATE EXCEL (Dynamic Import)
+            try {
+                // Dynamic import to save initial bundle size
+                const XLSX = await import("xlsx");
+
+                // --- Sheet 1: Bank Soal ---
+                const questionRows = fatExam.questions.map((q, i) => ({
+                    No: i + 1,
+                    ID: q.id,
+                    Tipe: q.questionType,
+                    Pertanyaan: stripHtml(q.questionText),
+                    Opsi: q.options ? q.options.map(stripHtml).join(' | ') : '-',
+                    Kunci_Jawaban: q.correctAnswer || '-'
+                }));
+                const wsQuestions = XLSX.utils.json_to_sheet(questionRows);
+
+                // --- Sheet 2: Hasil Siswa ---
+                const resultRows = examResults.map((r, i) => ({
+                    No: i + 1,
+                    Nama: r.student.fullName,
+                    Kelas: r.student.class,
+                    ID_Siswa: r.student.studentId,
+                    Nilai: r.score,
+                    Benar: r.correctAnswers,
+                    Salah: r.totalQuestions - r.correctAnswers - (Object.keys(r.answers).length < r.totalQuestions ? (r.totalQuestions - Object.keys(r.answers).length) : 0), // Simplified logic
+                    Total_Soal: r.totalQuestions,
+                    Status: r.status,
+                    Waktu_Selesai: r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : '-'
+                }));
+                const wsResults = XLSX.utils.json_to_sheet(resultRows);
+
+                // --- Sheet 3: Analisis Soal ---
+                // Simple calculation for correct percentage per question
+                const totalStudents = examResults.length;
+                const analysisRows = fatExam.questions.filter(q => q.questionType !== 'INFO').map((q, i) => {
+                    let correctCount = 0;
+                    examResults.forEach(r => {
+                        const ans = r.answers[q.id];
+                        // Basic check (normalized)
+                        const normAns = String(ans || '').trim().toLowerCase();
+                        const normKey = String(q.correctAnswer || '').trim().toLowerCase();
+                        if (normAns === normKey) correctCount++;
+                        // Note: This is a simplified check. Complex types might need stricter logic same as in ExamPage.
+                    });
+                    const pct = totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
+                    
+                    return {
+                        No: i + 1,
+                        Soal: stripHtml(q.questionText),
+                        Jawab_Benar: correctCount,
+                        Total_Partisipan: totalStudents,
+                        Persentase_Benar: pct + "%",
+                        Kategori: pct >= 80 ? 'Mudah' : pct >= 50 ? 'Sedang' : 'Sulit'
+                    };
+                });
+                const wsAnalysis = XLSX.utils.json_to_sheet(analysisRows);
+
+                // Create Workbook
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, wsQuestions, "Bank Soal");
+                XLSX.utils.book_append_sheet(wb, wsResults, "Hasil Siswa");
+                XLSX.utils.book_append_sheet(wb, wsAnalysis, "Analisis Soal");
+
+                // Download Excel
+                XLSX.writeFile(wb, `LAPORAN_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.xlsx`);
+
+            } catch (excelError) {
+                console.error("Gagal membuat Excel:", excelError);
+                alert("File JSON berhasil diunduh, tetapi gagal membuat Excel (Cek koneksi internet untuk memuat modul Excel).");
+            }
+
+            // 6. Cleanup Cloud
             await storageService.cleanupExamAssets(exam.code);
             await deleteExam(exam.code); // Hapus dari DB
             onRefreshExams();
@@ -193,6 +272,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         } catch (e) {
             console.error(e);
             alert("Gagal mengarsipkan ujian.");
+        } finally {
+            setIsLoadingArchive(false);
         }
     };
 
@@ -231,6 +312,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     return (
         <div className="min-h-screen bg-[#F8FAFC]">
+            {isLoadingArchive && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
+                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <p className="text-sm font-bold text-slate-700">Menyiapkan Arsip & Excel...</p>
+                        <p className="text-xs text-slate-400">Mohon tunggu, sedang mengunduh modul Excel.</p>
+                    </div>
+                </div>
+            )}
+
             <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="py-5 flex justify-between items-center">
@@ -284,7 +375,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onSelectExam={setSelectedFinishedExam} 
                         onDuplicateExam={handleDuplicateExam} 
                         onDeleteExam={handleDeleteExam}
-                        onArchiveExam={handleArchiveExam} // Pass Archive Handler
+                        onArchiveExam={handleArchiveExam} // Pass Archive Handler with Excel Logic
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
