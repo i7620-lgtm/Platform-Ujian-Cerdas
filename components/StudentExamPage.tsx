@@ -129,19 +129,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
     }, [exam.code]);
 
+    // LOAD STATE FROM INDEXED DB (Async)
     useEffect(() => {
-        const loadState = () => {
+        const loadState = async () => {
             try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch (e) { console.warn("Quota exceeded"); }
-            const localData = localStorage.getItem(STORAGE_KEY);
+            
+            // Try load from IndexedDB first (Point 7.1)
+            const localData = await storageService.getLocalProgress(STORAGE_KEY);
             if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    setAnswers(parsed.answers || {});
-                    answersRef.current = parsed.answers || {};
-                    if (parsed.logs) logRef.current = parsed.logs;
-                    return;
-                } catch(e) { }
+                setAnswers(localData.answers || {});
+                answersRef.current = localData.answers || {};
+                if (localData.logs) logRef.current = localData.logs;
+                return;
             }
+            
+            // Fallback to props (resume from server)
             if (initialData?.answers) {
                 setAnswers(initialData.answers);
                 answersRef.current = initialData.answers;
@@ -187,7 +189,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
         
         if (status === 'completed' || status === 'force_closed') {
-            localStorage.removeItem(STORAGE_KEY);
+            storageService.clearLocalProgress(STORAGE_KEY);
         }
     };
 
@@ -200,7 +202,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
+            
+            // Save log update to IDB
+            storageService.saveLocalProgress(STORAGE_KEY, { answers: answersRef.current, logs: logRef.current });
 
             if (activeExam.config.continueWithPermission) {
                 alert("PELANGGARAN TERDETEKSI: Anda meninggalkan halaman ujian. Akses dikunci.");
@@ -264,7 +268,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setAnswers(prev => {
             const next = { ...prev, [qId]: val };
             answersRef.current = next;
-            if (student.class !== 'PREVIEW') localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: next, logs: logRef.current, lastUpdated: Date.now() }));
+            
+            // SAVE TO INDEXED DB (Async, Non-blocking)
+            if (student.class !== 'PREVIEW') {
+                storageService.saveLocalProgress(STORAGE_KEY, { answers: next, logs: logRef.current, lastUpdated: Date.now() });
+            }
             return next;
         });
 
