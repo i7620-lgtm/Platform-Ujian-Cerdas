@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
 import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
@@ -1085,10 +1084,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="flex flex-col gap-1 text-[9px]">
                                                 {Object.entries(data.distribution).length > 0 ? (
                                                     Object.entries(data.distribution)
-                                                        .sort(([,a], [,b]) => b - a) 
+                                                        .sort(([,a], [,b]) => (b as number) - (a as number)) 
                                                         .slice(0, 10) // Show top 10 unique answers
                                                         .map(([ans, count], i) => {
-                                                            const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                            const numCount = count as number;
+                                                            const pct = totalStudents > 0 ? Math.round((numCount/totalStudents)*100) : 0;
                                                             
                                                             // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
                                                             let displayAns = ans; // Use raw answer by default (may contain HTML)
