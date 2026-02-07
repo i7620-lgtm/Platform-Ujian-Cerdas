@@ -284,7 +284,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     {/* 4. Progress */}
                                                     <td className="px-5 py-3">
                                                         {isLargeScale ? (
-                                                            <div className="text-center text-[10px] text-slate-400 italic">Hidden</div>
+                                                            <div className="text-center text-[10px] text-slate-400 italic">-</div>
                                                         ) : (
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
                                                                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
