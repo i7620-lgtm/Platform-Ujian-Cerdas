@@ -1,614 +1,587 @@
 
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import type { Exam, Student, Result, Question, ResultStatus } from '../types';
+import { 
+    ClockIcon, 
+    ListBulletIcon, 
+    CheckCircleIcon, 
+    ArrowLeftIcon,
+    ExclamationTriangleIcon,
+    NoWifiIcon,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    EyeIcon
+} from './Icons';
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
 
-// Helper: Convert Base64 to Blob for Upload
-const base64ToBlob = (base64: string): Blob => {
-    const arr = base64.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-};
-
-// Helper: Convert URL to Base64 for Archiving
-const urlToBase64 = async (url: string): Promise<string> => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (error) {
-        console.warn("Failed to convert image for archive:", url);
-        return url; // Fallback keep URL
-    }
-};
-
-// Helper shuffle array (Fisher-Yates)
-function shuffleArray<T>(array: T[]): T[] {
-    const newArr = [...array];
-    for (let i = newArr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-    }
-    return newArr;
+interface StudentExamPageProps {
+  exam: Exam;
+  student: Student;
+  initialData: Result | null;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status: ResultStatus, activityLog: string[], location?: string, grading?: any) => Promise<void>;
 }
 
-const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
-    if (!studentId || studentId === 'monitor') {
-        let questionsToProcess = [...exam.questions];
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        const sanitizedQuestions = questionsToProcess.map(q => {
-            const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-            if (exam.config.shuffleAnswers) {
-                if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
-                    sanitizedQ.options = shuffleArray(sanitizedQ.options);
-                }
-            }
-            return sanitizedQ;
-        });
-        return { ...exam, questions: sanitizedQuestions };
-    }
-
-    const STORAGE_KEY_ORDER = `exam_order_${exam.code}_${studentId}`;
-    let orderMap: { qOrder: string[]; optOrders: Record<string, string[]> } | null = null;
+// Helper: Calculate Grade Locally
+const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
+    let correct = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
     
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_ORDER);
-        if (stored) orderMap = JSON.parse(stored);
-    } catch(e) {}
-
-    if (!orderMap) {
-        let questionsToProcess = [...exam.questions];
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        const qOrder = questionsToProcess.map(q => q.id);
-        const optOrders: Record<string, string[]> = {};
-
-        questionsToProcess.forEach(q => {
-             if (exam.config.shuffleAnswers && q.options && 
-                (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
-                 const shuffledOpts = shuffleArray([...q.options]);
-                 optOrders[q.id] = shuffledOpts;
-             }
-        });
-
-        orderMap = { qOrder, optOrders };
-        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch(e) {}
-    }
-
-    const questionMap = new Map(exam.questions.map(q => [q.id, q]));
-    const orderedQuestions: Question[] = [];
-    
-    orderMap.qOrder.forEach(qid => {
-        const q = questionMap.get(qid);
-        if (q) {
-            orderedQuestions.push(q);
-            questionMap.delete(qid);
-        }
-    });
-
-    questionMap.forEach(q => orderedQuestions.push(q));
-
-    const finalQuestions = orderedQuestions.map(q => {
-        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+    scorableQuestions.forEach(q => {
+        const ans = answers[q.id];
+        if (!ans) return;
         
-        if (orderMap?.optOrders[q.id] && sanitizedQ.options) {
-             const storedOpts = orderMap.optOrders[q.id];
-             const currentOptSet = new Set(sanitizedQ.options);
-             const validStoredOpts = storedOpts.filter(o => currentOptSet.has(o));
-             
-             if (validStoredOpts.length === sanitizedQ.options.length) {
-                 sanitizedQ.options = validStoredOpts;
-             }
+        const normalize = (s: string) => s.trim().toLowerCase();
+        
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            if (normalize(ans) === normalize(q.correctAnswer || '')) correct++;
+        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
+            const cSet = new Set(normalize(q.correctAnswer || '').split(',').map(s=>s.trim()));
+            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) correct++;
+        } else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(ans);
+                if (q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer)) correct++;
+            } catch(e) {}
+        } else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                if (q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right)) correct++;
+            } catch(e) {}
         }
-        return sanitizedQ;
     });
-
-    return { ...exam, questions: finalQuestions };
+    
+    return {
+        score: scorableQuestions.length > 0 ? Math.round((correct / scorableQuestions.length) * 100) : 0,
+        correctAnswers: correct,
+        totalQuestions: scorableQuestions.length
+    };
 };
 
-class StorageService {
-    private syncQueue: any[] = [];
-    private isProcessingQueue = false;
-
-    constructor() {
-        const savedQueue = localStorage.getItem('exam_sync_queue');
-        if (savedQueue) {
-            try { this.syncQueue = JSON.parse(savedQueue); } catch(e) {}
-        }
-        
-        if (typeof window !== 'undefined') {
-            window.addEventListener('online', () => this.processQueue());
-            setInterval(() => {
-                if (this.syncQueue.length > 0) this.processQueue();
-            }, 30000);
-        }
+const isAnswered = (q: Question, answers: Record<string, string>) => {
+    const ans = answers[q.id];
+    if (ans === undefined || ans === null || ans === '') return false;
+    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') return ans.length > 0;
+    if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+        try { return Object.keys(JSON.parse(ans)).length > 0; } catch(e) { return false; }
     }
-  
-  // --- AUTH METHODS ---
-  async getCurrentUser(): Promise<TeacherProfile | null> {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
+    return true;
+};
 
-      const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('full_name, school, role')
-          .eq('id', session.user.id)
-          .single();
-
-      if (error || !profile) return null;
-
-      return {
-          id: session.user.id,
-          fullName: profile.full_name,
-          accountType: profile.role as AccountType,
-          school: profile.school,
-          email: session.user.email
-      };
-  }
-
-  async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const { data: authData, error: authError } = await supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-              data: {
-                  full_name: fullName,
-                  school: school,
-                  role: 'guru'
-              }
-          }
-      });
-
-      if (authError || !authData.user) {
-          throw new Error(authError?.message || 'Gagal mendaftar. Email mungkin sudah terdaftar.');
-      }
-
-      return {
-          id: authData.user.id,
-          fullName: fullName,
-          accountType: 'guru',
-          school: school,
-          email: email
-      };
-  }
-
-  async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error('Email atau password salah.');
-      
-      // Tunggu sebentar untuk trigger
-      await new Promise(r => setTimeout(r, 500));
-
-      let profile = await this.getCurrentUser();
-      
-      if (!profile) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-              const meta = user.user_metadata || {};
-              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
-              await supabase.from('profiles').insert({
-                  id: user.id,
-                  full_name: meta.full_name || 'Pengguna',
-                  school: meta.school || '-',
-                  role: meta.role || 'guru'
-              }).select().single();
-              
-              profile = await this.getCurrentUser();
-          }
-      }
-
-      if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
-      return profile;
-  }
-
-  async signOut() {
-      await supabase.auth.signOut();
-  }
-
-  // --- USER MANAGEMENT (SUPER ADMIN) ---
-  
-  async getAllUsers(): Promise<UserProfile[]> {
-      const { data: profiles, error } = await supabase.from('profiles').select('*');
-      if (error) throw error;
-      
-      return profiles.map((p: any) => ({
-          id: p.id,
-          fullName: p.full_name,
-          accountType: p.role as AccountType,
-          school: p.school,
-          email: '-' 
-      }));
-  }
-
-  async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole, school: newSchool })
-        .eq('id', userId);
-      
-      if (error) throw error;
-  }
-
-  // --- EXAM METHODS ---
-
-  async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
-    let query = supabase.from('exams').select('*');
-
-    if (profile) {
-        if (profile.accountType === 'super_admin') {
-            // Super Admin: No Filter
-        } else if (profile.accountType === 'admin_sekolah' && profile.school) {
-            query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
-        } else {
-            // Guru: Filter by Author ID
-            query = query.eq('author_id', profile.id);
-        }
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (error) {
-        console.error("Error fetching exams from Supabase:", error);
-        return {};
-    }
-
-    const examMap: Record<string, Exam> = {};
-    if (data) {
-        data.forEach((row: any) => {
-            examMap[row.code] = {
-                code: row.code,
-                authorId: row.author_id,
-                authorSchool: row.school,
-                config: row.config,
-                questions: row.questions,
-                status: row.status,
-                createdAt: row.created_at
-            };
-        });
-    }
-    return examMap;
-  }
-
-  async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
-      if (error || !data) throw new Error("EXAM_NOT_FOUND");
-      if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
-      const exam: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status
-      };
-      return sanitizeExamForStudent(exam, studentId);
-  }
-
-  async saveExam(exam: Exam): Promise<void> {
-    let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
-    const BUCKET_NAME = 'soal';
-    const examCode = exam.code;
-
-    const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
+    const STORAGE_KEY = `exam_progress_${exam.code}_${student.studentId}`;
     
-    if (!existing) {
-        const { error: initError } = await supabase.from('exams').insert({
-            code: exam.code, 
-            author_id: exam.authorId, 
-            school: exam.authorSchool,
-            config: exam.config, 
-            questions: [], 
-            status: 'DRAFT'
-        });
-        if (initError) throw initError;
-    }
+    // --- STATE ---
+    const [activeExam, setActiveExam] = useState<Exam>(exam);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
+    const [isNavOpen, setIsNavOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [cheatWarningCount, setCheatWarningCount] = useState(0);
+    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
-    const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-        if (!html || !html.includes('data:image')) return html;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const images = doc.getElementsByTagName('img');
-        
-        for (let i = 0; i < images.length; i++) {
-            const img = images[i];
-            const src = img.getAttribute('src');
+    // --- REFS ---
+    const answersRef = useRef<Record<string, string>>(answers);
+    const logRef = useRef<string[]>(initialData?.activityLog || []);
+    const userLocationRef = useRef<string | undefined>(undefined);
+    const isSubmittingRef = useRef(false);
+    const channelRef = useRef<any>(null);
+    const lastBroadcastTimeRef = useRef<number>(0);
+
+    // Sync Refs
+    useEffect(() => { answersRef.current = answers; }, [answers]);
+
+    // --- TIME SYNC LOGIC (CORRECTED) ---
+    // Calculate deadline based on Absolute Start Time + Limit
+    const deadline = useMemo(() => {
+        // Handle "Preview" mode or dateless exams gracefully
+        if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
+
+        const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
+        const start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
+    }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
+
+    const [timeLeft, setTimeLeft] = useState<number>(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const now = Date.now();
+            const diff = Math.floor((deadline - now) / 1000);
             
-            if (src && src.startsWith('data:image')) {
-                try {
-                    const blob = base64ToBlob(src);
-                    const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
-                    const filename = `${examCode}/${contextId}_${Date.now()}_${i}.${ext}`;
-                    
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        img.setAttribute('src', publicUrlData.publicUrl);
-                        img.setAttribute('data-bucket-path', filename); 
+            if (diff <= 0) {
+                setTimeLeft(0);
+                if (!isSubmittingRef.current && student.class !== 'PREVIEW') {
+                    handleSubmit(true, 'completed');
+                }
+                clearInterval(timer);
+            } else {
+                setTimeLeft(diff);
+            }
+        }, 1000);
+        
+        // Initial tick
+        const now = Date.now();
+        setTimeLeft(Math.max(0, Math.floor((deadline - now) / 1000)));
+
+        return () => clearInterval(timer);
+    }, [deadline]);
+
+    // --- REALTIME CONFIG LISTENER (ADD TIME FEATURE) ---
+    useEffect(() => {
+        const channel = supabase.channel(`exam-config-${exam.code}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` },
+                (payload) => {
+                    const newConfig = payload.new.config;
+                    if (newConfig) {
+                        setActiveExam(prev => {
+                            const oldLimit = prev.config.timeLimit;
+                            const newLimit = newConfig.timeLimit;
+                            if (newLimit > oldLimit) {
+                                const diff = newLimit - oldLimit;
+                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit!`);
+                                setTimeout(() => setTimeExtensionNotif(null), 5000);
+                            }
+                            return { ...prev, config: newConfig };
+                        });
                     }
-                } catch (e) { console.error("Gagal upload gambar", e); }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [exam.code]);
+
+    // --- SUBMISSION ---
+    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
+        if (!auto && status !== 'force_closed') {
+            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
+            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
+
+            if (unansweredCount > 0) {
+                setIsNavOpen(true);
+                if (!confirm(`Masih ada ${unansweredCount} soal belum diisi. Yakin kumpulkan?`)) return;
+            } else {
+                 if (!confirm("Kumpulkan jawaban sekarang?")) return;
             }
         }
-        return doc.body.innerHTML;
+        
+        if (isSubmittingRef.current) return;
+        
+        // Save final state locally
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            answers: answersRef.current,
+            timestamp: Date.now()
+        }));
+
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+        
+        try {
+            // Force Close (Cheating) allows offline submit
+            if (!navigator.onLine && status === 'completed' && !auto) {
+                throw new Error("Offline");
+            }
+
+            const grading = calculateGrade(activeExam, answersRef.current);
+            await onSubmit(answersRef.current, timeLeft, status, logRef.current, userLocationRef.current, grading);
+            
+            if (status === 'completed' || status === 'force_closed') {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        } catch (error: any) {
+            console.error("Submit failed:", error);
+            let msg = "Gagal mengirim. Periksa koneksi.";
+            if (error.message === "Offline") msg = "Koneksi terputus. Pastikan online untuk mengumpulkan.";
+            alert(msg);
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
+        }
     };
 
-    for (const q of processedQuestions) {
-        q.questionText = await processHtmlString(q.questionText, q.id);
-        if (q.options) {
-            for (let i = 0; i < q.options.length; i++) {
-                q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
-            }
+    // --- INITIALIZATION & EFFECTS ---
+    useEffect(() => {
+        // Load Local
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.answers) {
+                    setAnswers(prev => ({ ...prev, ...parsed.answers }));
+                    answersRef.current = { ...answers, ...parsed.answers };
+                }
+            } catch(e) {}
         }
-    }
 
-    const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
-        config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
-    });
-    if (error) throw error;
-  }
-
-  async deleteExam(code: string): Promise<void> {
-      await supabase.from('results').delete().eq('exam_code', code);
-      await supabase.from('exams').delete().eq('code', code);
-      const { data: files } = await supabase.storage.from('soal').list(code);
-      if (files && files.length > 0) {
-          const paths = files.map(f => `${code}/${f.name}`);
-          await supabase.storage.from('soal').remove(paths);
-      }
-  }
-
-  async getExamForArchive(code: string): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
-      if (error || !data) return null;
-
-      let examData: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status, createdAt: data.created_at
-      };
-
-      const revertHtmlImages = async (html: string): Promise<string> => {
-          if (!html.includes('<img')) return html;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const images = doc.getElementsByTagName('img');
-          for (let i = 0; i < images.length; i++) {
-              const img = images[i];
-              const src = img.getAttribute('src');
-              const bucketPath = img.getAttribute('data-bucket-path');
-
-              if (bucketPath) {
-                  try {
-                      const { data, error } = await supabase.storage.from('soal').download(bucketPath);
-                      if (!error && data) {
-                          const base64 = await new Promise<string>((resolve) => {
-                              const reader = new FileReader();
-                              reader.onloadend = () => resolve(reader.result as string);
-                              reader.readAsDataURL(data);
-                          });
-                          img.setAttribute('src', base64);
-                          img.removeAttribute('data-bucket-path');
-                          continue; 
-                      }
-                  } catch (e) {
-                      console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
-                  }
-              }
-
-              if (src && src.startsWith('http')) {
-                  img.setAttribute('src', await urlToBase64(src));
-                  img.removeAttribute('data-bucket-path');
-              }
-          }
-          return doc.body.innerHTML;
-      };
-
-      for (const q of examData.questions) {
-          q.questionText = await revertHtmlImages(q.questionText);
-          if (q.options) {
-              for (let i = 0; i < q.options.length; i++) {
-                  q.options[i] = await revertHtmlImages(q.options[i]);
-              }
-          }
-      }
-      return examData;
-  }
-
-  async cleanupExamAssets(code: string): Promise<void> {
-       const { data: files } = await supabase.storage.from('soal').list(code);
-       if (files && files.length > 0) {
-            await supabase.storage.from('soal').remove(files.map(f => `${code}/${f.name}`));
-       }
-  }
-
-  async getResults(examCode?: string, className?: string): Promise<Result[]> {
-    let query = supabase.from('results').select('*');
-    if (examCode) query = query.eq('exam_code', examCode);
-    if (className && className !== 'ALL') query = query.eq('class_name', className);
-    
-    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
-    query = query.order('updated_at', { ascending: false });
-    
-    const { data, error } = await query;
-    if (error) return [];
-    
-    return data.map((row: any) => ({
-        student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, 
-        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
-        score: row.score, 
-        correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, 
-        status: row.status, 
-        activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), 
-        location: row.location
-    }));
-  }
-
-  async submitExamResult(resultPayload: any): Promise<any> {
-    if (!navigator.onLine) {
-        this.addToQueue(resultPayload);
-        return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
-    }
-
-    try {
-        const { error } = await supabase.from('results').upsert({
-            exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, 
-            student_name: resultPayload.student.fullName,
-            class_name: resultPayload.student.class, 
-            answers: resultPayload.answers || {}, // Ensure not null
-            status: resultPayload.status,
-            activity_log: resultPayload.activityLog || [], 
-            score: resultPayload.score || 0, 
-            correct_answers: resultPayload.correctAnswers || 0,
-            total_questions: resultPayload.totalQuestions || 0, 
-            location: resultPayload.location, 
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'exam_code,student_id' });
-
-        if (error) throw error;
-        
-        return { ...resultPayload, isSynced: true };
-    } catch (error: any) {
-        console.error("CRITICAL DB ERROR:", error);
-        
-        const isNetworkError = !error.code && error.message === 'Failed to fetch'; 
-        
-        if (isNetworkError) {
-            console.warn("Network glitch, adding to queue...");
-            this.addToQueue(resultPayload);
-            return { ...resultPayload, isSynced: false };
-        } else {
-             throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
+        // Location
+        if (activeExam.config.trackLocation && navigator.geolocation) {
+             navigator.geolocation.getCurrentPosition(
+                (pos) => { userLocationRef.current = `${pos.coords.latitude},${pos.coords.longitude}`; },
+                (err) => { console.warn("Loc failed", err); }
+             );
         }
-    }
-  }
 
-  private addToQueue(payload: any) {
-      this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
-      this.syncQueue.push({ ...payload, queuedAt: Date.now() });
-      this.saveQueue();
-      if(navigator.onLine) this.processQueue(); 
-  }
+        // --- ANTI CHEAT ---
+        const handleViolation = () => {
+             if (!activeExam.config.detectBehavior || student.class === 'PREVIEW') return;
 
-  private saveQueue() {
-      localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue));
-  }
+             const timestamp = new Date().toLocaleTimeString();
+             const msg = `[${timestamp}] Meninggalkan ujian (Tab Switch/Blur)`;
+             logRef.current.push(msg);
+             setCheatWarningCount(prev => prev + 1);
 
-  async processQueue() {
-      if (this.isProcessingQueue || this.syncQueue.length === 0 || !navigator.onLine) return;
-      this.isProcessingQueue = true;
-      const queueCopy = [...this.syncQueue];
-      const remainingQueue: any[] = [];
-      
-      for (const payload of queueCopy) {
-          try {
-             const { error } = await supabase.from('results').upsert({
-                exam_code: payload.examCode, student_id: payload.student.studentId, student_name: payload.student.fullName,
-                class_name: payload.student.class, answers: payload.answers || {}, status: payload.status,
-                activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
-                total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
-             }, { onConflict: 'exam_code,student_id' });
-             
-             if (error) {
-                 if (error.code === '42501' || error.code === 'PGRST301') { 
-                     console.error("Queue item dropped due to permission error:", error);
-                 } else {
-                     throw error; 
-                 }
+             if (activeExam.config.continueWithPermission) {
+                 handleSubmit(true, 'force_closed');
              }
-          } catch (e) {
-              remainingQueue.push(payload);
-          }
-      }
-      this.syncQueue = remainingQueue;
-      this.saveQueue();
-      this.isProcessingQueue = false;
-  }
+        };
 
-  async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
-      if (error || !data) return null;
-      return {
-        student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
-        examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
-        timestamp: new Date(data.updated_at).getTime(), location: data.location
-      };
-  }
+        const handleVisibilityChange = () => { if (document.hidden) handleViolation(); };
+        const handleBlur = () => { if (activeExam.config.detectBehavior) handleViolation(); };
 
-  async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
-      const currentLog = (data?.activity_log as string[]) || [];
-      await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
-  }
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleBlur); 
+        
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
 
-  async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
-      if (data && data.config) {
-          const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
-          await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
-      }
-  }
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
-  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number) {
-      const channel = supabase.channel(`exam-room-${examCode}`);
-      await channel.send({ type: 'broadcast', event: 'student_progress', payload: { studentId, answeredCount, totalQuestions, timestamp: Date.now() } });
-  }
-  
-  async syncData() { this.processQueue(); }
+    // --- AUTO SAVE ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                answers: answersRef.current,
+                timestamp: Date.now()
+            }));
+        }, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
-  // --- NEW FEATURES (LOCKING) ---
-  async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
-      const token = Math.floor(1000 + Math.random() * 9000).toString();
-      await supabase.from('results').update({ unlock_token: token }).eq('exam_code', examCode).eq('student_id', studentId);
-      return token;
-  }
+    // --- REALTIME PROGRESS BROADCAST ---
+    useEffect(() => {
+        if (activeExam.config.disableRealtime) return;
+        const channel = supabase.channel(`exam-room-${activeExam.code}`, { config: { broadcast: { self: false } } });
+        channel.subscribe(status => { if (status === 'SUBSCRIBED') channelRef.current = channel; });
+        return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
+    }, [activeExam.code]);
 
-  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
-      try {
-          const { data, error } = await supabase
-              .from('results')
-              .select('unlock_token, activity_log')
-              .eq('exam_code', examCode)
-              .eq('student_id', studentId)
-              .single();
+    const broadcastProgress = () => {
+        if (activeExam.config.disableRealtime || !channelRef.current) return;
+        const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
+        const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
+        channelRef.current.send({
+            type: 'broadcast',
+            event: 'student_progress',
+            payload: { studentId: student.studentId, answeredCount: answeredQ, totalQuestions: totalQ, timestamp: Date.now() }
+        }).catch(() => {});
+    };
 
-          if (error || !data) return false;
-          
-          if (data.unlock_token && String(data.unlock_token).trim() === token.trim()) {
-              const currentLog = (typeof data.activity_log === 'string' ? JSON.parse(data.activity_log) : data.activity_log) || [];
-              
-              const { error: updateError } = await supabase
-                  .from('results')
-                  .update({ 
-                      unlock_token: null, 
-                      status: 'in_progress',
-                      activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`]
-                  })
-                  .eq('exam_code', examCode)
-                  .eq('student_id', studentId);
-              
-              if (updateError) throw updateError;
-              return true;
-          }
-          return false;
-      } catch (e) {
-          console.error("Unlock verification failed:", e);
-          return false;
-      }
-  }
-}
+    const handleAnswerChange = (qId: string, value: string) => {
+        setAnswers(prev => {
+            const next = { ...prev, [qId]: value };
+            answersRef.current = next;
+            return next;
+        });
 
-export const storageService = new StorageService();
+        const now = Date.now();
+        if (now - lastBroadcastTimeRef.current > 3000) {
+            broadcastProgress();
+            lastBroadcastTimeRef.current = now;
+        }
+    };
+
+    const currentQuestion = activeExam.questions[currentQuestionIndex];
+    const formatTime = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans">
+             {/* Header */}
+             <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+                <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                           <span className="font-black text-xs">{currentQuestionIndex + 1}</span>
+                        </div>
+                        <div>
+                             <h1 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1">{activeExam.config.subject}</h1>
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.fullName}</span>
+                                {!isOnline && <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 flex items-center gap-1"><NoWifiIcon className="w-3 h-3"/> Offline</span>}
+                             </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${timeLeft < 300 ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                             <ClockIcon className="w-4 h-4" />
+                             <span className="font-mono font-bold text-sm tabular-nums">{formatTime(timeLeft)}</span>
+                         </div>
+                         <button onClick={() => setIsNavOpen(!isNavOpen)} className="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                             <ListBulletIcon className="w-5 h-5" />
+                         </button>
+                    </div>
+                </div>
+                {/* Notifications Banner */}
+                <div className="flex flex-col">
+                    {activeExam.config.detectBehavior && (
+                        <div className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 flex items-center justify-center gap-2">
+                            <EyeIcon className="w-3 h-3 text-rose-400" />
+                            <span>Pengawasan Aktif</span>
+                            {cheatWarningCount > 0 && !activeExam.config.continueWithPermission && (
+                                <span className="bg-rose-500 text-white px-1.5 rounded ml-2 animate-pulse">{cheatWarningCount}x Pelanggaran</span>
+                            )}
+                        </div>
+                    )}
+                    {timeExtensionNotif && (
+                        <div className="bg-emerald-500 text-white text-xs font-bold text-center py-2 animate-slide-in-up">
+                            {timeExtensionNotif}
+                        </div>
+                    )}
+                </div>
+             </header>
+
+             {/* Navigation Drawer */}
+             {isNavOpen && (
+                 <div className="fixed inset-0 z-40 flex justify-end">
+                     <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsNavOpen(false)}></div>
+                     <div className="relative w-80 bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+                         <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                             <h3 className="font-bold text-slate-800">Navigasi Soal</h3>
+                             <button onClick={() => setIsNavOpen(false)} className="p-1 rounded-full hover:bg-slate-100"><ArrowLeftIcon className="w-5 h-5 rotate-180" /></button>
+                         </div>
+                         <div className="flex-1 overflow-y-auto p-5">
+                             <div className="grid grid-cols-5 gap-3">
+                                 {activeExam.questions.map((q, idx) => {
+                                     const answered = isAnswered(q, answers);
+                                     const current = idx === currentQuestionIndex;
+                                     return (
+                                         <button 
+                                            key={q.id} 
+                                            onClick={() => { setCurrentQuestionIndex(idx); setIsNavOpen(false); }}
+                                            className={`
+                                                aspect-square rounded-xl text-xs font-bold flex items-center justify-center transition-all border
+                                                ${current ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 scale-110' : 
+                                                  answered ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                                                  'bg-slate-50 text-slate-500 border-slate-200 hover:bg-white hover:border-indigo-200'}
+                                            `}
+                                         >
+                                             {idx + 1}
+                                         </button>
+                                     );
+                                 })}
+                             </div>
+                         </div>
+                         <div className="p-5 border-t border-slate-100">
+                             <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:bg-black transition-all disabled:opacity-50">
+                                 {isSubmitting ? 'Mengirim...' : 'Kumpulkan Jawaban'}
+                             </button>
+                         </div>
+                     </div>
+                 </div>
+             )}
+
+             {/* Main Content */}
+             <main className="flex-1 max-w-3xl mx-auto w-full p-4 md:p-6 pb-24">
+                 <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden min-h-[50vh] flex flex-col">
+                     <div className="p-6 md:p-8 flex-1">
+                         <div className="flex justify-between items-start mb-6">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Soal No. {currentQuestionIndex + 1}</span>
+                            {currentQuestion.questionType !== 'INFO' && (
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-wide ${isAnswered(currentQuestion, answers) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                    {isAnswered(currentQuestion, answers) ? 'Sudah Diisi' : 'Belum Diisi'}
+                                </span>
+                            )}
+                         </div>
+                         
+                         {/* Question Text */}
+                         <div className="prose prose-slate prose-lg max-w-none mb-8">
+                             <div dangerouslySetInnerHTML={{ __html: currentQuestion.questionText }} />
+                             {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} alt="Soal" className="rounded-xl mt-4 max-h-96 object-contain" />}
+                         </div>
+
+                         {/* Answer Input Area */}
+                         <div className="space-y-4">
+                             {/* MULTIPLE CHOICE */}
+                             {currentQuestion.questionType === 'MULTIPLE_CHOICE' && currentQuestion.options && (
+                                 <div className="grid grid-cols-1 gap-3">
+                                     {currentQuestion.options.map((opt, i) => {
+                                         const isSelected = answers[currentQuestion.id] === opt;
+                                         return (
+                                             <button 
+                                                key={i}
+                                                onClick={() => handleAnswerChange(currentQuestion.id, opt)}
+                                                className={`
+                                                    text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 group
+                                                    ${isSelected ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}
+                                                `}
+                                             >
+                                                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-300'}`}>
+                                                     <span className="text-xs font-bold">{String.fromCharCode(65 + i)}</span>
+                                                 </div>
+                                                 <div className="text-sm font-medium text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: opt }} />
+                                             </button>
+                                         )
+                                     })}
+                                 </div>
+                             )}
+
+                             {/* COMPLEX MULTIPLE CHOICE */}
+                             {currentQuestion.questionType === 'COMPLEX_MULTIPLE_CHOICE' && currentQuestion.options && (
+                                 <div className="grid grid-cols-1 gap-3">
+                                     {currentQuestion.options.map((opt, i) => {
+                                         const currentAns = answers[currentQuestion.id] ? answers[currentQuestion.id].split(',') : [];
+                                         const isSelected = currentAns.includes(opt);
+                                         
+                                         const toggle = () => {
+                                             let newAns;
+                                             if (isSelected) newAns = currentAns.filter(a => a !== opt);
+                                             else newAns = [...currentAns, opt];
+                                             handleAnswerChange(currentQuestion.id, newAns.join(','));
+                                         };
+
+                                         return (
+                                             <button 
+                                                key={i}
+                                                onClick={toggle}
+                                                className={`
+                                                    text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 group
+                                                    ${isSelected ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}
+                                                `}
+                                             >
+                                                 <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 group-hover:border-indigo-300'}`}>
+                                                     {isSelected && <CheckCircleIcon className="w-4 h-4" />}
+                                                 </div>
+                                                 <div className="text-sm font-medium text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: opt }} />
+                                             </button>
+                                         )
+                                     })}
+                                 </div>
+                             )}
+
+                             {/* TRUE FALSE */}
+                             {currentQuestion.questionType === 'TRUE_FALSE' && currentQuestion.trueFalseRows && (
+                                 <div className="space-y-2">
+                                     <div className="grid grid-cols-12 gap-2 mb-2 px-2">
+                                         <div className="col-span-8 text-[10px] font-bold text-slate-400 uppercase">Pernyataan</div>
+                                         <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase text-center">Benar</div>
+                                         <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase text-center">Salah</div>
+                                     </div>
+                                     {currentQuestion.trueFalseRows.map((row, idx) => {
+                                         const currentAns = answers[currentQuestion.id] ? JSON.parse(answers[currentQuestion.id]) : {};
+                                         const setVal = (val: boolean) => {
+                                             const newObj = { ...currentAns, [idx]: val };
+                                             handleAnswerChange(currentQuestion.id, JSON.stringify(newObj));
+                                         };
+
+                                         return (
+                                             <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                 <div className="col-span-8 text-sm font-medium text-slate-700">{row.text}</div>
+                                                 <div className="col-span-2 flex justify-center">
+                                                     <button onClick={() => setVal(true)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${currentAns[idx] === true ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'}`}>B</button>
+                                                 </div>
+                                                 <div className="col-span-2 flex justify-center">
+                                                     <button onClick={() => setVal(false)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${currentAns[idx] === false ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-slate-300'}`}>S</button>
+                                                 </div>
+                                             </div>
+                                         )
+                                     })}
+                                 </div>
+                             )}
+                             
+                             {/* ESSAY & FILL IN THE BLANK */}
+                             {(currentQuestion.questionType === 'ESSAY' || currentQuestion.questionType === 'FILL_IN_THE_BLANK') && (
+                                 <textarea
+                                    value={answers[currentQuestion.id] || ''}
+                                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                                    className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all min-h-[150px] text-sm font-medium text-slate-800 leading-relaxed resize-y"
+                                    placeholder={currentQuestion.questionType === 'ESSAY' ? "Tulis jawaban uraian Anda di sini..." : "Tulis jawaban singkat di sini..."}
+                                 />
+                             )}
+                             
+                             {/* MATCHING */}
+                             {currentQuestion.questionType === 'MATCHING' && currentQuestion.matchingPairs && (
+                                 <div className="space-y-4">
+                                     <p className="text-xs text-slate-500 italic">Pasangkan item kiri dengan item kanan yang sesuai.</p>
+                                     {currentQuestion.matchingPairs.map((pair, idx) => {
+                                          const currentAns = answers[currentQuestion.id] ? JSON.parse(answers[currentQuestion.id]) : {};
+                                          const onChange = (val: string) => {
+                                              const newObj = { ...currentAns, [idx]: val };
+                                              handleAnswerChange(currentQuestion.id, JSON.stringify(newObj));
+                                          };
+                                          return (
+                                              <div key={idx} className="flex flex-col md:flex-row gap-2 md:items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                  <div className="flex-1 text-sm font-bold text-slate-700 bg-white p-2 rounded border border-slate-200">{pair.left}</div>
+                                                  <div className="text-slate-400 hidden md:block">→</div>
+                                                  <input 
+                                                    type="text" 
+                                                    value={currentAns[idx] || ''} 
+                                                    onChange={e => onChange(e.target.value)}
+                                                    className="flex-1 p-2 text-sm border border-slate-200 rounded focus:border-indigo-500 outline-none"
+                                                    placeholder="Tulis pasangan..."
+                                                  />
+                                              </div>
+                                          )
+                                     })}
+                                 </div>
+                             )}
+                             
+                             {currentQuestion.questionType === 'INFO' && (
+                                 <div className="text-center p-8 bg-blue-50 rounded-xl text-blue-600 font-bold text-sm">
+                                     Ini adalah informasi. Silakan baca dengan seksama dan lanjutkan ke soal berikutnya.
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                     
+                     {/* Footer Navigation */}
+                     <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                         <button 
+                            onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                            disabled={currentQuestionIndex === 0}
+                            className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm shadow-sm"
+                         >
+                             <ArrowLeftIcon className="w-4 h-4" /> Sebelumnya
+                         </button>
+                         
+                         {currentQuestionIndex === activeExam.questions.length - 1 ? (
+                             <button 
+                                onClick={() => handleSubmit(false)}
+                                disabled={isSubmitting}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all text-sm shadow-lg shadow-indigo-200 disabled:opacity-70"
+                             >
+                                 {isSubmitting ? 'Mengirim...' : 'Selesai & Kumpulkan'} <CheckCircleIcon className="w-4 h-4" />
+                             </button>
+                         ) : (
+                             <button 
+                                onClick={() => setCurrentQuestionIndex(prev => Math.min(activeExam.questions.length - 1, prev + 1))}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-slate-900 hover:bg-black transition-all text-sm shadow-lg shadow-slate-200"
+                             >
+                                 Selanjutnya <ArrowLeftIcon className="w-4 h-4 rotate-180" />
+                             </button>
+                         )}
+                     </div>
+                 </div>
+                 
+                 <div className="mt-8 text-center">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">UjianCerdas • Secure Exam Environment</p>
+                 </div>
+             </main>
+        </div>
+    );
+};
