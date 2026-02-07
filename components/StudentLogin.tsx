@@ -59,7 +59,9 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
     try {
         const localKey = `exam_local_${cleanExamCode}_${compositeId}`;
-        const hasLocalData = localStorage.getItem(localKey);
+        
+        // Use IndexedDB helper instead of localStorage directly (Point 7.1)
+        const hasLocalData = await storageService.getLocalProgress(localKey);
         
         // Check session if no local data
         if (!hasLocalData) {
