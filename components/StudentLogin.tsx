@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon } from './Icons';
 import type { Student } from '../types';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon } from './Icons';
+import { storageService } from '../services/storage';
 
 interface StudentLoginProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -9,10 +10,16 @@ interface StudentLoginProps {
 }
 
 export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack }) => {
+  // Logic State
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+
+  // UI State
   const [examCode, setExamCode] = useState('');
   const [fullName, setFullName] = useState(() => localStorage.getItem('saved_student_fullname') || '');
   const [studentClass, setStudentClass] = useState(() => localStorage.getItem('saved_student_class') || '');
   const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem('saved_student_absent') || '');
+  
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
   const examCodeInputRef = useRef<HTMLInputElement>(null);
@@ -23,28 +30,106 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     if (!examCode || !fullName || !studentClass || !absentNumber) {
       setError('Mohon lengkapi semua data identitas.');
       return;
     }
     setError('');
 
+    // Save preference
     localStorage.setItem('saved_student_fullname', fullName.trim());
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
 
+    const cleanExamCode = examCode.toUpperCase().trim();
     const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+    
+    const studentData: Student = {
+        fullName: fullName.trim(),
+        class: studentClass.trim(),
+        absentNumber: absentNumber.trim(),
+        studentId: compositeId
+    };
 
-    onLoginSuccess(examCode.toUpperCase(), {
-      fullName: fullName.trim(),
-      class: studentClass.trim(),
-      absentNumber: absentNumber.trim(),
-      studentId: compositeId, 
-    });
+    setIsLoading(true);
+
+    try {
+        const localKey = `exam_local_${cleanExamCode}_${compositeId}`;
+        
+        // Use IndexedDB helper instead of localStorage directly (Point 7.1)
+        const hasLocalData = await storageService.getLocalProgress(localKey);
+        
+        // Check session if no local data
+        if (!hasLocalData) {
+            const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
+            if (remoteResult && (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed')) {
+                setIsLocked(true);
+                setIsLoading(false);
+                return;
+            }
+        }
+
+        onLoginSuccess(cleanExamCode, studentData);
+
+    } catch (e) {
+        console.error("Session check error", e);
+        setError("Gagal memeriksa sesi ujian. Periksa koneksi internet.");
+        setIsLoading(false);
+    }
   };
 
+  const handleUnlockAndResume = async (token: string) => {
+      const cleanExamCode = examCode.toUpperCase().trim();
+      const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+      
+      try {
+          const verified = await storageService.verifyUnlockToken(cleanExamCode, compositeId, token);
+          if (verified) {
+             const studentData: Student = {
+                fullName: fullName.trim(),
+                class: studentClass.trim(),
+                absentNumber: absentNumber.trim(),
+                studentId: compositeId
+             };
+             setIsLocked(false);
+             onLoginSuccess(cleanExamCode, studentData);
+          } else {
+             alert("Token salah.");
+          }
+      } catch(e) {
+          alert("Gagal verifikasi token.");
+      }
+  };
+
+  // Locked View (Preserving container style from new design for consistency)
+  if (isLocked) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] relative overflow-hidden font-sans">
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-rose-50/60 to-orange-50/60 rounded-full blur-[100px] animate-pulse"></div>
+            </div>
+            <div className="w-full max-w-[420px] px-6 relative z-10">
+                <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.03)] border border-white ring-1 ring-slate-50 text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-rose-50 text-rose-500 rounded-full mb-6 ring-8 ring-rose-50/50">
+                        <LockClosedIcon className="w-10 h-10"/>
+                    </div>
+                    <h2 className="text-xl font-black text-slate-800 mb-2 tracking-tight">Sesi Terkunci</h2>
+                    <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                        Akun ini sedang aktif di perangkat lain.<br/>
+                        Masukkan <strong>Token Reset</strong> dari pengawas.
+                    </p>
+                    <UnlockForm onUnlock={handleUnlockAndResume} onCancel={() => { setIsLocked(false); setIsLoading(false); }} />
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // Main Login View (From User Code)
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-800">
         {/* Zen Background Elements */}
@@ -77,7 +162,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     
                     {/* Input Group: Identity */}
                     <div className="space-y-4">
@@ -93,6 +178,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                     onBlur={() => setIsFocused(null)}
                                     className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:ring-0 outline-none"
                                     placeholder="Ketik nama anda..."
+                                    required
                                 />
                             </div>
                         </div>
@@ -110,6 +196,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                         onBlur={() => setIsFocused(null)}
                                         className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:ring-0 outline-none"
                                         placeholder="X-IPA-1"
+                                        required
                                     />
                                 </div>
                             </div>
@@ -126,6 +213,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                         onBlur={() => setIsFocused(null)}
                                         className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:ring-0 outline-none text-center"
                                         placeholder="00"
+                                        required
                                     />
                                 </div>
                             </div>
@@ -158,6 +246,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                 placeholder="KODE"
                                 autoComplete="off"
                                 maxLength={6}
+                                required
                            />
                         </div>
                     </div>
@@ -171,11 +260,21 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     
                     <button 
                         type="submit" 
-                        className="w-full bg-slate-900 text-white font-bold text-sm h-[56px] rounded-2xl hover:bg-black hover:shadow-xl hover:shadow-slate-200 transition-all active:scale-[0.98] mt-6 flex items-center justify-center gap-3 group relative overflow-hidden"
+                        disabled={isLoading}
+                        className="w-full bg-slate-900 text-white font-bold text-sm h-[56px] rounded-2xl hover:bg-black hover:shadow-xl hover:shadow-slate-200 transition-all active:scale-[0.98] mt-6 flex items-center justify-center gap-3 group relative overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        <span className="relative z-10">Mulai Mengerjakan</span>
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                        <CheckCircleIcon className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300 transition-colors relative z-10" />
+                        {isLoading ? (
+                            <>
+                                <span className="relative z-10">Memproses...</span>
+                                <div className="absolute inset-0 bg-slate-800"></div>
+                            </>
+                        ) : (
+                            <>
+                                <span className="relative z-10">Mulai Mengerjakan</span>
+                                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                                <CheckCircleIcon className="w-4 h-4 text-emerald-400 group-hover:text-emerald-300 transition-colors relative z-10" />
+                            </>
+                        )}
                     </button>
                 </form>
             </div>
@@ -186,4 +285,24 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         </div>
     </div>
   );
+};
+
+const UnlockForm: React.FC<{ onUnlock: (token: string) => void; onCancel: () => void }> = ({ onUnlock, onCancel }) => {
+    const [token, setToken] = useState('');
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onUnlock(token); }} className="space-y-4">
+            <input 
+                type="text" 
+                value={token} 
+                onChange={e => setToken(e.target.value)} 
+                className="w-full text-center text-2xl font-mono font-black tracking-[0.3em] py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-rose-400 focus:bg-white outline-none uppercase transition-all" 
+                placeholder="TOKEN" 
+                maxLength={6} 
+            />
+            <div className="flex gap-3">
+                <button type="button" onClick={onCancel} className="flex-1 py-3.5 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors uppercase tracking-wide">Batal</button>
+                <button type="submit" className="flex-[2] py-3.5 text-xs font-bold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-lg shadow-rose-200 transition-all uppercase tracking-wide">Buka Akses</button>
+            </div>
+        </form>
+    );
 };

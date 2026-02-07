@@ -33,7 +33,7 @@ const urlToBase64 = async (url: string): Promise<string> => {
     }
 };
 
-// Helper shuffle array (Fisher-Yates) - Menggunakan sintaks 'function' untuk keamanan parsing
+// Helper shuffle array (Fisher-Yates)
 function shuffleArray<T>(array: T[]): T[] {
     const newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -42,6 +42,27 @@ function shuffleArray<T>(array: T[]): T[] {
     }
     return newArr;
 }
+
+// --- INDEXED DB HELPER ---
+const DB_NAME = 'UjianCerdasDB';
+const DB_VERSION = 1;
+const STORE_PROGRESS = 'exam_progress';
+
+const initDB = (): Promise<IDBDatabase> => {
+    if (typeof window === 'undefined' || !window.indexedDB) return Promise.reject("IndexedDB not supported");
+    
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_PROGRESS)) {
+                db.createObjectStore(STORE_PROGRESS, { keyPath: 'key' });
+            }
+        };
+    });
+};
 
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor') {
@@ -137,10 +158,58 @@ class StorageService {
             }, 30000);
         }
     }
+
+  // --- INDEXED DB METHODS (LOCAL PROGRESS) ---
   
-  // --- AUTH METHODS (NEW) ---
+  async saveLocalProgress(key: string, data: any): Promise<void> {
+      try {
+          const db = await initDB();
+          return new Promise((resolve, reject) => {
+              const tx = db.transaction(STORE_PROGRESS, 'readwrite');
+              const store = tx.objectStore(STORE_PROGRESS);
+              store.put({ key, data, updatedAt: Date.now() });
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+          });
+      } catch(e) { 
+          // Fallback to LocalStorage if IDB fails
+          try { localStorage.setItem(key, JSON.stringify(data)); } catch(err) {}
+      }
+  }
+
+  async getLocalProgress(key: string): Promise<any | null> {
+      try {
+          const db = await initDB();
+          return new Promise((resolve, reject) => {
+              const tx = db.transaction(STORE_PROGRESS, 'readonly');
+              const store = tx.objectStore(STORE_PROGRESS);
+              const req = store.get(key);
+              req.onsuccess = () => resolve(req.result ? req.result.data : null);
+              req.onerror = () => reject(req.error);
+          });
+      } catch(e) { 
+          // Fallback to LocalStorage
+          try { 
+              const item = localStorage.getItem(key);
+              return item ? JSON.parse(item) : null;
+          } catch(err) { return null; }
+      }
+  }
+
+  async clearLocalProgress(key: string): Promise<void> {
+      try {
+          const db = await initDB();
+          const tx = db.transaction(STORE_PROGRESS, 'readwrite');
+          tx.objectStore(STORE_PROGRESS).delete(key);
+      } catch(e) {
+          localStorage.removeItem(key);
+      }
+  }
+  
+  // --- AUTH METHODS ---
   async getCurrentUser(): Promise<TeacherProfile | null> {
-      const { data: { session } } = await supabase.auth.getSession();
+      const auth = supabase.auth as any;
+      const { data: { session } } = await auth.getSession();
       if (!session?.user) return null;
 
       const { data: profile, error } = await supabase
@@ -161,7 +230,8 @@ class StorageService {
   }
 
   async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const { data: authData, error: authError } = await supabase.auth.signUp({ 
+      const auth = supabase.auth as any;
+      const { data: authData, error: authError } = await auth.signUp({ 
           email, 
           password,
           options: {
@@ -187,7 +257,8 @@ class StorageService {
   }
 
   async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const auth = supabase.auth as any;
+      const { error } = await auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
       // Tunggu sebentar untuk trigger
@@ -196,7 +267,7 @@ class StorageService {
       let profile = await this.getCurrentUser();
       
       if (!profile) {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { user } } = await auth.getUser();
           if (user) {
               const meta = user.user_metadata || {};
               // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
@@ -216,7 +287,8 @@ class StorageService {
   }
 
   async signOut() {
-      await supabase.auth.signOut();
+      const auth = supabase.auth as any;
+      await auth.signOut();
   }
 
   // --- USER MANAGEMENT (SUPER ADMIN) ---
@@ -568,6 +640,47 @@ class StorageService {
   }
   
   async syncData() { this.processQueue(); }
+
+  // --- NEW FEATURES (LOCKING) ---
+  async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
+      const token = Math.floor(1000 + Math.random() * 9000).toString();
+      await supabase.from('results').update({ unlock_token: token }).eq('exam_code', examCode).eq('student_id', studentId);
+      return token;
+  }
+
+  async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
+      try {
+          const { data, error } = await supabase
+              .from('results')
+              .select('unlock_token, activity_log')
+              .eq('exam_code', examCode)
+              .eq('student_id', studentId)
+              .single();
+
+          if (error || !data) return false;
+          
+          if (data.unlock_token && String(data.unlock_token).trim() === token.trim()) {
+              const currentLog = (typeof data.activity_log === 'string' ? JSON.parse(data.activity_log) : data.activity_log) || [];
+              
+              const { error: updateError } = await supabase
+                  .from('results')
+                  .update({ 
+                      unlock_token: null, 
+                      status: 'in_progress',
+                      activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`]
+                  })
+                  .eq('exam_code', examCode)
+                  .eq('student_id', studentId);
+              
+              if (updateError) throw updateError;
+              return true;
+          }
+          return false;
+      } catch (e) {
+          console.error("Unlock verification failed:", e);
+          return false;
+      }
+  }
 }
 
 export const storageService = new StorageService();

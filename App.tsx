@@ -1,6 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { TeacherDashboard } from './components/TeacherDashboard';
+import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
@@ -9,6 +8,9 @@ import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon } from './components/Icons';
 import { storageService } from './services/storage';
+
+// Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
+const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR';
 
@@ -194,6 +196,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleResumeFromLock = () => {
+      if (studentResult) {
+          const unlockedResult = { ...studentResult, status: 'in_progress' } as Result;
+          setStudentResult(unlockedResult);
+          setResumedResult(unlockedResult);
+          setView('STUDENT_EXAM');
+      }
+  };
+
   const resetToHome = () => { 
     setView('SELECTOR'); 
     setCurrentExam(null); 
@@ -216,6 +227,14 @@ const App: React.FC = () => {
         console.error("Sign out error", e);
     }
   };
+
+  // Loading Fallback Component for Suspense
+  const DashboardLoader = () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Memuat Dashboard...</p>
+    </div>
+  );
 
   if (isLoadingSession) {
     return (
@@ -299,27 +318,29 @@ const App: React.FC = () => {
         {view === 'STUDENT_LOGIN' && <StudentLogin onLoginSuccess={handleStudentLoginSuccess} onBack={() => setView('SELECTOR')} />}
         
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
-            <TeacherDashboard 
-                key={teacherProfile.id} /* FIX: Force remount to prevent ghosting */
-                teacherProfile={teacherProfile} 
-                exams={exams} 
-                results={results}
-                addExam={async (e) => { 
-                    const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                    await storageService.saveExam(examWithAuthor); 
-                    refreshExams(); 
-                }}
-                updateExam={async (e) => { 
-                    const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
-                    await storageService.saveExam(examWithAuthor); 
-                    refreshExams(); 
-                }}
-                deleteExam={async (c) => { await storageService.deleteExam(c); refreshExams(); }}
-                onLogout={handleLogout}
-                onRefreshExams={refreshExams}
-                onRefreshResults={refreshResults}
-                onAllowContinuation={async (sid, ec) => { await storageService.unlockStudentExam(ec, sid); refreshResults(); }}
-            />
+            <Suspense fallback={<DashboardLoader />}>
+                <TeacherDashboard 
+                    key={teacherProfile.id} /* FIX: Force remount to prevent ghosting */
+                    teacherProfile={teacherProfile} 
+                    exams={exams} 
+                    results={results}
+                    addExam={async (e) => { 
+                        const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                        await storageService.saveExam(examWithAuthor); 
+                        refreshExams(); 
+                    }}
+                    updateExam={async (e) => { 
+                        const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
+                        await storageService.saveExam(examWithAuthor); 
+                        refreshExams(); 
+                    }}
+                    deleteExam={async (c) => { await storageService.deleteExam(c); refreshExams(); }}
+                    onLogout={handleLogout}
+                    onRefreshExams={refreshExams}
+                    onRefreshResults={refreshResults}
+                    onAllowContinuation={async (sid, ec) => { await storageService.unlockStudentExam(ec, sid); refreshResults(); }}
+                />
+            </Suspense>
         )}
         
         {view === 'STUDENT_EXAM' && currentExam && currentStudent && (
@@ -336,6 +357,7 @@ const App: React.FC = () => {
                 result={studentResult} 
                 exam={currentExam} 
                 onFinish={resetToHome} 
+                onResume={handleResumeFromLock}
             />
         )}
 

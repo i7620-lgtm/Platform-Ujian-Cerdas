@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 
@@ -27,8 +27,8 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(normalize(studentAnswer).split(',').map(s => s.trim()));
-             const correctSet = new Set(normalize(q.correctAnswer).split(',').map(s => s.trim()));
+             const studentSet = new Set(normalize(studentAnswer).split(',').map((s: string) => s.trim()));
+             const correctSet = new Set(normalize(q.correctAnswer).split(',').map((s: string) => s.trim()));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                  correctCount++;
              }
@@ -82,7 +82,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const blurTimestampRef = useRef<number | null>(null);
     const [cheatingWarning, setCheatingWarning] = useState<string>('');
 
-    // --- REALTIME & POLLING LOGIC ---
+    // --- REALTIME & POLLING LOGIC (Robust Time Sync) ---
     useEffect(() => {
         const channel = supabase.channel(`exam-config-${exam.code}`)
             .on(
@@ -96,7 +96,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             const newLimit = newConfig.timeLimit;
                             if (newLimit > oldLimit) {
                                 const diff = newLimit - oldLimit;
-                                setTimeExtensionNotif(`Waktu diperpanjang ${diff} menit! (Live)`);
+                                setTimeExtensionNotif(`Waktu diperpanjang +${diff} menit!`);
                                 setTimeout(() => setTimeExtensionNotif(null), 5000);
                             }
                             return { ...prev, config: newConfig };
@@ -115,7 +115,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         if (prev.config.timeLimit !== data.config.timeLimit) {
                             const diff = data.config.timeLimit - prev.config.timeLimit;
                             if (diff > 0) {
-                                setTimeExtensionNotif(`Sinkronisasi: Waktu tambah ${diff} menit!`);
+                                setTimeExtensionNotif(`Sinkronisasi: Waktu +${diff} menit!`);
                                 setTimeout(() => setTimeExtensionNotif(null), 5000);
                             }
                             return { ...prev, config: data.config };
@@ -129,19 +129,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
     }, [exam.code]);
 
+    // LOAD STATE FROM INDEXED DB (Async)
     useEffect(() => {
-        const loadState = () => {
+        const loadState = async () => {
             try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch (e) { console.warn("Quota exceeded"); }
-            const localData = localStorage.getItem(STORAGE_KEY);
+            
+            // Try load from IndexedDB first (Point 7.1)
+            const localData = await storageService.getLocalProgress(STORAGE_KEY);
             if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    setAnswers(parsed.answers || {});
-                    answersRef.current = parsed.answers || {};
-                    if (parsed.logs) logRef.current = parsed.logs;
-                    return;
-                } catch(e) { }
+                setAnswers(localData.answers || {});
+                answersRef.current = localData.answers || {};
+                if (localData.logs) logRef.current = localData.logs;
+                return;
             }
+            
+            // Fallback to props (resume from server)
             if (initialData?.answers) {
                 setAnswers(initialData.answers);
                 answersRef.current = initialData.answers;
@@ -187,7 +189,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
         
         if (status === 'completed' || status === 'force_closed') {
-            localStorage.removeItem(STORAGE_KEY);
+            storageService.clearLocalProgress(STORAGE_KEY);
         }
     };
 
@@ -200,7 +202,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: answersRef.current, logs: logRef.current }));
+            
+            // Save log update to IDB
+            storageService.saveLocalProgress(STORAGE_KEY, { answers: answersRef.current, logs: logRef.current });
 
             if (activeExam.config.continueWithPermission) {
                 alert("PELANGGARAN TERDETEKSI: Anda meninggalkan halaman ujian. Akses dikunci.");
@@ -232,6 +236,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, [activeExam.config.trackLocation, student.class]);
 
+    // --- DEADLINE CALCULATION (Syncs with DB timeLimit) ---
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
         const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
@@ -263,7 +268,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         setAnswers(prev => {
             const next = { ...prev, [qId]: val };
             answersRef.current = next;
-            if (student.class !== 'PREVIEW') localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: next, logs: logRef.current, lastUpdated: Date.now() }));
+            
+            // SAVE TO INDEXED DB (Async, Non-blocking)
+            if (student.class !== 'PREVIEW') {
+                storageService.saveLocalProgress(STORAGE_KEY, { answers: next, logs: logRef.current, lastUpdated: Date.now() });
+            }
             return next;
         });
 
@@ -294,6 +303,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
     const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 max-w-full h-auto" ');
 
+    // Indikator Pengawasan
+    const isMonitored = activeExam.config.detectBehavior;
+
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40">
             {/* Header Ergonomis (Click-to-Expand) */}
@@ -310,17 +322,44 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${isNavOpen ? 'bg-slate-100 text-slate-600' : 'bg-transparent text-slate-400'}`}>
                              {isNavOpen ? <ChevronUpIcon className="w-5 h-5"/> : <ChevronDownIcon className="w-5 h-5"/>}
                          </div>
-                         <div className="min-w-0">
-                             <h1 className="text-sm font-black text-slate-800 tracking-tight truncate">{activeExam.config.subject}</h1>
+                         <div className="min-w-0 flex flex-col justify-center">
+                             <div className="flex items-center gap-2">
+                                <h1 className="text-sm font-black text-slate-800 tracking-tight truncate max-w-[150px] sm:max-w-xs">{activeExam.config.subject}</h1>
+                                {/* Monitoring Badge */}
+                                {isMonitored && (
+                                    <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-lg text-[9px] font-black uppercase text-indigo-600 tracking-wider animate-pulse" title="Sistem pengawas otomatis aktif">
+                                        <EyeIcon className="w-3 h-3" />
+                                        <span>Diawasi</span>
+                                    </div>
+                                )}
+                             </div>
                              <p className="text-[10px] font-medium text-slate-400 font-mono tracking-wide truncate">{isNavOpen ? 'Ketuk untuk tutup menu' : 'Ketuk header untuk navigasi'}</p>
                          </div>
                      </div>
-                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm shrink-0 ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
-                         <ClockIcon className="w-4 h-4" />
-                         <span className="text-sm">{formatTime(timeLeft)}</span>
+                     <div className="flex items-center gap-3">
+                        {/* Mobile Monitored Icon */}
+                        {isMonitored && (
+                            <div className="sm:hidden text-indigo-600 animate-pulse" title="Diawasi">
+                                <EyeIcon className="w-5 h-5" />
+                            </div>
+                        )}
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm shrink-0 ${timeLeft < 300 ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-white text-slate-600 border-slate-200'}`}>
+                            <ClockIcon className="w-4 h-4" />
+                            <span className="text-sm">{formatTime(timeLeft)}</span>
+                        </div>
                      </div>
                  </div>
             </header>
+
+            {/* Notification for Time Extension (Centered below header) */}
+            {timeExtensionNotif && (
+                <div className="fixed top-20 inset-x-0 flex justify-center z-[80] pointer-events-none">
+                    <div className="bg-emerald-600/90 backdrop-blur-md text-white px-6 py-2 rounded-full shadow-lg border border-emerald-500/50 text-xs font-bold animate-gentle-slide flex items-center gap-2 pointer-events-auto ring-2 ring-emerald-500/20">
+                        <ClockIcon className="w-4 h-4 shrink-0" /> 
+                        <span>{timeExtensionNotif}</span>
+                    </div>
+                </div>
+            )}
 
             {/* Navigation Panel (Slide Down) */}
             <div className={`fixed top-16 left-0 w-full bg-white/95 backdrop-blur-xl z-50 border-b border-slate-200 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? 'translate-y-0 opacity-100 visible' : '-translate-y-full opacity-0 invisible'}`}>
@@ -360,8 +399,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         })}
                     </div>
                     
-                    <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+                    <div className="mt-6 pt-4 border-t border-slate-100 text-center flex flex-col gap-1">
                         <p className="text-[10px] text-slate-400">Total {answeredCount} dari {totalQuestions} soal terjawab</p>
+                        {isMonitored && (
+                            <p className="text-[10px] font-bold text-indigo-600 flex items-center justify-center gap-1">
+                                <LockClosedIcon className="w-3 h-3" /> Mode Pengawasan Ketat Aktif
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -371,14 +415,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 className={`fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity duration-300 ${isNavOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
                 onClick={() => setIsNavOpen(false)}
             ></div>
-
-            {/* Notification for Time Extension */}
-            {timeExtensionNotif && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[80] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl shadow-emerald-200 text-sm font-bold animate-bounce flex items-center gap-3 w-max max-w-[90vw]">
-                    <CheckCircleIcon className="w-5 h-5 shrink-0" /> 
-                    <span>{timeExtensionNotif}</span>
-                </div>
-            )}
 
             {cheatingWarning && (
                 <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-rose-200 text-xs font-bold animate-bounce flex items-center gap-3 ring-4 ring-rose-100 w-max max-w-[90vw]">
