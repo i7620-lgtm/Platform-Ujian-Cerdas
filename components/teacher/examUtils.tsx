@@ -1,5 +1,3 @@
-  
-
 import type { Question, QuestionType } from '../../types';
 
 // --- INTERFACES ---
@@ -32,36 +30,63 @@ interface PageData {
 
 // --- COMPUTER VISION HELPERS ---
 
-// STRATEGI PENYIMPANAN: 
-// Kita menggunakan kualitas 0.6 (agak rendah) untuk menghemat database secara drastis.
-// Namun kita menjaga resolusi (maxWidth) di 1000px.
-// Tujuannya: File kecil, tapi pikselnya cukup banyak agar bisa "dipertajam" kembali oleh filter CSS/SVG di sisi siswa.
-export const compressImage = (dataUrl: string, quality = 0.6, maxWidth = 1000): Promise<string> => {
+// STRATEGI HIBRIDA (WebP + Smart Resize Loop)
+// Mengubah output menjadi WebP (lebih efisien dibanding JPEG).
+// Target resolusi maksimal 800px (cukup untuk HP).
+// Iterasi kompresi otomatis jika file > 150KB.
+export const compressImage = (dataUrl: string, quality = 0.7, maxWidth = 800, maxSizeBytes = 150 * 1024): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-            const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
+            let currentQuality = quality;
 
+            // 1. Initial Resize (Dimension Cap)
             if (width > maxWidth) {
                 height = Math.round((height * maxWidth) / width);
                 width = maxWidth;
             }
 
-            canvas.width = width;
-            canvas.height = height;
+            const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             if (!ctx) return resolve(dataUrl);
 
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, width, height);
-            // Menggunakan image smoothing 'medium' untuk hasil downscaling yang wajar
-            ctx.imageSmoothingQuality = 'medium';
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Kompresi agresif (0.6)
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            // Fungsi proses encoding
+            const process = (w: number, h: number, q: number): string => {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, w, h);
+                // Gunakan 'high' smoothing karena resolusi mungkin kecil
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high'; 
+                ctx.drawImage(img, 0, 0, w, h);
+                return canvas.toDataURL('image/webp', q);
+            };
+
+            let resultUrl = process(width, height, currentQuality);
+
+            // 2. Iterative Compression Loop (Target Size Check)
+            // Base64 length ~= 1.37 * Binary size. 150KB binary ~= 210KB Base64 string length.
+            const targetLength = Math.ceil(maxSizeBytes * 1.37);
+            let attempts = 0;
+            const maxAttempts = 6;
+
+            while (resultUrl.length > targetLength && attempts < maxAttempts) {
+                if (currentQuality > 0.5) {
+                    // Tahap 1: Kurangi kualitas WebP dulu (sangat efektif)
+                    currentQuality -= 0.1;
+                } else {
+                    // Tahap 2: Jika kualitas sudah batas bawah, kecilkan dimensi
+                    width = Math.floor(width * 0.9);
+                    height = Math.floor(height * 0.9);
+                }
+                resultUrl = process(width, height, currentQuality);
+                attempts++;
+            }
+
+            resolve(resultUrl);
         };
         img.onerror = () => resolve(dataUrl);
         img.src = dataUrl;
@@ -81,8 +106,8 @@ export const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, 
         
         try {
             ctx.drawImage(sourceImage, x, y, w, h, 0, 0, w, h);
-            // Crop juga dikompresi
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            // Gunakan WebP untuk hasil crop
+            resolve(canvas.toDataURL('image/webp', 0.7));
         } catch (e) {
             console.error("Crop error:", e);
             resolve('');
@@ -103,7 +128,8 @@ export const addWhitePadding = (dataUrl: string, padding: number = 10): Promise<
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, padding);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            // Gunakan WebP
+            resolve(canvas.toDataURL('image/webp', 0.7));
         };
         img.onerror = () => resolve(dataUrl);
         img.src = dataUrl;
@@ -211,7 +237,8 @@ export const refineImageContent = (dataUrl: string): Promise<string> => {
                 fCtx.fillStyle = '#FFFFFF';
                 fCtx.fillRect(0,0, cropW, cropH);
                 fCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-                resolve(finalCanvas.toDataURL('image/jpeg', 0.6));
+                // Output WebP
+                resolve(finalCanvas.toDataURL('image/webp', 0.7));
             } else {
                 resolve(dataUrl);
             }
@@ -255,7 +282,8 @@ export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> =
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
                     await page.render({ canvasContext: ctx, viewport }).promise;
-                    images.push(canvas.toDataURL('image/jpeg', 0.7));
+                    // Gunakan WebP untuk preview
+                    images.push(canvas.toDataURL('image/webp', 0.7));
                 }
                 resolve(images);
             } catch (err) { reject(new Error('Gagal mengonversi PDF.')); }
@@ -479,7 +507,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     ctx.fillRect(0,0, canvas.width, canvas.height);
                     ctx.drawImage(i1, 0, 0);
                     ctx.drawImage(i2, 0, i1.height);
-                    finalImage = canvas.toDataURL('image/jpeg', 0.6);
+                    // Use WebP for combined image
+                    finalImage = canvas.toDataURL('image/webp', 0.6);
                 }
             } else {
                 finalImage = img1;
