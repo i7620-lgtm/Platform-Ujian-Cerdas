@@ -157,6 +157,7 @@ const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
+    // ... existing code ...
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
@@ -246,6 +247,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     return (
         <div className="space-y-10 border-t-2 border-gray-200 pt-12">
+            {/* ... questions list ... */}
             <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                     <h2 className="text-xl font-bold text-neutral">{isEditing ? '1. Editor Soal' : '3. Editor Soal'}</h2>
@@ -332,9 +334,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                     <WysiwygEditor 
                                                                         value={row.text} 
                                                                         onChange={(val) => handleTrueFalseRowTextChange(q.id, i, val)} 
-                                                                        minHeight="60px" 
+                                                                        minHeight="80px" 
                                                                         placeholder={`Pernyataan ${i+1}`}
-                                                                        showTabs={false}
                                                                     />
                                                                 </div>
                                                                 <div className="col-span-4 flex items-center justify-center gap-2 h-full pt-2">
@@ -371,9 +372,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                     <WysiwygEditor 
                                                                         value={pair.left} 
                                                                         onChange={(val) => handleMatchingPairChange(q.id, i, 'left', val)} 
-                                                                        minHeight="60px" 
+                                                                        minHeight="120px" 
                                                                         placeholder="Item Kiri"
-                                                                        showTabs={false}
                                                                     />
                                                                 </div>
                                                                 <div className="text-slate-300 hidden md:block select-none">→</div>
@@ -382,9 +382,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                         <WysiwygEditor 
                                                                             value={pair.right} 
                                                                             onChange={(val) => handleMatchingPairChange(q.id, i, 'right', val)} 
-                                                                            minHeight="60px" 
+                                                                            minHeight="120px" 
                                                                             placeholder="Pasangan Kanan"
-                                                                            showTabs={false}
                                                                         />
                                                                     </div>
                                                                     <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all shrink-0"><TrashIcon className="w-4 h-4"/></button>
@@ -415,13 +414,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 </div>
                  <div className="mt-12 mb-20 text-center"><button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary font-bold hover:text-primary-focus mx-auto transition-all bg-white border border-primary/20 px-8 py-4 rounded-2xl hover:bg-primary hover:text-white shadow-sm hover:shadow-lg active:scale-95 group"><PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" /> Tambah Soal Baru</button></div>
              </div>
-
-            {/* --- CONFIGURATION --- */}
-            <div className="pt-10">
+             {/* ... configuration section ... */}
+             <div className="pt-10">
                  <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm mb-6">
                     <h2 className="text-xl font-bold text-neutral">{isEditing ? '2. Konfigurasi' : '4. Konfigurasi'}</h2>
                      <p className="text-sm text-gray-500 mt-1">Pengaturan waktu dan keamanan ujian.</p>
                 </div>
+                {/* ... config content ... */}
                 <div className="bg-white p-8 border border-gray-200 rounded-2xl shadow-sm space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                         <div className="md:col-span-2 pb-2 border-b border-gray-100 mb-2"><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Umum</h4></div>
@@ -488,7 +487,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     </div>
                 </div>
             </div>
-            
+            {/* ... footer buttons ... */}
             <div className="text-center pt-10 pb-20">
                 {isEditing ? (
                     <div className="flex justify-center items-center gap-4">
