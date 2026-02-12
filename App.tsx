@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -26,6 +25,30 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // Theme State Management
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+        const local = localStorage.getItem('theme');
+        return local === 'dark' || (!local && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
+
+  // Apply Theme Effect
+  useEffect(() => {
+    if (darkMode) {
+        document.documentElement.classList.add('dark');
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
+        localStorage.setItem('theme', 'dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#ffffff');
+        localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
+
+  const toggleTheme = () => setDarkMode(!darkMode);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -230,7 +253,7 @@ const App: React.FC = () => {
 
   // Loading Fallback Component for Suspense
   const DashboardLoader = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-900">
         <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Memuat Dashboard...</p>
     </div>
@@ -238,7 +261,7 @@ const App: React.FC = () => {
 
   if (isLoadingSession) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-900">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
                 <p className="text-sm font-medium text-slate-500">Memuat sesi...</p>
@@ -248,7 +271,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
         
         {/* Status Jaringan Minimalis & Elegan */}
         <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
@@ -260,7 +283,7 @@ const App: React.FC = () => {
             )}
             
             {isSyncing && isOnline && (
-                <div className="bg-white/80 backdrop-blur-md text-indigo-600 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 flex items-center gap-2 pointer-events-auto">
+                <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wide shadow-lg border border-indigo-50 dark:border-slate-700 flex items-center gap-2 pointer-events-auto">
                     <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     <span>Menyimpan...</span>
                 </div>
@@ -271,18 +294,18 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
                 {/* Background Decor */}
                 <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
-                    <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 blur-[100px]"></div>
-                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 blur-[100px]"></div>
+                    <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
                 </div>
                 
                 <div className="w-full max-w-sm z-10 animate-gentle-slide">
                     <div className="text-center mb-10">
-                        <div className="inline-flex p-4 bg-white rounded-2xl shadow-sm mb-6 border border-slate-50 ring-1 ring-slate-100">
-                            <LogoIcon className="w-10 h-10 text-indigo-600" />
+                        <div className="inline-flex p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
+                            <LogoIcon className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-3">UjianCerdas</h1>
-                        <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-3">UjianCerdas</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium leading-relaxed">
                             Platform evaluasi modern.<br/>Ringan, Cepat, Terpercaya.
                         </p>
                     </div>
@@ -290,7 +313,7 @@ const App: React.FC = () => {
                     <div className="space-y-4">
                         <button 
                             onClick={() => setView('STUDENT_LOGIN')} 
-                            className="w-full group relative overflow-hidden bg-slate-900 text-white p-4 rounded-xl shadow-lg shadow-slate-200 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                            className="w-full group relative overflow-hidden bg-slate-900 dark:bg-indigo-600 text-white p-4 rounded-xl shadow-lg shadow-slate-200 dark:shadow-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <div className="relative z-10 flex items-center justify-center gap-3">
                                 <span className="font-bold text-sm tracking-wide">Masuk sebagai Siswa</span>
@@ -300,14 +323,14 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-white text-slate-600 rounded-xl border border-slate-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50/50 dark:hover:bg-slate-700 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
                         >
                             <UserIcon className="w-4 h-4" />
                             Area Pengajar
                         </button>
                     </div>
 
-                    <p className="mt-12 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                    <p className="mt-12 text-center text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">
                         Versi 3.0 • Hemat Data
                     </p>
                 </div>
@@ -324,6 +347,8 @@ const App: React.FC = () => {
                     teacherProfile={teacherProfile} 
                     exams={exams} 
                     results={results}
+                    isDarkMode={darkMode}
+                    toggleTheme={toggleTheme}
                     addExam={async (e) => { 
                         const examWithAuthor = { ...e, authorId: teacherProfile.id, authorSchool: teacherProfile.school };
                         await storageService.saveExam(examWithAuthor); 
