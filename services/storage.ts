@@ -8,10 +8,10 @@ interface CompressedResult {
     v: 2;
     exam: Exam;
     mapping: {
-        q_ids: string[]; // Sequence of Question IDs for mapping answers array
-        cols: string[];  // Sequence of data columns
+        q_ids: string[]; // Urutan ID soal untuk mapping jawaban
+        cols: string[];  // Urutan kolom data siswa
     };
-    data: any[][]; // Array of arrays (CSV-like rows)
+    data: any[][]; // Baris data siswa
 }
 
 // Helper: Convert Base64 to Blob for Upload
@@ -638,7 +638,7 @@ class StorageService {
 
   // --- COLD STORAGE METHODS (NEW) ---
 
-  // 1. COMPRESSION UTILS (TYPE 2)
+  // 1. COMPRESSION UTILS
   private compressToType2(exam: Exam, results: Result[]): CompressedResult {
       // Mapping question IDs for columnar storage of answers
       const qIds = exam.questions.filter(q => q.questionType !== 'INFO').map(q => q.id);
@@ -648,8 +648,7 @@ class StorageService {
       
       // Transform Data
       const rows = results.map(r => {
-          // Map answers to simple array based on qIds order
-          const answerArray = qIds.map(qid => r.answers[qid] || ""); 
+          const answerArray = qIds.map(qid => r.answers[qid] || ""); // Preserve order
           return [
               r.student.fullName,
               r.student.class,
@@ -678,7 +677,7 @@ class StorageService {
       const results: Result[] = data.map(row => {
           // Reconstruct Answers Object
           const answersObj: Record<string, string> = {};
-          const ansArray = row[10]; // Index of answers_array based on cols above (10th index)
+          const ansArray = row[10]; // Index of answers_array based on cols above
           mapping.q_ids.forEach((qid, idx) => {
               if (ansArray[idx] !== undefined) answersObj[qid] = ansArray[idx];
           });
