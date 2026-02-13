@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon } from './Icons';
 import { storageService } from '../services/storage';
 
 interface StudentResultPageProps {
@@ -8,11 +8,13 @@ interface StudentResultPageProps {
   exam: Exam; 
   onFinish: () => void;
   onResume?: () => void;
+  isDarkMode?: boolean;
+  toggleTheme?: () => void;
 }
 
 const normalize = (str: string) => (str || '').trim().toLowerCase();
 
-export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume }) => {
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
     const [expandedReview, setExpandedReview] = useState(false);
     
@@ -154,6 +156,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
+            {/* Theme Toggle Top Right */}
+            {toggleTheme && (
+                <div className="absolute top-6 right-6 z-50">
+                    <button 
+                        onClick={toggleTheme} 
+                        className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"
+                    >
+                        {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+                    </button>
+                </div>
+            )}
+
             {/* Elegant Discrepancy Notification */}
             {calculatedStats.hasDiscrepancy && (
                 <div className="absolute top-6 inset-x-0 flex justify-center z-50 pointer-events-none">
