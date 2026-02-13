@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -5,7 +6,7 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon } from './components/Icons';
 import { storageService } from './services/storage';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
@@ -292,6 +293,23 @@ const App: React.FC = () => {
         
         {view === 'SELECTOR' && (
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+                
+                {/* Theme Toggle Button - Top Left */}
+                <div className="absolute top-6 left-6 z-20 animate-fade-in">
+                    <button
+                        onClick={toggleTheme}
+                        className="p-3 rounded-2xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-md shadow-sm border border-slate-200/50 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-amber-500 dark:hover:text-indigo-400 transition-all hover:scale-105 active:scale-95 group"
+                        title={darkMode ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+                        aria-label="Pengaturan Tema"
+                    >
+                        {darkMode ? (
+                            <SunIcon className="w-6 h-6 group-hover:rotate-180 transition-transform duration-700 ease-out" />
+                        ) : (
+                            <MoonIcon className="w-6 h-6 group-hover:-rotate-12 transition-transform duration-500" />
+                        )}
+                    </button>
+                </div>
+
                 {/* Background Decor */}
                 <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
@@ -397,5 +415,5 @@ const App: React.FC = () => {
     </div>
   );
 };
- 
+
 export default App;
