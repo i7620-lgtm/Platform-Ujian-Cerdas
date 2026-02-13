@@ -36,6 +36,13 @@ interface TeacherDashboardProps {
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
 
+// Helper to strip HTML for Excel export
+const stripHtml = (html: string) => {
+   const tmp = document.createElement("DIV");
+   tmp.innerHTML = html;
+   return tmp.textContent || tmp.innerText || "";
+}
+
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
     teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
 }) => {
@@ -58,7 +65,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         showResultToStudent: true,
         showCorrectAnswer: false,
         enablePublicStream: false,
-        disableRealtime: false, 
+        disableRealtime: false, // Default false
         trackLocation: false,
         subject: 'Lainnya',
         classLevel: 'Lainnya',
@@ -115,6 +122,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             if(status === 'PUBLISHED') setGeneratedCode(code); 
         }
 
+        // Navigasi Otomatis berdasarkan status dan waktu
         if (status === 'DRAFT') {
             setView('DRAFTS');
             resetForm();
@@ -134,7 +142,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     };
     
-    const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian beserta semua datanya? Tindakan ini tidak dapat dibatalkan.")) deleteExam(exam.code); };
+    const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian?")) deleteExam(exam.code); };
     
     const handleDuplicateExam = (exam: Exam) => { 
         setQuestions(exam.questions); 
@@ -157,18 +165,58 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setResetKey(prev => prev + 1);
     };
 
-    // ARCHIVE CLOUD LOGIC
-    const handleArchiveExamToCloud = async (exam: Exam) => {
-        if (!confirm(`Konfirmasi Arsip Cloud:\n\n1. Data akan dipindahkan ke Cold Storage (Hemat Kuota).\n2. Data akan dihapus dari Database Aktif (Hot).\n3. Anda dapat melihatnya kembali di menu "Buka Arsip".\n\nLanjutkan?`)) return;
+    // ARCHIVE & EXCEL LOGIC
+    const handleArchiveExam = async (exam: Exam) => {
+        const confirmMsg = `Konfirmasi Finalisasi & Arsip?\n\nSistem akan:\n1. Memindahkan data ke Cloud Storage (Cold Data).\n2. Menghapus data dari Database (SQL) untuk menjaga performa.\n3. Mengunduh backup lokal sebagai cadangan.\n\nPastikan proses upload selesai sebelum menutup.`;
+        if (!confirm(confirmMsg)) return;
         
         setIsLoadingArchive(true);
         try {
-            await storageService.archiveExamToCloud(exam.code, teacherProfile.id);
-            await onRefreshExams(); // Refresh list immediately
-            alert("Berhasil diarsipkan ke Cloud! Cek menu 'Buka Arsip'.");
-        } catch (e: any) {
+            // 1. Get Fat Exam Object (Base64 Images)
+            const fatExam = await storageService.getExamForArchive(exam.code);
+            if (!fatExam) throw new Error("Gagal mengambil data ujian.");
+
+            // 2. Get All Results for this exam
+            const examResults = await storageService.getResults(exam.code, undefined);
+
+            // 3. Create comprehensive archive object (JSON)
+            const archivePayload = {
+                exam: fatExam,
+                results: examResults
+            };
+            const jsonString = JSON.stringify(archivePayload, null, 2);
+
+            // 4. ATTEMPT CLOUD UPLOAD (Supabase Storage 'archives' bucket)
+            try {
+                await storageService.uploadArchive(exam.code, jsonString);
+                // If successful, proceed to SQL deletion
+                await storageService.cleanupExamAssets(exam.code);
+                await deleteExam(exam.code);
+                onRefreshExams();
+                alert("Berhasil! Data ujian telah dipindahkan ke Cloud Archive dan Database SQL telah dibersihkan.");
+            } catch (cloudError: any) {
+                console.error("Cloud upload failed:", cloudError);
+                // 5. FALLBACK: Download Local File if Cloud Fails
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `BACKUP_LOCAL_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                if (confirm("Gagal upload ke Cloud Storage (mungkin bucket belum disetup atau koneksi buruk). File backup telah diunduh ke perangkat Anda.\n\nApakah Anda tetap ingin menghapus data dari Database SQL? (Pastikan file backup aman!)")) {
+                    await storageService.cleanupExamAssets(exam.code);
+                    await deleteExam(exam.code);
+                    onRefreshExams();
+                }
+            }
+
+        } catch (e) {
             console.error(e);
-            alert("Gagal mengarsipkan: " + e.message);
+            alert("Gagal memproses arsip.");
         } finally {
             setIsLoadingArchive(false);
         }
@@ -180,6 +228,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
+    
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
     
     const now = new Date();
@@ -201,6 +250,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return new Date(`${dateStr}T${exam.config.startTime}`).getTime() + exam.config.timeLimit * 60000 < now.getTime();
     }).sort((a,b)=>b.config.date.localeCompare(a.config.date));
 
+    // Fallback for missing accountType
     const accountType = teacherProfile.accountType || 'guru';
 
     return (
@@ -209,8 +259,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
                         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Memindahkan ke Arsip Cloud...</p>
-                        <p className="text-xs text-slate-400">Sedang mengompresi data...</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Mengarsipkan ke Cloud...</p>
+                        <p className="text-xs text-slate-400">Mohon tunggu, jangan tutup halaman ini.</p>
                     </div>
                 </div>
             )}
@@ -279,7 +329,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onSelectExam={setSelectedFinishedExam} 
                         onDuplicateExam={handleDuplicateExam} 
                         onDeleteExam={handleDeleteExam}
-                        onArchiveExam={handleArchiveExamToCloud}
+                        onArchiveExam={handleArchiveExam}
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
