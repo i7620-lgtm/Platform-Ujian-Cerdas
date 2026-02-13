@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +11,8 @@ interface StudentExamPageProps {
   initialData?: Result | null;
   onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string, grading?: any) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
 }
 
 const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -56,7 +59,7 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
 };
 
-export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit }) => {
+export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, isDarkMode, toggleTheme }) => {
     const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
     const CACHED_EXAM_KEY = `exam_def_${exam.code}`;
 
@@ -290,9 +293,18 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                              <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 font-mono tracking-wide truncate">{isNavOpen ? 'Ketuk untuk tutup' : 'Ketuk untuk navigasi'}</p>
                          </div>
                      </div>
-                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900 animate-pulse' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
-                         <ClockIcon className="w-4 h-4" />
-                         <span className="text-sm">{formatTime(timeLeft)}</span>
+                     <div className="flex items-center gap-2">
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); toggleTheme(); }}
+                            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm border border-slate-200 dark:border-slate-700"
+                            title={isDarkMode ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+                         >
+                            {isDarkMode ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+                         </button>
+                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono font-bold tracking-tight transition-all shadow-sm ${timeLeft < 300 ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900 animate-pulse' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                             <ClockIcon className="w-4 h-4" />
+                             <span className="text-sm">{formatTime(timeLeft)}</span>
+                         </div>
                      </div>
                  </div>
             </header>
