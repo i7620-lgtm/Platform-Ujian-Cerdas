@@ -206,3 +206,4 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     </div>
   );
 };
+ 
