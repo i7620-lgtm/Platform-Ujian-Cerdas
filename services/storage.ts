@@ -1,6 +1,7 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
+import { compressImage, refineImageContent } from '../components/teacher/examUtils';
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -453,31 +454,47 @@ class StorageService {
           const parser = new DOMParser();
           const doc = parser.parseFromString(html, 'text/html');
           const images = doc.getElementsByTagName('img');
+          
           for (let i = 0; i < images.length; i++) {
               const img = images[i];
               const src = img.getAttribute('src');
               const bucketPath = img.getAttribute('data-bucket-path');
+              let rawBase64 = '';
 
               if (bucketPath) {
                   try {
                       const { data, error } = await supabase.storage.from('soal').download(bucketPath);
                       if (!error && data) {
-                          const base64 = await new Promise<string>((resolve) => {
+                          rawBase64 = await new Promise<string>((resolve) => {
                               const reader = new FileReader();
                               reader.onloadend = () => resolve(reader.result as string);
                               reader.readAsDataURL(data);
                           });
-                          img.setAttribute('src', base64);
-                          img.removeAttribute('data-bucket-path');
-                          continue; 
                       }
                   } catch (e) {
                       console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
                   }
               }
 
-              if (src && src.startsWith('http')) {
-                  img.setAttribute('src', await urlToBase64(src));
+              if (!rawBase64 && src && src.startsWith('http')) {
+                  rawBase64 = await urlToBase64(src);
+              }
+
+              if (rawBase64) {
+                  try {
+                      // OPTIMIZATION PIPELINE:
+                      // 1. Resize to max 800px (keep high quality for processing)
+                      const resized = await compressImage(rawBase64, 0.9, 800);
+                      // 2. Refine (Thresholding/High Contrast)
+                      const refined = await refineImageContent(resized);
+                      // 3. Final Compression (WebP q=0.5)
+                      const final = await compressImage(refined, 0.5, 800);
+                      
+                      img.setAttribute('src', final);
+                  } catch (e) {
+                      console.error("Optimization error, using original", e);
+                      img.setAttribute('src', rawBase64);
+                  }
                   img.removeAttribute('data-bucket-path');
               }
           }
