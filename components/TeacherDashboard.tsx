@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -35,13 +36,6 @@ interface TeacherDashboardProps {
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
 
-// Helper to strip HTML for Excel export
-const stripHtml = (html: string) => {
-   const tmp = document.createElement("DIV");
-   tmp.innerHTML = html;
-   return tmp.textContent || tmp.innerText || "";
-}
-
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
     teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
 }) => {
@@ -64,7 +58,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         showResultToStudent: true,
         showCorrectAnswer: false,
         enablePublicStream: false,
-        disableRealtime: false, // Default false
+        disableRealtime: false, 
         trackLocation: false,
         subject: 'Lainnya',
         classLevel: 'Lainnya',
@@ -121,7 +115,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             if(status === 'PUBLISHED') setGeneratedCode(code); 
         }
 
-        // Navigasi Otomatis berdasarkan status dan waktu
         if (status === 'DRAFT') {
             setView('DRAFTS');
             resetForm();
@@ -141,7 +134,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
     };
     
-    const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian?")) deleteExam(exam.code); };
+    const handleDeleteExam = (exam: Exam) => { if(confirm("Hapus ujian beserta semua datanya? Tindakan ini tidak dapat dibatalkan.")) deleteExam(exam.code); };
     
     const handleDuplicateExam = (exam: Exam) => { 
         setQuestions(exam.questions); 
@@ -164,117 +157,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setResetKey(prev => prev + 1);
     };
 
-    // ARCHIVE & EXCEL LOGIC
-    const handleArchiveExam = async (exam: Exam) => {
-        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nSistem akan mengunduh file JSON (Database) dan Excel (Laporan). Data di cloud akan dihapus agar hemat kuota.`)) return;
+    // ARCHIVE CLOUD LOGIC
+    const handleArchiveExamToCloud = async (exam: Exam) => {
+        if (!confirm(`Konfirmasi Arsip Cloud:\n\n1. Data akan dipindahkan ke Cold Storage (Hemat Kuota).\n2. Data akan dihapus dari Database Aktif (Hot).\n3. Anda dapat melihatnya kembali di menu "Buka Arsip".\n\nLanjutkan?`)) return;
         
         setIsLoadingArchive(true);
         try {
-            // 1. Get Fat Exam Object (Base64 Images) for JSON Backup
-            const fatExam = await storageService.getExamForArchive(exam.code);
-            if (!fatExam) throw new Error("Gagal mengambil data ujian.");
-
-            // 2. Get All Results for this exam
-            const examResults = await storageService.getResults(exam.code, undefined);
-
-            // 3. Create comprehensive archive object (JSON)
-            const archivePayload = {
-                exam: fatExam,
-                results: examResults
-            };
-
-            // 4. Download JSON
-            const jsonString = JSON.stringify(archivePayload, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `ARSIP_DB_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            // 5. GENERATE EXCEL (Dynamic Import)
-            try {
-                // Dynamic import to save initial bundle size
-                const XLSX = await import("xlsx");
-
-                // --- Sheet 1: Bank Soal ---
-                const questionRows = fatExam.questions.map((q, i) => ({
-                    No: i + 1,
-                    ID: q.id,
-                    Tipe: q.questionType,
-                    Pertanyaan: stripHtml(q.questionText),
-                    Opsi: q.options ? q.options.map(stripHtml).join(' | ') : '-',
-                    Kunci_Jawaban: q.correctAnswer || '-'
-                }));
-                const wsQuestions = XLSX.utils.json_to_sheet(questionRows);
-
-                // --- Sheet 2: Hasil Siswa ---
-                const resultRows = examResults.map((r, i) => ({
-                    No: i + 1,
-                    Nama: r.student.fullName,
-                    Kelas: r.student.class,
-                    ID_Siswa: r.student.studentId,
-                    Nilai: r.score,
-                    Benar: r.correctAnswers,
-                    Salah: r.totalQuestions - r.correctAnswers - (Object.keys(r.answers).length < r.totalQuestions ? (r.totalQuestions - Object.keys(r.answers).length) : 0), // Simplified logic
-                    Total_Soal: r.totalQuestions,
-                    Status: r.status,
-                    Waktu_Selesai: r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : '-'
-                }));
-                const wsResults = XLSX.utils.json_to_sheet(resultRows);
-
-                // --- Sheet 3: Analisis Soal ---
-                // Simple calculation for correct percentage per question
-                const totalStudents = examResults.length;
-                const analysisRows = fatExam.questions.filter(q => q.questionType !== 'INFO').map((q, i) => {
-                    let correctCount = 0;
-                    examResults.forEach(r => {
-                        const ans = r.answers[q.id];
-                        // Basic check (normalized)
-                        const normAns = String(ans || '').trim().toLowerCase();
-                        const normKey = String(q.correctAnswer || '').trim().toLowerCase();
-                        if (normAns === normKey) correctCount++;
-                        // Note: This is a simplified check. Complex types might need stricter logic same as in ExamPage.
-                    });
-                    const pct = totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
-                    
-                    return {
-                        No: i + 1,
-                        Soal: stripHtml(q.questionText),
-                        Jawab_Benar: correctCount,
-                        Total_Partisipan: totalStudents,
-                        Persentase_Benar: pct + "%",
-                        Kategori: pct >= 80 ? 'Mudah' : pct >= 50 ? 'Sedang' : 'Sulit'
-                    };
-                });
-                const wsAnalysis = XLSX.utils.json_to_sheet(analysisRows);
-
-                // Create Workbook
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, wsQuestions, "Bank Soal");
-                XLSX.utils.book_append_sheet(wb, wsResults, "Hasil Siswa");
-                XLSX.utils.book_append_sheet(wb, wsAnalysis, "Analisis Soal");
-
-                // Download Excel
-                XLSX.writeFile(wb, `LAPORAN_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.xlsx`);
-
-            } catch (excelError) {
-                console.error("Gagal membuat Excel:", excelError);
-                alert("File JSON berhasil diunduh, tetapi gagal membuat Excel (Cek koneksi internet untuk memuat modul Excel).");
-            }
-
-            // 6. Cleanup Cloud
-            await storageService.cleanupExamAssets(exam.code);
-            await deleteExam(exam.code); // Hapus dari DB
-            onRefreshExams();
-            
-            alert("Arsip berhasil diunduh dan data cloud dibersihkan.");
-        } catch (e) {
+            await storageService.archiveExamToCloud(exam.code, teacherProfile.id);
+            await onRefreshExams(); // Refresh list immediately
+            alert("Berhasil diarsipkan ke Cloud! Cek menu 'Buka Arsip'.");
+        } catch (e: any) {
             console.error(e);
-            alert("Gagal mengarsipkan ujian.");
+            alert("Gagal mengarsipkan: " + e.message);
         } finally {
             setIsLoadingArchive(false);
         }
@@ -286,7 +180,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
-    
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
     
     const now = new Date();
@@ -308,7 +201,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return new Date(`${dateStr}T${exam.config.startTime}`).getTime() + exam.config.timeLimit * 60000 < now.getTime();
     }).sort((a,b)=>b.config.date.localeCompare(a.config.date));
 
-    // Fallback for missing accountType
     const accountType = teacherProfile.accountType || 'guru';
 
     return (
@@ -317,8 +209,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
                         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Menyiapkan Arsip & Excel...</p>
-                        <p className="text-xs text-slate-400">Mohon tunggu, sedang mengunduh modul Excel.</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Memindahkan ke Arsip Cloud...</p>
+                        <p className="text-xs text-slate-400">Sedang mengompresi data...</p>
                     </div>
                 </div>
             )}
@@ -387,7 +279,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onSelectExam={setSelectedFinishedExam} 
                         onDuplicateExam={handleDuplicateExam} 
                         onDeleteExam={handleDeleteExam}
-                        onArchiveExam={handleArchiveExam}
+                        onArchiveExam={handleArchiveExamToCloud}
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
