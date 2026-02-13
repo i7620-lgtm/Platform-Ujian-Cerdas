@@ -1,7 +1,6 @@
-
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon } from './Icons';
 import { storageService } from '../services/storage';
 
 interface StudentResultPageProps {
@@ -9,11 +8,13 @@ interface StudentResultPageProps {
   exam: Exam; 
   onFinish: () => void;
   onResume?: () => void;
+  isDarkMode?: boolean;
+  toggleTheme?: () => void;
 }
 
 const normalize = (str: string) => (str || '').trim().toLowerCase();
 
-export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume }) => {
+export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
     const [expandedReview, setExpandedReview] = useState(false);
     
@@ -111,13 +112,13 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
     if (result.status === 'force_closed') {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-rose-50 p-6">
-                <div className="w-full max-w-sm text-center bg-white p-8 rounded-3xl shadow-xl border border-rose-100 animate-fade-in">
-                    <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-rose-50/50">
+            <div className="min-h-screen flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
+                <div className="w-full max-w-sm text-center bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-rose-100 dark:border-rose-900 animate-fade-in">
+                    <div className="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-rose-50/50 dark:ring-rose-900/20">
                         <LockClosedIcon className="w-8 h-8" />
                     </div>
-                    <h1 className="text-xl font-black text-slate-900 mb-2">Akses Terkunci</h1>
-                    <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white mb-2">Akses Terkunci</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
                         Sesi Anda dihentikan. <br/>
                         Masukkan <strong>Token Guru</strong> untuk membuka kembali akses ujian ini.
                     </p>
@@ -131,7 +132,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                                 setUnlockToken(val);
                             }}
-                            className="w-full text-center text-xl font-mono font-bold tracking-[0.5em] py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-rose-400 focus:bg-white outline-none transition-all uppercase placeholder:tracking-normal placeholder:font-sans"
+                            className="w-full text-center text-xl font-mono font-bold tracking-[0.5em] py-3 bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl focus:border-rose-400 dark:focus:border-rose-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all uppercase placeholder:tracking-normal placeholder:font-sans text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
                             placeholder="4 ANGKA TOKEN"
                             maxLength={4}
                         />
@@ -139,13 +140,13 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                         <button 
                             type="submit" 
                             disabled={isUnlocking || unlockToken.length !== 4}
-                            className="w-full bg-rose-500 text-white font-bold py-3 rounded-xl hover:bg-rose-600 transition-all text-sm shadow-lg shadow-rose-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="w-full bg-rose-500 text-white font-bold py-3 rounded-xl hover:bg-rose-600 transition-all text-sm shadow-lg shadow-rose-200 dark:shadow-rose-900/30 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                             {isUnlocking ? 'Membuka Akses...' : 'Buka Kunci'}
                         </button>
                     </form>
 
-                    <button onClick={onFinish} className="text-xs font-bold text-slate-400 hover:text-slate-600">Kembali ke Beranda</button>
+                    <button onClick={onFinish} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">Kembali ke Beranda</button>
                 </div>
             </div>
         );
@@ -154,11 +155,23 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
     const showResult = config.showResultToStudent;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 font-sans relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
+            {/* Theme Toggle Top Right */}
+            {toggleTheme && (
+                <div className="absolute top-6 right-6 z-50">
+                    <button 
+                        onClick={toggleTheme} 
+                        className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"
+                    >
+                        {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+                    </button>
+                </div>
+            )}
+
             {/* Elegant Discrepancy Notification */}
             {calculatedStats.hasDiscrepancy && (
                 <div className="absolute top-6 inset-x-0 flex justify-center z-50 pointer-events-none">
-                    <div className="bg-amber-50/90 backdrop-blur-md border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 max-w-md pointer-events-auto animate-gentle-slide">
+                    <div className="bg-amber-50/90 dark:bg-amber-900/90 backdrop-blur-md border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-200 px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 max-w-md pointer-events-auto animate-gentle-slide">
                         <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
                         <div>
                             <p className="text-xs font-bold uppercase tracking-wider mb-0.5">Pembaruan Nilai</p>
@@ -169,24 +182,24 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             )}
 
             <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
-                <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-white relative overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
                     
                     {/* Background decoration */}
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
                     
                     <div className="mb-8">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 text-emerald-500 mb-6 shadow-sm ring-4 ring-emerald-50/50">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 mb-6 shadow-sm ring-4 ring-emerald-50/50 dark:ring-emerald-900/10">
                             <CheckCircleIcon className="w-10 h-10" />
                         </div>
-                        <h1 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Ujian Selesai</h1>
-                        <p className="text-sm text-slate-500 font-medium">Jawaban Anda telah berhasil disimpan.</p>
+                        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Ujian Selesai</h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Jawaban Anda telah berhasil disimpan.</p>
                     </div>
                     
                     {showResult ? (
                         <div className="space-y-8">
                             <div className="py-6 relative">
-                                <span className="text-7xl font-black text-slate-800 tracking-tighter block scale-100 transition-transform">{calculatedStats.score}</span>
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
+                                <span className="text-7xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block scale-100 transition-transform">{calculatedStats.score}</span>
+                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
                                 {calculatedStats.hasDiscrepancy && (
                                     <span className="absolute top-2 right-1/2 translate-x-12 flex h-3 w-3">
                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -195,14 +208,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 )}
                             </div>
 
-                            <div className="flex justify-around border-t border-slate-50 pt-8">
+                            <div className="flex justify-around border-t border-slate-50 dark:border-slate-800 pt-8">
                                 <div className="text-center group cursor-default">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-emerald-500 transition-colors">Benar</p>
-                                    <p className="text-3xl font-black text-slate-800 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
+                                    <p className="text-3xl font-black text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
                                 </div>
                                 <div className="text-center group cursor-default">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Total Soal</p>
-                                    <p className="text-3xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
+                                    <p className="text-3xl font-black text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
                                 </div>
                             </div>
                             
@@ -210,14 +223,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 <div className="pt-8">
                                     <button 
                                         onClick={() => setExpandedReview(!expandedReview)}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-6 py-3 rounded-xl transition-all inline-flex items-center gap-2 border border-transparent hover:border-indigo-100"
+                                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-800 px-6 py-3 rounded-xl transition-all inline-flex items-center gap-2 border border-transparent hover:border-indigo-100 dark:hover:border-slate-700"
                                     >
                                         {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan'}
                                         {expandedReview ? <ChevronUpIcon className="w-3 h-3"/> : <ChevronDownIcon className="w-3 h-3"/>}
                                     </button>
 
                                     {expandedReview && (
-                                        <div className="mt-8 space-y-4 text-left border-t border-slate-50 pt-8 animate-fade-in">
+                                        <div className="mt-8 space-y-4 text-left border-t border-slate-50 dark:border-slate-800 pt-8 animate-fade-in">
                                             {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                 const studentAns = result.answers[q.id] || '-';
                                                 const correctAns = q.correctAnswer || '-';
@@ -248,15 +261,15 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
 
                                                 return (
-                                                    <div key={q.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors">
+                                                    <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 transition-colors">
                                                         <div className="flex justify-between mb-3">
-                                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Soal {idx + 1}</span>
-                                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
+                                                            <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Soal {idx + 1}</span>
+                                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 mb-4 leading-relaxed" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
-                                                        <div className="text-xs space-y-2 bg-white p-3 rounded-xl border border-slate-100">
-                                                            <p className="flex justify-between"><span className="text-slate-400 font-bold">Jawaban Kamu:</span> <span className={isCorrect ? 'text-emerald-600 font-black' : 'text-rose-600 font-black'}>{studentAns}</span></p>
-                                                            {!isCorrect && <p className="flex justify-between border-t border-slate-50 pt-2 mt-2"><span className="text-slate-400 font-bold">Kunci Jawaban:</span> <span className="font-black text-slate-700">{correctAns}</span></p>}
+                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                        <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                                                            <p className="flex justify-between"><span className="text-slate-400 dark:text-slate-500 font-bold">Jawaban Kamu:</span> <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-rose-600 dark:text-rose-400 font-black'}>{studentAns}</span></p>
+                                                            {!isCorrect && <p className="flex justify-between border-t border-slate-50 dark:border-slate-800 pt-2 mt-2"><span className="text-slate-400 dark:text-slate-500 font-bold">Kunci Jawaban:</span> <span className="font-black text-slate-700 dark:text-slate-300">{correctAns}</span></p>}
                                                         </div>
                                                     </div>
                                                 );
@@ -267,14 +280,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                             )}
                         </div>
                     ) : (
-                        <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-                            <p className="text-sm font-bold text-slate-600">Menunggu pengumuman nilai dari pengajar.</p>
+                        <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700">
+                            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Menunggu pengumuman nilai dari pengajar.</p>
                         </div>
                     )}
 
                     <button 
                         onClick={onFinish} 
-                        className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-[0.98] mt-10 text-xs uppercase tracking-widest"
+                        className="w-full bg-slate-900 dark:bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 active:scale-[0.98] mt-10 text-xs uppercase tracking-widest"
                     >
                         Tutup Halaman
                     </button>

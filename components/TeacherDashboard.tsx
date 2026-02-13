@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -9,13 +8,15 @@ import {
     CalendarDaysIcon,
     XMarkIcon,
     PencilIcon,
-    CloudArrowUpIcon
+    CloudArrowUpIcon,
+    MoonIcon,
+    SunIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer, UserManagementView } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
-import { storageService } from '../services/storage'; // Perbaikan path: ../services/storage
+import { storageService } from '../services/storage';
 
 interface TeacherDashboardProps {
     teacherProfile: TeacherProfile;
@@ -28,6 +29,8 @@ interface TeacherDashboardProps {
     onAllowContinuation: (studentId: string, examCode: string) => void;
     onRefreshExams: () => Promise<void>;
     onRefreshResults: () => Promise<void>;
+    isDarkMode: boolean;
+    toggleTheme: () => void;
 }
 
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
@@ -40,7 +43,7 @@ const stripHtml = (html: string) => {
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults 
+    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     const [isLoadingArchive, setIsLoadingArchive] = useState(false);
@@ -284,8 +287,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
     
-    // UPDATED: Allow admins to see all drafts returned by storage service (scoped by DB query).
-    // Previously filtered by authorId, hiding other teachers' drafts from admins.
     const draftExams = allExams.filter(e => e.status === 'DRAFT');
     
     const now = new Date();
@@ -311,47 +312,58 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const accountType = teacherProfile.accountType || 'guru';
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 transition-colors duration-300">
             {isLoadingArchive && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
-                    <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
                         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-slate-700">Menyiapkan Arsip & Excel...</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Menyiapkan Arsip & Excel...</p>
                         <p className="text-xs text-slate-400">Mohon tunggu, sedang mengunduh modul Excel.</p>
                     </div>
                 </div>
             )}
 
-            <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40">
+            <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="py-5 flex justify-between items-center">
                         <div>
                             <div className="flex items-center gap-3">
-                                <h1 className="text-xl font-black text-slate-900 tracking-tight">Dashboard Guru</h1>
+                                <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard Guru</h1>
                                 <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
                                     accountType === 'super_admin' ? 'bg-slate-800 text-white border-slate-900' :
-                                    accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                                    'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-800' :
+                                    'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800'
                                 }`}>
                                     {accountType.replace('_', ' ')}
                                 </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs font-bold text-slate-400">{teacherProfile.fullName}</span>
-                                <span className="text-[10px] font-black text-emerald-600 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-100">{teacherProfile.school}</span>
+                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{teacherProfile.fullName}</span>
+                                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800">{teacherProfile.school}</span>
                             </div>
                         </div>
-                        <button onClick={onLogout} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-rose-600 transition-colors uppercase tracking-widest"><LogoutIcon className="w-5 h-5"/> Keluar</button>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={toggleTheme} 
+                                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
+                                title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+                            >
+                                {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+                            </button>
+                            <button onClick={onLogout} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors uppercase tracking-widest">
+                                <LogoutIcon className="w-5 h-5"/> Keluar
+                            </button>
+                        </div>
                     </div>
-                    <nav className="flex gap-8 overflow-x-auto whitespace-nowrap">
-                         <button onClick={() => setView('UPLOAD')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buat Ujian</button>
-                         <button onClick={() => setView('DRAFTS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Draf</button>
-                         <button onClick={() => setView('ONGOING')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Berlangsung</button>
-                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Terjadwal</button>
-                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Selesai</button>
-                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Buka Arsip</button>
+                    <nav className="flex gap-8 overflow-x-auto whitespace-nowrap custom-scrollbar pb-1">
+                         <button onClick={() => setView('UPLOAD')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Buat Ujian</button>
+                         <button onClick={() => setView('DRAFTS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Draf</button>
+                         <button onClick={() => setView('ONGOING')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Berlangsung</button>
+                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Terjadwal</button>
+                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Selesai</button>
+                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Buka Arsip</button>
                          {accountType === 'super_admin' && (
-                            <button onClick={() => setView('ADMIN_USERS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600' : 'text-slate-300 border-transparent hover:text-slate-500'}`}>Kelola Pengguna</button>
+                            <button onClick={() => setView('ADMIN_USERS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-500 dark:hover:text-slate-400'}`}>Kelola Pengguna</button>
                          )}
                     </nav>
                 </div>
@@ -375,7 +387,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onSelectExam={setSelectedFinishedExam} 
                         onDuplicateExam={handleDuplicateExam} 
                         onDeleteExam={handleDeleteExam}
-                        onArchiveExam={handleArchiveExam} // Pass Archive Handler with Excel Logic
+                        onArchiveExam={handleArchiveExam}
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
@@ -404,12 +416,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             
             {isEditModalOpen && editingExam && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white">
-                        <div className="p-6 border-b flex justify-between items-center bg-white rounded-t-3xl">
-                            <h2 className="font-black text-slate-800">Edit Detail Ujian</h2>
-                            <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600"><XMarkIcon className="w-6 h-6"/></button>
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white dark:border-slate-700">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 rounded-t-3xl">
+                            <h2 className="font-black text-slate-800 dark:text-white">Edit Detail Ujian</h2>
+                            <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 transition-colors"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
-                        <div className="p-8 overflow-y-auto flex-1 bg-slate-50/30">
+                        <div className="p-8 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-900/50">
                             <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} />
                         </div>
                     </div>
