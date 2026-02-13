@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { TeacherLogin } from './components/TeacherLogin';
 import { StudentLogin } from './components/StudentLogin';
 import { TeacherDashboard } from './components/TeacherDashboard';
@@ -36,17 +37,12 @@ function App() {
     }
   }, [darkMode]);
 
-  const toggleTheme = () => setDarkMode(!darkMode);
+  const toggleTheme = useCallback(() => setDarkMode(prev => !prev), []);
 
   // --- TEACHER FLOW ---
 
-  const handleTeacherLogin = (profile: TeacherProfile) => {
-    setTeacherProfile(profile);
-    setView('TEACHER_DASHBOARD');
-    refreshData(profile);
-  };
-
-  const refreshData = async (profile = teacherProfile) => {
+  // FIX: Wrap refreshData in useCallback to prevent infinite useEffect loops in TeacherDashboard
+  const refreshData = useCallback(async (profile: TeacherProfile | null = teacherProfile) => {
     if (!profile) return;
     try {
         const fetchedExams = await storageService.getExams(profile);
@@ -56,36 +52,42 @@ function App() {
     } catch (error) {
         console.error("Failed to refresh data", error);
     }
-  };
+  }, [teacherProfile]);
 
-  const handleAddExam = async (newExam: Exam) => {
+  const handleTeacherLogin = useCallback((profile: TeacherProfile) => {
+    setTeacherProfile(profile);
+    setView('TEACHER_DASHBOARD');
+    refreshData(profile);
+  }, [refreshData]);
+
+  const handleAddExam = useCallback(async (newExam: Exam) => {
       try {
           await storageService.saveExam(newExam);
           await refreshData();
       } catch (e) {
           alert("Gagal menyimpan ujian.");
       }
-  };
+  }, [refreshData]);
 
-  const handleUpdateExam = async (updatedExam: Exam) => {
+  const handleUpdateExam = useCallback(async (updatedExam: Exam) => {
       try {
           await storageService.saveExam(updatedExam);
           await refreshData();
       } catch (e) {
           alert("Gagal memperbarui ujian.");
       }
-  };
+  }, [refreshData]);
 
-  const handleDeleteExam = async (code: string) => {
+  const handleDeleteExam = useCallback(async (code: string) => {
       try {
           await storageService.deleteExam(code);
           await refreshData();
       } catch (e) {
           alert("Gagal menghapus ujian.");
       }
-  };
+  }, [refreshData]);
 
-  const handleAllowContinuation = async (studentId: string, examCode: string) => {
+  const handleAllowContinuation = useCallback(async (studentId: string, examCode: string) => {
       try {
           await storageService.unlockStudentExam(examCode, studentId);
           await refreshData();
@@ -93,11 +95,11 @@ function App() {
       } catch (e) {
           alert("Gagal membuka akses.");
       }
-  };
+  }, [refreshData]);
 
   // --- STUDENT FLOW ---
 
-  const handleStudentLogin = async (examCode: string, student: Student) => {
+  const handleStudentLogin = useCallback(async (examCode: string, student: Student) => {
       try {
           // Check local progress first
           const localKey = `exam_local_${examCode}_${student.studentId}`;
@@ -131,9 +133,15 @@ function App() {
           else if (error.message === "EXAM_IS_DRAFT") alert("Ujian belum dipublikasikan.");
           else alert("Terjadi kesalahan saat memuat ujian: " + error.message);
       }
-  };
+  }, []);
 
-  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', logs: string[] = [], location?: string, grading?: any) => {
+  const handleExamSubmit = useCallback(async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', logs: string[] = [], location?: string, grading?: any) => {
+      // Need to use functional update or refs if dependencies change too often, 
+      // but here we rely on currentExam/currentStudent from closure which is fine as long as they don't change mid-exam
+      // actually, to be safe, we guard against nulls inside.
+      
+      // Note: We use the state directly. If currentExam changes, this callback recreates. 
+      // Since currentExam is stable during an exam, this is safe.
       if (!currentExam || !currentStudent) return;
 
       const resultData: Result = {
@@ -155,23 +163,23 @@ function App() {
       } catch (e) {
           alert("Gagal mengirim jawaban. Coba lagi.");
       }
-  };
+  }, [currentExam, currentStudent]);
 
-  const handleResumeFromLock = () => {
+  const handleResumeFromLock = useCallback(() => {
       if (currentExam && currentStudent && studentResult) {
           setResumedResult(studentResult);
           setView('STUDENT_EXAM');
       }
-  };
+  }, [currentExam, currentStudent, studentResult]);
 
-  const resetToHome = () => {
+  const resetToHome = useCallback(() => {
       setView('HOME');
       setCurrentExam(null);
       setCurrentStudent(null);
       setStudentResult(null);
       setResumedResult(null);
       setTeacherProfile(null);
-  };
+  }, []);
 
   // --- RENDER ---
 
