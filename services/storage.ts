@@ -2,6 +2,18 @@
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
 
+// --- TYPE DEFINITIONS FOR COMPRESSION ---
+// JSON Type 2 (Optimized)
+interface CompressedResult {
+    v: 2;
+    exam: Exam;
+    mapping: {
+        q_ids: string[]; // Urutan ID soal untuk mapping jawaban
+        cols: string[];  // Urutan kolom data siswa
+    };
+    data: any[][]; // Baris data siswa
+}
+
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
     const arr = base64.split(',');
@@ -160,7 +172,6 @@ class StorageService {
     }
 
   // --- INDEXED DB METHODS (LOCAL PROGRESS) ---
-  
   async saveLocalProgress(key: string, data: any): Promise<void> {
       try {
           const db = await initDB();
@@ -172,7 +183,6 @@ class StorageService {
               tx.onerror = () => reject(tx.error);
           });
       } catch(e) { 
-          // Fallback to LocalStorage if IDB fails
           try { localStorage.setItem(key, JSON.stringify(data)); } catch(err) {}
       }
   }
@@ -188,7 +198,6 @@ class StorageService {
               req.onerror = () => reject(req.error);
           });
       } catch(e) { 
-          // Fallback to LocalStorage
           try { 
               const item = localStorage.getItem(key);
               return item ? JSON.parse(item) : null;
@@ -261,7 +270,6 @@ class StorageService {
       const { error } = await auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
-      // Tunggu sebentar untuk trigger
       await new Promise(r => setTimeout(r, 500));
 
       let profile = await this.getCurrentUser();
@@ -270,14 +278,12 @@ class StorageService {
           const { data: { user } } = await auth.getUser();
           if (user) {
               const meta = user.user_metadata || {};
-              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
               await supabase.from('profiles').insert({
                   id: user.id,
                   full_name: meta.full_name || 'Pengguna',
                   school: meta.school || '-',
                   role: meta.role || 'guru'
               }).select().single();
-              
               profile = await this.getCurrentUser();
           }
       }
@@ -291,12 +297,10 @@ class StorageService {
       await auth.signOut();
   }
 
-  // --- USER MANAGEMENT (SUPER ADMIN) ---
-  
+  // --- USER MANAGEMENT ---
   async getAllUsers(): Promise<UserProfile[]> {
       const { data: profiles, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
-      
       return profiles.map((p: any) => ({
           id: p.id,
           fullName: p.full_name,
@@ -311,32 +315,22 @@ class StorageService {
         .from('profiles')
         .update({ role: newRole, school: newSchool })
         .eq('id', userId);
-      
       if (error) throw error;
   }
 
-  // --- EXAM METHODS ---
-
+  // --- EXAM METHODS (HOT DATA) ---
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
     let query = supabase.from('exams').select('*');
-
     if (profile) {
         if (profile.accountType === 'super_admin') {
-            // Super Admin: No Filter
         } else if (profile.accountType === 'admin_sekolah' && profile.school) {
             query = query.or(`school.eq."${profile.school}",author_id.eq.${profile.id}`);
         } else {
-            // Guru: Filter by Author ID
             query = query.eq('author_id', profile.id);
         }
     }
-
     const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (error) {
-        console.error("Error fetching exams from Supabase:", error);
-        return {};
-    }
+    if (error) return {};
 
     const examMap: Record<string, Exam> = {};
     if (data) {
@@ -439,62 +433,6 @@ class StorageService {
       }
   }
 
-  async getExamForArchive(code: string): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
-      if (error || !data) return null;
-
-      let examData: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status, createdAt: data.created_at
-      };
-
-      const revertHtmlImages = async (html: string): Promise<string> => {
-          if (!html.includes('<img')) return html;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const images = doc.getElementsByTagName('img');
-          for (let i = 0; i < images.length; i++) {
-              const img = images[i];
-              const src = img.getAttribute('src');
-              const bucketPath = img.getAttribute('data-bucket-path');
-
-              if (bucketPath) {
-                  try {
-                      const { data, error } = await supabase.storage.from('soal').download(bucketPath);
-                      if (!error && data) {
-                          const base64 = await new Promise<string>((resolve) => {
-                              const reader = new FileReader();
-                              reader.onloadend = () => resolve(reader.result as string);
-                              reader.readAsDataURL(data);
-                          });
-                          img.setAttribute('src', base64);
-                          img.removeAttribute('data-bucket-path');
-                          continue; 
-                      }
-                  } catch (e) {
-                      console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
-                  }
-              }
-
-              if (src && src.startsWith('http')) {
-                  img.setAttribute('src', await urlToBase64(src));
-                  img.removeAttribute('data-bucket-path');
-              }
-          }
-          return doc.body.innerHTML;
-      };
-
-      for (const q of examData.questions) {
-          q.questionText = await revertHtmlImages(q.questionText);
-          if (q.options) {
-              for (let i = 0; i < q.options.length; i++) {
-                  q.options[i] = await revertHtmlImages(q.options[i]);
-              }
-          }
-      }
-      return examData;
-  }
-
   async cleanupExamAssets(code: string): Promise<void> {
        const { data: files } = await supabase.storage.from('soal').list(code);
        if (files && files.length > 0) {
@@ -506,8 +444,6 @@ class StorageService {
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
     if (className && className !== 'ALL') query = query.eq('class_name', className);
-    
-    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
     query = query.order('updated_at', { ascending: false });
     
     const { data, error } = await query;
@@ -516,7 +452,7 @@ class StorageService {
     return data.map((row: any) => ({
         student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
         examCode: row.exam_code, 
-        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
+        answers: row.answers || {},
         score: row.score, 
         correctAnswers: row.correct_answers,
         totalQuestions: row.total_questions, 
@@ -539,7 +475,7 @@ class StorageService {
             student_id: resultPayload.student.studentId, 
             student_name: resultPayload.student.fullName,
             class_name: resultPayload.student.class, 
-            answers: resultPayload.answers || {}, // Ensure not null
+            answers: resultPayload.answers || {}, 
             status: resultPayload.status,
             activity_log: resultPayload.activityLog || [], 
             score: resultPayload.score || 0, 
@@ -553,12 +489,8 @@ class StorageService {
         
         return { ...resultPayload, isSynced: true };
     } catch (error: any) {
-        console.error("CRITICAL DB ERROR:", error);
-        
         const isNetworkError = !error.code && error.message === 'Failed to fetch'; 
-        
         if (isNetworkError) {
-            console.warn("Network glitch, adding to queue...");
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         } else {
@@ -583,7 +515,6 @@ class StorageService {
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
       const remainingQueue: any[] = [];
-      
       for (const payload of queueCopy) {
           try {
              const { error } = await supabase.from('results').upsert({
@@ -592,17 +523,8 @@ class StorageService {
                 activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
                 total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
-             
-             if (error) {
-                 if (error.code === '42501' || error.code === 'PGRST301') { 
-                     console.error("Queue item dropped due to permission error:", error);
-                 } else {
-                     throw error; 
-                 }
-             }
-          } catch (e) {
-              remainingQueue.push(payload);
-          }
+             if (error && error.code !== '42501' && error.code !== 'PGRST301') throw error; 
+          } catch (e) { remainingQueue.push(payload); }
       }
       this.syncQueue = remainingQueue;
       this.saveQueue();
@@ -641,7 +563,6 @@ class StorageService {
   
   async syncData() { this.processQueue(); }
 
-  // --- NEW FEATURES (LOCKING) ---
   async generateUnlockToken(examCode: string, studentId: string): Promise<string> {
       const token = Math.floor(1000 + Math.random() * 9000).toString();
       await supabase.from('results').update({ unlock_token: token }).eq('exam_code', examCode).eq('student_id', studentId);
@@ -650,36 +571,228 @@ class StorageService {
 
   async verifyUnlockToken(examCode: string, studentId: string, token: string): Promise<boolean> {
       try {
-          const { data, error } = await supabase
-              .from('results')
-              .select('unlock_token, activity_log')
-              .eq('exam_code', examCode)
-              .eq('student_id', studentId)
-              .single();
-
+          const { data, error } = await supabase.from('results').select('unlock_token, activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
           if (error || !data) return false;
-          
           if (data.unlock_token && String(data.unlock_token).trim() === token.trim()) {
               const currentLog = (typeof data.activity_log === 'string' ? JSON.parse(data.activity_log) : data.activity_log) || [];
-              
-              const { error: updateError } = await supabase
-                  .from('results')
-                  .update({ 
-                      unlock_token: null, 
-                      status: 'in_progress',
-                      activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`]
-                  })
-                  .eq('exam_code', examCode)
-                  .eq('student_id', studentId);
-              
+              const { error: updateError } = await supabase.from('results').update({ unlock_token: null, status: 'in_progress', activity_log: [...currentLog, `[${new Date().toLocaleTimeString()}] Akses dibuka siswa dengan token`] }).eq('exam_code', examCode).eq('student_id', studentId);
               if (updateError) throw updateError;
               return true;
           }
           return false;
-      } catch (e) {
-          console.error("Unlock verification failed:", e);
-          return false;
+      } catch (e) { return false; }
+  }
+
+  async getExamForArchive(code: string): Promise<Exam | null> {
+      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
+      if (error || !data) return null;
+
+      let examData: Exam = {
+          code: data.code, authorId: data.author_id, authorSchool: data.school,
+          config: data.config, questions: data.questions, status: data.status, createdAt: data.created_at
+      };
+
+      const revertHtmlImages = async (html: string): Promise<string> => {
+          if (!html.includes('<img')) return html;
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const images = doc.getElementsByTagName('img');
+          for (let i = 0; i < images.length; i++) {
+              const img = images[i];
+              const src = img.getAttribute('src');
+              const bucketPath = img.getAttribute('data-bucket-path');
+
+              if (bucketPath) {
+                  try {
+                      const { data, error } = await supabase.storage.from('soal').download(bucketPath);
+                      if (!error && data) {
+                          const base64 = await new Promise<string>((resolve) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.readAsDataURL(data);
+                          });
+                          img.setAttribute('src', base64);
+                          img.removeAttribute('data-bucket-path');
+                          continue; 
+                      }
+                  } catch (e) { console.warn("Direct download failed for archive", bucketPath); }
+              }
+              if (src && src.startsWith('http')) {
+                  img.setAttribute('src', await urlToBase64(src));
+                  img.removeAttribute('data-bucket-path');
+              }
+          }
+          return doc.body.innerHTML;
+      };
+
+      for (const q of examData.questions) {
+          q.questionText = await revertHtmlImages(q.questionText);
+          if (q.options) {
+              for (let i = 0; i < q.options.length; i++) {
+                  q.options[i] = await revertHtmlImages(q.options[i]);
+              }
+          }
       }
+      return examData;
+  }
+
+  // --- COLD STORAGE METHODS (NEW) ---
+
+  // 1. COMPRESSION UTILS
+  private compressToType2(exam: Exam, results: Result[]): CompressedResult {
+      // Mapping question IDs for columnar storage of answers
+      const qIds = exam.questions.filter(q => q.questionType !== 'INFO').map(q => q.id);
+      
+      // Define Columns
+      const cols = ['name', 'class', 'student_id', 'score', 'correct', 'total', 'status', 'logs', 'location', 'time', 'answers_array'];
+      
+      // Transform Data
+      const rows = results.map(r => {
+          const answerArray = qIds.map(qid => r.answers[qid] || ""); // Preserve order
+          return [
+              r.student.fullName,
+              r.student.class,
+              r.student.studentId,
+              r.score,
+              r.correctAnswers,
+              r.totalQuestions,
+              r.status,
+              r.activityLog,
+              r.location || "",
+              r.timestamp,
+              answerArray
+          ];
+      });
+
+      return {
+          v: 2,
+          exam: exam,
+          mapping: { q_ids: qIds, cols: cols },
+          data: rows
+      };
+  }
+
+  private decompressFromType2(archive: CompressedResult): { exam: Exam, results: Result[] } {
+      const { exam, mapping, data } = archive;
+      const results: Result[] = data.map(row => {
+          // Reconstruct Answers Object
+          const answersObj: Record<string, string> = {};
+          const ansArray = row[10]; // Index of answers_array based on cols above
+          mapping.q_ids.forEach((qid, idx) => {
+              if (ansArray[idx] !== undefined) answersObj[qid] = ansArray[idx];
+          });
+
+          return {
+              student: {
+                  fullName: row[0],
+                  class: row[1],
+                  studentId: row[2],
+                  absentNumber: '00' // Placeholder
+              },
+              examCode: exam.code,
+              score: row[3],
+              correctAnswers: row[4],
+              totalQuestions: row[5],
+              status: row[6],
+              activityLog: row[7],
+              location: row[8],
+              timestamp: row[9],
+              answers: answersObj
+          };
+      });
+
+      return { exam, results };
+  }
+
+  // 2. ARCHIVE ACTIONS
+  async archiveExamToCloud(examCode: string, teacherId: string): Promise<void> {
+      // A. Fetch Data (Hot)
+      const fatExam = await this.getExamForArchive(examCode);
+      if (!fatExam) throw new Error("Gagal mengambil data ujian lengkap.");
+      const examResults = await this.getResults(examCode);
+
+      // B. Compress (Hot -> Cold Structure)
+      const compressedData = this.compressToType2(fatExam, examResults);
+      const jsonString = JSON.stringify(compressedData);
+      const blob = new Blob([jsonString], { type: "application/json" });
+
+      // C. Upload to Storage
+      // Path: archives/{teacherId}/{timestamp}_{subject}_{code}.json
+      const safeSubject = fatExam.config.subject.replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${Date.now()}_${safeSubject}_${examCode}.json`;
+      const filePath = `${teacherId}/${filename}`;
+
+      const { error: uploadError } = await supabase.storage.from('archives').upload(filePath, blob, { upsert: true });
+      if (uploadError) throw new Error("Gagal upload arsip ke cloud: " + uploadError.message);
+
+      // D. Cleanup Hot Data (SQL & Assets)
+      // Note: We keep the assets in 'soal' bucket or clean them? 
+      // The prompt says "Data di cloud akan dihapus agar hemat kuota". 
+      // This implies cleaning assets in 'soal' bucket is good, 
+      // BUT since we embedded Base64 into the JSON (via getExamForArchive), we CAN delete original assets safely.
+      
+      await this.cleanupExamAssets(examCode); // Delete images from 'soal' bucket
+      await this.deleteExam(examCode); // Delete from SQL tables
+  }
+
+  async getArchivedExamsList(teacherId: string): Promise<{name: string, created_at: string, size: number}[]> {
+      const { data, error } = await supabase.storage.from('archives').list(teacherId, {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' },
+      });
+      if (error) throw error;
+      return data.map(f => ({ name: f.name, created_at: f.created_at, size: f.metadata?.size || 0 }));
+  }
+
+  async loadArchivedExam(teacherId: string, filename: string): Promise<{ exam: Exam, results: Result[] }> {
+      const { data, error } = await supabase.storage.from('archives').download(`${teacherId}/${filename}`);
+      if (error || !data) throw new Error("Gagal mengunduh file arsip.");
+
+      const text = await data.text();
+      const json = JSON.parse(text);
+
+      // Check Version
+      if (json.v === 2) {
+          return this.decompressFromType2(json as CompressedResult);
+      } else {
+          // Legacy Type 1 (No Compression)
+          // Asumsi format lama: { exam: ..., results: ... }
+          return json; 
+      }
+  }
+
+  async uploadLegacyArchive(file: File, teacherId: string): Promise<void> {
+      const text = await file.text();
+      let jsonData;
+      try {
+          jsonData = JSON.parse(text);
+      } catch(e) { throw new Error("File bukan JSON valid."); }
+
+      // Check format
+      let finalBlob: Blob;
+      
+      if (jsonData.v === 2) {
+          // Already compressed, just upload
+          finalBlob = new Blob([text], { type: "application/json" });
+      } else if (jsonData.exam && jsonData.results) {
+          // Legacy Type 1 -> Convert to Type 2
+          const compressed = this.compressToType2(jsonData.exam, jsonData.results);
+          finalBlob = new Blob([JSON.stringify(compressed)], { type: "application/json" });
+      } else {
+          throw new Error("Format arsip tidak dikenali.");
+      }
+
+      // Generate Filename based on content if possible, or file name
+      const examCode = jsonData.exam?.code || 'UNKNOWN';
+      const subject = jsonData.exam?.config?.subject || 'LEGACY';
+      const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
+      // Prevent overwrite if uploading same file name, prepend timestamp
+      const filename = `${Date.now()}_IMPORTED_${safeSubject}_${examCode}.json`;
+      const filePath = `${teacherId}/${filename}`;
+
+      const { error } = await supabase.storage.from('archives').upload(filePath, finalBlob, { upsert: true });
+      if (error) throw new Error("Gagal upload arsip lama: " + error.message);
   }
 }
 
