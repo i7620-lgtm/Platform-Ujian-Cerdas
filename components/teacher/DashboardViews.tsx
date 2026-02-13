@@ -160,14 +160,6 @@ interface FinishedExamsProps {
 }
 
 export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
-    // We can add a function to just download Excel here if needed, 
-    // but the main "Archive" button now implies "Move to Cold Storage".
-    const handleDownloadReport = async (e: React.MouseEvent, exam: Exam) => {
-        e.stopPropagation();
-        alert("Fitur Unduh Excel (Tanpa Hapus Data) bisa diimplementasikan di sini. Saat ini gunakan tombol Arsip Cloud untuk proses lengkap.");
-        // Logic similar to previous handleArchiveExam but WITHOUT deleteExam()
-    };
-
     return (
         <div className="space-y-6 animate-fade-in">
              <div className="flex items-center gap-2"><div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg"><ChartBarIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Selesai (Ruang Kerja)</h2><p className="text-sm text-gray-500 dark:text-slate-400">Periksa nilai, unduh laporan, atau pindahkan ke arsip cloud.</p></div></div>
