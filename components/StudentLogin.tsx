@@ -1,15 +1,16 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon } from './Icons';
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
 
 interface StudentLoginProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
   onBack: () => void;
+  isDarkMode?: boolean;
+  toggleTheme?: () => void;
 }
 
-export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack }) => {
+export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme }) => {
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -137,6 +138,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '8s'}}></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-gradient-to-tl from-blue-50/60 to-emerald-50/60 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '10s'}}></div>
         </div>
+
+        {/* Theme Toggle Top Right */}
+        {toggleTheme && (
+            <div className="absolute top-6 right-6 z-50">
+                <button 
+                    onClick={toggleTheme} 
+                    className="p-2.5 rounded-full bg-white/50 dark:bg-slate-800/50 backdrop-blur-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm border border-white/20 dark:border-slate-700"
+                >
+                    {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+                </button>
+            </div>
+        )}
 
         <div className="w-full max-w-[420px] px-6 relative z-10 flex flex-col h-full sm:h-auto justify-center">
             {/* Header Navigation */}
