@@ -8,10 +8,10 @@ interface CompressedResult {
     v: 2;
     exam: Exam;
     mapping: {
-        q_ids: string[]; // Urutan ID soal untuk mapping jawaban
-        cols: string[];  // Urutan kolom data siswa
+        q_ids: string[]; // Sequence of Question IDs for mapping answers array
+        cols: string[];  // Sequence of data columns
     };
-    data: any[][]; // Baris data siswa
+    data: any[][]; // Array of arrays (CSV-like rows)
 }
 
 // Helper: Convert Base64 to Blob for Upload
@@ -638,7 +638,7 @@ class StorageService {
 
   // --- COLD STORAGE METHODS (NEW) ---
 
-  // 1. COMPRESSION UTILS
+  // 1. COMPRESSION UTILS (TYPE 2)
   private compressToType2(exam: Exam, results: Result[]): CompressedResult {
       // Mapping question IDs for columnar storage of answers
       const qIds = exam.questions.filter(q => q.questionType !== 'INFO').map(q => q.id);
@@ -648,7 +648,8 @@ class StorageService {
       
       // Transform Data
       const rows = results.map(r => {
-          const answerArray = qIds.map(qid => r.answers[qid] || ""); // Preserve order
+          // Map answers to simple array based on qIds order
+          const answerArray = qIds.map(qid => r.answers[qid] || ""); 
           return [
               r.student.fullName,
               r.student.class,
@@ -677,7 +678,7 @@ class StorageService {
       const results: Result[] = data.map(row => {
           // Reconstruct Answers Object
           const answersObj: Record<string, string> = {};
-          const ansArray = row[10]; // Index of answers_array based on cols above
+          const ansArray = row[10]; // Index of answers_array based on cols above (10th index)
           mapping.q_ids.forEach((qid, idx) => {
               if (ansArray[idx] !== undefined) answersObj[qid] = ansArray[idx];
           });
@@ -726,11 +727,6 @@ class StorageService {
       if (uploadError) throw new Error("Gagal upload arsip ke cloud: " + uploadError.message);
 
       // D. Cleanup Hot Data (SQL & Assets)
-      // Note: We keep the assets in 'soal' bucket or clean them? 
-      // The prompt says "Data di cloud akan dihapus agar hemat kuota". 
-      // This implies cleaning assets in 'soal' bucket is good, 
-      // BUT since we embedded Base64 into the JSON (via getExamForArchive), we CAN delete original assets safely.
-      
       await this.cleanupExamAssets(examCode); // Delete images from 'soal' bucket
       await this.deleteExam(examCode); // Delete from SQL tables
   }
