@@ -94,3 +94,18 @@ export interface UserProfile extends TeacherProfile {
     email: string;
     createdAt?: string;
 }
+
+export interface ExamSummary {
+    id: string;
+    school_name: string;
+    exam_subject: string;
+    exam_code: string;
+    exam_date: string;
+    total_participants: number;
+    average_score: number;
+    highest_score: number;
+    lowest_score: number;
+    passing_rate: number;
+    question_stats: any; // JSONB Statistical Snapshot
+    region?: string;
+}
