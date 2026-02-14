@@ -496,6 +496,19 @@ class StorageService {
       return { backupUrl };
   }
 
+  async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
+      // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
+      const summary = this.calculateExamStatistics(exam, results);
+      
+      // Simpan ke tabel exam_summaries
+      const { error } = await supabase.from('exam_summaries').insert(summary);
+      
+      if (error) {
+          console.error("Legacy Stats Insert Failed:", error);
+          throw new Error("Gagal menyimpan statistik ke database: " + error.message);
+      }
+  }
+
   private calculateExamStatistics(exam: Exam, results: Result[]): Partial<ExamSummary> {
       const scores = results.map(r => Number(r.score));
       const total = scores.length;
