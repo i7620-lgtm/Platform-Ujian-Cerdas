@@ -554,6 +554,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
+    const [isRegisteringStats, setIsRegisteringStats] = useState(false);
 
     useEffect(() => {
         // Load cloud archives list on mount
@@ -723,6 +724,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             alert("Gagal mengunggah ke Cloud.");
         } finally {
             setIsLoadingCloud(false);
+        }
+    };
+
+    const handleRegisterStats = async () => {
+        if (!archiveData) return;
+        if (!confirm("Konfirmasi Pencatatan Statistik?\n\nSistem akan menghitung ulang data dari arsip ini dan menyimpannya ke Database Analisis Daerah.\n\nPERINGATAN: Pastikan data ini belum pernah tercatat sebelumnya agar tidak terjadi duplikasi data statistik.")) return;
+
+        setIsRegisteringStats(true);
+        try {
+            await storageService.registerLegacyArchive(archiveData.exam, archiveData.results);
+            alert("Berhasil! Statistik ujian telah dicatat dan kini tersedia di menu Analisis Daerah.");
+        } catch (e: any) {
+            console.error(e);
+            alert(e.message || "Gagal mencatat statistik.");
+        } finally {
+            setIsRegisteringStats(false);
         }
     };
 
@@ -1015,10 +1032,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
                         
                         {sourceType === 'LOCAL' && (
-                            <button onClick={handleUploadToCloud} disabled={isLoadingCloud} className="flex-1 md:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
-                                {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
-                                <span>Simpan ke Cloud</span>
-                            </button>
+                            <>
+                                <button onClick={handleRegisterStats} disabled={isRegisteringStats} className="flex-1 md:flex-none px-4 py-2 bg-amber-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-amber-600 transition-all shadow-md shadow-amber-100 dark:shadow-amber-900/30 flex items-center justify-center gap-2">
+                                    {isRegisteringStats ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <ChartBarIcon className="w-4 h-4"/>}
+                                    <span>Catat Statistik</span>
+                                </button>
+
+                                <button onClick={handleUploadToCloud} disabled={isLoadingCloud} className="flex-1 md:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
+                                    {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
+                                    <span>Simpan ke Cloud</span>
+                                </button>
+                            </>
                         )}
 
                         <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
