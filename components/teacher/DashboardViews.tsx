@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
-import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
+import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage, refineImageContent } from './examUtils';
 import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
@@ -552,6 +552,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
 
     useEffect(() => {
@@ -616,6 +617,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const loadFromCloud = async (filename: string) => {
         setIsLoadingCloud(true);
+        setLoadingMessage('Mengunduh dari Cloud...');
         setError('');
         try {
             const data = await storageService.downloadArchive(filename);
@@ -636,19 +638,65 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const handleUploadToCloud = async () => {
         if (!archiveData) return;
         
-        if (!confirm("Arsip ini akan diunggah ke Cloud Storage (Archives). Versi lokal Anda akan disimpan secara permanen di server.\n\nLanjutkan?")) return;
+        if (!confirm("Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?")) return;
 
         setIsLoadingCloud(true);
+        setLoadingMessage('Mengoptimalkan gambar...');
+        
         try {
-            const jsonString = JSON.stringify(archiveData, null, 2);
-            await storageService.uploadArchive(archiveData.exam.code, jsonString);
+            // Helper to process HTML string
+            const processHtmlString = async (html: string) => {
+                if (!html || !html.includes('data:image')) return html;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const images = doc.getElementsByTagName('img');
+                
+                for (let i = 0; i < images.length; i++) {
+                    const img = images[i];
+                    const src = img.getAttribute('src');
+                    
+                    if (src && src.startsWith('data:image')) {
+                        try {
+                            // OPTIMIZATION PIPELINE:
+                            // 1. Resize to max 800px
+                            const resized = await compressImage(src, 0.9, 800);
+                            // 2. Refine (Thresholding/High Contrast)
+                            const refined = await refineImageContent(resized);
+                            // 3. Final Compression (WebP q=0.5)
+                            const final = await compressImage(refined, 0.5, 800);
+                            img.setAttribute('src', final);
+                        } catch (e) { console.warn("Image opt failed, using original", e); }
+                    }
+                }
+                return doc.body.innerHTML;
+            };
+
+            // Deep clone to avoid mutating state directly during process
+            const optimizedExam = JSON.parse(JSON.stringify(archiveData.exam)) as Exam;
+            
+            // Loop through questions and optimize images
+            for (let i = 0; i < optimizedExam.questions.length; i++) {
+                const q = optimizedExam.questions[i];
+                q.questionText = await processHtmlString(q.questionText);
+                if (q.options) {
+                    for (let j = 0; j < q.options.length; j++) {
+                        q.options[j] = await processHtmlString(q.options[j]);
+                    }
+                }
+            }
+
+            setLoadingMessage('Mengunggah ke Cloud...');
+            const finalPayload = { ...archiveData, exam: optimizedExam };
+            const jsonString = JSON.stringify(finalPayload, null, 2);
+            await storageService.uploadArchive(optimizedExam.code, jsonString);
             
             // Refresh list
             const list = await storageService.getArchivedList();
             setCloudArchives(list);
             
             setSourceType('CLOUD'); // Switch mode to cloud
-            alert("Berhasil! Arsip lokal telah disimpan ke Cloud Storage.");
+            setArchiveData(finalPayload); // Update view with optimized data
+            alert("Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.");
         } catch(e) {
             console.error(e);
             alert("Gagal mengunggah ke Cloud.");
@@ -836,7 +884,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex flex-col items-center">
                             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                            <p className="text-sm font-bold text-slate-700 dark:text-white">Mengunduh dari Cloud...</p>
+                            <p className="text-sm font-bold text-slate-700 dark:text-white">{loadingMessage}</p>
                         </div>
                     </div>
                 )}
