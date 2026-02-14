@@ -682,9 +682,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     if (src && src.startsWith('data:image')) {
                         try {
                             // OPTIMIZATION PIPELINE:
-                            // Resize to max 800px & Compress (WebP q=0.6)
+                            // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
                             // Refine step removed to prevent unwanted cropping
-                            const final = await compressImage(src, 0.6, 800);
+                            const final = await compressImage(src, 0.7, 800);
                             img.setAttribute('src', final);
                         } catch (e) { console.warn("Image opt failed, using original", e); }
                     }
