@@ -657,14 +657,26 @@ class StorageService {
           `;
 
           const response = await ai.models.generateContent({
-              model: 'gemini-3-pro-preview', // Using Pro for complex HTML generation
+              model: 'gemini-3-flash-preview', // Switch to Flash Model for higher rate limits
               contents: prompt
           });
 
           return response.text || "Gagal menghasilkan analisis.";
-      } catch (e) {
+      } catch (e: any) {
           console.error("Gemini Error:", e);
-          return "Maaf, layanan analisis AI sedang sibuk. Coba lagi nanti.";
+          
+          // Friendly Error UI for Rate Limits (429)
+          if (e.message?.includes('429') || e.status === 429) {
+             return `
+                <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
+                    <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
+                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">Layanan Sedang Sibuk</h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-400">Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.</p>
+                </div>
+             `;
+          }
+
+          return "Maaf, layanan analisis AI sedang mengalami gangguan. Silakan coba lagi nanti.";
       }
   }
 
