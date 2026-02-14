@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
-import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText } from './examUtils';
+import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage } from './examUtils';
 import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
@@ -368,7 +368,7 @@ interface FinishedExamsProps {
     onSelectExam: (exam: Exam) => void;
     onDuplicateExam: (exam: Exam) => void;
     onDeleteExam: (exam: Exam) => void;
-    onArchiveExam: (exam: Exam) => void; // New prop
+    onArchiveExam: (exam: Exam) => void; 
 }
 
 export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
@@ -392,7 +392,7 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                             </div>
                             
                             <div className="flex items-center gap-3 self-end md:self-center w-full md:w-auto">
-                                <button onClick={() => onArchiveExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors font-bold shadow-sm border border-indigo-100 dark:border-indigo-800" title="Download Arsip & Hapus dari Cloud"><DocumentArrowUpIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Arsip</span></button>
+                                <button onClick={() => onArchiveExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2.5 text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors font-bold shadow-sm border border-indigo-100 dark:border-indigo-800" title="Simpan ke Cloud & Hapus SQL"><CloudArrowUpIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Finalisasi & Arsip</span></button>
                                 <button onClick={() => onDuplicateExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-4 py-2.5 text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors font-bold shadow-sm border border-gray-200 dark:border-slate-600" title="Gunakan Kembali Soal"><DocumentDuplicateIcon className="w-4 h-4" /><span className="md:hidden lg:inline">Reuse</span></button>
                                 <button onClick={() => onSelectExam(exam)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 dark:bg-indigo-600 text-white px-5 py-2.5 text-sm rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all font-bold shadow-lg shadow-gray-200 dark:shadow-indigo-900/30 transform active:scale-95"><ChartBarIcon className="w-4 h-4" /> Lihat Hasil</button>
                             </div>
@@ -550,6 +550,23 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number}[]>([]);
+    const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
+    const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
+
+    useEffect(() => {
+        // Load cloud archives list on mount
+        const loadCloudList = async () => {
+            try {
+                const list = await storageService.getArchivedList();
+                setCloudArchives(list);
+            } catch (e) {
+                console.warn("Cloud archives list unavailable");
+            }
+        };
+        loadCloudList();
+    }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -585,6 +602,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
                         setArchiveData(data);
                         setActiveTab('DETAIL');
+                        setSourceType('LOCAL');
                     } else {
                         setError('File JSON tidak valid atau bukan format arsip lengkap.');
                     }
@@ -597,9 +615,122 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         reader.readAsText(file);
     };
 
+    const loadFromCloud = async (filename: string) => {
+        setIsLoadingCloud(true);
+        setLoadingMessage('Mengunduh dari Cloud...');
+        setError('');
+        try {
+            const data = await storageService.downloadArchive(filename);
+            if (data && data.exam && data.exam.questions) {
+                setArchiveData(data);
+                setActiveTab('DETAIL');
+                setSourceType('CLOUD');
+            } else {
+                setError("Data arsip cloud rusak.");
+            }
+        } catch (e) {
+            setError("Gagal mengunduh arsip dari cloud.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
+    const handleDeleteArchive = async (filename: string, e: React.MouseEvent) => {
+        e.stopPropagation(); 
+        if (!confirm(`Apakah Anda yakin ingin menghapus arsip "${filename}" secara permanen dari Cloud Storage?`)) return;
+
+        setIsLoadingCloud(true);
+        setLoadingMessage('Menghapus arsip...');
+        
+        try {
+            await storageService.deleteArchive(filename);
+            const list = await storageService.getArchivedList();
+            setCloudArchives(list);
+            
+            // If the deleted file is currently open, close it
+            if (archiveData && sourceType === 'CLOUD' && archiveData.exam.code === filename.split('_')[0]) {
+               resetView();
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Gagal menghapus arsip.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
+    const handleUploadToCloud = async () => {
+        if (!archiveData) return;
+        
+        if (!confirm("Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?")) return;
+
+        setIsLoadingCloud(true);
+        setLoadingMessage('Mengoptimalkan gambar...');
+        
+        try {
+            // Helper to process HTML string
+            const processHtmlString = async (html: string) => {
+                if (!html || !html.includes('data:image')) return html;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const images = doc.getElementsByTagName('img');
+                
+                for (let i = 0; i < images.length; i++) {
+                    const img = images[i];
+                    const src = img.getAttribute('src');
+                    
+                    if (src && src.startsWith('data:image')) {
+                        try {
+                            // OPTIMIZATION PIPELINE:
+                            // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
+                            // Refine step removed to prevent unwanted cropping
+                            const final = await compressImage(src, 0.7, 800);
+                            img.setAttribute('src', final);
+                        } catch (e) { console.warn("Image opt failed, using original", e); }
+                    }
+                }
+                return doc.body.innerHTML;
+            };
+
+            // Deep clone to avoid mutating state directly during process
+            const optimizedExam = JSON.parse(JSON.stringify(archiveData.exam)) as Exam;
+            
+            // Loop through questions and optimize images
+            for (let i = 0; i < optimizedExam.questions.length; i++) {
+                const q = optimizedExam.questions[i];
+                q.questionText = await processHtmlString(q.questionText);
+                if (q.options) {
+                    for (let j = 0; j < q.options.length; j++) {
+                        q.options[j] = await processHtmlString(q.options[j]);
+                    }
+                }
+            }
+
+            setLoadingMessage('Mengunggah ke Cloud...');
+            const finalPayload = { ...archiveData, exam: optimizedExam };
+            const jsonString = JSON.stringify(finalPayload, null, 2);
+            await storageService.uploadArchive(optimizedExam.code, jsonString);
+            
+            // Refresh list
+            const list = await storageService.getArchivedList();
+            setCloudArchives(list);
+            
+            setSourceType('CLOUD'); // Switch mode to cloud
+            setArchiveData(finalPayload); // Update view with optimized data
+            alert("Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.");
+        } catch(e) {
+            console.error(e);
+            alert("Gagal mengunggah ke Cloud.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
     const resetView = () => {
-        setArchiveData(null); setError(''); setFixMessage('');
+        setArchiveData(null); setError(''); setFixMessage(''); setSourceType(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
+        // Refresh list
+        storageService.getArchivedList().then(setCloudArchives).catch(()=>{});
     };
 
     const handlePrint = () => {
@@ -620,7 +751,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
             const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-            const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+            const cSet = new Set(normalize(correctAns).split(',').map(s=>s.trim()));
             if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
             return 'WRONG';
         }
@@ -769,13 +900,69 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     // --- UPLOAD VIEW ---
     if (!archiveData) {
         return (
-            <div className="max-w-4xl mx-auto text-center animate-fade-in p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
-                <div className="mb-8"><div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4"><DocumentArrowUpIcon className="w-8 h-8" /></div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Buka Arsip Ujian</h2><p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Pilih file arsip ujian (.json) untuk melihat detail soal, hasil siswa, dan analisisnya.</p></div>
-                <div onDrop={handleDrop} onDragOver={handleDragOver} className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-12 text-center hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                    <div className="space-y-2 pointer-events-none"><CloudArrowUpIcon className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto" /><p className="text-slate-600 dark:text-slate-300 font-medium">Seret file ke sini atau klik untuk memilih</p><p className="text-xs text-slate-400 dark:text-slate-500">Hanya file .json yang berisi data ujian dan hasil siswa.</p></div>
+            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+                {isLoadingCloud && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex flex-col items-center">
+                            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-white">{loadingMessage}</p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="text-center mb-8">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Buka Arsip Ujian</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Akses data ujian lama dari Cloud Storage atau file lokal.</p>
                 </div>
-                {error && <div className="mt-6 p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-sm rounded-xl border border-rose-100 dark:border-rose-900"><strong>Error:</strong> {error}</div>}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Cloud Archives */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                            <CloudArrowUpIcon className="w-5 h-5 text-indigo-500"/> Arsip Tersimpan (Cloud)
+                        </h3>
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
+                            {cloudArchives.length > 0 ? (
+                                cloudArchives.map((file, idx) => (
+                                    <div key={idx} className="relative group">
+                                        <button 
+                                            onClick={() => loadFromCloud(file.name)}
+                                            className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
+                                        >
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
+                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400">
+                                                <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                                                <span>{(file.size / 1024).toFixed(1)} KB</span>
+                                            </div>
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleDeleteArchive(file.name, e)}
+                                            className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all shadow-sm border border-slate-200 dark:border-slate-600 z-10"
+                                            title="Hapus Arsip"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10 text-slate-400 text-xs">Tidak ada arsip di cloud.</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Local File */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col">
+                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                            <DocumentDuplicateIcon className="w-5 h-5 text-emerald-500"/> Upload File Lokal
+                        </h3>
+                        <div onDrop={handleDrop} onDragOver={handleDragOver} className="flex-1 border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative cursor-pointer flex flex-col items-center justify-center" onClick={() => fileInputRef.current?.click()}>
+                            <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                            <CloudArrowUpIcon className="w-10 h-10 text-slate-300 dark:text-slate-500 mb-3" />
+                            <p className="text-slate-600 dark:text-slate-300 font-medium text-sm">Pilih file .json</p>
+                        </div>
+                        {error && <div className="mt-4 p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-xs rounded-lg border border-rose-100 dark:border-rose-900"><strong>Error:</strong> {error}</div>}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -817,12 +1004,24 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             <div className="p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm print:hidden">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{exam.config.subject}</span></h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{exam.config.subject}</span></h2>
+                            {sourceType === 'LOCAL' && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase border border-gray-200">Local File</span>}
+                            {sourceType === 'CLOUD' && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase border border-blue-100">Cloud Storage</span>}
+                        </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}</p>
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
-                         <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
+                        
+                        {sourceType === 'LOCAL' && (
+                            <button onClick={handleUploadToCloud} disabled={isLoadingCloud} className="flex-1 md:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
+                                {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
+                                <span>Simpan ke Cloud</span>
+                            </button>
+                        )}
+
+                        <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
                         <button onClick={() => onReuseExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>
                 </div>

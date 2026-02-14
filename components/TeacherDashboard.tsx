@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -166,11 +167,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // ARCHIVE & EXCEL LOGIC
     const handleArchiveExam = async (exam: Exam) => {
-        if (!confirm(`Arsip ujian "${exam.config.subject}"?\n\nSistem akan mengunduh file JSON (Database) dan Excel (Laporan). Data di cloud akan dihapus agar hemat kuota.`)) return;
+        const confirmMsg = `Konfirmasi Finalisasi & Arsip?\n\nSistem akan:\n1. Memindahkan data ke Cloud Storage (Cold Data).\n2. Menghapus data dari Database (SQL) untuk menjaga performa.\n3. Mengunduh backup lokal sebagai cadangan.\n\nPastikan proses upload selesai sebelum menutup.`;
+        if (!confirm(confirmMsg)) return;
         
         setIsLoadingArchive(true);
         try {
-            // 1. Get Fat Exam Object (Base64 Images) for JSON Backup
+            // 1. Get Fat Exam Object (Base64 Images)
             const fatExam = await storageService.getExamForArchive(exam.code);
             if (!fatExam) throw new Error("Gagal mengambil data ujian.");
 
@@ -182,99 +184,39 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 exam: fatExam,
                 results: examResults
             };
-
-            // 4. Download JSON
             const jsonString = JSON.stringify(archivePayload, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `ARSIP_DB_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
 
-            // 5. GENERATE EXCEL (Dynamic Import)
+            // 4. ATTEMPT CLOUD UPLOAD (Supabase Storage 'archives' bucket)
             try {
-                // Dynamic import to save initial bundle size
-                const XLSX = await import("xlsx");
+                await storageService.uploadArchive(exam.code, jsonString);
+                // If successful, proceed to SQL deletion
+                await storageService.cleanupExamAssets(exam.code);
+                await deleteExam(exam.code);
+                onRefreshExams();
+                alert("Berhasil! Data ujian telah dipindahkan ke Cloud Archive dan Database SQL telah dibersihkan.");
+            } catch (cloudError: any) {
+                console.error("Cloud upload failed:", cloudError);
+                // 5. FALLBACK: Download Local File if Cloud Fails
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `BACKUP_LOCAL_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
 
-                // --- Sheet 1: Bank Soal ---
-                const questionRows = fatExam.questions.map((q, i) => ({
-                    No: i + 1,
-                    ID: q.id,
-                    Tipe: q.questionType,
-                    Pertanyaan: stripHtml(q.questionText),
-                    Opsi: q.options ? q.options.map(stripHtml).join(' | ') : '-',
-                    Kunci_Jawaban: q.correctAnswer || '-'
-                }));
-                const wsQuestions = XLSX.utils.json_to_sheet(questionRows);
-
-                // --- Sheet 2: Hasil Siswa ---
-                const resultRows = examResults.map((r, i) => ({
-                    No: i + 1,
-                    Nama: r.student.fullName,
-                    Kelas: r.student.class,
-                    ID_Siswa: r.student.studentId,
-                    Nilai: r.score,
-                    Benar: r.correctAnswers,
-                    Salah: r.totalQuestions - r.correctAnswers - (Object.keys(r.answers).length < r.totalQuestions ? (r.totalQuestions - Object.keys(r.answers).length) : 0), // Simplified logic
-                    Total_Soal: r.totalQuestions,
-                    Status: r.status,
-                    Waktu_Selesai: r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : '-'
-                }));
-                const wsResults = XLSX.utils.json_to_sheet(resultRows);
-
-                // --- Sheet 3: Analisis Soal ---
-                // Simple calculation for correct percentage per question
-                const totalStudents = examResults.length;
-                const analysisRows = fatExam.questions.filter(q => q.questionType !== 'INFO').map((q, i) => {
-                    let correctCount = 0;
-                    examResults.forEach(r => {
-                        const ans = r.answers[q.id];
-                        // Basic check (normalized)
-                        const normAns = String(ans || '').trim().toLowerCase();
-                        const normKey = String(q.correctAnswer || '').trim().toLowerCase();
-                        if (normAns === normKey) correctCount++;
-                        // Note: This is a simplified check. Complex types might need stricter logic same as in ExamPage.
-                    });
-                    const pct = totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
-                    
-                    return {
-                        No: i + 1,
-                        Soal: stripHtml(q.questionText),
-                        Jawab_Benar: correctCount,
-                        Total_Partisipan: totalStudents,
-                        Persentase_Benar: pct + "%",
-                        Kategori: pct >= 80 ? 'Mudah' : pct >= 50 ? 'Sedang' : 'Sulit'
-                    };
-                });
-                const wsAnalysis = XLSX.utils.json_to_sheet(analysisRows);
-
-                // Create Workbook
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, wsQuestions, "Bank Soal");
-                XLSX.utils.book_append_sheet(wb, wsResults, "Hasil Siswa");
-                XLSX.utils.book_append_sheet(wb, wsAnalysis, "Analisis Soal");
-
-                // Download Excel
-                XLSX.writeFile(wb, `LAPORAN_${exam.config.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${exam.code}.xlsx`);
-
-            } catch (excelError) {
-                console.error("Gagal membuat Excel:", excelError);
-                alert("File JSON berhasil diunduh, tetapi gagal membuat Excel (Cek koneksi internet untuk memuat modul Excel).");
+                if (confirm("Gagal upload ke Cloud Storage (mungkin bucket belum disetup atau koneksi buruk). File backup telah diunduh ke perangkat Anda.\n\nApakah Anda tetap ingin menghapus data dari Database SQL? (Pastikan file backup aman!)")) {
+                    await storageService.cleanupExamAssets(exam.code);
+                    await deleteExam(exam.code);
+                    onRefreshExams();
+                }
             }
 
-            // 6. Cleanup Cloud
-            await storageService.cleanupExamAssets(exam.code);
-            await deleteExam(exam.code); // Hapus dari DB
-            onRefreshExams();
-            
-            alert("Arsip berhasil diunduh dan data cloud dibersihkan.");
         } catch (e) {
             console.error(e);
-            alert("Gagal mengarsipkan ujian.");
+            alert("Gagal memproses arsip.");
         } finally {
             setIsLoadingArchive(false);
         }
@@ -317,8 +259,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-bounce">
                         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Menyiapkan Arsip & Excel...</p>
-                        <p className="text-xs text-slate-400">Mohon tunggu, sedang mengunduh modul Excel.</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Mengarsipkan ke Cloud...</p>
+                        <p className="text-xs text-slate-400">Mohon tunggu, jangan tutup halaman ini.</p>
                     </div>
                 </div>
             )}

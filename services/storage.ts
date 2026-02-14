@@ -1,6 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
+import { compressImage } from '../components/teacher/examUtils';
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -453,31 +454,44 @@ class StorageService {
           const parser = new DOMParser();
           const doc = parser.parseFromString(html, 'text/html');
           const images = doc.getElementsByTagName('img');
+          
           for (let i = 0; i < images.length; i++) {
               const img = images[i];
               const src = img.getAttribute('src');
               const bucketPath = img.getAttribute('data-bucket-path');
+              let rawBase64 = '';
 
               if (bucketPath) {
                   try {
                       const { data, error } = await supabase.storage.from('soal').download(bucketPath);
                       if (!error && data) {
-                          const base64 = await new Promise<string>((resolve) => {
+                          rawBase64 = await new Promise<string>((resolve) => {
                               const reader = new FileReader();
                               reader.onloadend = () => resolve(reader.result as string);
                               reader.readAsDataURL(data);
                           });
-                          img.setAttribute('src', base64);
-                          img.removeAttribute('data-bucket-path');
-                          continue; 
                       }
                   } catch (e) {
                       console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
                   }
               }
 
-              if (src && src.startsWith('http')) {
-                  img.setAttribute('src', await urlToBase64(src));
+              if (!rawBase64 && src && src.startsWith('http')) {
+                  rawBase64 = await urlToBase64(src);
+              }
+
+              if (rawBase64) {
+                  try {
+                      // OPTIMIZATION PIPELINE:
+                      // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
+                      // Refine step removed to prevent unwanted cropping
+                      const final = await compressImage(rawBase64, 0.7, 800);
+                      
+                      img.setAttribute('src', final);
+                  } catch (e) {
+                      console.error("Optimization error, using original", e);
+                      img.setAttribute('src', rawBase64);
+                  }
                   img.removeAttribute('data-bucket-path');
               }
           }
@@ -680,6 +694,53 @@ class StorageService {
           console.error("Unlock verification failed:", e);
           return false;
       }
+  }
+
+  // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
+
+  async uploadArchive(examCode: string, jsonString: string): Promise<string> {
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const filename = `${examCode}_${Date.now()}.json`;
+      
+      const { data, error } = await supabase.storage
+          .from('archives')
+          .upload(filename, blob, { upsert: true });
+          
+      if (error) throw error;
+      return data?.path || filename;
+  }
+
+  async getArchivedList(): Promise<{name: string, created_at: string, size: number}[]> {
+      const { data, error } = await supabase.storage.from('archives').list('', {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' },
+      });
+      
+      if (error) {
+          // If bucket doesn't exist or generic error, return empty to fallback to local
+          console.warn("Failed to list archives:", error);
+          return [];
+      }
+      
+      return data.map((f: any) => ({
+          name: f.name,
+          created_at: f.created_at,
+          size: f.metadata?.size || 0
+      }));
+  }
+
+  async downloadArchive(path: string): Promise<any> {
+      const { data, error } = await supabase.storage.from('archives').download(path);
+      if (error) throw error;
+      
+      const text = await data.text();
+      return JSON.parse(text);
+  }
+
+  async deleteArchive(filename: string): Promise<void> {
+      const { error } = await supabase.storage.from('archives').remove([filename]);
+      if (error) throw error;
   }
 }
 
