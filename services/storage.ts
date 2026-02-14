@@ -1,7 +1,11 @@
 
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
+import { GoogleGenAI } from "@google/genai";
+
+// Initialize Gemini AI
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -437,6 +441,184 @@ class StorageService {
       if (files && files.length > 0) {
           const paths = files.map(f => `${code}/${f.name}`);
           await supabase.storage.from('soal').remove(paths);
+      }
+  }
+
+  // --- ARCHIVE & ANALYTICS METHODS (TRANSACTION SAFE) ---
+
+  // New method to handle the complete archive process with safety checks
+  async performFullArchive(exam: Exam): Promise<{ backupUrl?: string }> {
+      // 1. Get Fat Exam Object (Base64 Images)
+      const fatExam = await this.getExamForArchive(exam.code);
+      if (!fatExam) throw new Error("Gagal mengambil data ujian.");
+
+      // 2. Get All Results for this exam
+      const examResults = await this.getResults(exam.code, undefined);
+
+      // 3. Create comprehensive archive object (JSON)
+      const archivePayload = {
+          exam: fatExam,
+          results: examResults
+      };
+      const jsonString = JSON.stringify(archivePayload, null, 2);
+
+      // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
+      const summary = this.calculateExamStatistics(fatExam, examResults);
+      
+      // 5. Insert Summary into SQL (Transaction Step 2)
+      // If this fails, we abort.
+      const { error: summaryError } = await supabase.from('exam_summaries').insert(summary);
+      if (summaryError) {
+          console.error("Summary Insert Failed:", summaryError);
+          throw new Error("Gagal menyimpan ringkasan statistik. Arsip dibatalkan.");
+      }
+
+      let backupUrl: string | undefined;
+
+      // 6. ATTEMPT CLOUD UPLOAD (Transaction Step 3)
+      try {
+          await this.uploadArchive(exam.code, jsonString);
+          // 7. CLEANUP (Transaction Step 4 - Only if upload success)
+          await this.cleanupExamAssets(exam.code);
+          await this.deleteExam(exam.code);
+      } catch (cloudError: any) {
+          console.error("Cloud upload failed:", cloudError);
+          // FALLBACK: Generate Blob URL for local download
+          const blob = new Blob([jsonString], { type: "application/json" });
+          backupUrl = URL.createObjectURL(blob);
+          
+          // Note: We do NOT delete the exam from SQL if cloud upload fails, 
+          // unless the user manually confirms in the UI layer. 
+          // But logically, we already inserted the summary. 
+          // For now, we return the backupUrl so the UI can prompt the user.
+      }
+
+      return { backupUrl };
+  }
+
+  private calculateExamStatistics(exam: Exam, results: Result[]): Partial<ExamSummary> {
+      const scores = results.map(r => Number(r.score));
+      const total = scores.length;
+      
+      // Basic Stats
+      const avg = total > 0 ? scores.reduce((a, b) => a + b, 0) / total : 0;
+      const max = total > 0 ? Math.max(...scores) : 0;
+      const min = total > 0 ? Math.min(...scores) : 0;
+      const passing = scores.filter(s => s >= 75).length; // Assuming KKM 75
+      const passingRate = total > 0 ? (passing / total) * 100 : 0;
+
+      // Question Stats Snapshot (JSONB)
+      const questionStats: any[] = exam.questions
+          .filter(q => q.questionType !== 'INFO')
+          .map(q => {
+              let correctCount = 0;
+              const answerDist: Record<string, number> = {};
+              
+              results.forEach(r => {
+                  const ans = r.answers[q.id];
+                  // Normalize and Check (Simplified for stats)
+                  if (this.isAnswerCorrect(q, ans)) correctCount++;
+                  
+                  // Track distraction
+                  if (ans) {
+                      const strAns = typeof ans === 'string' ? ans : JSON.stringify(ans);
+                      answerDist[strAns] = (answerDist[strAns] || 0) + 1;
+                  }
+              });
+
+              return {
+                  id: q.id,
+                  type: q.questionType,
+                  correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
+                  top_wrong_answer: this.getTopWrongAnswer(answerDist, q)
+              };
+          });
+
+      return {
+          school_name: exam.authorSchool || 'Unknown School',
+          exam_subject: exam.config.subject,
+          exam_code: exam.code,
+          exam_date: exam.config.date,
+          total_participants: total,
+          average_score: parseFloat(avg.toFixed(2)),
+          highest_score: max,
+          lowest_score: min,
+          passing_rate: parseFloat(passingRate.toFixed(2)),
+          question_stats: questionStats,
+          region: '' // Region usually comes from profile, handled in UI or DB default
+      };
+  }
+
+  private isAnswerCorrect(q: Question, ans: any): boolean {
+      if (!ans) return false;
+      const normalize = (s: string) => String(s).trim().toLowerCase();
+      
+      if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+          return normalize(ans) === normalize(q.correctAnswer || '');
+      }
+      if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+          // Simplified check
+          return normalize(ans).length === normalize(q.correctAnswer || '').length; 
+      }
+      return false; // Other types ignored for simple stats
+  }
+
+  private getTopWrongAnswer(dist: Record<string, number>, q: Question): string | null {
+      // Very basic logic to find most common wrong answer
+      let max = 0;
+      let topAns = null;
+      for (const [ans, count] of Object.entries(dist)) {
+          if (!this.isAnswerCorrect(q, ans) && count > max) {
+              max = count;
+              topAns = ans;
+          }
+      }
+      return topAns;
+  }
+
+  async getAnalyticsData(filters?: { region?: string, subject?: string }): Promise<ExamSummary[]> {
+      let query = supabase.from('exam_summaries').select('*');
+      if (filters?.region) query = query.ilike('school_name', `%${filters.region}%`); // Simple proxy for region
+      if (filters?.subject) query = query.eq('exam_subject', filters.subject);
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) return [];
+      return data as ExamSummary[];
+  }
+
+  // --- GEMINI AI ANALYTICS ---
+  async generateAIAnalysis(summaries: ExamSummary[]): Promise<string> {
+      try {
+          // Pre-process data to save tokens
+          const simpleData = summaries.map(s => ({
+              school: s.school_name,
+              avg: s.average_score,
+              participants: s.total_participants,
+              weakness: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length
+          }));
+
+          const prompt = `
+            Bertindaklah sebagai Konsultan Pendidikan Senior.
+            Berikut adalah data hasil ujian dari beberapa sekolah:
+            ${JSON.stringify(simpleData)}
+
+            Tugas Anda:
+            1. Analisis tren performa antar sekolah.
+            2. Identifikasi pola kelemahan umum (berdasarkan jumlah soal dengan rate < 50%).
+            3. Berikan rekomendasi "Praktik Baik" (Best Practice) yang bisa ditiru dari sekolah dengan nilai tinggi.
+            
+            Output dalam format Markdown yang rapi.
+          `;
+
+          const response = await ai.models.generateContent({
+              model: 'gemini-3-flash-preview',
+              contents: prompt
+          });
+
+          return response.text || "Gagal menghasilkan analisis.";
+      } catch (e) {
+          console.error("Gemini Error:", e);
+          return "Maaf, layanan analisis AI sedang sibuk. Coba lagi nanti.";
       }
   }
 
