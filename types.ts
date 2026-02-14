@@ -10,6 +10,10 @@ export interface Question {
   imageUrl?: string; 
   optionImages?: (string | null)[];
   
+  // Metadata Baru
+  category?: string; // e.g., "Teks Prosedur", "Aljabar"
+  level?: string;    // e.g., "1", "HOTS", "LOTS"
+
   matchingPairs?: {
     left: string;
     right: string; 
