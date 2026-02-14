@@ -599,7 +599,7 @@ class StorageService {
       return data as ExamSummary[];
   }
 
-  // --- GEMINI AI ANALYTICS ---
+  // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
   async generateAIAnalysis(summaries: ExamSummary[]): Promise<string> {
       try {
           // Pre-process data to save tokens
@@ -607,24 +607,57 @@ class StorageService {
               school: s.school_name,
               avg: s.average_score,
               participants: s.total_participants,
-              weakness: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length
+              weakness_count: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length,
+              top_difficulty_questions: s.question_stats
+                  .filter((qs: any) => qs.correct_rate < 40)
+                  .map((qs: any) => `Q${qs.id.split('-')[1] || qs.id}: ${qs.correct_rate}%`)
+                  .slice(0, 3)
           }));
 
           const prompt = `
-            Bertindaklah sebagai Konsultan Pendidikan Senior.
-            Berikut adalah data hasil ujian dari beberapa sekolah:
+            You are a Senior Education Data Consultant creating an Executive Dashboard.
+            
+            INPUT DATA (JSON):
             ${JSON.stringify(simpleData)}
 
-            Tugas Anda:
-            1. Analisis tren performa antar sekolah.
-            2. Identifikasi pola kelemahan umum (berdasarkan jumlah soal dengan rate < 50%).
-            3. Berikan rekomendasi "Praktik Baik" (Best Practice) yang bisa ditiru dari sekolah dengan nilai tinggi.
+            TASK:
+            Generate a visual-heavy HTML/Markdown report.
+            DO NOT output raw JSON.
+            DO NOT wrap HTML in code blocks (no \`\`\`html). Embed raw HTML directly into the response so it renders immediately.
             
-            Output dalam format Markdown yang rapi.
+            STRUCTURE & VISUAL RULES:
+
+            1. EXECUTIVE SUMMARY (Scorecard Style):
+               - Create a flexbox container with 3 cards: "Rata-rata Wilayah", "Sekolah Tertinggi", "Perlu Intervensi".
+               - Use Tailwind classes: \`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm\`.
+               - Use text colors like \`text-emerald-600\` for good stats and \`text-rose-600\` for bad stats.
+
+            2. DISTRIBUTION ANALYSIS (Generative Bar Charts):
+               - List top 5 and bottom 5 schools.
+               - Instead of just text, render a Horizontal Bar Chart using HTML <div>.
+               - Template: 
+                 <div class="mb-2">
+                   <div class="flex justify-between text-xs font-bold mb-1"><span>{SchoolName}</span><span>{Score}</span></div>
+                   <div class="w-full bg-slate-100 rounded-full h-2.5 dark:bg-slate-700">
+                     <div class="bg-indigo-600 h-2.5 rounded-full" style="width: {Score}%"></div>
+                   </div>
+                 </div>
+
+            3. ITEM DIAGNOSIS (Heatmap Table):
+               - Identify common difficult questions.
+               - Render a small HTML table where the "Difficulty" cell background color depends on value (Red < 40, Yellow < 70, Green > 70).
+               - Use classes: \`w-full text-sm border-collapse\`, \`p-2 border\`.
+
+            4. RECOMMENDATIONS (Quadrant Matrix):
+               - Present a 2x2 Matrix using a Markdown Table.
+               - Columns: "Quick Wins (High Impact, Low Effort)" vs "Long Term Projects".
+               - Use emojis for bullet points.
+
+            Output must be in Bahasa Indonesia. Keep it professional, insightful, and visually modern.
           `;
 
           const response = await ai.models.generateContent({
-              model: 'gemini-3-flash-preview',
+              model: 'gemini-3-pro-preview', // Using Pro for complex HTML generation
               contents: prompt
           });
 
