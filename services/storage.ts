@@ -740,6 +740,11 @@ class StorageService {
       const text = await data.text();
       return JSON.parse(text);
   }
+
+  async deleteArchive(filename: string): Promise<void> {
+      const { error } = await supabase.storage.from('archives').remove([filename]);
+      if (error) throw error;
+  }
 }
 
 export const storageService = new StorageService();
