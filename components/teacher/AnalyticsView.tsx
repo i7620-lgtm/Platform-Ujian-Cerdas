@@ -115,13 +115,15 @@ const AnalyticsView: React.FC = () => {
 
             {aiResult && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
                         <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-900 rounded-t-2xl">
                             <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-300 flex items-center gap-2"><SparklesIcon className="w-5 h-5"/> Laporan Analisis AI</h3>
                             <button onClick={() => setAiResult(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">Tutup</button>
                         </div>
-                        <div className="p-8 overflow-y-auto prose prose-slate dark:prose-invert max-w-none bg-slate-50 dark:bg-slate-900/50 flex-1">
-                            <div dangerouslySetInnerHTML={{ __html: aiResult.replace(/\n/g, '<br/>') }} /> 
+                        {/* Modified Container for Generative Visuals */}
+                        <div className="p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 flex-1">
+                            {/* Prose max-w-none ensures tables and charts take full width */}
+                            <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-indigo-600" dangerouslySetInnerHTML={{ __html: aiResult.replace(/\n/g, '<br/>') }} /> 
                         </div>
                     </div>
                 </div>
