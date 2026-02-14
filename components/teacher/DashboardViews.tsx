@@ -635,6 +635,30 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
     };
 
+    const handleDeleteArchive = async (filename: string, e: React.MouseEvent) => {
+        e.stopPropagation(); 
+        if (!confirm(`Apakah Anda yakin ingin menghapus arsip "${filename}" secara permanen dari Cloud Storage?`)) return;
+
+        setIsLoadingCloud(true);
+        setLoadingMessage('Menghapus arsip...');
+        
+        try {
+            await storageService.deleteArchive(filename);
+            const list = await storageService.getArchivedList();
+            setCloudArchives(list);
+            
+            // If the deleted file is currently open, close it
+            if (archiveData && sourceType === 'CLOUD' && archiveData.exam.code === filename.split('_')[0]) {
+               resetView();
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Gagal menghapus arsip.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
     const handleUploadToCloud = async () => {
         if (!archiveData) return;
         
@@ -903,17 +927,25 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
                             {cloudArchives.length > 0 ? (
                                 cloudArchives.map((file, idx) => (
-                                    <button 
-                                        key={idx}
-                                        onClick={() => loadFromCloud(file.name)}
-                                        className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
-                                    >
-                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300">{file.name}</p>
-                                        <div className="flex justify-between mt-1 text-[10px] text-slate-400">
-                                            <span>{new Date(file.created_at).toLocaleDateString()}</span>
-                                            <span>{(file.size / 1024).toFixed(1)} KB</span>
-                                        </div>
-                                    </button>
+                                    <div key={idx} className="relative group">
+                                        <button 
+                                            onClick={() => loadFromCloud(file.name)}
+                                            className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
+                                        >
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-8">{file.name}</p>
+                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400">
+                                                <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                                                <span>{(file.size / 1024).toFixed(1)} KB</span>
+                                            </div>
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleDeleteArchive(file.name, e)}
+                                            className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-200 dark:border-slate-600 z-10"
+                                            title="Hapus Arsip"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 ))
                             ) : (
                                 <div className="text-center py-10 text-slate-400 text-xs">Tidak ada arsip di cloud.</div>
