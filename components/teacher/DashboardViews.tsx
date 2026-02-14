@@ -932,7 +932,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             onClick={() => loadFromCloud(file.name)}
                                             className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
                                         >
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-8">{file.name}</p>
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
                                             <div className="flex justify-between mt-1 text-[10px] text-slate-400">
                                                 <span>{new Date(file.created_at).toLocaleDateString()}</span>
                                                 <span>{(file.size / 1024).toFixed(1)} KB</span>
@@ -940,7 +940,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         </button>
                                         <button 
                                             onClick={(e) => handleDeleteArchive(file.name, e)}
-                                            className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-slate-200 dark:border-slate-600 z-10"
+                                            className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all shadow-sm border border-slate-200 dark:border-slate-600 z-10"
                                             title="Hapus Arsip"
                                         >
                                             <TrashIcon className="w-4 h-4" />
