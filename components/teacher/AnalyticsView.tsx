@@ -1,133 +1,235 @@
 
-import React, { useState, useEffect } from 'react';
-import { ChartBarIcon, TableCellsIcon, CheckCircleIcon, ArrowPathIcon } from '../Icons';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChartBarIcon, TableCellsIcon, CheckCircleIcon, ArrowPathIcon, UserIcon, LightBulbIcon } from '../Icons';
 import { storageService } from '../../services/storage';
-import type { ExamSummary } from '../../types';
+import type { ExamSummary, Exam, Result, Question } from '../../types';
 
-// Simple Icon for AI Button
-const SparklesIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-    </svg>
-);
+// --- TYPE DEFINITIONS FOR DIAGNOSTICS ---
+
+export interface DiagnosticCategory {
+    name: string;
+    total: number;
+    correct: number;
+    score: number; // 0-100
+}
+
+export interface Recommendation {
+    status: string; // "Perlu Intervensi", "Cukup", "Kompeten", "Istimewa"
+    color: string; // Tailwind classes
+    title: string;
+    description: string;
+    actionItem: string; // Saran konkret
+}
+
+export interface DiagnosticResult {
+    score: number;
+    categories: DiagnosticCategory[];
+    levels: DiagnosticCategory[]; // HOTS, LOTS, etc.
+    recommendation: Recommendation;
+    weakestCategory: string;
+    strongestCategory: string;
+}
+
+// --- RULE-BASED ENGINE (THE LOGIC) ---
+
+/**
+ * Menganalisis hasil satu siswa berdasarkan soal ujian.
+ * Fungsi ini MURNI (Pure Function) dan bisa dipanggil di mana saja (Siswa/Guru).
+ */
+export const analyzeExamResult = (exam: Exam, result: Result): DiagnosticResult => {
+    const categoriesMap: Record<string, { total: number; correct: number }> = {};
+    const levelsMap: Record<string, { total: number; correct: number }> = {};
+    
+    // 1. Iterasi Soal & Jawaban
+    exam.questions.forEach(q => {
+        if (q.questionType === 'INFO') return;
+
+        const catName = q.category && q.category.trim() !== '' ? q.category.trim() : 'Umum';
+        const levelName = q.level && q.level.trim() !== '' ? q.level.trim() : 'Dasar';
+
+        // Init Map
+        if (!categoriesMap[catName]) categoriesMap[catName] = { total: 0, correct: 0 };
+        if (!levelsMap[levelName]) levelsMap[levelName] = { total: 0, correct: 0 };
+
+        // Hitung Total
+        categoriesMap[catName].total++;
+        levelsMap[levelName].total++;
+
+        // Cek Kebenaran (Sederhana)
+        const studentAns = (result.answers[q.id] || '').trim().toLowerCase();
+        const correctAns = (q.correctAnswer || '').trim().toLowerCase();
+        
+        let isCorrect = false;
+        
+        // Logika Pengecekan Standar
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            isCorrect = studentAns === correctAns;
+        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(studentAns.split(',').map(s => s.trim()));
+            const cSet = new Set(correctAns.split(',').map(s => s.trim()));
+            isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        } else if (q.questionType === 'TRUE_FALSE') {
+             try {
+                const ansObj = JSON.parse(result.answers[q.id] || '{}');
+                isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+            } catch(e) {}
+        } else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(result.answers[q.id] || '{}');
+                isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+            } catch(e) {}
+        }
+
+        if (isCorrect) {
+            categoriesMap[catName].correct++;
+            levelsMap[levelName].correct++;
+        }
+    });
+
+    // 2. Konversi ke Array & Hitung Persentase
+    const processMap = (map: Record<string, { total: number; correct: number }>): DiagnosticCategory[] => {
+        return Object.entries(map).map(([name, stats]) => ({
+            name,
+            total: stats.total,
+            correct: stats.correct,
+            score: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
+        })).sort((a, b) => a.score - b.score); // Urutkan dari terlemah
+    };
+
+    const categories = processMap(categoriesMap);
+    const levels = processMap(levelsMap);
+
+    // 3. Tentukan Weakest & Strongest
+    const weakestCategory = categories.length > 0 ? categories[0].name : '-';
+    const strongestCategory = categories.length > 0 ? categories[categories.length - 1].name : '-';
+
+    // 4. Generate Rekomendasi (Rule-Based)
+    const score = result.score;
+    let recommendation: Recommendation;
+
+    if (score <= 45) {
+        recommendation = {
+            status: "Perlu Intervensi",
+            color: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800",
+            title: "Butuh Remedial Intensif",
+            description: "Nilai belum mencapai standar minimum kompetensi.",
+            actionItem: "Wajib mengikuti kelas Remedial. Fokus ulangi materi dasar dan konsep fundamental."
+        };
+    } else if (score <= 75) {
+        recommendation = {
+            status: "Cukup (Perlu Latihan)",
+            color: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800",
+            title: "Perbanyak Latihan Soal",
+            description: "Pemahaman konsep sudah ada, namun ketelitian perlu ditingkatkan.",
+            actionItem: "Lakukan penugasan mandiri pada topik yang lemah. Disarankan belajar metode Tutor Sebaya."
+        };
+    } else if (score <= 90) {
+        recommendation = {
+            status: "Kompeten",
+            color: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
+            title: "Siap Pengayaan",
+            description: "Penguasaan materi sangat baik. Siap untuk tantangan lebih.",
+            actionItem: "Pertahankan prestasi. Anda bisa mulai mengerjakan soal-soal HOTS atau studi kasus."
+        };
+    } else {
+        recommendation = {
+            status: "Istimewa",
+            color: "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800",
+            title: "Direkomendasikan Mentor Sebaya",
+            description: "Sangat Memuaskan! Penguasaan materi sempurna.",
+            actionItem: "Anda direkomendasikan menjadi 'Tutor Sebaya' untuk membantu teman sekelas."
+        };
+    }
+
+    return { score, categories, levels, recommendation, weakestCategory, strongestCategory };
+};
+
+
+// --- COMPONENT UI (TEACHER VIEW) ---
 
 const AnalyticsView: React.FC = () => {
     const [summaries, setSummaries] = useState<ExamSummary[]>([]);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [filterRegion, setFilterRegion] = useState('');
-    const [filterSubject, setFilterSubject] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [aiResult, setAiResult] = useState<string | null>(null);
-    const [isAiLoading, setIsAiLoading] = useState(false);
-
-    const fetchData = async () => {
-        setIsLoading(true);
-        const data = await storageService.getAnalyticsData({ region: filterRegion, subject: filterSubject });
-        setSummaries(data);
-        setIsLoading(false);
-    };
 
     useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            const data = await storageService.getAnalyticsData();
+            setSummaries(data);
+            setIsLoading(false);
+        };
         fetchData();
     }, []);
-
-    const toggleSelect = (id: string) => {
-        const newSet = new Set(selectedIds);
-        if (newSet.has(id)) newSet.delete(id);
-        else newSet.add(id);
-        setSelectedIds(newSet);
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedIds.size === summaries.length) setSelectedIds(new Set());
-        else setSelectedIds(new Set(summaries.map(s => s.id)));
-    };
-
-    const handleGenerateAI = async () => {
-        const selectedData = summaries.filter(s => selectedIds.has(s.id));
-        if (selectedData.length === 0) return;
-        
-        setIsAiLoading(true);
-        const report = await storageService.generateAIAnalysis(selectedData);
-        setAiResult(report);
-        setIsAiLoading(false);
-    };
 
     return (
         <div className="space-y-6 animate-fade-in relative">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <ChartBarIcon className="w-6 h-6 text-indigo-600"/> Analisis Daerah (Super Admin)
+                        <ChartBarIcon className="w-6 h-6 text-indigo-600"/> Analisis Daerah & Sekolah
                     </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Analisis performa sekolah dan generate laporan berbasis AI.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Data agregat dari hasil ujian yang telah diarsipkan.</p>
                 </div>
-                <div className="flex gap-2">
-                    <input 
-                        placeholder="Filter Wilayah/Sekolah..." 
-                        value={filterRegion} 
-                        onChange={e => setFilterRegion(e.target.value)}
-                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                    />
-                    <button onClick={fetchData} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
+                <button onClick={() => window.location.reload()} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Scorecard Summary */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Ujian</p>
+                    <p className="text-3xl font-black text-slate-800 dark:text-white mt-1">{summaries.length}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rata-rata Total</p>
+                    <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                        {summaries.length > 0 ? Math.round(summaries.reduce((a,b) => a + Number(b.average_score), 0) / summaries.length) : 0}
+                    </p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Partisipan</p>
+                    <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                        {summaries.reduce((a,b) => a + b.total_participants, 0)}
+                    </p>
                 </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
+                    <h3 className="font-bold text-slate-700 dark:text-slate-200">Riwayat Statistik Sekolah</h3>
+                </div>
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-700">
                         <tr>
-                            <th className="px-6 py-4 w-10">
-                                <input type="checkbox" checked={summaries.length > 0 && selectedIds.size === summaries.length} onChange={toggleSelectAll} className="rounded text-indigo-600 focus:ring-indigo-500"/>
-                            </th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Mapel</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
-                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Tanggal</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Kelulusan</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                        {isLoading ? <tr><td colSpan={6} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
+                        {isLoading ? <tr><td colSpan={5} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
                             <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                <td className="px-6 py-4"><input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} className="rounded text-indigo-600 focus:ring-indigo-500"/></td>
                                 <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{s.school_name}</td>
-                                <td className="px-6 py-4 text-sm">{s.exam_subject}</td>
-                                <td className="px-6 py-4 text-center font-bold">{s.average_score}</td>
+                                <td className="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">
+                                    {s.exam_subject}
+                                    <span className="block text-[10px] text-slate-400 font-mono">{s.exam_code}</span>
+                                </td>
+                                <td className="px-6 py-4 text-center font-black text-indigo-600 dark:text-indigo-400">{s.average_score}</td>
                                 <td className="px-6 py-4 text-center text-sm">{s.total_participants}</td>
-                                <td className="px-6 py-4 text-center text-xs text-slate-500">{new Date(s.exam_date).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${s.passing_rate > 75 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                        {s.passing_rate}%
+                                    </span>
+                                </td>
                             </tr>
                         ))}
+                        {summaries.length === 0 && !isLoading && (
+                            <tr><td colSpan={5} className="p-8 text-center text-slate-400 italic">Belum ada data statistik tersimpan.</td></tr>
+                        )}
                     </tbody>
                 </table>
             </div>
-
-            <div className="sticky bottom-6 flex justify-center">
-                <button 
-                    onClick={handleGenerateAI} 
-                    disabled={selectedIds.size === 0 || isAiLoading}
-                    className={`px-8 py-4 rounded-2xl font-bold shadow-xl flex items-center gap-3 transition-all transform active:scale-95 ${selectedIds.size > 0 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                >
-                    {isAiLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <SparklesIcon className="w-5 h-5"/>}
-                    <span>{isAiLoading ? 'Sedang Menganalisis...' : `Analisis ${selectedIds.size} Sekolah dengan AI`}</span>
-                </button>
-            </div>
-
-            {aiResult && (
-                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
-                        <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-900 rounded-t-2xl">
-                            <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-300 flex items-center gap-2"><SparklesIcon className="w-5 h-5"/> Laporan Analisis AI</h3>
-                            <button onClick={() => setAiResult(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">Tutup</button>
-                        </div>
-                        {/* Modified Container for Generative Visuals */}
-                        <div className="p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 flex-1">
-                            {/* Prose max-w-none ensures tables and charts take full width */}
-                            <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-indigo-600" dangerouslySetInnerHTML={{ __html: aiResult.replace(/\n/g, '<br/>') }} /> 
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
