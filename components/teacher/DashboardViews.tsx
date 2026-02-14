@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
-import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage, refineImageContent } from './examUtils';
+import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage } from './examUtils';
 import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
@@ -682,12 +682,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     if (src && src.startsWith('data:image')) {
                         try {
                             // OPTIMIZATION PIPELINE:
-                            // 1. Resize to max 800px
-                            const resized = await compressImage(src, 0.9, 800);
-                            // 2. Refine (Thresholding/High Contrast)
-                            const refined = await refineImageContent(resized);
-                            // 3. Final Compression (WebP q=0.5)
-                            const final = await compressImage(refined, 0.5, 800);
+                            // Resize to max 800px & Compress (WebP q=0.6)
+                            // Refine step removed to prevent unwanted cropping
+                            const final = await compressImage(src, 0.6, 800);
                             img.setAttribute('src', final);
                         } catch (e) { console.warn("Image opt failed, using original", e); }
                     }
