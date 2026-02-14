@@ -1,7 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile } from '../types';
-import { compressImage, refineImageContent } from '../components/teacher/examUtils';
+import { compressImage } from '../components/teacher/examUtils';
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -483,12 +483,9 @@ class StorageService {
               if (rawBase64) {
                   try {
                       // OPTIMIZATION PIPELINE:
-                      // 1. Resize to max 800px (keep high quality for processing)
-                      const resized = await compressImage(rawBase64, 0.9, 800);
-                      // 2. Refine (Thresholding/High Contrast)
-                      const refined = await refineImageContent(resized);
-                      // 3. Final Compression (WebP q=0.5)
-                      const final = await compressImage(refined, 0.5, 800);
+                      // Resize to max 800px & Compress (WebP q=0.6)
+                      // Refine step removed to prevent unwanted cropping
+                      const final = await compressImage(rawBase64, 0.6, 800);
                       
                       img.setAttribute('src', final);
                   } catch (e) {
