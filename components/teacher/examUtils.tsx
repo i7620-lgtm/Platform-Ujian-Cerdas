@@ -1,3 +1,4 @@
+
 import type { Question, QuestionType } from '../../types';
 
 // --- INTERFACES ---
@@ -531,6 +532,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     questionType: currentOptions.length > 0 ? 'MULTIPLE_CHOICE' : 'ESSAY',
                     options: currentOptions.length > 0 ? await Promise.all(currentOptions.map(o => o.promise)) : undefined,
                     correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
+                    category: '',
+                    level: ''
                 });
             }
             
@@ -561,6 +564,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
             questionType: currentOptions.length > 0 ? 'MULTIPLE_CHOICE' : 'ESSAY',
             options: currentOptions.length > 0 ? await Promise.all(currentOptions.map(o => o.promise)) : undefined,
             correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
+            category: '',
+            level: ''
         });
     }
 
@@ -617,7 +622,9 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
                 options: trimmedOptions.length > 0 ? trimmedOptions : undefined,
                 correctAnswer: finalCorrectAnswer,
                 imageUrl: undefined,
-                optionImages: undefined
+                optionImages: undefined,
+                category: '',
+                level: ''
             });
         }
         currentQuestion = null;
