@@ -483,9 +483,9 @@ class StorageService {
               if (rawBase64) {
                   try {
                       // OPTIMIZATION PIPELINE:
-                      // Resize to max 800px & Compress (WebP q=0.6)
+                      // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
                       // Refine step removed to prevent unwanted cropping
-                      const final = await compressImage(rawBase64, 0.6, 800);
+                      const final = await compressImage(rawBase64, 0.7, 800);
                       
                       img.setAttribute('src', final);
                   } catch (e) {
