@@ -1412,34 +1412,41 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 4. ANALISIS BUTIR SOAL (Existing Layout maintained as requested) */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">4. Analisis Butir Soal</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                {/* 4. ANALISIS BUTIR SOAL (Reverted to Single Column Detailed View) */}
+                <div className="mb-8">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-4 border-l-4 border-slate-800 pl-2">4. Analisis Butir Soal</h3>
+                    <div className="space-y-6">
                         {questionAnalysisData.map((data, idx) => {
                             const difficultyLabel = data.correctRate >= 80 ? 'Mudah' : data.correctRate >= 50 ? 'Sedang' : 'Sulit';
                             const difficultyColor = data.correctRate >= 80 ? 'bg-emerald-100 text-emerald-800' : data.correctRate >= 50 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800';
                             
                             return (
-                                <div key={data.id} className="avoid-break border border-slate-300 rounded p-2 text-xs flex flex-col gap-2 bg-white">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] border border-slate-200">Soal {idx + 1}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${difficultyColor}`}>{difficultyLabel}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-                                            <div className={`h-full ${data.correctRate >= 80 ? 'bg-emerald-500' : data.correctRate >= 50 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
+                                <div key={data.id} className="avoid-break border border-slate-300 rounded-xl p-4 bg-white">
+                                    <div className="flex justify-between items-start gap-4 mb-3">
+                                        <div className="flex-1">
+                                            <span className="inline-block font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] border border-slate-200 mb-2">No. {idx + 1}</span>
+                                            <div className="text-xs text-slate-800 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: data.qText }}></div>
                                         </div>
-                                        <span className="font-bold text-[10px] w-14 text-right">{data.correctRate}% Benar</span>
+                                        <div className="text-right shrink-0">
+                                            <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${difficultyColor}`}>{difficultyLabel}</span>
+                                            <div className="mt-1 font-bold text-xs">{data.correctRate}% Benar</div>
+                                        </div>
                                     </div>
-                                    <div className="pt-1 border-t border-slate-100 text-[9px]">
-                                        {/* Simplified distribution for print */}
-                                        {Object.entries(data.distribution).slice(0, 5).map(([ans, count]) => (
-                                            <div key={ans} className="flex justify-between text-slate-600">
-                                                <span className="truncate max-w-[150px]">{ans.replace(/<[^>]*>/g, '')}</span>
-                                                <span className="font-bold">{Math.round((count as number / totalStudents) * 100)}%</span>
-                                            </div>
-                                        ))}
+                                    
+                                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200 mb-4">
+                                        <div className={`h-full ${data.correctRate >= 80 ? 'bg-emerald-500' : data.correctRate >= 50 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
+                                    </div>
+
+                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                        <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Distribusi Jawaban</p>
+                                        <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                                            {Object.entries(data.distribution).map(([ans, count]) => (
+                                                <div key={ans} className="flex justify-between items-center text-[10px] border-b border-slate-200 last:border-0 pb-1">
+                                                    <div className="truncate flex-1 pr-2" dangerouslySetInnerHTML={{__html: ans.replace(/<[^>]*>/g, '')}}></div>
+                                                    <div className="font-mono font-bold text-slate-700">{count as number} ({Math.round((count as number / totalStudents) * 100)}%)</div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )
@@ -1449,34 +1456,40 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 5. BANK SOAL & KUNCI JAWABAN (Existing Layout maintained as requested) */}
+                {/* 5. BANK SOAL & KUNCI JAWABAN (Reverted to Box/Card Style) */}
                 <div>
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">5. Bank Soal & Kunci Jawaban</h3>
-                    <div className="space-y-4">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-4 border-l-4 border-slate-800 pl-2">5. Bank Soal & Kunci Jawaban</h3>
+                    <div className="space-y-6">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
-                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
-                                    <div className="flex gap-3">
-                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
-                                        <div className="flex-1">
-                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                <div key={q.id} className="avoid-break border border-slate-200 rounded-xl p-5 bg-white shadow-sm">
+                                    <div className="flex gap-4">
+                                        <div className="shrink-0 w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-sm text-slate-600 border border-slate-200">
+                                            {q.questionType === 'INFO' ? 'i' : questionNumber}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm text-slate-900 mb-4 prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            
                                             {q.options && (
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                                                <div className="space-y-2 mb-4">
                                                     {q.options.map((opt, i) => {
                                                         const isCorrect = (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) || (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
                                                         return (
-                                                            <div key={i} className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}>
-                                                                <span>{String.fromCharCode(65+i)}.</span><div dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border ${isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+                                                                <span className={`flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold border ${isCorrect ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{String.fromCharCode(65+i)}</span>
+                                                                <div className={`text-xs ${isCorrect ? 'font-bold text-emerald-900' : 'text-slate-700'}`} dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                                {isCorrect && <CheckCircleIcon className="w-4 h-4 text-emerald-500 ml-auto"/>}
                                                             </div>
                                                         )
                                                     })}
                                                 </div>
                                             )}
+
                                             {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') && q.correctAnswer && (
-                                                <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
-                                                    <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">Kunci Jawaban:</p>
-                                                    <div className="text-emerald-900" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
+                                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Kunci Jawaban / Rubrik</p>
+                                                    <div className="text-xs text-slate-800 font-medium" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
                                                 </div>
                                             )}
                                         </div>
