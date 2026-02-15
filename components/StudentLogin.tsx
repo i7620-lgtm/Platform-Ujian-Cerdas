@@ -8,15 +8,16 @@ interface StudentLoginProps {
   onBack: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
+  initialCode?: string;
 }
 
-export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme }) => {
+export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme, initialCode }) => {
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
   // UI State
-  const [examCode, setExamCode] = useState('');
+  const [examCode, setExamCode] = useState(initialCode || '');
   const [fullName, setFullName] = useState(() => localStorage.getItem('saved_student_fullname') || '');
   const [studentClass, setStudentClass] = useState(() => localStorage.getItem('saved_student_class') || '');
   const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem('saved_student_absent') || '');
@@ -24,12 +25,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
   const examCodeInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
+    // Logic fokus kursor cerdas
+    if (initialCode) {
+        // Jika join via QR, fokus ke nama
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+    } else if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
+        // Jika data diri ada di local storage, fokus ke kode
         examCodeInputRef.current.focus();
     }
-  }, []);
+  }, [initialCode, fullName, studentClass, absentNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +191,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                             <div className="px-5 pt-3">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Nama Lengkap</label>
                                 <input
+                                    ref={nameInputRef}
                                     type="text"
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
@@ -319,4 +327,3 @@ const UnlockForm: React.FC<{ onUnlock: (token: string) => void; onCancel: () => 
         </form>
     );
 };
- 

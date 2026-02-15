@@ -1,7 +1,9 @@
+
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
 import { storageService } from '../services/storage';
+import { analyzeStudentPerformance } from './teacher/examUtils';
 
 interface StudentResultPageProps {
   result: Result;
@@ -110,6 +112,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
         };
     }, [exam.questions, result.answers, result.score]);
 
+    // NEW: Analytical Data for Diagnostic Card
+    const analysisData = useMemo(() => analyzeStudentPerformance(exam, result), [exam, result]);
+
     if (result.status === 'force_closed') {
         return (
             <div className="min-h-screen flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
@@ -205,6 +210,39 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                                       <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
                                     </span>
+                                )}
+                            </div>
+
+                            {/* NEW: DIAGNOSTIC CARD */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
+                                <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <ChartBarIcon className="w-4 h-4"/> Analisis Kemampuan
+                                </h3>
+                                
+                                {analysisData.stats.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {analysisData.stats.map((stat) => {
+                                            const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
+                                            return (
+                                                <div key={stat.name}>
+                                                    <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                        <span>{stat.name}</span>
+                                                        <span>{stat.percentage}%</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                        <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                                            <p className="text-xs italic text-slate-600 dark:text-slate-300 font-medium">
+                                                "{analysisData.recommendation}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>
                                 )}
                             </div>
 

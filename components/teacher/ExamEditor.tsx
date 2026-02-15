@@ -6,7 +6,7 @@ import {
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon
+    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -157,7 +157,16 @@ const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
-    // ... existing code ...
+    // Check if Essay Exists
+    const hasEssay = useMemo(() => questions.some(q => q.questionType === 'ESSAY'), [questions]);
+
+    // Force disable automatic result showing if Essay exists
+    useEffect(() => {
+        if (hasEssay && config.showResultToStudent) {
+            setConfig(prev => ({ ...prev, showResultToStudent: false }));
+        }
+    }, [hasEssay]);
+
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
@@ -176,15 +185,19 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
                 if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
-                if (name === 'disableRealtime' && checked) { newConfig.enablePublicStream = false; }
+                // 'disableRealtime' is now handled by the radio group separately
                 return newConfig;
             });
         } else {
             setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' ? parseInt(value) : value }));
         }
     };
+    // ... existing handlers (handleSubjectSelect, handleQuestionTextChange, etc.) ...
     const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
+    const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
+    const handleLevelChange = (id: string, level: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, level } : q));
+
     const handleTypeChange = (qId: string, newType: QuestionType) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId) {
@@ -217,7 +230,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     };
     const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
     const createNewQuestion = (type: QuestionType): Question => {
-        const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined };
+        const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '' };
         switch (type) {
             case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
         }
@@ -276,9 +289,34 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     </div>
                                     <div className="p-6 md:p-8">
                                         <div className="flex items-start gap-4 md:gap-6">
-                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">{String(questionNumber).padStart(2, '0')}</span>}</div>
+                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">{String.fromCharCode(48 + Math.floor(questionNumber / 10)) + String.fromCharCode(48 + (questionNumber % 10))}</span>}</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
+                                                
+                                                {/* METADATA INPUTS */}
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={q.category || ''} 
+                                                            onChange={(e) => handleCategoryChange(q.id, e.target.value)}
+                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                            placeholder="Contoh: Aljabar, Teks Prosedur"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Level Soal</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={q.level || ''} 
+                                                            onChange={(e) => handleLevelChange(q.id, e.target.value)}
+                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                            placeholder="Contoh: 1, 2, HOTS, LOTS"
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
                                                 
                                                 {/* MULTIPLE CHOICE */}
@@ -442,7 +480,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Soal</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Opsi</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Pindah Tab</span></label>
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Kecurangan</span></label>
                            {config.detectBehavior && (
                             <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
                                 <input 
@@ -460,28 +498,59 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
                              <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Hasil & Monitor</h4>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span></label>
+                                <div className={`flex flex-col p-3 rounded-xl border transition-colors shadow-sm ${hasEssay ? 'bg-amber-50 border-amber-200 opacity-80' : 'border-gray-100 hover:bg-slate-50 cursor-pointer group'}`}>
+                                    <label className={`flex items-center ${hasEssay ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                        <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} disabled={hasEssay} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400" />
+                                        <span className={`ml-3 text-sm font-medium ${hasEssay ? 'text-gray-500' : 'text-gray-700 group-hover:text-primary'}`}>Umumkan Nilai Otomatis</span>
+                                    </label>
+                                    {hasEssay && <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai.</div>}
+                                </div>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
-                                <label className={`flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 transition-colors cursor-pointer group shadow-sm ${config.disableRealtime ? 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-                                    <input 
-                                        type="checkbox" 
-                                        name="enablePublicStream" 
-                                        checked={config.enablePublicStream} 
-                                        onChange={handleConfigChange} 
-                                        disabled={config.disableRealtime}
-                                        className={`h-5 w-5 rounded border-gray-300 ${config.disableRealtime ? 'text-gray-400 focus:ring-0 cursor-not-allowed' : 'text-primary focus:ring-primary'}`} 
-                                    />
-                                    <span className={`ml-3 text-sm font-medium transition-colors ${config.disableRealtime ? 'text-gray-400' : 'text-gray-700 dark:text-slate-300 group-hover:text-primary'}`}>Pantauan Orang Tua (Live)</span>
-                                </label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
-                                
-                                <label className="flex items-center p-3 rounded-xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer group shadow-sm col-span-1 sm:col-span-2">
-                                    <input type="checkbox" name="disableRealtime" checked={config.disableRealtime} onChange={handleConfigChange} className="h-5 w-5 rounded text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 border-indigo-300" />
-                                    <div className="ml-3">
-                                        <span className="text-sm font-bold text-indigo-900 dark:text-indigo-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-200 transition-colors block">Mode Skala Besar ({'>'}200 Siswa)</span>
-                                        <span className="text-xs text-indigo-500 dark:text-indigo-400">Nonaktifkan fitur Live Monitor untuk menghemat koneksi server.</span>
+                             </div>
+
+                             {/* Mode Selection Block */}
+                             <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* Mode Normal (Left - Default) */}
+                                    <div 
+                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: true, enablePublicStream: false }))}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200'}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.disableRealtime ? 'border-emerald-500' : 'border-slate-400'}`}>
+                                                {config.disableRealtime && <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <WifiIcon className={`w-4 h-4 ${config.disableRealtime ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Normal</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                            Menonaktifkan fitur pantauan orang tua dan progres ujian untuk menghemat kuota koneksi.
+                                        </p>
                                     </div>
-                                </label>
+
+                                    {/* Mode Realtime (Right) */}
+                                    <div 
+                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
+                                                {!config.disableRealtime && <div className="w-2 h-2 bg-indigo-500 rounded-full" />}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Realtime</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                            Pantauan orang tua dan progres ujian akan aktif namun menghabiskan lebih banyak kuota koneksi.
+                                        </p>
+                                    </div>
+                                </div>
                              </div>
                         </div>
                     </div>

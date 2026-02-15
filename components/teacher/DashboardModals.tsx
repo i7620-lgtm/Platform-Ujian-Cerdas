@@ -6,6 +6,7 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
+import { calculateAggregateStats } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
@@ -19,6 +20,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
@@ -109,29 +111,35 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     };
     
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
+    const joinUrl = `${window.location.origin}/?join=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
 
     return (
         <>
-            <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-                <div className="bg-white dark:bg-slate-900 sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-800">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
+                <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
                     {/* Header Modal */}
-                    <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex flex-col gap-4 bg-white dark:bg-slate-900 sticky top-0 z-20 shadow-sm transition-colors">
+                    <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-4 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-sm">
                         <div className="flex justify-between items-start">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
+                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-none">
                                     <SignalIcon className="w-5 h-5"/>
                                 </div>
                                 <div>
                                     <h2 className="text-lg font-black text-slate-800 dark:text-white tracking-tight">Live Monitoring</h2>
                                     <div className="flex items-center gap-3 mt-0.5">
-                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 tracking-widest uppercase">{displayExam.code}</span>
+                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />
                                         {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">Sync...</span>}
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {!isReadOnly && (
+                                    <button onClick={() => setIsJoinQrModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800">
+                                        <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
+                                    </button>
+                                )}
                                 {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
                                     <button onClick={() => setIsShareModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800">
                                         <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
@@ -142,20 +150,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                         <PlusCircleIcon className="w-4 h-4"/> <span className="hidden sm:inline">Waktu</span>
                                     </button>
                                 )}
-                                <button onClick={onClose} className="p-2 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-all border border-transparent hover:border-rose-100 dark:hover:border-rose-900">
+                                <button onClick={onClose} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all border border-transparent hover:border-rose-100 dark:hover:border-rose-800">
                                     <XMarkIcon className="w-5 h-5"/>
                                 </button>
                             </div>
                         </div>
                         
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-700">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
                                 <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Sync Mode (Hemat Data)' : 'Realtime Mode'}
+                                {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
-                                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
+                                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
                                     <option value="ALL">SEMUA KELAS</option>
                                     {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
@@ -183,7 +191,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/60 dark:border-slate-700 shadow-sm overflow-hidden min-h-[300px] flex flex-col">
                             <div className="overflow-x-auto custom-scrollbar flex-1">
                                 <table className="w-full min-w-[900px] text-left border-collapse">
-                                    <thead className="bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-500 dark:text-slate-400 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
+                                    <thead className="bg-slate-50/80 dark:bg-slate-700/80 backdrop-blur-md text-slate-500 dark:text-slate-400 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
                                         <tr>
                                             {/* Kolom 1: Siswa */}
                                             <th className="px-5 py-4 w-64">
@@ -206,13 +214,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     <span className="hidden sm:inline">Status</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 4: Progress */}
-                                            <th className="px-5 py-4 text-center w-40">
-                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                                    <ChartBarIcon className="w-3.5 h-3.5 sm:hidden" />
-                                                    <span className="hidden sm:inline">Progres</span>
-                                                </div>
-                                            </th>
+                                            {/* Kolom 4: Progress - HANYA DI MODE REALTIME */}
+                                            {!isLargeScale && (
+                                                <th className="px-5 py-4 text-center w-40">
+                                                    <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                                        <ChartBarIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                        <span className="hidden sm:inline">Progres</span>
+                                                    </div>
+                                                </th>
+                                            )}
                                             {/* Kolom 5: Terakhir Aktif */}
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -236,7 +246,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
                                         {localResults.length > 0 ? localResults.map((r) => { 
                                             const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; 
                                             const broadcastData = broadcastProgressRef.current[r.student.studentId]; 
@@ -247,7 +257,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             const progress = totalQ > 0 ? Math.round((answered/totalQ)*100) : 0; 
                                             
                                             return (
-                                                <tr key={r.student.studentId} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition-colors group">
+                                                <tr key={r.student.studentId} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors group">
                                                     {/* 1. Siswa */}
                                                     <td className="px-5 py-3">
                                                         <div className="flex items-center gap-3">
@@ -282,25 +292,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    {/* 4. Progress */}
-                                                    <td className="px-5 py-3">
-                                                        {isLargeScale ? (
-                                                            <div className="text-center text-[10px] text-slate-400 dark:text-slate-500 italic">-</div>
-                                                        ) : (
+                                                    {/* 4. Progress - HANYA DI MODE REALTIME */}
+                                                    {!isLargeScale && (
+                                                        <td className="px-5 py-3">
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
                                                                 <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-200 dark:border-slate-600">
-                                                                    <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500 dark:bg-indigo-400'}`} style={{width: `${progress}%`}}></div>
+                                                                    <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
                                                                 </div>
                                                                 <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400">{answered} / {totalQ} Soal ({progress}%)</span>
                                                             </div>
-                                                        )}
-                                                    </td>
+                                                        </td>
+                                                    )}
                                                     {/* 5. Last Active */}
                                                     <td className="px-5 py-3 text-center">
                                                         {isLargeScale ? (
                                                             <span className="text-[10px] text-slate-300 dark:text-slate-600">-</span>
                                                         ) : (
-                                                            <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">
+                                                            <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-600">
                                                                 {getRelativeTime(lastActive)}
                                                             </span>
                                                         )}
@@ -322,7 +330,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
                                                             <button 
                                                                 onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
-                                                                className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-slate-600 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
                                                             >
                                                                 Buat Token
                                                             </button>
@@ -332,7 +340,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             ); 
                                         }) : (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-20 text-center">
+                                                <td colSpan={!isLargeScale ? 7 : 6} className="px-6 py-20 text-center">
                                                     <div className="flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-2">
                                                         <UserIcon className="w-8 h-8 opacity-20"/>
                                                         <span className="text-sm font-medium italic">Belum ada siswa yang bergabung...</span>
@@ -343,7 +351,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex justify-between items-center sticky bottom-0">
+                            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex justify-between items-center sticky bottom-0">
                                 <span>Total: {localResults.length} Siswa</span>
                                 <span>Updated: {new Date().toLocaleTimeString()}</span>
                             </div>
@@ -354,17 +362,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             
             {/* Generated Token Modal */}
             {generatedTokenData && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-fade-in">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border border-white dark:border-slate-700 relative animate-slide-in-up">
-                        <button onClick={() => setGeneratedTokenData(null)} className="absolute top-4 right-4 p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
+                        <button onClick={() => setGeneratedTokenData(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
                         <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-emerald-50/50 dark:ring-emerald-900/20">
                             <LockClosedIcon className="w-8 h-8" />
                         </div>
                         <h3 className="text-lg font-black text-slate-800 dark:text-white mb-1">Kode Akses Dibuat!</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 px-4">Berikan kode ini kepada <strong>{generatedTokenData.name}</strong> untuk membuka sesi ujian.</p>
                         
-                        <div className="bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl py-5 mb-6 shadow-inner">
-                            <span className="text-4xl font-mono font-black tracking-[0.25em] text-slate-800 dark:text-slate-100">{generatedTokenData.token}</span>
+                        <div className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl py-5 mb-6 shadow-inner">
+                            <span className="text-4xl font-mono font-black tracking-[0.25em] text-slate-800 dark:text-white">{generatedTokenData.token}</span>
                         </div>
                         
                         <button onClick={() => setGeneratedTokenData(null)} className="w-full bg-slate-900 dark:bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg active:scale-[0.98] text-sm uppercase tracking-wider">Tutup</button>
@@ -372,7 +380,28 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </div>
             )}
 
-            {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600 p-2"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 rounded-lg shadow-sm border border-slate-100 dark:border-slate-500 hover:bg-indigo-50 dark:hover:bg-slate-500 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
+            {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
+            
+            {/* MODAL QR CODE JOIN SISWA */}
+            {isJoinQrModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700 relative">
+                        <button onClick={() => setIsJoinQrModalOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5" /></button>
+                        <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Gabung Ujian</h3></div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-lg mb-6 inline-block mx-auto relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div>
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&margin=10`} alt="QR Join" className="w-48 h-48 object-contain relative bg-white rounded-xl"/>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">
+                            Minta siswa untuk memindai kode ini agar langsung masuk ke halaman login ujian.
+                        </p>
+                        <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Kode Ujian</p>
+                            <p className="text-xl font-mono font-black text-slate-800 dark:text-white tracking-widest">{displayExam.code}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
@@ -391,41 +420,20 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [fixMessage, setFixMessage] = useState('');
 
-    useEffect(() => {
-        const fetchResults = async () => {
-            setIsLoading(true);
-            try {
-                const data = await storageService.getResults(exam.code, undefined);
-                
-                // --- AUTO RE-CALCULATION CHECK ---
-                let discrepancyCount = 0;
-                const recalculatedResults = data.map(r => {
-                    const stats = getCalculatedStats(r);
-                    if (stats.score !== r.score || stats.correct !== r.correctAnswers) {
-                        discrepancyCount++;
-                        return {
-                            ...r,
-                            score: stats.score,
-                            correctAnswers: stats.correct,
-                            totalQuestions: stats.correct + stats.wrong + stats.empty
-                        };
-                    }
-                    return r;
-                });
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+            const data = await storageService.getResults(exam.code, undefined);
+            setResults(data);
+        } catch (error) {
+            console.error("Failed to fetch results", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-                if (discrepancyCount > 0) {
-                    setFixMessage(`Terdeteksi ${discrepancyCount} nilai tidak sesuai (mungkin karena kunci jawaban berubah). Tampilan ini menggunakan hasil hitung ulang otomatis.`);
-                    setResults(recalculatedResults);
-                } else {
-                    setResults(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch results", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchResults();
+    useEffect(() => {
+        fetchData();
     }, [exam, teacherProfile]);
 
     const handleDownloadCorrected = () => {
@@ -444,7 +452,14 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
     const normalize = (str: string) => str.trim().toLowerCase();
 
+    // Enhanced checkAnswerStatus supporting Manual Grading Override
     const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+        // 1. Check for manual grade override first
+        const manualGradeKey = `_grade_${q.id}`;
+        if (studentAnswers[manualGradeKey]) {
+            return studentAnswers[manualGradeKey]; // 'CORRECT' or 'WRONG'
+        }
+
         const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
@@ -475,6 +490,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             } catch(e) { return 'WRONG'; }
         }
 
+        // For Essay, if no manual grade, default to wrong (needs grading) or just unverified.
+        // We return 'WRONG' to indicate it doesn't add points yet.
         return 'WRONG'; 
     };
 
@@ -503,6 +520,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
 
+    // --- NEW: CATEGORY & LEVEL ANALYSIS ---
+    const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(exam, results), [exam, results]);
+
     const questionStats = useMemo(() => {
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
@@ -523,8 +543,44 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         else setExpandedStudent(id);
     };
 
+    // MANUAL GRADING LOGIC
+    const rateQuestion = async (studentResult: Result, qId: string, isCorrect: boolean) => {
+        const newAnswers = { ...studentResult.answers, [`_grade_${qId}`]: isCorrect ? 'CORRECT' : 'WRONG' };
+        
+        // Recalculate Score locally
+        let correct = 0;
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        scorableQuestions.forEach(q => {
+            // Using newAnswers which contains the override
+            const status = checkAnswerStatus(q, newAnswers);
+            if (status === 'CORRECT') correct++;
+        });
+        const total = scorableQuestions.length;
+        const newScore = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+        // Optimistic Update
+        setResults(prev => prev.map(r => 
+            r.student.studentId === studentResult.student.studentId 
+            ? { ...r, answers: newAnswers, score: newScore, correctAnswers: correct } 
+            : r
+        ));
+
+        // Save to DB
+        try {
+            await supabase.from('results').update({
+                answers: newAnswers,
+                score: newScore,
+                correct_answers: correct
+            }).eq('exam_code', exam.code).eq('student_id', studentResult.student.studentId);
+        } catch (e) {
+            console.error("Grading failed", e);
+            alert("Gagal menyimpan nilai.");
+            fetchData(); // Revert
+        }
+    };
+
     return (
-        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-white dark:border-slate-700 relative">
                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-slate-800 sticky top-0 z-10 gap-4">
                     <div>
@@ -533,10 +589,10 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                     <div className="flex gap-2">
                         <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-xl flex">
-                            <button onClick={() => setActiveTab('ANALYSIS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'ANALYSIS' ? 'bg-white dark:bg-slate-800 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Analisis Soal</button>
-                            <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'STUDENTS' ? 'bg-white dark:bg-slate-800 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Rekap Siswa</button>
+                            <button onClick={() => setActiveTab('ANALYSIS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'ANALYSIS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Analisis Soal</button>
+                            <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'STUDENTS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Rekap Siswa</button>
                         </div>
-                        <button onClick={onClose} className="p-2.5 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-all">
+                        <button onClick={onClose} className="p-2.5 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all">
                             <XMarkIcon className="w-6 h-6"/>
                         </button>
                     </div>
@@ -566,6 +622,52 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                     <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                                     <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                                 </div>
+
+                                {/* NEW: Category & Level Statistics */}
+                                {(categoryStats.length > 0 || levelStats.length > 0) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                            <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <ListBulletIcon className="w-4 h-4"/> Penguasaan Materi (Kategori)
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {categoryStats.map(stat => (
+                                                    <div key={stat.name}>
+                                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                            <span>{stat.name}</span>
+                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {categoryStats.length === 0 && <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                            <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <ChartBarIcon className="w-4 h-4"/> Tingkat Kesulitan (Level)
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {levelStats.map(stat => (
+                                                    <div key={stat.name}>
+                                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                            <span>{stat.name}</span>
+                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {levelStats.length === 0 && <p className="text-xs text-slate-400 italic">Tidak ada data level.</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div>
                                     <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                                         <TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/>
@@ -600,12 +702,12 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Lokasi</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
                                         {results.map(r => {
                                             const { correct, wrong, empty, score } = getCalculatedStats(r);
                                             return (
                                                 <React.Fragment key={r.student.studentId}>
-                                                    <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group">
+                                                    <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer group">
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-2">
                                                                 <div className={`transition-transform duration-300 ${expandedStudent === r.student.studentId ? 'rotate-180' : ''}`}>
@@ -628,17 +730,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
-                                                                <div className="group/log relative inline-block">
-                                                                    <span className="cursor-help text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded border border-amber-100 dark:border-amber-800 flex items-center justify-center gap-1 w-fit mx-auto">
-                                                                        <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
-                                                                    </span>
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/log:opacity-100 group-hover/log:visible transition-all z-20 pointer-events-none">
-                                                                        <ul className="list-disc pl-3 space-y-1">
-                                                                            {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
-                                                                            {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
-                                                                        </ul>
-                                                                    </div>
-                                                                </div>
+                                                                <span className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded font-bold text-[10px] border border-amber-100 dark:border-amber-800">{r.activityLog.length} Log</span>
                                                             ) : (
                                                                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-800">Aman</span>
                                                             )}
@@ -650,22 +742,69 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                     </tr>
                                                     {expandedStudent === r.student.studentId && (
-                                                        <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-700/50 shadow-inner">
+                                                        <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
                                                             <td colSpan={6} className="p-6">
                                                                 <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-500 rounded"></div> Benar</span>
-                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-500 rounded"></div> Salah</span>
-                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-600 rounded"></div> Kosong</span>
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div> Benar</span>
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
                                                                 </div>
-                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                <div className="flex flex-wrap gap-1 mt-2 mb-4">
                                                                     {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
-                                                                        let bgClass = 'bg-slate-200 dark:bg-slate-600'; 
-                                                                        if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-white';
-                                                                        else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-white';
-                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold text-slate-900 dark:text-slate-100 ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
+                                                                        let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
+                                                                        if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
+                                                                        else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
+                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
                                                                     })}
                                                                 </div>
+
+                                                                {/* MANUAL ESSAY GRADING UI */}
+                                                                {exam.questions.some(q => q.questionType === 'ESSAY') && (
+                                                                    <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                                        <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Penilaian Manual Soal Esai</h4>
+                                                                        <div className="space-y-4">
+                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q, idx) => {
+                                                                                const ans = r.answers[q.id];
+                                                                                const manualStatus = r.answers[`_grade_${q.id}`];
+                                                                                
+                                                                                return (
+                                                                                    <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
+                                                                                        <p className="font-bold text-slate-700 dark:text-slate-200 mb-1" dangerouslySetInnerHTML={{__html: q.questionText}}></p>
+                                                                                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2">
+                                                                                            {ans || <span className="text-slate-400">Tidak menjawab</span>}
+                                                                                        </div>
+                                                                                        <div className="flex gap-2">
+                                                                                            <button 
+                                                                                                onClick={() => rateQuestion(r, q.id, true)}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <CheckCircleIcon className="w-3 h-3"/> Benar
+                                                                                            </button>
+                                                                                            <button 
+                                                                                                onClick={() => rateQuestion(r, q.id, false)}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <XMarkIcon className="w-3 h-3"/> Salah
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {r.activityLog && r.activityLog.length > 0 && (
+                                                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                                        <h4 className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-2">
+                                                                            <ExclamationTriangleIcon className="w-3 h-3"/> Riwayat Aktivitas & Kecurangan
+                                                                        </h4>
+                                                                        <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4 font-mono bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                            {r.activityLog.map((log, i) => <li key={i}>{log}</li>)}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     )}

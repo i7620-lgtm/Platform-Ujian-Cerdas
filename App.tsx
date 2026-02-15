@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -5,8 +6,9 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon } from './components/Icons';
 import { storageService } from './services/storage';
+import { InvitationModal } from './components/InvitationModal';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
@@ -25,6 +27,8 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [prefillCode, setPrefillCode] = useState<string>('');
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -139,6 +143,14 @@ const App: React.FC = () => {
         return;
     }
 
+    const joinCode = params.get('join');
+    if (joinCode) {
+        setPrefillCode(joinCode.toUpperCase());
+        setView('STUDENT_LOGIN');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+    }
+
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
@@ -235,6 +247,7 @@ const App: React.FC = () => {
     setStudentResult(null); 
     setResumedResult(null);
     setTeacherProfile(null);
+    setPrefillCode('');
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     setExams({});
     setResults([]);
@@ -261,7 +274,7 @@ const App: React.FC = () => {
 
   if (isLoadingSession) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-900">
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
                 <p className="text-sm font-medium text-slate-500">Memuat sesi...</p>
@@ -283,7 +296,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
         
         {/* Status Jaringan Minimalis & Elegan */}
         <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
@@ -308,6 +321,19 @@ const App: React.FC = () => {
                 </div>
             )}
         </div>
+
+        {/* Invite Button for Selector View */}
+        {view === 'SELECTOR' && (
+            <div className="fixed top-6 left-6 z-[100]">
+                <button 
+                    onClick={() => setIsInviteOpen(true)}
+                    className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-md dark:shadow-none border border-slate-100 dark:border-slate-700"
+                    title="Cetak Undangan"
+                >
+                    <QrCodeIcon className="w-5 h-5" />
+                </button>
+            </div>
+        )}
         
         {view === 'SELECTOR' && (
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
@@ -371,6 +397,7 @@ const App: React.FC = () => {
                 onBack={() => setView('SELECTOR')} 
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
+                initialCode={prefillCode}
             />
         )}
         
@@ -432,9 +459,14 @@ const App: React.FC = () => {
                 isReadOnly={true}
             />
         )}
+
+        {/* Global Invitation Modal */}
+        <InvitationModal 
+            isOpen={isInviteOpen} 
+            onClose={() => setIsInviteOpen(false)} 
+        />
     </div>
   );
 };
  
 export default App;
- 

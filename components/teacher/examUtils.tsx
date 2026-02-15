@@ -1,4 +1,5 @@
-import type { Question, QuestionType } from '../../types';
+
+import type { Question, QuestionType, Exam, Result } from '../../types';
 
 // --- INTERFACES ---
 interface VisualLine {
@@ -28,12 +29,167 @@ interface PageData {
     height: number;
 }
 
+export interface CategoryStat {
+    name: string;
+    total: number;
+    correct: number;
+    percentage: number;
+}
+
+export interface StudentAnalysis {
+    stats: CategoryStat[];
+    weakestCategory: string | null;
+    strongestCategory: string | null;
+    recommendation: string;
+}
+
+// --- ANALYTICS ENGINE (Pure Functions) ---
+
+export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
+    const catMap: Record<string, { total: number; correct: number }> = {};
+    const lvlMap: Record<string, { total: number; correct: number }> = {};
+    const normalize = (str: string) => (str || '').trim().toLowerCase();
+
+    const checkAnswer = (q: Question, ans: string) => {
+        if (!ans) return false;
+        const normAns = normalize(String(ans));
+        const normKey = normalize(String(q.correctAnswer || ''));
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            return normAns === normKey;
+        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(normAns.split(',').map(s => s.trim()));
+            const cSet = new Set(normKey.split(',').map(s => s.trim()));
+            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        } else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+            } catch(e) { return false; }
+        } else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+            } catch(e) { return false; }
+        }
+        return false;
+    };
+
+    // 1. Initialize Maps
+    exam.questions.forEach(q => {
+        if (q.questionType === 'INFO') return;
+        const cat = q.category && q.category.trim() !== '' ? q.category.trim() : 'Tanpa Kategori';
+        const lvl = q.level && q.level.trim() !== '' ? q.level.trim() : 'Umum';
+
+        if (!catMap[cat]) catMap[cat] = { total: 0, correct: 0 };
+        if (!lvlMap[lvl]) lvlMap[lvl] = { total: 0, correct: 0 };
+
+        // 2. Iterate Results
+        results.forEach(r => {
+            catMap[cat].total++;
+            lvlMap[lvl].total++;
+            if (checkAnswer(q, r.answers[q.id])) {
+                catMap[cat].correct++;
+                lvlMap[lvl].correct++;
+            }
+        });
+    });
+
+    // 3. Process to Array
+    const processMap = (map: any) => Object.entries(map).map(([name, data]: any) => ({
+        name,
+        percentage: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0,
+        totalAttempt: data.total,
+        totalCorrect: data.correct
+    })).sort((a, b) => b.percentage - a.percentage);
+
+    return { 
+        categoryStats: processMap(catMap), 
+        levelStats: processMap(lvlMap) 
+    };
+};
+
+export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
+    const statsMap: Record<string, { total: number; correct: number }> = {};
+    const normalize = (str: string) => (str || '').trim().toLowerCase();
+
+    // 1. Calculate Stats per Category
+    exam.questions.forEach(q => {
+        if (q.questionType === 'INFO') return;
+
+        const category = q.category && q.category.trim() !== '' ? q.category.trim() : 'Umum';
+        
+        if (!statsMap[category]) {
+            statsMap[category] = { total: 0, correct: 0 };
+        }
+
+        statsMap[category].total += 1;
+
+        // Check Correctness (Simplified Logic matching StudentResultPage)
+        const studentAns = result.answers[q.id];
+        let isCorrect = false;
+        
+        if (studentAns) {
+            const normAns = normalize(String(studentAns));
+            const normKey = normalize(String(q.correctAnswer || ''));
+
+            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                isCorrect = normAns === normKey;
+            } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                const sSet = new Set(normAns.split(',').map(s => s.trim()));
+                const cSet = new Set(normKey.split(',').map(s => s.trim()));
+                isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+            } else if (q.questionType === 'TRUE_FALSE') {
+                try {
+                    const ansObj = JSON.parse(studentAns);
+                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                } catch(e) {}
+            } else if (q.questionType === 'MATCHING') {
+                try {
+                    const ansObj = JSON.parse(studentAns);
+                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                } catch(e) {}
+            }
+        }
+
+        if (isCorrect) {
+            statsMap[category].correct += 1;
+        }
+    });
+
+    // 2. Convert to Array & Sort
+    const stats: CategoryStat[] = Object.entries(statsMap).map(([name, data]) => ({
+        name,
+        total: data.total,
+        correct: data.correct,
+        percentage: Math.round((data.correct / data.total) * 100)
+    })).sort((a, b) => b.percentage - a.percentage); // Sort highest to lowest
+
+    // 3. Identify Weakest/Strongest
+    const strongestCategory = stats.length > 0 ? stats[0].name : null;
+    const weakestCategory = stats.length > 0 ? stats[stats.length - 1].name : null;
+    const weakestScore = stats.length > 0 ? stats[stats.length - 1].percentage : 0;
+
+    // 4. Generate Recommendation
+    const score = Number(result.score);
+    let recommendation = "";
+
+    if (score < 60) {
+        recommendation = "Perlu Remedial. Fokus ulangi materi dasar secara keseluruhan.";
+    } else if (score < 80) {
+        recommendation = `Cukup Baik. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`;
+    } else if (score < 95) {
+        recommendation = `Sangat Baik. Pertahankan prestasi dan bantu teman sebagai Tutor Sebaya.`;
+    } else {
+        recommendation = "Istimewa (Perfect). Siap untuk materi pengayaan atau tingkat lanjut.";
+    }
+
+    return { stats, weakestCategory, strongestCategory, recommendation };
+};
+
 // --- COMPUTER VISION HELPERS ---
 
 // STRATEGI HIBRIDA (WebP + Smart Resize Loop)
-// Mengubah output menjadi WebP (lebih efisien dibanding JPEG).
-// Target resolusi maksimal 800px (cukup untuk HP).
-// Iterasi kompresi otomatis jika file > 150KB.
 export const compressImage = (dataUrl: string, quality = 0.7, maxWidth = 800, maxSizeBytes = 150 * 1024): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
@@ -68,17 +224,14 @@ export const compressImage = (dataUrl: string, quality = 0.7, maxWidth = 800, ma
             let resultUrl = process(width, height, currentQuality);
 
             // 2. Iterative Compression Loop (Target Size Check)
-            // Base64 length ~= 1.37 * Binary size. 150KB binary ~= 210KB Base64 string length.
             const targetLength = Math.ceil(maxSizeBytes * 1.37);
             let attempts = 0;
             const maxAttempts = 6;
 
             while (resultUrl.length > targetLength && attempts < maxAttempts) {
                 if (currentQuality > 0.5) {
-                    // Tahap 1: Kurangi kualitas WebP dulu (sangat efektif)
                     currentQuality -= 0.1;
                 } else {
-                    // Tahap 2: Jika kualitas sudah batas bawah, kecilkan dimensi
                     width = Math.floor(width * 0.9);
                     height = Math.floor(height * 0.9);
                 }
@@ -531,6 +684,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     questionType: currentOptions.length > 0 ? 'MULTIPLE_CHOICE' : 'ESSAY',
                     options: currentOptions.length > 0 ? await Promise.all(currentOptions.map(o => o.promise)) : undefined,
                     correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
+                    category: '',
+                    level: ''
                 });
             }
             
@@ -561,6 +716,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
             questionType: currentOptions.length > 0 ? 'MULTIPLE_CHOICE' : 'ESSAY',
             options: currentOptions.length > 0 ? await Promise.all(currentOptions.map(o => o.promise)) : undefined,
             correctAnswer: currentOptions.length > 0 ? await currentOptions[0].promise : undefined,
+            category: '',
+            level: ''
         });
     }
 
@@ -617,7 +774,9 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
                 options: trimmedOptions.length > 0 ? trimmedOptions : undefined,
                 correctAnswer: finalCorrectAnswer,
                 imageUrl: undefined,
-                optionImages: undefined
+                optionImages: undefined,
+                category: '',
+                level: ''
             });
         }
         currentQuestion = null;
