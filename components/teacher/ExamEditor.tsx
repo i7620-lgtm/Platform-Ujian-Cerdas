@@ -279,7 +279,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     </div>
                                     <div className="p-6 md:p-8">
                                         <div className="flex items-start gap-4 md:gap-6">
-                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">{String(questionNumber).padStart(2, '0')}</span>}</div>
+                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">{String.fromCharCode(48 + Math.floor(questionNumber / 10)) + String.fromCharCode(48 + (questionNumber % 10))}</span>}</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 
@@ -497,26 +497,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                              <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {/* Mode Realtime */}
-                                    <div 
-                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
-                                    >
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
-                                                {!config.disableRealtime && <div className="w-2 h-2 bg-indigo-500 rounded-full" />}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
-                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Realtime</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-                                            Pantauan orang tua dan progres ujian akan aktif namun menghabiskan lebih banyak kuota koneksi.
-                                        </p>
-                                    </div>
-
-                                    {/* Mode Normal */}
+                                    {/* Mode Normal (Left - Default) */}
                                     <div 
                                         onClick={() => setConfig(prev => ({ ...prev, disableRealtime: true, enablePublicStream: false }))}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200'}`}
@@ -532,6 +513,25 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
                                             Menonaktifkan fitur pantauan orang tua dan progres ujian untuk menghemat kuota koneksi.
+                                        </p>
+                                    </div>
+
+                                    {/* Mode Realtime (Right) */}
+                                    <div 
+                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
+                                                {!config.disableRealtime && <div className="w-2 h-2 bg-indigo-500 rounded-full" />}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Realtime</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                            Pantauan orang tua dan progres ujian akan aktif namun menghabiskan lebih banyak kuota koneksi.
                                         </p>
                                     </div>
                                 </div>
