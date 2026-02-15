@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -5,8 +6,9 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon } from './components/Icons';
 import { storageService } from './services/storage';
+import { InvitationModal } from './components/InvitationModal';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
@@ -26,6 +28,7 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -318,6 +321,19 @@ const App: React.FC = () => {
                 </div>
             )}
         </div>
+
+        {/* Invite Button for Selector View */}
+        {view === 'SELECTOR' && (
+            <div className="fixed top-6 left-6 z-[100]">
+                <button 
+                    onClick={() => setIsInviteOpen(true)}
+                    className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-md dark:shadow-none border border-slate-100 dark:border-slate-700"
+                    title="Cetak Undangan"
+                >
+                    <QrCodeIcon className="w-5 h-5" />
+                </button>
+            </div>
+        )}
         
         {view === 'SELECTOR' && (
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
@@ -443,9 +459,14 @@ const App: React.FC = () => {
                 isReadOnly={true}
             />
         )}
+
+        {/* Global Invitation Modal */}
+        <InvitationModal 
+            isOpen={isInviteOpen} 
+            onClose={() => setIsInviteOpen(false)} 
+        />
     </div>
   );
 };
  
 export default App;
- 
