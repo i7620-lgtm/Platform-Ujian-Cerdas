@@ -706,17 +706,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
-                                                                <div className="group/log relative inline-block">
-                                                                    <span className="cursor-help text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded border border-amber-100 dark:border-amber-800 flex items-center justify-center gap-1 w-fit mx-auto">
-                                                                        <ListBulletIcon className="w-3 h-3"/> {r.activityLog.length} Log
-                                                                    </span>
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/log:opacity-100 group-hover/log:visible transition-all z-20 pointer-events-none">
-                                                                        <ul className="list-disc pl-3 space-y-1">
-                                                                            {r.activityLog.slice(0, 5).map((log, i) => <li key={i}>{log}</li>)}
-                                                                            {r.activityLog.length > 5 && <li>...dan {r.activityLog.length - 5} lainnya</li>}
-                                                                        </ul>
-                                                                    </div>
-                                                                </div>
+                                                                <span className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded font-bold text-[10px] border border-amber-100 dark:border-amber-800">{r.activityLog.length} Log</span>
                                                             ) : (
                                                                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-800">Aman</span>
                                                             )}
