@@ -795,7 +795,20 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     };
 
     const handlePrint = () => {
-        window.print();
+        // Force light mode state for printing
+        const wasDark = document.documentElement.classList.contains('dark');
+        if (wasDark) {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Allow DOM update before printing
+        setTimeout(() => {
+            window.print();
+            // Restore theme if it was dark
+            if (wasDark) {
+                document.documentElement.classList.add('dark');
+            }
+        }, 50);
     };
 
     const normalize = (str: string) => str.trim().toLowerCase();
