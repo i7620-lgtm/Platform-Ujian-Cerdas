@@ -57,7 +57,7 @@ export const ListBulletIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =
 
 export const CogIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75v4.5m0-4.5a1.5 1.5 0 011.5 1.5v1.5a1.5 1.5 0 01-3 0V11.25a1.5 1.5 0 011.5-1.5z" />
   </svg>
 );
@@ -324,10 +324,4 @@ export const PrinterIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75v6.75a2.25 2.25 0 0 1-2.25 2.25H9.75a2.25 2.25 0 0 1-2.25-2.25v-6.75h9Z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 9.75h1.5m-12 0h1.5" />
     </svg>
-);
-
-export const LightBulbIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.854 1.591-2.145a6.015 6.015 0 00-6.682-4.172 6.015 6.015 0 00.999 6.317c.5.5.5 1.15.5 1.636V18.75m-3.75 0h7.5" />
-  </svg>
 );
