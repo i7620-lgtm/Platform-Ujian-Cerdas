@@ -1068,48 +1068,75 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 @media print {
                     @page { margin: 1cm; size: portrait; }
                     
-                    /* FORCE LIGHT MODE */
-                    :root { color-scheme: light; }
+                    /* FORCE LIGHT THEME ROOT VARIABLES */
+                    :root {
+                        color-scheme: light !important;
+                    }
                     
-                    body, html { 
-                        -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact;
-                        background-color: #ffffff !important; 
-                        color: #0f172a !important; /* slate-900 */
+                    /* RESET HTML/BODY */
+                    html, body {
+                        background-color: #ffffff !important;
+                        color: #0f172a !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
 
-                    /* RESET DARK MODE UTILITIES MANUALLY FOR PRINT */
-                    .dark .text-white, .text-white { color: #000 !important; }
-                    .dark .bg-slate-900, .bg-slate-900 { background-color: #fff !important; color: #000 !important; }
-                    
-                    /* FORCE SPECIFIC COLORS TO LIGHT THEME VALUES */
-                    .bg-white { background-color: #ffffff !important; }
-                    .bg-slate-50 { background-color: #f8fafc !important; }
-                    .bg-slate-100 { background-color: #f1f5f9 !important; }
-                    .bg-slate-200 { background-color: #e2e8f0 !important; }
-                    
-                    .text-slate-300 { color: #cbd5e1 !important; }
-                    .text-slate-400 { color: #94a3b8 !important; }
-                    .text-slate-500 { color: #64748b !important; }
-                    .text-slate-600 { color: #475569 !important; }
-                    .text-slate-700 { color: #334155 !important; }
-                    .text-slate-800 { color: #1e293b !important; }
-                    .text-slate-900 { color: #0f172a !important; }
+                    /* RESET DARK MODE BACKGROUNDS TO WHITE */
+                    .dark .bg-slate-900, .bg-slate-900,
+                    .dark .bg-slate-800, .bg-slate-800,
+                    .dark .bg-slate-950, .bg-slate-950 {
+                        background-color: #ffffff !important;
+                        color: #0f172a !important;
+                        border-color: #cbd5e1 !important; /* Slate 300 */
+                    }
 
-                    .border-slate-200 { border-color: #e2e8f0 !important; }
-                    .border-slate-300 { border-color: #cbd5e1 !important; }
+                    /* RESET DARK MODE TEXT TO DARK */
+                    .dark .text-white, .text-white,
+                    .dark .text-slate-100, .text-slate-100,
+                    .dark .text-slate-200, .text-slate-200,
+                    .dark .text-slate-300, .text-slate-300,
+                    .dark .text-slate-400, .text-slate-400 {
+                        color: #0f172a !important;
+                    }
+
+                    /* PRESERVE SEMANTIC BACKGROUNDS (Correct/Wrong) BUT FIX TEXT */
+                    .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-slate-50, .bg-slate-100 {
+                        background-color: #f1f5f9 !important; /* Force light gray/white-ish base */
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                     
-                    /* Status Colors */
-                    .bg-emerald-50 { background-color: #ecfdf5 !important; }
-                    .text-emerald-700 { color: #047857 !important; }
-                    .bg-rose-50 { background-color: #fff1f2 !important; }
-                    .text-rose-700 { color: #be123c !important; }
+                    /* Force explicit colors for semantic badges to ensure contrast on paper */
+                    .bg-emerald-100, .dark .bg-emerald-900\\/30 {
+                        background-color: #d1fae5 !important;
+                        color: #065f46 !important;
+                    }
+                    .bg-rose-100, .dark .bg-rose-900\\/30 {
+                        background-color: #ffe4e6 !important;
+                        color: #9f1239 !important;
+                    }
                     
-                    .no-print { display: none !important; }
-                    .print-only { display: block !important; }
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; }
-                    table { border-collapse: collapse; width: 100%; font-size: 10px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px; }
+                    /* BORDERS */
+                    .border-slate-100, .dark .border-slate-700,
+                    .border-slate-200, .dark .border-slate-600 {
+                        border-color: #cbd5e1 !important;
+                        border-width: 1px !important;
+                        border-style: solid !important;
+                    }
+
+                    /* HIDE NON-PRINT ELEMENTS */
+                    .no-print, .print\\:hidden { display: none !important; }
+                    
+                    /* LAYOUT FIXES */
+                    .max-w-5xl { max-width: none !important; margin: 0 !important; width: 100% !important; }
+                    .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+                    
+                    /* TABLE STYLING FOR PRINT */
+                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
+                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
+                    thead th { background-color: #f1f5f9 !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
+                    
+                    /* PAGE BREAKS */
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
                 }
