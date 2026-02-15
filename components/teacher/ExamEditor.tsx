@@ -6,7 +6,7 @@ import {
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon, SignalIcon, WifiIcon
+    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -157,7 +157,16 @@ const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
-    // ... existing code ...
+    // Check if Essay Exists
+    const hasEssay = useMemo(() => questions.some(q => q.questionType === 'ESSAY'), [questions]);
+
+    // Force disable automatic result showing if Essay exists
+    useEffect(() => {
+        if (hasEssay && config.showResultToStudent) {
+            setConfig(prev => ({ ...prev, showResultToStudent: false }));
+        }
+    }, [hasEssay]);
+
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
@@ -183,6 +192,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' ? parseInt(value) : value }));
         }
     };
+    // ... existing handlers (handleSubjectSelect, handleQuestionTextChange, etc.) ...
     const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
@@ -488,7 +498,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
                              <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Hasil & Monitor</h4>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span></label>
+                                <div className={`flex flex-col p-3 rounded-xl border transition-colors shadow-sm ${hasEssay ? 'bg-amber-50 border-amber-200 opacity-80' : 'border-gray-100 hover:bg-slate-50 cursor-pointer group'}`}>
+                                    <label className={`flex items-center ${hasEssay ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                        <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} disabled={hasEssay} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400" />
+                                        <span className={`ml-3 text-sm font-medium ${hasEssay ? 'text-gray-500' : 'text-gray-700 group-hover:text-primary'}`}>Umumkan Nilai Otomatis</span>
+                                    </label>
+                                    {hasEssay && <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai.</div>}
+                                </div>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                              </div>
