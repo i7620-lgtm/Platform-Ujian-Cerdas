@@ -5,7 +5,7 @@ import { storageService } from '../../../services/storage';
 import { calculateAggregateStats, analyzeStudentPerformance, compressImage } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
-    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon 
+    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon 
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
 
@@ -600,9 +600,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
                                     return (
                                     <React.Fragment key={r.student.studentId}>
-                                        <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30 cursor-pointer group">
+                                        <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30 cursor-pointer group transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`transition-transform duration-300 text-slate-400 ${expandedStudent === r.student.studentId ? 'rotate-180 text-indigo-500' : ''}`}>
+                                                        {expandedStudent === r.student.studentId ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
+                                                    </div>
+                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{r.student.class}</td>
                                             <td className="px-6 py-4 text-center">
@@ -621,6 +626,37 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 )}
                                             </td>
                                         </tr>
+                                        {expandedStudent === r.student.studentId && (
+                                            <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
+                                                <td colSpan={5} className="p-6">
+                                                    <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div> Benar</span>
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
+                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1 mt-2">
+                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                            const status = checkAnswerStatus(q, r.answers);
+                                                            let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
+                                                            if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
+                                                            else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
+                                                            return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
+                                                        })}
+                                                    </div>
+                                                    
+                                                    {r.activityLog && r.activityLog.length > 0 && (
+                                                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                            <h4 className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-2">
+                                                                <ExclamationTriangleIcon className="w-3 h-3"/> Riwayat Aktivitas & Kecurangan
+                                                            </h4>
+                                                            <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4 font-mono bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                {r.activityLog.map((log, i) => <li key={i}>{log}</li>)}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
                                     </React.Fragment>
                                 )})}
                             </tbody>
