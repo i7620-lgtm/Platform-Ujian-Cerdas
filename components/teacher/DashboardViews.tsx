@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
-import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage, analyzeStudentPerformance } from './examUtils';
+import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage, analyzeStudentPerformance, calculateAggregateStats } from './examUtils';
 import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
@@ -123,6 +123,14 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                 
                 <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                 
+                {/* NEW: Category & Level Badges */}
+                {(q.category || q.level) && (
+                    <div className="flex gap-2">
+                        {q.category && <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{q.category}</span>}
+                        {q.level && <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">{q.level}</span>}
+                    </div>
+                )}
+
                 <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
                     <div 
                         className={`h-full transition-all duration-1000 ${stats.correctRate >= 80 ? 'bg-emerald-500' : stats.correctRate >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} 
@@ -915,6 +923,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         });
     }, [archiveData]);
 
+    // --- NEW: Category & Level Aggregation for Archive ---
+    const { categoryStats, levelStats } = useMemo(() => {
+        if (!archiveData) return { categoryStats: [], levelStats: [] };
+        return calculateAggregateStats(archiveData.exam, archiveData.results);
+    }, [archiveData]);
+
     // --- UPLOAD VIEW ---
     if (!archiveData) {
         return (
@@ -1165,6 +1179,49 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                              <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                              <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                         </div>
+
+                        {/* NEW: Visual Analysis for Archive */}
+                        {(categoryStats.length > 0 || levelStats.length > 0) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <ListBulletIcon className="w-4 h-4"/> Penguasaan Materi (Kategori)
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {categoryStats.map(stat => (
+                                            <div key={stat.name}>
+                                                <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                    <span>{stat.name}</span>
+                                                    <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                    <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <ChartBarIcon className="w-4 h-4"/> Tingkat Kesulitan (Level)
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {levelStats.map(stat => (
+                                            <div key={stat.name}>
+                                                <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                    <span>{stat.name}</span>
+                                                    <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                    <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={results} />; })}</div></div>
                     </div>
                 )}
