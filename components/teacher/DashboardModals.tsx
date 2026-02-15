@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
@@ -20,6 +19,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
@@ -110,6 +110,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     };
     
     const liveUrl = `${window.location.origin}/?live=${displayExam.code}`;
+    const joinUrl = `${window.location.origin}/?join=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
 
     return (
@@ -133,6 +134,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {!isReadOnly && (
+                                    <button onClick={() => setIsJoinQrModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-emerald-50 text-emerald-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 transition-all flex items-center gap-2 shadow-sm border border-emerald-100">
+                                        <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
+                                    </button>
+                                )}
                                 {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
                                     <button onClick={() => setIsShareModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm border border-indigo-100">
                                         <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
@@ -374,6 +380,27 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             )}
 
             {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-slate-100 hover:bg-indigo-50 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
+            
+            {/* MODAL QR CODE JOIN SISWA */}
+            {isJoinQrModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white relative">
+                        <button onClick={() => setIsJoinQrModalOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors"><XMarkIcon className="w-5 h-5" /></button>
+                        <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 tracking-tight">Gabung Ujian</h3></div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-lg mb-6 inline-block mx-auto relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div>
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&margin=10`} alt="QR Join" className="w-48 h-48 object-contain relative bg-white rounded-xl"/>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed px-2">
+                            Minta siswa untuk memindai kode ini agar langsung masuk ke halaman login ujian.
+                        </p>
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kode Ujian</p>
+                            <p className="text-xl font-mono font-black text-slate-800 tracking-widest">{displayExam.code}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
