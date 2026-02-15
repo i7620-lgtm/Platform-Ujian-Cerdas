@@ -240,7 +240,6 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
 
 const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { 
     if (!text || text === 'Lainnya') return null; 
-    // Adapting generic color classes for dark mode if they are standard utility classes
     let darkClass = "";
     if (colorClass.includes("blue")) darkClass = "dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800";
     else if (colorClass.includes("purple")) darkClass = "dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800";
@@ -250,11 +249,14 @@ const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colo
     return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass} ${darkClass}`}>{text}</span>); 
 };
 
-// ... (CREATION, DRAFTS, ONGOING, UPCOMING, FINISHED, USERMANAGEMENT - NO CHANGES) ...
-// --- CREATION VIEW ---
-interface CreationViewProps { onQuestionsGenerated: (questions: Question[], mode: 'manual' | 'auto') => void; }
-type InputMethod = 'paste' | 'upload';
+type InputMethod = 'upload' | 'paste';
+
+interface CreationViewProps {
+    onQuestionsGenerated: (questions: Question[], source: 'manual' | 'auto') => void;
+}
+
 export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated }) => {
+    // ... implementation same as before ...
     const [inputMethod, setInputMethod] = useState<InputMethod>('upload');
     const [inputText, setInputText] = useState('');
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -290,7 +292,7 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
                                     onChange={(e) => { 
                                         if (e.target.files && e.target.files[0]) { 
                                             const file = e.target.files[0];
-                                            if (file.size > 10 * 1024 * 1024) { // 10MB Check
+                                            if (file.size > 10 * 1024 * 1024) { 
                                                 setError("Ukuran file terlalu besar (Max 10MB). Harap kompres PDF Anda.");
                                                 e.target.value = '';
                                                 setUploadedFile(null);
@@ -319,7 +321,6 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
     );
 };
 
-// --- DRAFTS VIEW ---
 export const DraftsView: React.FC<{ exams: Exam[]; onContinueDraft: (exam: Exam) => void; onDeleteDraft: (exam: Exam) => void; }> = ({ exams, onContinueDraft, onDeleteDraft }) => {
     const [previewExam, setPreviewExam] = useState<Exam | null>(null);
     return (
@@ -330,7 +331,6 @@ export const DraftsView: React.FC<{ exams: Exam[]; onContinueDraft: (exam: Exam)
     );
 };
 
-// --- ONGOING EXAMS VIEW ---
 export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     const [joinQrExam, setJoinQrExam] = useState<Exam | null>(null);
 
@@ -338,7 +338,6 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500 dark:text-slate-400">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
             {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { const activeCount = results.filter(r => r.examCode === exam.code).length; return (<div key={exam.code} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900 shadow-sm hover:shadow-xl hover:shadow-emerald-50 dark:hover:shadow-emerald-900/10 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
             
-            {/* UPDATED ACTION BUTTONS - ALWAYS VISIBLE */}
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button
                     type="button"
@@ -396,7 +395,6 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
     );
 };
 
-// --- UPCOMING EXAMS VIEW ---
 export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (exam: Exam) => void; }> = ({ exams, onEditExam }) => {
     return (
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><CalendarDaysIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Akan Datang</h2><p className="text-sm text-gray-500 dark:text-slate-400">Daftar semua ujian yang telah dijadwalkan.</p></div></div>
@@ -405,13 +403,12 @@ export const UpcomingExamsView: React.FC<{ exams: Exam[]; onEditExam: (exam: Exa
     );
 };
 
-// --- FINISHED EXAMS VIEW (UPDATED) ---
 interface FinishedExamsProps {
     exams: Exam[];
     onSelectExam: (exam: Exam) => void;
     onDuplicateExam: (exam: Exam) => void;
     onDeleteExam: (exam: Exam) => void;
-    onArchiveExam: (exam: Exam) => void; 
+    onArchiveExam: (exam: Exam) => void;
 }
 
 export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelectExam, onDuplicateExam, onDeleteExam, onArchiveExam }) => {
@@ -449,8 +446,6 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
     );
 };
 
-// ... (USERMANAGEMENT, ARCHIVE VIEWER - NO CHANGES) ...
-// --- USER MANAGEMENT VIEW (SUPER ADMIN) ---
 export const UserManagementView: React.FC = () => {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -1056,94 +1051,82 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     }
     
     // --- DISPLAY VIEW ---
-    const { exam, results } = archiveData;
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
+    const { exam: displayExam, results: displayResults } = archiveData;
+    const currentTotalStudents = displayResults.length;
+    const currentAverageScore = currentTotalStudents > 0 ? Math.round(displayResults.reduce((acc, r) => acc + r.score, 0) / currentTotalStudents) : 0;
+    const currentHighestScore = currentTotalStudents > 0 ? Math.max(...displayResults.map(r => r.score)) : 0;
+    const currentLowestScore = currentTotalStudents > 0 ? Math.min(...displayResults.map(r => r.score)) : 0;
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             <style>{`
                 @media print {
-                    @page { margin: 1cm; size: portrait; }
-                    
-                    /* FORCE LIGHT THEME ROOT VARIABLES */
+                    /* FORCE LIGHT THEME PREFERENCE */
                     :root {
                         color-scheme: light !important;
                     }
                     
-                    /* RESET HTML/BODY */
-                    html, body {
+                    /* RESET GLOBAL STYLES */
+                    body, html, .dark, .bg-slate-900, .dark\:bg-slate-900, .bg-slate-950, .dark\:bg-slate-950 {
                         background-color: #ffffff !important;
                         color: #0f172a !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
 
-                    /* RESET DARK MODE BACKGROUNDS TO WHITE */
-                    .dark .bg-slate-900, .bg-slate-900,
-                    .dark .bg-slate-800, .bg-slate-800,
-                    .dark .bg-slate-950, .bg-slate-950 {
-                        background-color: #ffffff !important;
-                        color: #0f172a !important;
-                        border-color: #cbd5e1 !important; /* Slate 300 */
-                    }
-
-                    /* RESET DARK MODE TEXT TO DARK */
-                    .dark .text-white, .text-white,
-                    .dark .text-slate-100, .text-slate-100,
-                    .dark .text-slate-200, .text-slate-200,
-                    .dark .text-slate-300, .text-slate-300,
-                    .dark .text-slate-400, .text-slate-400 {
+                    /* OVERRIDE DARK MODE TEXT COLORS */
+                    .text-white, .dark\:text-white, 
+                    .text-slate-200, .dark\:text-slate-200,
+                    .text-slate-300, .dark\:text-slate-300,
+                    .text-slate-400, .dark\:text-slate-400 {
                         color: #0f172a !important;
                     }
 
-                    /* PRESERVE SEMANTIC BACKGROUNDS (Correct/Wrong) BUT FIX TEXT */
-                    .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-slate-50, .bg-slate-100 {
-                        background-color: #f1f5f9 !important; /* Force light gray/white-ish base */
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
+                    /* OVERRIDE DARK MODE BACKGROUNDS */
+                    .dark\:bg-slate-800, .bg-slate-800,
+                    .dark\:bg-slate-700, .bg-slate-700,
+                    .dark\:bg-slate-900\/30, .dark\:bg-indigo-900\/30 {
+                        background-color: transparent !important;
                     }
-                    
-                    /* Force explicit colors for semantic badges to ensure contrast on paper */
-                    .bg-emerald-100, .dark .bg-emerald-900\\/30 {
-                        background-color: #d1fae5 !important;
-                        color: #065f46 !important;
-                    }
-                    .bg-rose-100, .dark .bg-rose-900\\/30 {
-                        background-color: #ffe4e6 !important;
-                        color: #9f1239 !important;
-                    }
-                    
-                    /* BORDERS */
-                    .border-slate-100, .dark .border-slate-700,
-                    .border-slate-200, .dark .border-slate-600 {
-                        border-color: #cbd5e1 !important;
+
+                    /* FIX BORDERS */
+                    .border-slate-700, .dark\:border-slate-700,
+                    .border-slate-600, .dark\:border-slate-600 {
+                        border-color: #cbd5e1 !important; /* slate-300 */
                         border-width: 1px !important;
                         border-style: solid !important;
                     }
 
-                    /* HIDE NON-PRINT ELEMENTS */
-                    .no-print, .print\\:hidden { display: none !important; }
+                    /* FIX SEMANTIC COLORS (Ensure light background for readability) */
+                    .bg-emerald-50, .dark\:bg-emerald-900\/30 { background-color: #ecfdf5 !important; color: #065f46 !important; }
+                    .bg-rose-50, .dark\:bg-rose-900\/30 { background-color: #fff1f2 !important; color: #9f1239 !important; }
+                    .bg-amber-50, .dark\:bg-amber-900\/30 { background-color: #fffbeb !important; color: #92400e !important; }
+                    .bg-blue-50, .dark\:bg-blue-900\/30 { background-color: #eff6ff !important; color: #1e40af !important; }
                     
+                    /* HIDE INTERACTIVE ELEMENTS */
+                    .print\:hidden {
+                        display: none !important;
+                    }
+
+                    /* SHOW PRINT BLOCK */
+                    .print\:block {
+                        display: block !important;
+                    }
+
                     /* LAYOUT FIXES */
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; width: 100% !important; }
-                    .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
-                    
-                    /* TABLE STYLING FOR PRINT */
-                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
-                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
-                    thead th { background-color: #f1f5f9 !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
-                    
-                    /* PAGE BREAKS */
+                    @page { margin: 1.5cm; size: A4; }
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+                    
+                    /* ENSURE TABLES ARE READABLE */
+                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
+                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
+                    thead th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact !important; }
                 }
             `}</style>
 
             {fixMessage && (
-                <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
+                <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm print:hidden">
                     <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-amber-600 dark:text-amber-400" />
                     <div className="flex-1">
                         <p className="text-sm font-bold">Auto-Correction Active</p>
@@ -1157,11 +1140,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{exam.config.subject}</span></h2>
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{displayExam.config.subject}</span></h2>
                             {sourceType === 'LOCAL' && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase border border-gray-200">Local File</span>}
                             {sourceType === 'CLOUD' && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase border border-blue-100">Cloud Storage</span>}
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-mono">{displayExam.code} • {displayExam.createdAt ? `Diarsipkan pada ${displayExam.createdAt}` : 'Tanggal tidak diketahui'}</p>
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
@@ -1181,12 +1164,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         )}
 
                         <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
-                        <button onClick={() => onReuseExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
+                        <button onClick={() => onReuseExam(displayExam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-4">
                     {(['DETAIL', 'STUDENTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
-                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${totalStudents})` : 'Analisis Soal';
+                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${currentTotalStudents})` : 'Analisis Soal';
                         return <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{label}</button>
                     })}
                 </div>
@@ -1196,8 +1179,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             <div className="animate-fade-in print:hidden">
                 {activeTab === 'DETAIL' && (
                     <div className="space-y-4">
-                        {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                        {displayExam.questions.map((q, index) => {
+                            const questionNumber = displayExam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
                                 <div key={q.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                     <div className="flex items-start gap-4">
@@ -1229,8 +1212,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {results.map(r => {
-                                    const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
+                                {displayResults.map(r => {
+                                    const { correct, wrong, empty, score } = getCalculatedStats(r, displayExam);
                                     return (
                                     <React.Fragment key={r.student.studentId}>
                                         <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30 cursor-pointer group">
@@ -1263,10 +1246,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 {activeTab === 'ANALYSIS' && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                             <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
-                             <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
-                             <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
-                             <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
+                             <StatWidget label="Rata-rata" value={currentAverageScore} color="bg-indigo-50" icon={ChartBarIcon} />
+                             <StatWidget label="Tertinggi" value={currentHighestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
+                             <StatWidget label="Terendah" value={currentLowestScore} color="bg-rose-50" icon={XMarkIcon} />
+                             <StatWidget label="Partisipan" value={currentTotalStudents} color="bg-blue-50" icon={UserIcon} />
                         </div>
                         {(categoryStats.length > 0 || levelStats.length > 0) && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1298,21 +1281,21 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </div>
                             </div>
                         )}
-                        <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={results} />; })}</div></div>
+                        <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={displayResults} />; })}</div></div>
                     </div>
                 )}
             </div>
             
-            {/* PRINT VIEW (Clean & Sequential 5 Points) */}
-            <div className="hidden print:block text-slate-900">
+            {/* PRINT VIEW (Clean & Sequential 5 Points) - FORCE LIGHT MODE */}
+            <div className="hidden print:block text-slate-900 bg-white">
                 {/* Header Global */}
                 <div className="border-b-2 border-slate-900 pb-2 mb-6">
-                    <h1 className="text-2xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
+                    <h1 className="text-2xl font-black uppercase tracking-tight">{displayExam.config.subject}</h1>
                     <div className="flex justify-between items-end mt-2">
                         <div className="text-xs font-bold text-slate-600">
-                            <p>KODE UJIAN: <span className="font-mono text-slate-900 text-sm bg-slate-100 px-1">{exam.code}</span></p>
-                            <p>TANGGAL: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p>SEKOLAH: {exam.authorSchool || '-'}</p>
+                            <p>KODE UJIAN: <span className="font-mono text-slate-900 text-sm bg-slate-100 px-1">{displayExam.code}</span></p>
+                            <p>TANGGAL: {new Date(displayExam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <p>SEKOLAH: {displayExam.authorSchool || '-'}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs font-bold text-slate-500 uppercase">Arsip Lengkap Ujian</p>
@@ -1328,19 +1311,19 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <div className="grid grid-cols-4 gap-4 mb-4">
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata</p>
-                            <p className="text-lg font-black">{averageScore}</p>
+                            <p className="text-lg font-black">{currentAverageScore}</p>
                         </div>
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Tertinggi</p>
-                            <p className="text-lg font-black text-emerald-700">{highestScore}</p>
+                            <p className="text-lg font-black text-emerald-700">{currentHighestScore}</p>
                         </div>
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Terendah</p>
-                            <p className="text-lg font-black text-rose-700">{lowestScore}</p>
+                            <p className="text-lg font-black text-rose-700">{currentLowestScore}</p>
                         </div>
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Partisipan</p>
-                            <p className="text-lg font-black text-blue-700">{totalStudents}</p>
+                            <p className="text-lg font-black text-blue-700">{currentTotalStudents}</p>
                         </div>
                     </div>
 
@@ -1394,8 +1377,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </tr>
                         </thead>
                         <tbody>
-                            {results.map((r, index) => {
-                                const { score } = getCalculatedStats(r, exam);
+                            {displayResults.map((r, index) => {
+                                const { score } = getCalculatedStats(r, displayExam);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
                                         <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
@@ -1404,7 +1387,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <td className="border border-slate-300 p-2 text-center font-bold text-sm">{score}</td>
                                         <td className="border border-slate-300 p-1">
                                             <div className="flex flex-wrap gap-0.5">
-                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                     const status = checkAnswerStatus(q, r.answers);
                                                     let bgClass = 'bg-slate-200 text-slate-500'; 
                                                     if (status === 'CORRECT') bgClass = 'bg-emerald-300 text-emerald-900 border-emerald-400';
@@ -1440,8 +1423,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </tr>
                         </thead>
                         <tbody>
-                            {results.map((r, index) => {
-                                const analysis = analyzeStudentPerformance(exam, r);
+                            {displayResults.map((r, index) => {
+                                const analysis = analyzeStudentPerformance(displayExam, r);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
                                         <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
@@ -1485,7 +1468,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     : 'bg-rose-50 text-rose-700 border-rose-100';
                             
                             // Get original question to check correct answer
-                            const originalQ = exam.questions.find(q => q.id === data.id);
+                            const originalQ = displayExam.questions.find(q => q.id === data.id);
 
                             return (
                                 <div key={data.id} className="avoid-break border border-slate-300 rounded p-2 text-xs flex flex-col gap-2 bg-white">
@@ -1509,7 +1492,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 {data.options.map((opt, i) => {
                                                     const label = String.fromCharCode(65+i);
                                                     const count = data.distribution[opt] || 0;
-                                                    const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                    const pct = currentTotalStudents > 0 ? Math.round((count/currentTotalStudents)*100) : 0;
                                                     
                                                     const isCorrect = 
                                                         (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
@@ -1535,7 +1518,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         .slice(0, 10) // Show top 10 unique answers
                                                         .map(([ans, count], i) => {
                                                             const numCount = count as number;
-                                                            const pct = totalStudents > 0 ? Math.round((numCount/totalStudents)*100) : 0;
+                                                            const pct = currentTotalStudents > 0 ? Math.round((numCount/currentTotalStudents)*100) : 0;
                                                             
                                                             // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
                                                             let displayAns = ans; // Use raw answer by default (may contain HTML)
@@ -1594,8 +1577,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                     
                     <div className="space-y-4">
-                        {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                        {displayExam.questions.map((q, index) => {
+                            const questionNumber = displayExam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
                                 <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
                                     <div className="flex gap-3">
