@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
@@ -5,6 +6,7 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
+import { calculateAggregateStats } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
@@ -502,44 +504,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
 
-    // --- NEW: CATEGORY & LEVEL ANALYSIS (Requested Feature) ---
-    const { categoryStats, levelStats } = useMemo(() => {
-        const catMap: Record<string, { total: number; correct: number }> = {};
-        const lvlMap: Record<string, { total: number; correct: number }> = {};
-
-        // Loop through all questions to initialize aggregation
-        exam.questions.forEach(q => {
-            if (q.questionType === 'INFO') return;
-            const cat = q.category && q.category.trim() !== '' ? q.category.trim() : 'Tanpa Kategori';
-            const lvl = q.level && q.level.trim() !== '' ? q.level.trim() : 'Umum';
-
-            if (!catMap[cat]) catMap[cat] = { total: 0, correct: 0 };
-            if (!lvlMap[lvl]) lvlMap[lvl] = { total: 0, correct: 0 };
-
-            // Loop through all results to count correctness for this question
-            results.forEach(r => {
-                const status = checkAnswerStatus(q, r.answers);
-                // Increment total attempts (per student per question)
-                catMap[cat].total++;
-                lvlMap[lvl].total++;
-                
-                if (status === 'CORRECT') {
-                    catMap[cat].correct++;
-                    lvlMap[lvl].correct++;
-                }
-            });
-        });
-
-        const processMap = (map: any) => Object.entries(map).map(([name, data]: any) => ({
-            name,
-            percentage: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0
-        })).sort((a, b) => b.percentage - a.percentage);
-
-        return { 
-            categoryStats: processMap(catMap), 
-            levelStats: processMap(lvlMap) 
-        };
-    }, [exam.questions, results]);
+    // --- NEW: CATEGORY & LEVEL ANALYSIS ---
+    const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(exam, results), [exam, results]);
 
     const questionStats = useMemo(() => {
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
@@ -605,10 +571,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                     <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                                 </div>
 
-                                {/* NEW SECTION: Kategori & Level Statistics */}
+                                {/* NEW: Category & Level Statistics */}
                                 {(categoryStats.length > 0 || levelStats.length > 0) && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Kategori Stats */}
                                         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                                             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <ListBulletIcon className="w-4 h-4"/> Penguasaan Materi (Kategori)
@@ -618,7 +583,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                     <div key={stat.name}>
                                                         <div className="flex justify-between text-[10px] font-bold text-slate-600 mb-1">
                                                             <span>{stat.name}</span>
-                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
                                                         </div>
                                                         <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                                             <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
@@ -629,7 +594,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                             </div>
                                         </div>
 
-                                        {/* Level Stats */}
                                         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                                             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <ChartBarIcon className="w-4 h-4"/> Tingkat Kesulitan (Level)
@@ -639,7 +603,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                     <div key={stat.name}>
                                                         <div className="flex justify-between text-[10px] font-bold text-slate-600 mb-1">
                                                             <span>{stat.name}</span>
-                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
                                                         </div>
                                                         <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                                             <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
