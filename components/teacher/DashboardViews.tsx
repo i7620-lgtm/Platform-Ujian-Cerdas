@@ -795,20 +795,23 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     };
 
     const handlePrint = () => {
-        // Force light mode state for printing
-        const wasDark = document.documentElement.classList.contains('dark');
-        if (wasDark) {
+        // 1. Deteksi mode saat ini
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        // 2. Paksa hapus class 'dark' dari root HTML agar Tailwind merender versi Light
+        if (isDark) {
             document.documentElement.classList.remove('dark');
         }
 
-        // Allow DOM update before printing
+        // 3. Trigger Print (Timeout memberi waktu browser repaint ke Light mode)
         setTimeout(() => {
             window.print();
-            // Restore theme if it was dark
-            if (wasDark) {
+            
+            // 4. Kembalikan mode gelap jika sebelumnya aktif
+            if (isDark) {
                 document.documentElement.classList.add('dark');
             }
-        }, 50);
+        }, 100);
     };
 
     const normalize = (str: string) => str.trim().toLowerCase();
@@ -1081,77 +1084,68 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 @media print {
                     @page { margin: 1cm; size: portrait; }
                     
-                    /* FORCE LIGHT THEME ROOT VARIABLES */
-                    :root {
+                    /* STRICT RESET TO LIGHT MODE & WHITE BACKGROUND */
+                    :root, html, body {
+                        color-scheme: light !important;
+                        background-color: #ffffff !important;
+                        color: #0f172a !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+
+                    .dark {
                         color-scheme: light !important;
                     }
                     
-                    /* RESET HTML/BODY */
-                    html, body {
-                        background-color: #ffffff !important;
-                        color: #0f172a !important;
+                    /* FORCE WHITE BACKGROUND FOR ALL CONTAINERS */
+                    *, *:before, *:after {
+                        background-color: transparent;
+                        border-color: #cbd5e1; /* slate-300 */
+                    }
+
+                    /* Utility Classes for Colored Print Elements (Using !important to override reset) */
+                    .print-bg-green {
+                        background-color: #dcfce7 !important; /* emerald-100 */
+                        border-color: #86efac !important; /* emerald-300 */
+                        color: #14532d !important; /* emerald-900 */
                         -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
                     }
-
-                    /* RESET DARK MODE BACKGROUNDS TO WHITE */
-                    .dark .bg-slate-900, .bg-slate-900,
-                    .dark .bg-slate-800, .bg-slate-800,
-                    .dark .bg-slate-950, .bg-slate-950 {
-                        background-color: #ffffff !important;
-                        color: #0f172a !important;
-                        border-color: #cbd5e1 !important; /* Slate 300 */
-                    }
-
-                    /* RESET DARK MODE TEXT TO DARK */
-                    .dark .text-white, .text-white,
-                    .dark .text-slate-100, .text-slate-100,
-                    .dark .text-slate-200, .text-slate-200,
-                    .dark .text-slate-300, .text-slate-300,
-                    .dark .text-slate-400, .text-slate-400 {
-                        color: #0f172a !important;
-                    }
-
-                    /* PRESERVE SEMANTIC BACKGROUNDS (Correct/Wrong) BUT FIX TEXT */
-                    .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-slate-50, .bg-slate-100 {
-                        background-color: #f1f5f9 !important; /* Force light gray/white-ish base */
+                    .print-bg-red {
+                        background-color: #fee2e2 !important; /* rose-100 */
+                        border-color: #fda4af !important; /* rose-300 */
+                        color: #881337 !important; /* rose-900 */
                         -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
+                    }
+                    .print-bg-orange {
+                        background-color: #ffedd5 !important; /* orange-100 */
+                        border-color: #fdba74 !important; /* orange-300 */
+                        color: #7c2d12 !important; /* orange-900 */
+                        -webkit-print-color-adjust: exact !important;
+                    }
+                    .print-bg-gray {
+                        background-color: #f1f5f9 !important; /* slate-100 */
+                        border-color: #cbd5e1 !important; /* slate-300 */
+                        color: #475569 !important; /* slate-600 */
+                        -webkit-print-color-adjust: exact !important;
                     }
                     
-                    /* Force explicit colors for semantic badges to ensure contrast on paper */
-                    .bg-emerald-100, .dark .bg-emerald-900\\/30 {
-                        background-color: #d1fae5 !important;
-                        color: #065f46 !important;
-                    }
-                    .bg-rose-100, .dark .bg-rose-900\\/30 {
-                        background-color: #ffe4e6 !important;
-                        color: #9f1239 !important;
-                    }
-                    
-                    /* BORDERS */
-                    .border-slate-100, .dark .border-slate-700,
-                    .border-slate-200, .dark .border-slate-600 {
-                        border-color: #cbd5e1 !important;
-                        border-width: 1px !important;
-                        border-style: solid !important;
-                    }
+                    /* Progress Bar Colors */
+                    .print-bar-green { background-color: #10b981 !important; -webkit-print-color-adjust: exact !important; }
+                    .print-bar-orange { background-color: #f97316 !important; -webkit-print-color-adjust: exact !important; }
+                    .print-bar-red { background-color: #ef4444 !important; -webkit-print-color-adjust: exact !important; }
 
-                    /* HIDE NON-PRINT ELEMENTS */
+                    /* Table Styles */
+                    table { width: 100% !important; border-collapse: collapse !important; font-size: 8pt !important; }
+                    th, td { border: 1px solid #94a3b8 !important; padding: 3px 5px !important; color: #0f172a !important; }
+                    thead th { background-color: #f8fafc !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
+                    
+                    /* Hide non-print elements */
                     .no-print, .print\\:hidden { display: none !important; }
                     
-                    /* LAYOUT FIXES */
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; width: 100% !important; }
-                    .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
-                    
-                    /* TABLE STYLING FOR PRINT */
-                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
-                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
-                    thead th { background-color: #f1f5f9 !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
-                    
-                    /* PAGE BREAKS */
+                    /* Layout */
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+                    .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
                 }
             `}</style>
 
@@ -1207,6 +1201,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
             {/* INTERACTIVE CONTENT (HIDDEN ON PRINT) */}
             <div className="animate-fade-in print:hidden">
+                {/* ... (Keep existing interactive content as is) ... */}
                 {activeTab === 'DETAIL' && (
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
@@ -1364,9 +1359,19 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             <table className="w-full border-collapse border border-slate-300 text-[10px]">
                                 <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
                                 <tbody>
-                                    {categoryStats.length > 0 ? categoryStats.map(s => (
-                                        <tr key={s.name}><td className="border p-1">{s.name}</td><td className="border p-1 text-right font-bold">{s.percentage}%</td></tr>
-                                    )) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                    {categoryStats.length > 0 ? categoryStats.map(s => {
+                                        let bgClass = '';
+                                        if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                        else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                        else bgClass = 'print-bg-red';
+                                        
+                                        return (
+                                            <tr key={s.name}>
+                                                <td className="border p-1">{s.name}</td>
+                                                <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                            </tr>
+                                        )
+                                    }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -1376,9 +1381,19 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             <table className="w-full border-collapse border border-slate-300 text-[10px]">
                                 <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Level</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
                                 <tbody>
-                                    {levelStats.length > 0 ? levelStats.map(s => (
-                                        <tr key={s.name}><td className="border p-1">{s.name}</td><td className="border p-1 text-right font-bold">{s.percentage}%</td></tr>
-                                    )) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                    {levelStats.length > 0 ? levelStats.map(s => {
+                                        let bgClass = '';
+                                        if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                        else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                        else bgClass = 'print-bg-red';
+
+                                        return (
+                                            <tr key={s.name}>
+                                                <td className="border p-1">{s.name}</td>
+                                                <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                            </tr>
+                                        )
+                                    }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -1396,14 +1411,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 {/* 2. REKAPITULASI HASIL */}
                 <div className="mb-4">
                     <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2. Rekapitulasi Hasil</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                    <table className="w-full border-collapse border border-slate-300 text-[9px]">
                         <thead>
                             <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-40">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left w-20">Kelas</th>
-                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
+                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
+                                <th className="border border-slate-300 p-1 text-left w-16">Kelas</th>
+                                <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
+                                <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1411,17 +1426,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 const { score } = getCalculatedStats(r, exam);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-2 uppercase">{r.student.class}</td>
-                                        <td className="border border-slate-300 p-2 text-center font-bold text-sm">{score}</td>
+                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                        <td className="border border-slate-300 p-1 uppercase">{r.student.class}</td>
+                                        <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
                                         <td className="border border-slate-300 p-1">
                                             <div className="flex flex-wrap gap-0.5">
                                                 {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                     const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'bg-slate-200 text-slate-500'; 
-                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300 text-emerald-900 border-emerald-400';
-                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300 text-rose-900 border-rose-400';
+                                                    let bgClass = 'print-bg-gray'; 
+                                                    if (status === 'CORRECT') bgClass = 'print-bg-green';
+                                                    else if (status === 'WRONG') bgClass = 'print-bg-red';
                                                     
                                                     return (
                                                         <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
@@ -1443,13 +1458,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 {/* 3. ANALISIS INDIVIDU (NEW) */}
                 <div className="mb-4">
                     <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">3. Analisis Individu</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                    <table className="w-full border-collapse border border-slate-300 text-[9px]">
                         <thead>
                             <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left">Analisis Kategori (Penguasaan)</th>
-                                <th className="border border-slate-300 p-2 text-left w-48">Rekomendasi Tindakan</th>
+                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
+                                <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
+                                <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1457,22 +1472,28 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 const analysis = analyzeStudentPerformance(exam, r);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-2">
+                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                        <td className="border border-slate-300 p-1">
                                             <div className="flex flex-wrap gap-2">
-                                                {analysis.stats.map(stat => (
-                                                    <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                                        <span className="font-semibold">{stat.name}:</span>
-                                                        <span className={stat.percentage < 50 ? 'text-rose-700 font-bold' : stat.percentage < 80 ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
-                                                            {stat.percentage}%
+                                                {analysis.stats.map(stat => {
+                                                    let textClass = 'text-emerald-700';
+                                                    if (stat.percentage < 50) textClass = 'text-rose-700';
+                                                    else if (stat.percentage < 80) textClass = 'text-amber-700';
+
+                                                    return (
+                                                        <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                            <span className="font-semibold">{stat.name}:</span>
+                                                            <span className={`font-bold ${textClass}`}>
+                                                                {stat.percentage}%
+                                                            </span>
                                                         </span>
-                                                    </span>
-                                                ))}
+                                                    );
+                                                })}
                                                 {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
                                             </div>
                                         </td>
-                                        <td className="border border-slate-300 p-2 font-medium italic text-slate-700">
+                                        <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
                                             "{analysis.recommendation}"
                                         </td>
                                     </tr>
@@ -1491,11 +1512,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <div className="grid grid-cols-2 gap-4">
                         {questionAnalysisData.map((data, idx) => {
                             const difficultyLabel = data.correctRate >= 80 ? 'Mudah' : data.correctRate >= 50 ? 'Sedang' : 'Sulit';
-                            const difficultyColor = data.correctRate >= 80 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                : data.correctRate >= 50 
-                                    ? 'bg-orange-50 text-orange-700 border-orange-100' 
-                                    : 'bg-rose-50 text-rose-700 border-rose-100';
+                            
+                            let diffColorClass = 'print-bg-green';
+                            let barColorClass = 'print-bar-green';
+                            
+                            if (data.correctRate < 50) { 
+                                diffColorClass = 'print-bg-red'; 
+                                barColorClass = 'print-bar-red'; 
+                            } else if (data.correctRate < 80) { 
+                                diffColorClass = 'print-bg-orange'; 
+                                barColorClass = 'print-bar-orange'; 
+                            }
                             
                             // Get original question to check correct answer
                             const originalQ = exam.questions.find(q => q.id === data.id);
@@ -1504,12 +1531,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 <div key={data.id} className="avoid-break border border-slate-300 rounded p-2 text-xs flex flex-col gap-2 bg-white">
                                     <div className="flex justify-between items-center">
                                         <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] border border-slate-200">Soal {idx + 1}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${difficultyColor}`}>{difficultyLabel}</span>
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${diffColorClass}`}>{difficultyLabel}</span>
                                     </div>
 
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-                                            <div className={`h-full ${data.correctRate >= 80 ? 'bg-emerald-500' : data.correctRate >= 50 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
+                                            <div className={`h-full ${barColorClass}`} style={{ width: `${data.correctRate}%` }}></div>
                                         </div>
                                         <span className="font-bold text-[10px] w-14 text-right">{data.correctRate}% Benar</span>
                                     </div>
@@ -1529,7 +1556,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
                                                     
                                                     return (
-                                                        <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
+                                                        <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'border-slate-100 text-slate-600'}`}>
                                                             <div className="flex gap-2 truncate max-w-[70%]">
                                                                 <span className="w-4 font-bold">{label}.</span>
                                                                 <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
@@ -1580,7 +1607,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             } catch(e) {}
 
                                                             return (
-                                                                <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                                                <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                                                                     <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
@@ -1626,7 +1653,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         return (
                                                             <div 
                                                                 key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}
+                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'border-transparent'}`}
                                                             >
                                                                 <span>{String.fromCharCode(65+i)}.</span>
                                                                 <div dangerouslySetInnerHTML={{__html: opt}}></div>
