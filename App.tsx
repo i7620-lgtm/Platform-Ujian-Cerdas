@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [prefillCode, setPrefillCode] = useState<string>('');
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -139,6 +140,14 @@ const App: React.FC = () => {
         return;
     }
 
+    const joinCode = params.get('join');
+    if (joinCode) {
+        setPrefillCode(joinCode.toUpperCase());
+        setView('STUDENT_LOGIN');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+    }
+
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
@@ -235,6 +244,7 @@ const App: React.FC = () => {
     setStudentResult(null); 
     setResumedResult(null);
     setTeacherProfile(null);
+    setPrefillCode('');
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     setExams({});
     setResults([]);
@@ -261,7 +271,7 @@ const App: React.FC = () => {
 
   if (isLoadingSession) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-900">
+        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
                 <p className="text-sm font-medium text-slate-500">Memuat sesi...</p>
@@ -283,7 +293,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
         
         {/* Status Jaringan Minimalis & Elegan */}
         <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
@@ -371,6 +381,7 @@ const App: React.FC = () => {
                 onBack={() => setView('SELECTOR')} 
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
+                initialCode={prefillCode}
             />
         )}
         
@@ -437,4 +448,3 @@ const App: React.FC = () => {
 };
  
 export default App;
- 
