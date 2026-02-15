@@ -6,7 +6,7 @@ import {
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon
+    ArrowPathIcon, SignalIcon, WifiIcon
 } from '../Icons';
 import { compressImage } from './examUtils';
 
@@ -176,7 +176,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
                 if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
-                if (name === 'disableRealtime' && checked) { newConfig.enablePublicStream = false; }
+                // 'disableRealtime' is now handled by the radio group separately
                 return newConfig;
             });
         } else {
@@ -470,7 +470,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Soal</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Opsi</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Pindah Tab</span></label>
+                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Kecurangan</span></label>
                            {config.detectBehavior && (
                             <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
                                 <input 
@@ -490,26 +490,51 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Umumkan Nilai Otomatis</span></label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
-                                <label className={`flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 transition-colors cursor-pointer group shadow-sm ${config.disableRealtime ? 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-                                    <input 
-                                        type="checkbox" 
-                                        name="enablePublicStream" 
-                                        checked={config.enablePublicStream} 
-                                        onChange={handleConfigChange} 
-                                        disabled={config.disableRealtime}
-                                        className={`h-5 w-5 rounded border-gray-300 ${config.disableRealtime ? 'text-gray-400 focus:ring-0 cursor-not-allowed' : 'text-primary focus:ring-primary'}`} 
-                                    />
-                                    <span className={`ml-3 text-sm font-medium transition-colors ${config.disableRealtime ? 'text-gray-400' : 'text-gray-700 dark:text-slate-300 group-hover:text-primary'}`}>Pantauan Orang Tua (Live)</span>
-                                </label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
-                                
-                                <label className="flex items-center p-3 rounded-xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer group shadow-sm col-span-1 sm:col-span-2">
-                                    <input type="checkbox" name="disableRealtime" checked={config.disableRealtime} onChange={handleConfigChange} className="h-5 w-5 rounded text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 border-indigo-300" />
-                                    <div className="ml-3">
-                                        <span className="text-sm font-bold text-indigo-900 dark:text-indigo-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-200 transition-colors block">Mode Skala Besar ({'>'}200 Siswa)</span>
-                                        <span className="text-xs text-indigo-500 dark:text-indigo-400">Nonaktifkan fitur Live Monitor untuk menghemat koneksi server.</span>
+                             </div>
+
+                             {/* Mode Selection Block */}
+                             <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* Mode Realtime */}
+                                    <div 
+                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
+                                                {!config.disableRealtime && <div className="w-2 h-2 bg-indigo-500 rounded-full" />}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Realtime</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                            Pantauan orang tua dan progres ujian akan aktif namun menghabiskan lebih banyak kuota koneksi.
+                                        </p>
                                     </div>
-                                </label>
+
+                                    {/* Mode Normal */}
+                                    <div 
+                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: true, enablePublicStream: false }))}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200'}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.disableRealtime ? 'border-emerald-500' : 'border-slate-400'}`}>
+                                                {config.disableRealtime && <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <WifiIcon className={`w-4 h-4 ${config.disableRealtime ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Normal</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                            Menonaktifkan fitur pantauan orang tua dan progres ujian untuk menghemat kuota koneksi.
+                                        </p>
+                                    </div>
+                                </div>
                              </div>
                         </div>
                     </div>
