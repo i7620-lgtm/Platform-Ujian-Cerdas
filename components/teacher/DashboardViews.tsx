@@ -795,23 +795,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     };
 
     const handlePrint = () => {
-        // 1. Deteksi mode saat ini
-        const isDark = document.documentElement.classList.contains('dark');
-        
-        // 2. Paksa hapus class 'dark' dari root HTML agar Tailwind merender versi Light
-        if (isDark) {
-            document.documentElement.classList.remove('dark');
-        }
-
-        // 3. Trigger Print (Timeout memberi waktu browser repaint ke Light mode)
-        setTimeout(() => {
-            window.print();
-            
-            // 4. Kembalikan mode gelap jika sebelumnya aktif
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            }
-        }, 100);
+        window.print();
     };
 
     const normalize = (str: string) => str.trim().toLowerCase();
@@ -1082,56 +1066,107 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         <div className="max-w-5xl mx-auto space-y-6">
             <style>{`
                 @media print {
-                    @page { margin: 1cm; size: portrait; }
+                    @page { margin: 1.5cm; size: A4; }
                     
-                    /* STRICT RESET TO LIGHT MODE */
-                    :root, html, body {
-                        color-scheme: light !important;
+                    /* --- ZEN MODE PRINT CSS --- */
+                    
+                    /* 1. RESET TO CLEAN WHITE & BLACK */
+                    html, body, #root {
                         background-color: #ffffff !important;
-                        color: #0f172a !important;
+                        color: #1a1a1a !important;
+                        width: 100%;
+                        overflow: visible;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
 
-                    /* OVERRIDE DARK MODE UTILITIES GLOBALLY */
-                    .dark {
-                        color-scheme: light !important;
-                    }
-                    
-                    /* Force all backgrounds to white except specific badges */
-                    *:not(.bg-emerald-100):not(.bg-rose-100):not(.bg-amber-100):not(.bg-slate-100) {
+                    /* 2. OVERRIDE DARK MODE VARIABLES AGGRESSIVELY */
+                    .dark .bg-slate-900, .bg-slate-900,
+                    .dark .bg-slate-800, .bg-slate-800,
+                    .dark .bg-slate-950, .bg-slate-950 {
                         background-color: #ffffff !important;
-                        color: #0f172a !important;
-                        border-color: #cbd5e1 !important;
+                        color: #1a1a1a !important;
+                        border-color: #e2e8f0 !important; /* Slate 200 */
                     }
 
-                    /* Fix Semantic Badges Visibility */
-                    .bg-emerald-100, .dark .bg-emerald-900\\/30 {
-                        background-color: #d1fae5 !important;
-                        color: #065f46 !important;
-                        border: 1px solid #6ee7b7 !important;
+                    .dark .text-white, .text-white,
+                    .dark .text-slate-100, .text-slate-100,
+                    .dark .text-slate-200, .text-slate-200,
+                    .dark .text-slate-300, .text-slate-300,
+                    .dark .text-slate-400, .text-slate-400 {
+                        color: #1a1a1a !important;
                     }
-                    .bg-rose-100, .dark .bg-rose-900\\/30 {
-                        background-color: #ffe4e6 !important;
-                        color: #9f1239 !important;
-                        border: 1px solid #fda4af !important;
+
+                    .text-slate-500, .text-gray-500 {
+                        color: #4a4a4a !important;
+                    }
+
+                    /* 3. ZEN TYPOGRAPHY */
+                    body {
+                        font-family: 'Georgia', 'Garamond', serif !important; /* Serif for readability */
+                        line-height: 1.5 !important;
+                        font-size: 11pt !important;
                     }
                     
-                    /* Table Styles */
-                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
-                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
-                    thead th { background-color: #f1f5f9 !important; font-weight: bold !important; }
+                    h1, h2, h3, h4, th {
+                        font-family: 'Inter', sans-serif !important; /* Sans for structure */
+                        letter-spacing: -0.01em;
+                    }
+
+                    /* 4. CLEAN TABLES */
+                    table { 
+                        width: 100% !important; 
+                        border-collapse: collapse !important; 
+                        margin-bottom: 1rem;
+                    }
+                    th, td { 
+                        border: 1px solid #cbd5e1 !important; /* Slate 300 */
+                        padding: 6px 10px !important; 
+                        page-break-inside: avoid;
+                    }
+                    thead th { 
+                        background-color: #f1f5f9 !important; /* Slate 100 */
+                        font-weight: 800 !important; 
+                        text-transform: uppercase;
+                        font-size: 8pt;
+                        letter-spacing: 0.05em;
+                    }
                     
-                    /* Utils */
-                    .no-print, .print\\:hidden { display: none !important; }
+                    /* 5. FORCE COLOR FOR IMPORTANT METRICS */
+                    .bg-emerald-500, .bg-indigo-500, .bg-rose-500, .bg-amber-500 {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    /* 6. HIDE NON-PRINT ELEMENTS */
+                    .no-print, .print\\:hidden, button, nav, header, .fixed { 
+                        display: none !important; 
+                    }
+                    
+                    /* 7. LAYOUT FIXES */
+                    .max-w-5xl { max-width: none !important; margin: 0 !important; padding: 0 !important; }
+                    .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+                    .rounded-xl, .rounded-2xl { border-radius: 4px !important; }
+                    
+                    /* 8. PAGE BREAK CONTROLS */
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
-                    .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
+                    
+                    /* Cover Page Styles */
+                    .cover-page { 
+                        height: 100vh; 
+                        display: flex; 
+                        flex-direction: column; 
+                        justify-content: center; 
+                        text-align: center; 
+                        border: 2px solid #000;
+                        margin-bottom: 2rem;
+                    }
                 }
             `}</style>
 
             {fixMessage && (
-                <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
+                <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm print:hidden">
                     <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-amber-600 dark:text-amber-400" />
                     <div className="flex-1">
                         <p className="text-sm font-bold">Auto-Correction Active</p>
@@ -1291,94 +1326,105 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
             </div>
             
-            {/* PRINT VIEW (Clean & Sequential 5 Points) */}
-            <div className="hidden print:block text-slate-900">
-                {/* Header Global */}
-                <div className="border-b-2 border-slate-900 pb-2 mb-6">
-                    <h1 className="text-2xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
-                    <div className="flex justify-between items-end mt-2">
-                        <div className="text-xs font-bold text-slate-600">
-                            <p>KODE UJIAN: <span className="font-mono text-slate-900 text-sm bg-slate-100 px-1">{exam.code}</span></p>
-                            <p>TANGGAL: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p>SEKOLAH: {exam.authorSchool || '-'}</p>
+            {/* PRINT VIEW (ZEN MODE, CLEAN & READABLE, AUTO LIGHT) */}
+            <div className="hidden print:block text-slate-900 bg-white">
+                {/* 0. COVER PAGE */}
+                <div className="cover-page page-break">
+                    <h1 className="text-4xl font-black uppercase tracking-tight mb-2">{exam.config.subject}</h1>
+                    <p className="text-xl font-serif text-slate-600 italic mb-8">{exam.config.examType || 'Laporan Hasil Ujian'}</p>
+                    
+                    <div className="border-y-2 border-black py-6 my-6 max-w-md mx-auto w-full">
+                        <div className="grid grid-cols-2 gap-4 text-left font-sans text-sm">
+                            <div className="font-bold uppercase text-slate-500">Kode Ujian</div>
+                            <div className="font-mono font-bold">{exam.code}</div>
+                            
+                            <div className="font-bold uppercase text-slate-500">Tanggal</div>
+                            <div>{new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                            
+                            <div className="font-bold uppercase text-slate-500">Sekolah</div>
+                            <div>{exam.authorSchool || '-'}</div>
+
+                            <div className="font-bold uppercase text-slate-500">Total Peserta</div>
+                            <div>{totalStudents} Siswa</div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-slate-500 uppercase">Arsip Lengkap Ujian</p>
-                        </div>
+                    </div>
+                    
+                    <div className="mt-auto mb-10 text-xs text-slate-400 uppercase tracking-widest">
+                        Dokumen Arsip Digital • UjianCerdas Platform
                     </div>
                 </div>
 
                 {/* 1. LAPORAN UMUM */}
                 <div className="mb-8 avoid-break">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">1. Laporan Umum</h3>
+                    <h3 className="font-sans font-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-1">1. Laporan Umum</h3>
                     
                     {/* Stat Grid */}
-                    <div className="grid grid-cols-4 gap-4 mb-4">
-                        <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata</p>
-                            <p className="text-lg font-black">{averageScore}</p>
+                    <div className="grid grid-cols-4 gap-4 mb-6">
+                        <div className="border border-slate-300 p-4 rounded text-center bg-slate-50">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Rata-rata</p>
+                            <p className="text-3xl font-black mt-1">{averageScore}</p>
                         </div>
-                        <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Tertinggi</p>
-                            <p className="text-lg font-black text-emerald-700">{highestScore}</p>
+                        <div className="border border-slate-300 p-4 rounded text-center bg-slate-50">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tertinggi</p>
+                            <p className="text-3xl font-black mt-1 text-emerald-700">{highestScore}</p>
                         </div>
-                        <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Terendah</p>
-                            <p className="text-lg font-black text-rose-700">{lowestScore}</p>
+                        <div className="border border-slate-300 p-4 rounded text-center bg-slate-50">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Terendah</p>
+                            <p className="text-3xl font-black mt-1 text-rose-700">{lowestScore}</p>
                         </div>
-                        <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Partisipan</p>
-                            <p className="text-lg font-black text-blue-700">{totalStudents}</p>
+                        <div className="border border-slate-300 p-4 rounded text-center bg-slate-50">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Partisipan</p>
+                            <p className="text-3xl font-black mt-1 text-blue-700">{totalStudents}</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 mb-4">
+                    <div className="grid grid-cols-2 gap-8 mb-6">
                         {/* Kategori */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi (Kategori)</p>
-                            <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                                <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
+                            <p className="text-xs font-bold uppercase mb-2 text-slate-500 border-b border-slate-200 pb-1">Penguasaan Materi (Kategori)</p>
+                            <table className="w-full border-collapse border border-slate-300 text-xs">
+                                <thead className="bg-slate-100"><tr><th className="border p-2 text-left">Kategori</th><th className="border p-2 text-right w-20">Skor</th></tr></thead>
                                 <tbody>
                                     {categoryStats.length > 0 ? categoryStats.map(s => (
-                                        <tr key={s.name}><td className="border p-1">{s.name}</td><td className="border p-1 text-right font-bold">{s.percentage}%</td></tr>
-                                    )) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                        <tr key={s.name}><td className="border p-2">{s.name}</td><td className="border p-2 text-right font-bold">{s.percentage}%</td></tr>
+                                    )) : <tr><td colSpan={2} className="border p-2 italic text-center">Data tidak tersedia</td></tr>}
                                 </tbody>
                             </table>
                         </div>
                         {/* Level */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Tingkat Kesulitan</p>
-                            <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                                <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Level</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                            <p className="text-xs font-bold uppercase mb-2 text-slate-500 border-b border-slate-200 pb-1">Tingkat Kesulitan</p>
+                            <table className="w-full border-collapse border border-slate-300 text-xs">
+                                <thead className="bg-slate-100"><tr><th className="border p-2 text-left">Level</th><th className="border p-2 text-right w-20">Skor</th></tr></thead>
                                 <tbody>
                                     {levelStats.length > 0 ? levelStats.map(s => (
-                                        <tr key={s.name}><td className="border p-1">{s.name}</td><td className="border p-1 text-right font-bold">{s.percentage}%</td></tr>
-                                    )) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                        <tr key={s.name}><td className="border p-2">{s.name}</td><td className="border p-2 text-right font-bold">{s.percentage}%</td></tr>
+                                    )) : <tr><td colSpan={2} className="border p-2 italic text-center">Data tidak tersedia</td></tr>}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
                     {/* General Recommendation Box */}
-                    <div className="border border-slate-300 bg-slate-50 p-3 rounded">
-                        <p className="text-[10px] font-bold uppercase text-slate-500 mb-1">Rekomendasi Tindakan Umum</p>
-                        <p className="text-xs font-medium italic text-slate-800">"{generalRecommendation}"</p>
+                    <div className="border-l-4 border-slate-400 bg-slate-50 p-4 italic text-sm text-slate-800">
+                        <p className="not-italic text-[10px] font-bold uppercase text-slate-500 mb-1">Rekomendasi Umum:</p>
+                        "{generalRecommendation}"
                     </div>
                 </div>
 
                 <div className="page-break"></div>
 
                 {/* 2. REKAPITULASI HASIL */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2. Rekapitulasi Hasil</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                <div className="mb-8">
+                    <h3 className="font-sans font-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-1">2. Rekapitulasi Hasil</h3>
+                    <table className="w-full border-collapse border border-slate-300 text-xs">
                         <thead>
                             <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-40">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left w-20">Kelas</th>
-                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
-                                <th className="border border-slate-300 p-2 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
+                                <th className="border border-slate-300 p-2 text-center w-10">No</th>
+                                <th className="border border-slate-300 p-2 text-left w-48">Nama Siswa</th>
+                                <th className="border border-slate-300 p-2 text-left w-24">Kelas</th>
+                                <th className="border border-slate-300 p-2 text-center w-16">Nilai</th>
+                                <th className="border border-slate-300 p-2 text-left">Rincian (■ Benar, □ Salah)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1394,13 +1440,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="flex flex-wrap gap-0.5">
                                                 {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                     const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'bg-slate-200 text-slate-500'; 
-                                                    if (status === 'CORRECT') bgClass = 'bg-emerald-300 text-emerald-900 border-emerald-400';
-                                                    else if (status === 'WRONG') bgClass = 'bg-rose-300 text-rose-900 border-rose-400';
+                                                    let visual = <span className="text-slate-300">·</span>; 
+                                                    if (status === 'CORRECT') visual = <span className="font-bold text-black">■</span>;
+                                                    else if (status === 'WRONG') visual = <span className="text-slate-500">□</span>;
                                                     
                                                     return (
-                                                        <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
-                                                            {idx + 1}
+                                                        <div key={q.id} className="w-3 h-3 flex items-center justify-center text-[10px]">
+                                                            {visual}
                                                         </div>
                                                     );
                                                 })}
@@ -1416,15 +1462,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 <div className="page-break"></div>
 
                 {/* 3. ANALISIS INDIVIDU (NEW) */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">3. Analisis Individu</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                <div className="mb-8">
+                    <h3 className="font-sans font-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-1">3. Analisis Individu</h3>
+                    <table className="w-full border-collapse border border-slate-300 text-xs">
                         <thead>
                             <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-2 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
-                                <th className="border border-slate-300 p-2 text-left">Analisis Kategori (Penguasaan)</th>
-                                <th className="border border-slate-300 p-2 text-left w-48">Rekomendasi Tindakan</th>
+                                <th className="border border-slate-300 p-2 text-center w-10">No</th>
+                                <th className="border border-slate-300 p-2 text-left w-40">Nama Siswa</th>
+                                <th className="border border-slate-300 p-2 text-left">Penguasaan Kategori</th>
+                                <th className="border border-slate-300 p-2 text-left w-56">Rekomendasi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1435,19 +1481,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
                                         <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
                                         <td className="border border-slate-300 p-2">
-                                            <div className="flex flex-wrap gap-2">
+                                            <div className="flex flex-wrap gap-x-3 gap-y-1">
                                                 {analysis.stats.map(stat => (
-                                                    <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                                        <span className="font-semibold">{stat.name}:</span>
-                                                        <span className={stat.percentage < 50 ? 'text-rose-700 font-bold' : stat.percentage < 80 ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
-                                                            {stat.percentage}%
-                                                        </span>
+                                                    <span key={stat.name} className="whitespace-nowrap">
+                                                        <span className="text-slate-500">{stat.name}:</span> <b>{stat.percentage}%</b>
                                                     </span>
                                                 ))}
-                                                {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
                                             </div>
                                         </td>
-                                        <td className="border border-slate-300 p-2 font-medium italic text-slate-700">
+                                        <td className="border border-slate-300 p-2 font-serif italic text-slate-800">
                                             "{analysis.recommendation}"
                                         </td>
                                     </tr>
@@ -1460,111 +1502,42 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 <div className="page-break"></div>
 
                 {/* 4. ANALISIS BUTIR SOAL */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">4. Analisis Butir Soal</h3>
+                <div className="mb-8">
+                    <h3 className="font-sans font-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-1">4. Analisis Butir Soal</h3>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
                         {questionAnalysisData.map((data, idx) => {
-                            const difficultyLabel = data.correctRate >= 80 ? 'Mudah' : data.correctRate >= 50 ? 'Sedang' : 'Sulit';
-                            const difficultyColor = data.correctRate >= 80 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                : data.correctRate >= 50 
-                                    ? 'bg-orange-50 text-orange-700 border-orange-100' 
-                                    : 'bg-rose-50 text-rose-700 border-rose-100';
-                            
-                            // Get original question to check correct answer
-                            const originalQ = exam.questions.find(q => q.id === data.id);
-
                             return (
-                                <div key={data.id} className="avoid-break border border-slate-300 rounded p-2 text-xs flex flex-col gap-2 bg-white">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] border border-slate-200">Soal {idx + 1}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${difficultyColor}`}>{difficultyLabel}</span>
+                                <div key={data.id} className="avoid-break border border-slate-300 rounded p-3 text-xs flex flex-col gap-2 bg-white">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-1">
+                                        <span className="font-bold text-slate-800 text-sm">Soal {idx + 1}</span>
+                                        <span className="font-mono text-xs">{data.correctRate}% Benar</span>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
-                                            <div className={`h-full ${data.correctRate >= 80 ? 'bg-emerald-500' : data.correctRate >= 50 ? 'bg-orange-400' : 'bg-rose-500'}`} style={{ width: `${data.correctRate}%` }}></div>
-                                        </div>
-                                        <span className="font-bold text-[10px] w-14 text-right">{data.correctRate}% Benar</span>
-                                    </div>
-
-                                    <div className="pt-1 border-t border-slate-100">
-                                        {/* Updated Distribution Rendering - Handles ALL TYPES Correctly */}
+                                    {/* Simplified Distribution for Print */}
+                                    <div className="space-y-1">
                                         {data.options ? (
-                                            /* Multiple Choice & Complex Grid */
-                                            <div className="grid grid-cols-1 gap-1 text-[9px]">
-                                                {data.options.map((opt, i) => {
-                                                    const label = String.fromCharCode(65+i);
-                                                    const count = data.distribution[opt] || 0;
-                                                    const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
-                                                    
-                                                    const isCorrect = 
+                                            data.options.map((opt, i) => {
+                                                const label = String.fromCharCode(65+i);
+                                                const count = data.distribution[opt] || 0;
+                                                const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
+                                                const originalQ = exam.questions.find(q => q.id === data.id);
+                                                const isCorrect = 
                                                         (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
                                                         (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
-                                                    
-                                                    return (
-                                                        <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'border-slate-100 text-slate-600'}`}>
-                                                            <div className="flex gap-2 truncate max-w-[70%]">
-                                                                <span className="w-4 font-bold">{label}.</span>
-                                                                <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                            <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
+                                                
+                                                return (
+                                                    <div key={i} className="flex items-center justify-between">
+                                                        <div className={`flex gap-2 ${isCorrect ? 'font-bold text-black' : 'text-slate-500'}`}>
+                                                            <span>{label}.</span>
+                                                            {isCorrect ? <span>(Kunci)</span> : null}
                                                         </div>
-                                                    )
-                                                })}
-                                            </div>
+                                                        <span className="font-mono">{count} ({pct}%)</span>
+                                                    </div>
+                                                )
+                                            })
                                         ) : (
-                                            /* Generic List for other types (MATCHING, TRUE_FALSE, ESSAY) */
-                                            <div className="flex flex-col gap-1 text-[9px]">
-                                                {Object.entries(data.distribution).length > 0 ? (
-                                                    Object.entries(data.distribution)
-                                                        .sort(([,a], [,b]) => (b as number) - (a as number)) 
-                                                        .slice(0, 10) // Show top 10 unique answers
-                                                        .map(([ans, count], i) => {
-                                                            const numCount = count as number;
-                                                            const pct = totalStudents > 0 ? Math.round((numCount/totalStudents)*100) : 0;
-                                                            
-                                                            // LOGIC UNTUK FORMAT JAWABAN YANG LEBIH BAIK
-                                                            let displayAns = ans; // Use raw answer by default (may contain HTML)
-                                                            let isCorrect = false;
-
-                                                            try {
-                                                                if (originalQ?.questionType === 'MATCHING') {
-                                                                    const parsed = JSON.parse(ans);
-                                                                    const orderedValues = (originalQ.matchingPairs || []).map((_, idx) => parsed[idx] || '—');
-                                                                    displayAns = orderedValues.join(', ');
-                                                                    isCorrect = originalQ.matchingPairs?.every((pair, idx) => parsed[idx] === pair.right) ?? false;
-                                                                } else if (originalQ?.questionType === 'TRUE_FALSE') {
-                                                                    const parsed = JSON.parse(ans);
-                                                                    const orderedValues = (originalQ.trueFalseRows || []).map((_, idx) => {
-                                                                        const val = parsed[idx];
-                                                                        return val === true ? 'Benar' : (val === false ? 'Salah' : '—');
-                                                                    });
-                                                                    displayAns = orderedValues.join(', ');
-                                                                    isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
-                                                                } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                                    const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
-                                                                    const cSet = new Set(normalize(originalQ.correctAnswer || '').split(',').map(s=>s.trim()));
-                                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-                                                                } else {
-                                                                    const normAns = normalize(ans);
-                                                                    const normKey = normalize(originalQ?.correctAnswer || '');
-                                                                    isCorrect = normAns === normKey;
-                                                                }
-                                                            } catch(e) {}
-
-                                                            return (
-                                                                <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                                    <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
-                                                                    <span className="shrink-0 font-bold">{count} ({pct}%)</span>
-                                                                </div>
-                                                            )
-                                                        })
-                                                ) : (
-                                                    <span className="text-slate-400 italic text-center py-1">Belum ada jawaban.</span>
-                                                )}
-                                            </div>
+                                            <div className="text-slate-500 italic">Lihat rincian jawaban di sistem.</div>
                                         )}
                                     </div>
                                 </div>
@@ -1577,86 +1550,44 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 {/* 5. BANK SOAL & KUNCI JAWABAN */}
                 <div>
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">5. Bank Soal & Kunci Jawaban</h1>
-                    </div>
+                    <h3 className="font-sans font-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-1">5. Bank Soal & Kunci</h3>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
-                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
-                                    <div className="flex gap-3">
-                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
+                                <div key={q.id} className="avoid-break border-b border-slate-300 pb-4 last:border-0">
+                                    <div className="flex gap-4">
+                                        <span className="font-bold text-base w-6 text-right">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
                                         <div className="flex-1">
-                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            <div className="text-sm text-slate-900 mb-3 prose prose-sm max-w-none font-serif leading-relaxed" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
                                             {q.options && (
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs mb-3">
                                                     {q.options.map((opt, i) => {
                                                         const isCorrect = 
                                                             (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
                                                             (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
                                                         
                                                         return (
-                                                            <div 
-                                                                key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900' : 'border-transparent'}`}
-                                                            >
-                                                                <span>{String.fromCharCode(65+i)}.</span>
-                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div key={i} className="flex gap-2">
+                                                                <span className={isCorrect ? "font-bold text-black" : "text-slate-600"}>{String.fromCharCode(65+i)}.</span>
+                                                                <div className={isCorrect ? "font-bold" : ""} dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
                                                         )
                                                     })}
                                                 </div>
                                             )}
 
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="mt-2 border border-slate-200 rounded overflow-hidden">
-                                                    <table className="w-full text-[10px]">
-                                                        <thead className="bg-slate-50">
-                                                            <tr>
-                                                                <th className="p-1.5 text-left font-bold text-slate-600">Pernyataan</th>
-                                                                <th className="p-1.5 text-center w-20 font-bold text-slate-600">Kunci</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {q.trueFalseRows.map((row, rIdx) => (
-                                                                <tr key={rIdx}>
-                                                                    <td className="p-1.5">{row.text}</td>
-                                                                    <td className={`p-1.5 text-center font-bold ${row.answer ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                        {row.answer ? 'BENAR' : 'SALAH'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                <div className="mt-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
-                                                    <p className="font-bold text-slate-500 text-[9px] uppercase mb-1">Kunci Pasangan:</p>
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {q.matchingPairs.map((pair, pIdx) => (
-                                                            <div key={pIdx} className="flex items-center gap-2">
-                                                                <span className="font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">{pair.left}</span>
-                                                                <span className="text-slate-400 text-[9px]">●──●</span>
-                                                                <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{pair.right}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
-                                                <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
-                                                    <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">
-                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban Singkat:'}
-                                                    </p>
-                                                    <div className="text-emerald-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
-                                                </div>
-                                            )}
+                                            {/* Key Display */}
+                                            <div className="text-[10px] uppercase font-bold text-slate-500 mt-2 pt-2 border-t border-slate-200">
+                                                Kunci: <span className="text-black ml-1">
+                                                    {q.questionType === 'MULTIPLE_CHOICE' ? q.correctAnswer : 
+                                                     q.questionType === 'TRUE_FALSE' ? 'Lihat Tabel Kebenaran' :
+                                                     q.questionType === 'MATCHING' ? 'Lihat Pasangan' :
+                                                     q.correctAnswer}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
