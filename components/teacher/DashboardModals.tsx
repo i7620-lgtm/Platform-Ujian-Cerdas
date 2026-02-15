@@ -207,13 +207,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     <span className="hidden sm:inline">Status</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 4: Progress */}
-                                            <th className="px-5 py-4 text-center w-40">
-                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                    <ChartBarIcon className="w-3.5 h-3.5 sm:hidden" />
-                                                    <span className="hidden sm:inline">Progres</span>
-                                                </div>
-                                            </th>
+                                            {/* Kolom 4: Progress - HANYA DI MODE REALTIME */}
+                                            {!isLargeScale && (
+                                                <th className="px-5 py-4 text-center w-40">
+                                                    <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                        <ChartBarIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                        <span className="hidden sm:inline">Progres</span>
+                                                    </div>
+                                                </th>
+                                            )}
                                             {/* Kolom 5: Terakhir Aktif */}
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -283,19 +285,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    {/* 4. Progress */}
-                                                    <td className="px-5 py-3">
-                                                        {isLargeScale ? (
-                                                            <div className="text-center text-[10px] text-slate-400 italic">-</div>
-                                                        ) : (
+                                                    {/* 4. Progress - HANYA DI MODE REALTIME */}
+                                                    {!isLargeScale && (
+                                                        <td className="px-5 py-3">
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
                                                                 <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                                                     <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${progress}%`}}></div>
                                                                 </div>
                                                                 <span className="text-[9px] font-bold text-slate-500">{answered} / {totalQ} Soal ({progress}%)</span>
                                                             </div>
-                                                        )}
-                                                    </td>
+                                                        </td>
+                                                    )}
                                                     {/* 5. Last Active */}
                                                     <td className="px-5 py-3 text-center">
                                                         {isLargeScale ? (
@@ -333,7 +333,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             ); 
                                         }) : (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-20 text-center">
+                                                <td colSpan={!isLargeScale ? 7 : 6} className="px-6 py-20 text-center">
                                                     <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
                                                         <UserIcon className="w-8 h-8 opacity-20"/>
                                                         <span className="text-sm font-medium italic">Belum ada siswa yang bergabung...</span>
