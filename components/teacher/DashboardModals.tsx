@@ -152,7 +152,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
                                 <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Sync Mode (Hemat Data)' : 'Realtime Mode'}
+                                {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
