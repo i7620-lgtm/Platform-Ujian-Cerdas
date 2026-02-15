@@ -420,41 +420,20 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [fixMessage, setFixMessage] = useState('');
 
-    useEffect(() => {
-        const fetchResults = async () => {
-            setIsLoading(true);
-            try {
-                const data = await storageService.getResults(exam.code, undefined);
-                
-                // --- AUTO RE-CALCULATION CHECK ---
-                let discrepancyCount = 0;
-                const recalculatedResults = data.map(r => {
-                    const stats = getCalculatedStats(r);
-                    if (stats.score !== r.score || stats.correct !== r.correctAnswers) {
-                        discrepancyCount++;
-                        return {
-                            ...r,
-                            score: stats.score,
-                            correctAnswers: stats.correct,
-                            totalQuestions: stats.correct + stats.wrong + stats.empty
-                        };
-                    }
-                    return r;
-                });
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+            const data = await storageService.getResults(exam.code, undefined);
+            setResults(data);
+        } catch (error) {
+            console.error("Failed to fetch results", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-                if (discrepancyCount > 0) {
-                    setFixMessage(`Terdeteksi ${discrepancyCount} nilai tidak sesuai (mungkin karena kunci jawaban berubah). Tampilan ini menggunakan hasil hitung ulang otomatis.`);
-                    setResults(recalculatedResults);
-                } else {
-                    setResults(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch results", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchResults();
+    useEffect(() => {
+        fetchData();
     }, [exam, teacherProfile]);
 
     const handleDownloadCorrected = () => {
@@ -473,7 +452,14 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
     const normalize = (str: string) => str.trim().toLowerCase();
 
+    // Enhanced checkAnswerStatus supporting Manual Grading Override
     const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+        // 1. Check for manual grade override first
+        const manualGradeKey = `_grade_${q.id}`;
+        if (studentAnswers[manualGradeKey]) {
+            return studentAnswers[manualGradeKey]; // 'CORRECT' or 'WRONG'
+        }
+
         const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
@@ -504,6 +490,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             } catch(e) { return 'WRONG'; }
         }
 
+        // For Essay, if no manual grade, default to wrong (needs grading) or just unverified.
+        // We return 'WRONG' to indicate it doesn't add points yet.
         return 'WRONG'; 
     };
 
@@ -553,6 +541,42 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
         else setExpandedStudent(id);
+    };
+
+    // MANUAL GRADING LOGIC
+    const rateQuestion = async (studentResult: Result, qId: string, isCorrect: boolean) => {
+        const newAnswers = { ...studentResult.answers, [`_grade_${qId}`]: isCorrect ? 'CORRECT' : 'WRONG' };
+        
+        // Recalculate Score locally
+        let correct = 0;
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        scorableQuestions.forEach(q => {
+            // Using newAnswers which contains the override
+            const status = checkAnswerStatus(q, newAnswers);
+            if (status === 'CORRECT') correct++;
+        });
+        const total = scorableQuestions.length;
+        const newScore = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+        // Optimistic Update
+        setResults(prev => prev.map(r => 
+            r.student.studentId === studentResult.student.studentId 
+            ? { ...r, answers: newAnswers, score: newScore, correctAnswers: correct } 
+            : r
+        ));
+
+        // Save to DB
+        try {
+            await supabase.from('results').update({
+                answers: newAnswers,
+                score: newScore,
+                correct_answers: correct
+            }).eq('exam_code', exam.code).eq('student_id', studentResult.student.studentId);
+        } catch (e) {
+            console.error("Grading failed", e);
+            alert("Gagal menyimpan nilai.");
+            fetchData(); // Revert
+        }
     };
 
     return (
@@ -725,7 +749,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
                                                                 </div>
-                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                <div className="flex flex-wrap gap-1 mt-2 mb-4">
                                                                     {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
                                                                         let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
@@ -734,6 +758,42 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                         return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
                                                                     })}
                                                                 </div>
+
+                                                                {/* MANUAL ESSAY GRADING UI */}
+                                                                {exam.questions.some(q => q.questionType === 'ESSAY') && (
+                                                                    <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                                        <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Penilaian Manual Soal Esai</h4>
+                                                                        <div className="space-y-4">
+                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q, idx) => {
+                                                                                const ans = r.answers[q.id];
+                                                                                const manualStatus = r.answers[`_grade_${q.id}`];
+                                                                                
+                                                                                return (
+                                                                                    <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
+                                                                                        <p className="font-bold text-slate-700 dark:text-slate-200 mb-1" dangerouslySetInnerHTML={{__html: q.questionText}}></p>
+                                                                                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2">
+                                                                                            {ans || <span className="text-slate-400">Tidak menjawab</span>}
+                                                                                        </div>
+                                                                                        <div className="flex gap-2">
+                                                                                            <button 
+                                                                                                onClick={() => rateQuestion(r, q.id, true)}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <CheckCircleIcon className="w-3 h-3"/> Benar
+                                                                                            </button>
+                                                                                            <button 
+                                                                                                onClick={() => rateQuestion(r, q.id, false)}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <XMarkIcon className="w-3 h-3"/> Salah
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
 
                                                                 {r.activityLog && r.activityLog.length > 0 && (
                                                                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
