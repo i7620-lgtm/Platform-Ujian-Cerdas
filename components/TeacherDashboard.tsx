@@ -5,7 +5,7 @@ import {
     CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
-    ClockIcon,
+    ClockIcon, 
     CalendarDaysIcon,
     XMarkIcon,
     PencilIcon,
@@ -62,7 +62,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         showResultToStudent: true,
         showCorrectAnswer: false,
         enablePublicStream: false,
-        disableRealtime: false, // Default false
+        disableRealtime: true, // Default true: Normal Mode as basic mode
         trackLocation: false,
         subject: 'Lainnya',
         classLevel: 'Lainnya',
