@@ -12,13 +12,15 @@ import {
     CloudArrowUpIcon,
     MoonIcon,
     SunIcon,
-    TableCellsIcon
+    TableCellsIcon,
+    QrCodeIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer, UserManagementView } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage';
+import { InvitationModal } from './InvitationModal';
 
 // Lazy Load Analytics View for Super Admin
 const AnalyticsView = React.lazy(() => import('./teacher/AnalyticsView'));
@@ -80,6 +82,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [selectedFinishedExam, setSelectedFinishedExam] = useState<Exam | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
 
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
@@ -258,6 +261,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
                         <div className="flex items-center gap-4">
                             <button 
+                                onClick={() => setIsInviteOpen(true)}
+                                className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-800 shadow-sm"
+                            >
+                                <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Undangan</span>
+                            </button>
+                            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                            <button 
                                 onClick={toggleTheme} 
                                 className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
                                 title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
@@ -347,6 +357,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Personal Invitation Modal */}
+            <InvitationModal 
+                isOpen={isInviteOpen} 
+                onClose={() => setIsInviteOpen(false)}
+                teacherName={teacherProfile.fullName}
+                schoolName={teacherProfile.school}
+            />
         </div>
     );
 };
