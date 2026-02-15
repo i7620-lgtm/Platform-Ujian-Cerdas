@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
@@ -313,6 +314,21 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                  </div>
             </header>
 
+            {/* MONITORING BADGE */}
+            {activeExam.config.detectBehavior && (
+                <div className="fixed top-20 right-4 z-40 animate-fade-in pointer-events-none">
+                    <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-indigo-100 dark:border-indigo-900 shadow-lg rounded-full px-4 py-1.5 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                            {activeExam.config.continueWithPermission ? 'Diawasi & Terkunci' : 'Diawasi Sistem'}
+                        </span>
+                    </div>
+                </div>
+            )}
+
             <div className={`fixed top-16 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-50 border-b border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? 'translate-y-0 opacity-100 visible' : '-translate-y-full opacity-0 invisible'}`}>
                 <div className="max-w-4xl mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
                     <div className="flex flex-wrap gap-2 justify-center">
@@ -490,4 +506,3 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         </div>
     );
 };
- 
