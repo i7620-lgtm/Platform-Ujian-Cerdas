@@ -6,27 +6,27 @@ import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
     ListBulletIcon, 
-    PencilIcon, 
-    FileTextIcon, 
-    CogIcon, 
-    ClockIcon, 
-    CalendarDaysIcon, 
-    ChartBarIcon, 
-    CheckCircleIcon, 
-    TrashIcon, 
-    DocumentDuplicateIcon, 
-    EyeIcon, 
-    XMarkIcon, 
-    ShareIcon, 
-    DocumentArrowUpIcon, 
-    TableCellsIcon, 
-    UserIcon, 
-    LockClosedIcon, 
-    ChevronDownIcon, 
-    ChevronUpIcon, 
-    PrinterIcon, 
-    ExclamationTriangleIcon, 
-    QrCodeIcon 
+    PencilIcon,
+    FileTextIcon,
+    CogIcon,
+    ClockIcon,
+    CalendarDaysIcon,
+    ChartBarIcon,
+    CheckCircleIcon,
+    TrashIcon,
+    DocumentDuplicateIcon,
+    EyeIcon,
+    XMarkIcon,
+    ShareIcon,
+    DocumentArrowUpIcon,
+    TableCellsIcon,
+    UserIcon,
+    LockClosedIcon,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    PrinterIcon,
+    ExclamationTriangleIcon,
+    QrCodeIcon
 } from '../Icons';
 
 // --- SHARED COMPONENTS (Moved from Modals for Reusability) ---
@@ -1067,44 +1067,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             <style>{`
                 @media print {
                     @page { margin: 1cm; size: portrait; }
-                    
-                    /* FORCE LIGHT MODE */
-                    :root { color-scheme: light; }
-                    
-                    body, html { 
-                        -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact;
-                        background-color: #ffffff !important; 
-                        color: #0f172a !important; /* slate-900 */
-                    }
-
-                    /* RESET DARK MODE UTILITIES MANUALLY FOR PRINT */
-                    .dark .text-white, .text-white { color: #000 !important; }
-                    .dark .bg-slate-900, .bg-slate-900 { background-color: #fff !important; color: #000 !important; }
-                    
-                    /* FORCE SPECIFIC COLORS TO LIGHT THEME VALUES */
-                    .bg-white { background-color: #ffffff !important; }
-                    .bg-slate-50 { background-color: #f8fafc !important; }
-                    .bg-slate-100 { background-color: #f1f5f9 !important; }
-                    .bg-slate-200 { background-color: #e2e8f0 !important; }
-                    
-                    .text-slate-300 { color: #cbd5e1 !important; }
-                    .text-slate-400 { color: #94a3b8 !important; }
-                    .text-slate-500 { color: #64748b !important; }
-                    .text-slate-600 { color: #475569 !important; }
-                    .text-slate-700 { color: #334155 !important; }
-                    .text-slate-800 { color: #1e293b !important; }
-                    .text-slate-900 { color: #0f172a !important; }
-
-                    .border-slate-200 { border-color: #e2e8f0 !important; }
-                    .border-slate-300 { border-color: #cbd5e1 !important; }
-                    
-                    /* Status Colors */
-                    .bg-emerald-50 { background-color: #ecfdf5 !important; }
-                    .text-emerald-700 { color: #047857 !important; }
-                    .bg-rose-50 { background-color: #fff1f2 !important; }
-                    .text-rose-700 { color: #be123c !important; }
-                    
+                    body { -webkit-print-color-adjust: exact; background: white !important; }
                     .no-print { display: none !important; }
                     .print-only { display: block !important; }
                     .max-w-5xl { max-width: none !important; margin: 0 !important; }
