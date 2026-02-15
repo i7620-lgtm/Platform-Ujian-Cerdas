@@ -744,6 +744,17 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                         return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
                                                                     })}
                                                                 </div>
+
+                                                                {r.activityLog && r.activityLog.length > 0 && (
+                                                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                                        <h4 className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-2">
+                                                                            <ExclamationTriangleIcon className="w-3 h-3"/> Riwayat Aktivitas & Kecurangan
+                                                                        </h4>
+                                                                        <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4 font-mono bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                            {r.activityLog.map((log, i) => <li key={i}>{log}</li>)}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     )}
