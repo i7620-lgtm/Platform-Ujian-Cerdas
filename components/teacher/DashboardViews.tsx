@@ -1,7 +1,7 @@
- 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Question, Result, UserProfile, AccountType } from '../../types';
-import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage } from './examUtils';
+import { extractTextFromPdf, parsePdfAndAutoCrop, convertPdfToImages, parseQuestionsFromPlainText, compressImage, analyzeStudentPerformance } from './examUtils';
 import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
@@ -241,6 +241,7 @@ const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colo
     return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass} ${darkClass}`}>{text}</span>); 
 };
 
+// ... (CREATION, DRAFTS, ONGOING, UPCOMING, FINISHED, USERMANAGEMENT - NO CHANGES) ...
 // --- CREATION VIEW ---
 interface CreationViewProps { onQuestionsGenerated: (questions: Question[], mode: 'manual' | 'auto') => void; }
 type InputMethod = 'paste' | 'upload';
@@ -1484,6 +1485,58 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             );
                         })}
                     </div>
+                </div>
+
+                <div className="page-break"></div>
+
+                {/* 4. NEW PAGE: LAMPIRAN ANALISIS INDIVIDU (REQUESTED FEATURE) */}
+                <div className="avoid-break">
+                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
+                        <h1 className="text-lg font-black uppercase tracking-tight">4. Lampiran Analisis Individu</h1>
+                        <p className="text-xs text-slate-500">Rekapitulasi penguasaan materi per siswa.</p>
+                    </div>
+
+                    <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                        <thead>
+                            <tr className="bg-slate-100">
+                                <th className="border border-slate-300 p-2 text-left w-8">No</th>
+                                <th className="border border-slate-300 p-2 text-left w-32">Nama Siswa</th>
+                                <th className="border border-slate-300 p-2 text-center w-12">Nilai</th>
+                                <th className="border border-slate-300 p-2 text-left">Analisis Kategori (Penguasaan)</th>
+                                <th className="border border-slate-300 p-2 text-left w-48">Rekomendasi Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {results.map((r, index) => {
+                                // Use the new Analysis Engine Logic here for Print View
+                                const analysis = analyzeStudentPerformance(exam, r);
+                                
+                                return (
+                                    <tr key={r.student.studentId} className="avoid-break">
+                                        <td className="border border-slate-300 p-2 text-center">{index + 1}</td>
+                                        <td className="border border-slate-300 p-2 font-bold">{r.student.fullName}</td>
+                                        <td className="border border-slate-300 p-2 text-center font-bold">{Math.round(r.score)}</td>
+                                        <td className="border border-slate-300 p-2">
+                                            <div className="flex flex-wrap gap-2">
+                                                {analysis.stats.map(stat => (
+                                                    <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                        <span className="font-semibold">{stat.name}:</span>
+                                                        <span className={stat.percentage < 50 ? 'text-rose-600 font-bold' : stat.percentage < 80 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                                            {stat.percentage}%
+                                                        </span>
+                                                    </span>
+                                                ))}
+                                                {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
+                                            </div>
+                                        </td>
+                                        <td className="border border-slate-300 p-2 font-medium italic text-slate-700">
+                                            "{analysis.recommendation}"
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
