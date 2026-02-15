@@ -166,11 +166,39 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // ARCHIVE & EXCEL LOGIC (Refactored to use Transaction Safe Service)
     const handleArchiveExam = async (exam: Exam) => {
-        const confirmMsg = `Konfirmasi Finalisasi & Arsip?\n\nSistem akan:\n1. Menghitung & menyimpan statistik ke Database Pusat (Untuk Analisis).\n2. Memindahkan data detail ke Cloud Storage (Cold Data).\n3. Menghapus data detail dari Database SQL (Optimasi).\n\nPastikan proses selesai 100%.`;
-        if (!confirm(confirmMsg)) return;
-        
         setIsLoadingArchive(true);
         try {
+            // --- VALIDATION FOR ESSAY GRADING ---
+            const essayQuestions = exam.questions.filter(q => q.questionType === 'ESSAY');
+            if (essayQuestions.length > 0) {
+                // Fetch results first to check
+                const currentResults = await storageService.getResults(exam.code, undefined);
+                
+                let ungradedCount = 0;
+                for (const r of currentResults) {
+                    for (const q of essayQuestions) {
+                        const answer = r.answers[q.id];
+                        // If answered but no grade key found
+                        if (answer && !r.answers[`_grade_${q.id}`]) {
+                            ungradedCount++;
+                        }
+                    }
+                }
+
+                if (ungradedCount > 0) {
+                    alert(`Gagal Arsip: Ditemukan ${ungradedCount} jawaban esai yang belum diperiksa.\n\nSilakan buka menu 'Lihat Hasil' dan berikan penilaian manual (Benar/Salah) untuk setiap jawaban esai siswa terlebih dahulu.`);
+                    setIsLoadingArchive(false);
+                    return;
+                }
+            }
+            // --- END VALIDATION ---
+
+            const confirmMsg = `Konfirmasi Finalisasi & Arsip?\n\nSistem akan:\n1. Menghitung & menyimpan statistik ke Database Pusat (Untuk Analisis).\n2. Memindahkan data detail ke Cloud Storage (Cold Data).\n3. Menghapus data detail dari Database SQL (Optimasi).\n\nPastikan proses selesai 100%.`;
+            if (!confirm(confirmMsg)) {
+                setIsLoadingArchive(false);
+                return;
+            }
+        
             // Using the new Transaction Safe method
             const { backupUrl } = await storageService.performFullArchive(exam);
             
