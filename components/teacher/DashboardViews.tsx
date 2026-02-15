@@ -6,27 +6,27 @@ import { storageService } from '../../services/storage';
 import { 
     CloudArrowUpIcon, 
     ListBulletIcon, 
-    PencilIcon,
-    FileTextIcon,
-    CogIcon,
-    ClockIcon,
-    CalendarDaysIcon,
-    ChartBarIcon,
-    CheckCircleIcon,
-    TrashIcon,
-    DocumentDuplicateIcon,
-    EyeIcon,
-    XMarkIcon,
-    ShareIcon,
-    DocumentArrowUpIcon,
-    TableCellsIcon,
-    UserIcon,
-    LockClosedIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    PrinterIcon,
-    ExclamationTriangleIcon,
-    QrCodeIcon
+    PencilIcon, 
+    FileTextIcon, 
+    CogIcon, 
+    ClockIcon, 
+    CalendarDaysIcon, 
+    ChartBarIcon, 
+    CheckCircleIcon, 
+    TrashIcon, 
+    DocumentDuplicateIcon, 
+    EyeIcon, 
+    XMarkIcon, 
+    ShareIcon, 
+    DocumentArrowUpIcon, 
+    TableCellsIcon, 
+    UserIcon, 
+    LockClosedIcon, 
+    ChevronDownIcon, 
+    ChevronUpIcon, 
+    PrinterIcon, 
+    ExclamationTriangleIcon, 
+    QrCodeIcon 
 } from '../Icons';
 
 // --- SHARED COMPONENTS (Moved from Modals for Reusability) ---
@@ -1067,12 +1067,76 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             <style>{`
                 @media print {
                     @page { margin: 1cm; size: portrait; }
-                    body { -webkit-print-color-adjust: exact; background: white !important; }
-                    .no-print { display: none !important; }
-                    .print-only { display: block !important; }
-                    .max-w-5xl { max-width: none !important; margin: 0 !important; }
-                    table { border-collapse: collapse; width: 100%; font-size: 10px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 4px; }
+                    
+                    /* FORCE LIGHT THEME ROOT VARIABLES */
+                    :root {
+                        color-scheme: light !important;
+                    }
+                    
+                    /* RESET HTML/BODY */
+                    html, body {
+                        background-color: #ffffff !important;
+                        color: #0f172a !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+
+                    /* RESET DARK MODE BACKGROUNDS TO WHITE */
+                    .dark .bg-slate-900, .bg-slate-900,
+                    .dark .bg-slate-800, .bg-slate-800,
+                    .dark .bg-slate-950, .bg-slate-950 {
+                        background-color: #ffffff !important;
+                        color: #0f172a !important;
+                        border-color: #cbd5e1 !important; /* Slate 300 */
+                    }
+
+                    /* RESET DARK MODE TEXT TO DARK */
+                    .dark .text-white, .text-white,
+                    .dark .text-slate-100, .text-slate-100,
+                    .dark .text-slate-200, .text-slate-200,
+                    .dark .text-slate-300, .text-slate-300,
+                    .dark .text-slate-400, .text-slate-400 {
+                        color: #0f172a !important;
+                    }
+
+                    /* PRESERVE SEMANTIC BACKGROUNDS (Correct/Wrong) BUT FIX TEXT */
+                    .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-slate-50, .bg-slate-100 {
+                        background-color: #f1f5f9 !important; /* Force light gray/white-ish base */
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    
+                    /* Force explicit colors for semantic badges to ensure contrast on paper */
+                    .bg-emerald-100, .dark .bg-emerald-900\\/30 {
+                        background-color: #d1fae5 !important;
+                        color: #065f46 !important;
+                    }
+                    .bg-rose-100, .dark .bg-rose-900\\/30 {
+                        background-color: #ffe4e6 !important;
+                        color: #9f1239 !important;
+                    }
+                    
+                    /* BORDERS */
+                    .border-slate-100, .dark .border-slate-700,
+                    .border-slate-200, .dark .border-slate-600 {
+                        border-color: #cbd5e1 !important;
+                        border-width: 1px !important;
+                        border-style: solid !important;
+                    }
+
+                    /* HIDE NON-PRINT ELEMENTS */
+                    .no-print, .print\\:hidden { display: none !important; }
+                    
+                    /* LAYOUT FIXES */
+                    .max-w-5xl { max-width: none !important; margin: 0 !important; width: 100% !important; }
+                    .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+                    
+                    /* TABLE STYLING FOR PRINT */
+                    table { width: 100% !important; border-collapse: collapse !important; font-size: 10pt !important; }
+                    th, td { border: 1px solid #94a3b8 !important; padding: 4px 8px !important; color: #0f172a !important; }
+                    thead th { background-color: #f1f5f9 !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
+                    
+                    /* PAGE BREAKS */
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
                 }
