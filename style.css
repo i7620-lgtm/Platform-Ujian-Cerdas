@@ -30,4 +30,61 @@
     display: inline-block;
     vertical-align: middle;
   }
+
+  /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
+  
+  /* Target both the Editor (.wysiwyg-content) and Tailwind Typography (.prose) */
+  .wysiwyg-content table, 
+  .prose table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 0.5rem 0; 
+  } 
+
+  /* Cell Borders & Spacing */
+  .wysiwyg-content th, .wysiwyg-content td,
+  .prose th, .prose td { 
+    border: 1px solid #cbd5e1; 
+    padding: 0.5rem; 
+    min-width: 30px; 
+    color: inherit; 
+  } 
+
+  /* Dark Mode Borders */
+  .dark .wysiwyg-content th, .dark .wysiwyg-content td,
+  .dark .prose th, .dark .prose td { 
+    border-color: #334155; 
+  } 
+
+  /* Header Styling (Light Mode) */
+  .wysiwyg-content th,
+  .prose th, .prose thead th { 
+    background-color: #f8fafc; 
+    font-weight: bold; 
+    text-align: left; 
+  } 
+
+  /* Header Styling (Dark Mode) - CRITICAL FIX */
+  .dark .wysiwyg-content th,
+  .dark .prose th, .dark .prose thead th { 
+    background-color: #1e293b !important; /* Slate 800 */
+    color: #f1f5f9 !important; /* Slate 100 */
+    border-color: #334155;
+  } 
+
+  /* Body Cell Styling (Dark Mode) */
+  .dark .wysiwyg-content td,
+  .dark .prose td { 
+    background-color: transparent; 
+    color: #f1f5f9; 
+  }
+
+  /* Wysiwyg Specific Lists & Quotes (Replicating Editor Styles Globally) */
+  .wysiwyg-content:empty:before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; } 
+  .dark .wysiwyg-content:empty:before { color: #64748b; } 
+  .wysiwyg-content ul { list-style-type: disc; padding-left: 1.5rem; } 
+  .wysiwyg-content ol { list-style-type: decimal; padding-left: 1.5rem; } 
+  .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; } 
+  .dark .wysiwyg-content blockquote { border-color: #475569; color: #94a3b8; } 
+  .dark .wysiwyg-content { color: #f1f5f9; }
 }
