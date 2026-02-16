@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -9,14 +9,16 @@ import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './type
 import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
+import { TermsPage, PrivacyPage } from './components/LegalPages';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
+  const [previousView, setPreviousView] = useState<View>('SELECTOR');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
@@ -385,7 +387,9 @@ const App: React.FC = () => {
         {view === 'TEACHER_LOGIN' && (
             <TeacherLogin 
                 onLoginSuccess={(p) => { setTeacherProfile(p); setView('TEACHER_DASHBOARD'); }} 
-                onBack={() => setView('SELECTOR')} 
+                onBack={() => setView('SELECTOR')}
+                onViewTerms={() => { setPreviousView('TEACHER_LOGIN'); setView('TERMS'); }}
+                onViewPrivacy={() => { setPreviousView('TEACHER_LOGIN'); setView('PRIVACY'); }}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
             />
@@ -465,6 +469,15 @@ const App: React.FC = () => {
             isOpen={isInviteOpen} 
             onClose={() => setIsInviteOpen(false)} 
         />
+
+        {/* Legal Pages */}
+        {view === 'TERMS' && (
+            <TermsPage onBack={() => setView(previousView)} />
+        )}
+
+        {view === 'PRIVACY' && (
+            <PrivacyPage onBack={() => setView(previousView)} />
+        )}
     </div>
   );
 };

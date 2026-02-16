@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { UserIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon, SunIcon, MoonIcon } from './Icons';
 import type { TeacherProfile } from '../types';
@@ -6,17 +7,20 @@ import { storageService } from '../services/storage';
 interface TeacherLoginProps {
   onLoginSuccess: (profile: TeacherProfile) => void;
   onBack: () => void;
+  onViewTerms?: () => void;
+  onViewPrivacy?: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
 }
 
-export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme }) => {
+export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBack, onViewTerms, onViewPrivacy, isDarkMode, toggleTheme }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [school, setSchool] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -33,6 +37,10 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
         }
         if (password !== confirmPassword) {
             setError("Konfirmasi password tidak cocok.");
+            return;
+        }
+        if (!agreedToTerms) {
+            setError("Anda harus menyetujui Syarat & Ketentuan serta Kebijakan Privasi.");
             return;
         }
     }
@@ -59,6 +67,9 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     setError('');
     setPassword('');
     setConfirmPassword('');
+    if (!isRegistering) {
+        setAgreedToTerms(false);
+    }
   };
 
   return (
@@ -178,6 +189,26 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                             )}
                         </div>
                     )}
+
+                    {isRegistering && (
+                        <div className="flex items-start gap-3 mt-4 px-1">
+                            <div className="relative flex items-center mt-0.5">
+                                <input 
+                                    type="checkbox" 
+                                    id="terms" 
+                                    checked={agreedToTerms} 
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)} 
+                                    className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-300 transition-all checked:border-indigo-600 checked:bg-indigo-600 dark:border-slate-600 dark:checked:border-indigo-500 dark:checked:bg-indigo-500"
+                                />
+                                <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                </div>
+                            </div>
+                            <label htmlFor="terms" className="text-xs text-slate-500 dark:text-slate-400 leading-tight select-none">
+                                Saya setuju dengan <button type="button" onClick={onViewTerms} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Syarat & Ketentuan</button> dan <button type="button" onClick={onViewPrivacy} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Kebijakan Privasi</button> layanan ini.
+                            </label>
+                        </div>
+                    )}
                     
                     {error && (
                         <div className="text-rose-500 text-xs bg-rose-50 dark:bg-rose-900/20 p-4 rounded-2xl text-center font-bold border border-rose-100 dark:border-rose-800 animate-shake">
@@ -206,4 +237,3 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     </div>
   );
 };
- 
