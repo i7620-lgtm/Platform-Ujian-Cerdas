@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList } from './teacher/examUtils';
 
 interface StudentResultPageProps {
   result: Result;
@@ -78,8 +78,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 isCorrect = studentAns === correctAns;
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-                const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+                const sSet = new Set(parseList(studentAns).map(normalize));
+                const cSet = new Set(parseList(correctAns).map(normalize));
                 isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
             }
             else if (q.questionType === 'TRUE_FALSE') {
@@ -280,8 +280,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                                                     isCorrect = normalizedStudent === normalizedCorrect;
                                                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                    const sSet = new Set(normalizedStudent.split(',').map(s=>s.trim()));
-                                                    const cSet = new Set(normalizedCorrect.split(',').map(s=>s.trim()));
+                                                    const sSet = new Set(parseList(normalizedStudent).map(normalize));
+                                                    const cSet = new Set(parseList(normalizedCorrect).map(normalize));
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
                                                      isCorrect = JSON.stringify(studentAns) === JSON.stringify(correctAns); 
