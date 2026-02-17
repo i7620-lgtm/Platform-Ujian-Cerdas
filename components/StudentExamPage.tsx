@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon, SignalIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { parseList } from './teacher/examUtils';
@@ -70,6 +70,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     
     const [isNavOpen, setIsNavOpen] = useState(false);
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+    const [showConfigIntro, setShowConfigIntro] = useState(true);
 
     const [activeExam, setActiveExam] = useState<Exam>(exam);
     const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
@@ -283,6 +284,74 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
+            {/* Modal Informasi Aturan Ujian */}
+            {showConfigIntro && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white dark:border-slate-800 animate-gentle-slide">
+                        <div className="p-8 sm:p-10">
+                            <div className="flex justify-center mb-8">
+                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl text-indigo-600 dark:text-indigo-400">
+                                    <ShieldCheckIcon className="w-10 h-10" />
+                                </div>
+                            </div>
+
+                            <h2 className="text-2xl font-black text-slate-800 dark:text-white text-center mb-2 tracking-tight">Aturan Ujian</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-8 font-medium">Mohon perhatikan konfigurasi ujian berikut:</p>
+
+                            <div className="space-y-4 mb-10">
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <ClockIcon className="w-5 h-5 text-indigo-500 shrink-0" />
+                                    <div>
+                                        <p className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Batas Waktu</p>
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{activeExam.config.timeLimit} Menit</p>
+                                    </div>
+                                </div>
+
+                                {activeExam.config.detectBehavior && (
+                                    <div className="flex items-center gap-4 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30">
+                                        <LockClosedIcon className="w-5 h-5 text-rose-500 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-rose-400 dark:text-rose-500 tracking-widest">Pengawasan Aktif</p>
+                                            <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
+                                                {activeExam.config.continueWithPermission ? "Akses Terkunci Otomatis Jika Curang" : "Aktivitas Tercatat Sistem"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(activeExam.config.shuffleQuestions || activeExam.config.shuffleAnswers) && (
+                                    <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                                        <ArrowsRightLeftIcon className="w-5 h-5 text-blue-500 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-blue-400 dark:text-blue-500 tracking-widest">Mode Acak</p>
+                                            <p className="text-sm font-bold text-blue-700 dark:text-blue-300">Soal & Jawaban Diacak</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeExam.config.trackLocation && (
+                                    <div className="flex items-center gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <MapPinIcon className="w-5 h-5 text-emerald-500 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-emerald-400 dark:text-emerald-500 tracking-widest">Pelacakan Lokasi</p>
+                                            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Koordinat GPS Dicatat</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button 
+                                onClick={() => setShowConfigIntro(false)}
+                                className="w-full py-4 bg-slate-900 dark:bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:shadow-indigo-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+                            >
+                                <span>Mulai Mengerjakan</span>
+                                <CheckCircleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <header 
                 className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 h-16 flex items-center ${isNavOpen ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200/60 dark:border-slate-800/60'}`}
             >
