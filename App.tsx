@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -6,15 +6,16 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
+import { TutorialPage } from './components/TutorialPage';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -375,6 +376,14 @@ const App: React.FC = () => {
                             <UserIcon className="w-4 h-4" />
                             Area Pengajar
                         </button>
+
+                        <button 
+                            onClick={() => setView('TUTORIAL')} 
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-transparent text-slate-400 dark:text-slate-500 rounded-xl border border-transparent hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-all duration-300 font-bold text-xs uppercase tracking-widest active:scale-[0.98]"
+                        >
+                            <BookOpenIcon className="w-4 h-4" />
+                            Panduan & Fitur
+                        </button>
                     </div>
 
                     <p className="mt-12 text-center text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">
@@ -477,6 +486,11 @@ const App: React.FC = () => {
 
         {view === 'PRIVACY' && (
             <PrivacyPage onBack={() => setView(previousView)} />
+        )}
+
+        {/* Tutorial Page */}
+        {view === 'TUTORIAL' && (
+            <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
     </div>
   );
