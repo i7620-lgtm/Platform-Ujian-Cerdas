@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -371,7 +370,7 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TEACHER_LOGIN')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50/50 dark:hover:bg-slate-700 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-xl border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all duration-300 font-bold text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
                         >
                             <UserIcon className="w-4 h-4" />
                             Area Pengajar
@@ -379,7 +378,7 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TUTORIAL')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50/50 dark:hover:bg-slate-700 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-xl border border-teal-100 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-all duration-300 font-bold text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
                         >
                             <BookOpenIcon className="w-4 h-4" />
                             Panduan & Fitur
