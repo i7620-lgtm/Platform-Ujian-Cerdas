@@ -43,6 +43,17 @@ export interface StudentAnalysis {
     recommendation: string;
 }
 
+// --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
+export const parseList = (str: string | undefined | null): string[] => {
+    if (!str) return [];
+    try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) return parsed.map(String);
+    } catch(e) {}
+    // Fallback: handle legacy comma-separated
+    return str.split(',').map(s => s.trim()).filter(s => s !== '');
+};
+
 // --- ANALYTICS ENGINE (Pure Functions) ---
 
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
@@ -58,8 +69,8 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
             return normAns === normKey;
         } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(normAns.split(',').map(s => s.trim()));
-            const cSet = new Set(normKey.split(',').map(s => s.trim()));
+            const sSet = new Set(parseList(normAns).map(normalize));
+            const cSet = new Set(parseList(normKey).map(normalize));
             return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
         } else if (q.questionType === 'TRUE_FALSE') {
             try {
@@ -136,8 +147,8 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                 isCorrect = normAns === normKey;
             } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(normAns.split(',').map(s => s.trim()));
-                const cSet = new Set(normKey.split(',').map(s => s.trim()));
+                const sSet = new Set(parseList(normAns).map(normalize));
+                const cSet = new Set(parseList(normKey).map(normalize));
                 isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
             } else if (q.questionType === 'TRUE_FALSE') {
                 try {
