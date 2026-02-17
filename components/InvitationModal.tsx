@@ -51,16 +51,19 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                     #invitation-card {
                         width: 400px !important;
                         max-width: 90% !important;
+                        max-height: none !important;
                         border: 2px solid #e2e8f0 !important;
                         box-shadow: none !important;
                         border-radius: 24px !important;
-                        overflow: hidden;
+                        overflow: visible !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                         background-color: white !important;
                         color: black !important;
                         display: block !important;
-                        height: auto !important;
+                    }
+                    #invitation-card > div {
+                        overflow: visible !important;
                     }
                     .no-print { 
                         display: none !important; 
@@ -75,12 +78,12 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             `}</style>
 
             {/* Wrapper div for print targeting */}
-            <div className="print-container w-full flex justify-center max-h-full">
-                <div id="invitation-card" className="bg-white dark:bg-slate-800 w-full max-w-md max-h-[90vh] flex flex-col rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 relative animate-slide-in-up">
+            <div className="print-container w-full max-w-md flex flex-col justify-center">
+                <div id="invitation-card" className="bg-white dark:bg-slate-800 w-full max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-700 relative animate-slide-in-up flex flex-col">
                     {/* Header Decoration */}
                     <div className="h-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 print-gradient shrink-0"></div>
                     
-                    <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-rose-50 hover:text-rose-500 text-slate-400 rounded-full transition-colors no-print">
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-rose-50 hover:text-rose-500 text-slate-400 rounded-full transition-colors no-print z-10">
                         <XMarkIcon className="w-5 h-5"/>
                     </button>
 
