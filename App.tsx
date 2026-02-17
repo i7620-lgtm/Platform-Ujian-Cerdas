@@ -379,7 +379,7 @@ const App: React.FC = () => {
 
                         <button 
                             onClick={() => setView('TUTORIAL')} 
-                            className="w-full flex items-center justify-center gap-2 p-4 bg-transparent text-slate-400 dark:text-slate-500 rounded-xl border border-transparent hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-all duration-300 font-bold text-xs uppercase tracking-widest active:scale-[0.98]"
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50/50 dark:hover:bg-slate-700 transition-all duration-300 font-bold text-sm hover:shadow-sm active:scale-[0.98]"
                         >
                             <BookOpenIcon className="w-4 h-4" />
                             Panduan & Fitur
