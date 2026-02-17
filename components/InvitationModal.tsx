@@ -59,6 +59,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                         print-color-adjust: exact !important;
                         background-color: white !important;
                         color: black !important;
+                        display: block !important;
+                        height: auto !important;
                     }
                     .no-print { 
                         display: none !important; 
@@ -73,16 +75,16 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             `}</style>
 
             {/* Wrapper div for print targeting */}
-            <div className="print-container">
-                <div id="invitation-card" className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-700 relative animate-slide-in-up">
+            <div className="print-container w-full flex justify-center max-h-full">
+                <div id="invitation-card" className="bg-white dark:bg-slate-800 w-full max-w-md max-h-[90vh] flex flex-col rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 relative animate-slide-in-up">
                     {/* Header Decoration */}
-                    <div className="h-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 print-gradient"></div>
+                    <div className="h-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 print-gradient shrink-0"></div>
                     
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-rose-50 hover:text-rose-500 text-slate-400 rounded-full transition-colors no-print">
+                    <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-rose-50 hover:text-rose-500 text-slate-400 rounded-full transition-colors no-print">
                         <XMarkIcon className="w-5 h-5"/>
                     </button>
 
-                    <div className="p-8 text-center">
+                    <div className="p-8 text-center overflow-y-auto custom-scrollbar">
                         {/* Logo Area */}
                         <div className="flex justify-center mb-6">
                             <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl print-bg-indigo-50">
