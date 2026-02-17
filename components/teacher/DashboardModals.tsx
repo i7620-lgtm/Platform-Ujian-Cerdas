@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
@@ -6,7 +6,7 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
-import { calculateAggregateStats } from './examUtils';
+import { calculateAggregateStats, parseList } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
@@ -470,8 +470,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             return studentAns === correctAns ? 'CORRECT' : 'WRONG';
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(studentAns.split(',').map(s=>s.trim()));
-            const cSet = new Set(correctAns.split(',').map(s=>s.trim()));
+            const sSet = new Set(parseList(studentAns).map(normalize));
+            const cSet = new Set(parseList(correctAns).map(normalize));
             if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
             return 'WRONG';
         }
