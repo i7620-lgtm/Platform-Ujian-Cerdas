@@ -4,6 +4,7 @@ import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
+import { parseList } from './teacher/examUtils';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -29,8 +30,8 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(normalize(studentAnswer).split(',').map((s: string) => s.trim()));
-             const correctSet = new Set(normalize(q.correctAnswer).split(',').map((s: string) => s.trim()));
+             const studentSet = new Set(parseList(studentAnswer).map(normalize));
+             const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                  correctCount++;
              }
@@ -406,10 +407,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                                 <div className="grid grid-cols-1 gap-3">
                                                     {q.options.map((opt, i) => {
-                                                        const currentAns = answers[q.id] ? answers[q.id].split(',') : [];
+                                                        const currentAns = parseList(answers[q.id]);
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
-                                                            <button key={i} onClick={() => { const newAns = isSelected ? currentAns.filter(a => a !== opt) : [...currentAns, opt]; handleAnswerChange(q.id, newAns.join(',')); }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                                            <button key={i} onClick={() => { 
+                                                                const newAns = isSelected ? currentAns.filter(a => a !== opt) : [...currentAns, opt]; 
+                                                                handleAnswerChange(q.id, JSON.stringify(newAns)); 
+                                                            }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
                                                                 <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                             </button>
