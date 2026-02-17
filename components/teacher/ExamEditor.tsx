@@ -8,7 +8,7 @@ import {
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
-import { compressImage } from './examUtils';
+import { compressImage, parseList } from './examUtils';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -214,21 +214,43 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleOptionTextChange = (qId: string, optIndex: number, text: string) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === qId && q.options) {
-                const oldOption = q.options[optIndex]; const newOptions = [...q.options]; newOptions[optIndex] = text; let newCorrectAnswer = q.correctAnswer;
-                if (q.questionType === 'MULTIPLE_CHOICE') { if (q.correctAnswer === oldOption) newCorrectAnswer = text; } 
-                else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { let answers = q.correctAnswer ? q.correctAnswer.split(',') : []; if (answers.includes(oldOption)) { answers = answers.map(a => a === oldOption ? text : a); newCorrectAnswer = answers.join(','); } }
+                const oldOption = q.options[optIndex]; 
+                const newOptions = [...q.options]; 
+                newOptions[optIndex] = text; 
+                let newCorrectAnswer = q.correctAnswer;
+                
+                if (q.questionType === 'MULTIPLE_CHOICE') { 
+                    if (q.correctAnswer === oldOption) newCorrectAnswer = text; 
+                } 
+                else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
+                    let answers = parseList(q.correctAnswer);
+                    if (answers.includes(oldOption)) { 
+                        answers = answers.map(a => a === oldOption ? text : a); 
+                        newCorrectAnswer = JSON.stringify(answers); 
+                    } 
+                }
                 return { ...q, options: newOptions, correctAnswer: newCorrectAnswer };
             }
             return q;
         }));
     };
     const handleCorrectAnswerChange = (questionId: string, answer: string) => setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
+    
     const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
         setQuestions(prev => prev.map(q => {
-            if (q.id === questionId) { let currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : []; if (isChecked) { if (!currentAnswers.includes(option)) currentAnswers.push(option); } else { currentAnswers = currentAnswers.filter(a => a !== option); } return { ...q, correctAnswer: currentAnswers.join(',') }; }
+            if (q.id === questionId) { 
+                let currentAnswers = parseList(q.correctAnswer);
+                if (isChecked) { 
+                    if (!currentAnswers.includes(option)) currentAnswers.push(option); 
+                } else { 
+                    currentAnswers = currentAnswers.filter(a => a !== option); 
+                } 
+                return { ...q, correctAnswer: JSON.stringify(currentAnswers) }; 
+            }
             return q;
         }));
     };
+
     const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
     const createNewQuestion = (type: QuestionType): Question => {
         const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '' };
@@ -244,7 +266,27 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setIsTypeSelectionModalOpen(false); setInsertIndex(null);
     };
     const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages }; } return q; })); };
-    const handleDeleteOption = (questionId: string, indexToRemove: number) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options && q.options.length > 1) { const optionToRemove = q.options[indexToRemove]; const newOptions = q.options.filter((_, i) => i !== indexToRemove); const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; let newCorrectAnswer = q.correctAnswer; if (q.questionType === 'MULTIPLE_CHOICE') { if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { let answers = q.correctAnswer ? q.correctAnswer.split(',') : []; answers = answers.filter(a => a !== optionToRemove); newCorrectAnswer = answers.join(','); } return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; } return q; })); };
+    
+    const handleDeleteOption = (questionId: string, indexToRemove: number) => { 
+        setQuestions(prev => prev.map(q => { 
+            if (q.id === questionId && q.options && q.options.length > 1) { 
+                const optionToRemove = q.options[indexToRemove]; 
+                const newOptions = q.options.filter((_, i) => i !== indexToRemove); 
+                const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; 
+                let newCorrectAnswer = q.correctAnswer; 
+                
+                if (q.questionType === 'MULTIPLE_CHOICE') { 
+                    if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; 
+                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
+                    let answers = parseList(q.correctAnswer);
+                    answers = answers.filter(a => a !== optionToRemove); 
+                    newCorrectAnswer = JSON.stringify(answers); 
+                } 
+                return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; 
+            } 
+            return q; 
+        })); 
+    };
     
     // --- HANDLERS FOR TRUE/FALSE ---
     const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], text: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
@@ -338,7 +380,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => {
-                                                            const currentAnswers = q.correctAnswer ? q.correctAnswer.split(',') : [];
+                                                            const currentAnswers = parseList(q.correctAnswer);
                                                             const isSelected = currentAnswers.includes(option);
                                                             return (
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
