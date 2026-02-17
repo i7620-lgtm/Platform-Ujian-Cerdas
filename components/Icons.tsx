@@ -1,5 +1,5 @@
 import React from 'react';
- 
+
 export const LogoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 2.25c-5.376 0-9.75 4.374-9.75 9.75s4.374 9.75 9.75 9.75 9.75-4.374 9.75-9.75S17.376 2.25 12 2.25Zm.094 15.341a.75.75 0 0 1-.884-.652l-.003-2.435-.002-3.35c0-1.242.02-2.484.058-3.725.011-.371.363-.642.736-.642.373 0 .725.27.736.642.038 1.24.058 2.482.058 3.725l.001 5.79.001.002a.75.75 0 0 1-.696.749Z" />
@@ -227,7 +227,7 @@ export const AlignLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
 
 export const AlignCenterIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M6.75 12h10.5M3.75 17.25h16.5" />
   </svg>
 );
 
@@ -320,7 +320,7 @@ export const UserIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 
 export const PrinterIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3h10.5a2.25 2.25 0 0 1 2.25 2.25v2.25H4.5V5.25A2.25 2.25 0 0 1 6.75 3ZM2.25 12.75a2.25 2.25 0 0 1 2.25-2.25h15a2.25 2.25 0 0 1 2.25 2.25v3.75a2.25 2.25 0 0 1-2.25 2.25H4.5a2.25 2.25 0 0 1-2.25-2.25v-3.75Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3h10.5a2.25 2.25 0 0 1 2.25 2.25v2.25H4.5V5.25A2.25 2.25 0 0 1 6.75 3ZM2.25 12.75a2.25 2.25 0 0 1 2.25-2.25h15a2.25 2.25 0 0 1 2.25 2.25v3.75a2.25 2.25 0 0 1-2.25-2.25H4.5a2.25 2.25 0 0 1-2.25-2.25v-3.75Z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75v6.75a2.25 2.25 0 0 1-2.25 2.25H9.75a2.25 2.25 0 0 1-2.25-2.25v-6.75h9Z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 9.75h1.5m-12 0h1.5" />
     </svg>
