@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon } from './Icons';
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
 
@@ -15,6 +16,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
@@ -27,16 +29,36 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const examCodeInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-fetch config when code changes to determine if dropdown should be used
+  useEffect(() => {
+    const checkConfig = async () => {
+        if (examCode.length === 6) {
+            const config = await storageService.getExamConfig(examCode.toUpperCase().trim());
+            if (config && config.targetClasses && config.targetClasses.length > 0) {
+                setAvailableClasses(config.targetClasses);
+            } else {
+                setAvailableClasses([]);
+            }
+        } else {
+            setAvailableClasses([]);
+        }
+    };
+    checkConfig();
+  }, [examCode]);
+
   useEffect(() => {
     // Logic fokus kursor cerdas
     if (initialCode) {
-        // Jika join via QR, fokus ke nama
         setTimeout(() => nameInputRef.current?.focus(), 100);
     } else if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
-        // Jika data diri ada di local storage, fokus ke kode
         examCodeInputRef.current.focus();
     }
   }, [initialCode, fullName, studentClass, absentNumber]);
+
+  // STRICTOR NORMALIZATION HELPER
+  const normalizeId = (text: string) => {
+      return text.trim().toLowerCase().replace(/\s+/g, '');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,19 +70,25 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     }
     setError('');
 
-    // Save preference
+    // Save preference (original text for display)
     localStorage.setItem('saved_student_fullname', fullName.trim());
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
 
     const cleanExamCode = examCode.toUpperCase().trim();
-    const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+    
+    // COMPOSITE ID NORMALIZATION (THE CORE FIX)
+    // We normalize all components to ensure "I Made" and "imade" produce the same ID segment.
+    const normName = normalizeId(fullName);
+    const normClass = normalizeId(studentClass);
+    const normAbsent = normalizeId(absentNumber);
+    const compositeId = `${normName}-${normClass}-${normAbsent}`;
     
     const studentData: Student = {
-        fullName: fullName.trim(),
+        fullName: fullName.trim(), // Keep original for result sheet
         class: studentClass.trim(),
         absentNumber: absentNumber.trim(),
-        studentId: compositeId
+        studentId: compositeId // This is the PK-safe ID
     };
 
     setIsLoading(true);
@@ -68,7 +96,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     try {
         const localKey = `exam_local_${cleanExamCode}_${compositeId}`;
         
-        // Use IndexedDB helper instead of localStorage directly (Point 7.1)
+        // Use IndexedDB helper instead of localStorage directly
         const hasLocalData = await storageService.getLocalProgress(localKey);
         
         // Check session if no local data
@@ -92,7 +120,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   const handleUnlockAndResume = async (token: string) => {
       const cleanExamCode = examCode.toUpperCase().trim();
-      const compositeId = `${fullName.trim()}-${studentClass.trim()}-${absentNumber.trim()}`;
+      const normName = normalizeId(fullName);
+      const normClass = normalizeId(studentClass);
+      const normAbsent = normalizeId(absentNumber);
+      const compositeId = `${normName}-${normClass}-${normAbsent}`;
       
       try {
           const verified = await storageService.verifyUnlockToken(cleanExamCode, compositeId, token);
@@ -113,7 +144,6 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       }
   };
 
-  // Locked View
   if (isLocked) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans transition-colors duration-300">
@@ -127,7 +157,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     </div>
                     <h2 className="text-xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Sesi Terkunci</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                        Akun ini sedang aktif di perangkat lain.<br/>
+                        Akun Anda ("{fullName}") sedang aktif atau dihentikan paksa.<br/>
                         Masukkan <strong>Token Reset</strong> dari pengawas.
                     </p>
                     <UnlockForm onUnlock={handleUnlockAndResume} onCancel={() => { setIsLocked(false); setIsLoading(false); }} />
@@ -137,16 +167,13 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       );
   }
 
-  // Main Login View
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
-        {/* Zen Background Elements */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '8s'}}></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-gradient-to-tl from-blue-50/60 to-emerald-50/60 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '10s'}}></div>
         </div>
 
-        {/* Theme Toggle Top Right */}
         {toggleTheme && (
             <div className="absolute top-6 right-6 z-50">
                 <button 
@@ -159,7 +186,6 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         )}
 
         <div className="w-full max-w-[420px] px-6 relative z-10 flex flex-col h-full sm:h-auto justify-center">
-            {/* Header Navigation */}
             <button 
                 onClick={onBack} 
                 className="group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-6 text-[10px] font-bold uppercase tracking-widest transition-all pl-2 py-2"
@@ -184,9 +210,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     
-                    {/* Input Group: Identity */}
                     <div className="space-y-4">
-                        {/* Nama Lengkap */}
                         <div className={`transition-all duration-300 rounded-2xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'name' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                             <div className="px-5 pt-3">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Nama Lengkap</label>
@@ -205,24 +229,42 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                             {/* Kelas */}
                              <div className={`transition-all duration-300 rounded-2xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'class' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                                 <div className="px-5 pt-3">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Kelas</label>
-                                    <input
-                                        type="text"
-                                        value={studentClass}
-                                        onChange={(e) => setStudentClass(e.target.value)}
-                                        onFocus={() => setIsFocused('class')}
-                                        onBlur={() => setIsFocused(null)}
-                                        className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
-                                        placeholder="X-IPA-1"
-                                        required
-                                    />
+                                    
+                                    {availableClasses.length > 0 ? (
+                                        <div className="relative group">
+                                            <select 
+                                                value={studentClass} 
+                                                onChange={(e) => setStudentClass(e.target.value)}
+                                                onFocus={() => setIsFocused('class')}
+                                                onBlur={() => setIsFocused(null)}
+                                                className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                                                required
+                                            >
+                                                <option value="" disabled className="dark:bg-slate-900">Pilih...</option>
+                                                {availableClasses.map(c => <option key={c} value={c} className="dark:bg-slate-900">{c}</option>)}
+                                            </select>
+                                            <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
+                                                <ChevronDownIcon className="w-4 h-4"/>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={studentClass}
+                                            onChange={(e) => setStudentClass(e.target.value)}
+                                            onFocus={() => setIsFocused('class')}
+                                            onBlur={() => setIsFocused(null)}
+                                            className="block w-full bg-transparent border-none p-0 pb-3 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                                            placeholder="Contoh: 9A"
+                                            required
+                                        />
+                                    )}
                                 </div>
                             </div>
 
-                             {/* Absen */}
                              <div className={`transition-all duration-300 rounded-2xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'absent' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                                 <div className="px-5 pt-3">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">No. Absen</label>
@@ -241,14 +283,12 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                         </div>
                     </div>
 
-                    {/* Divider Visual */}
                     <div className="flex items-center gap-4 py-2">
                         <div className="h-px bg-slate-100 dark:bg-slate-800 flex-1"></div>
                         <div className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">Akses Ujian</div>
                         <div className="h-px bg-slate-100 dark:bg-slate-800 flex-1"></div>
                     </div>
 
-                    {/* Exam Code Input - Distinct Style */}
                     <div className={`relative group transition-all duration-300 ${isFocused === 'code' ? 'scale-[1.02]' : ''}`}>
                         <div className={`absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl opacity-0 group-hover:opacity-20 transition duration-500 blur ${isFocused === 'code' ? 'opacity-30' : ''}`}></div>
                         <div className={`relative bg-white dark:bg-slate-900 rounded-2xl p-1.5 flex items-center shadow-sm border transition-colors ${isFocused === 'code' ? 'border-indigo-100 dark:border-indigo-500' : 'border-slate-100 dark:border-slate-800'}`}>
