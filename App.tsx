@@ -181,17 +181,13 @@ const App: React.FC = () => {
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    const startTime = parseExamSchedule(exam.config.date, exam.config.startTime);
-                    const now = new Date();
-
-                    if (!isNaN(startTime.getTime()) && now < startTime) {
-                        setWaitingExam(exam);
-                        setView('WAITING_ROOM');
-                    } else {
-                        setPrefillCode(code);
-                        setView('STUDENT_LOGIN');
-                    }
+                    // MODIFIKASI: Selalu arahkan ke Waiting Room (Halaman Undangan)
+                    // terlepas dari apakah waktu sudah mulai atau belum.
+                    // WaitingRoom component yang akan menangani logika tombol "Masuk".
+                    setWaitingExam(exam);
+                    setView('WAITING_ROOM');
                 } else {
+                    // Jika ujian tidak ditemukan, fallback ke login manual
                     setPrefillCode(code);
                     setView('STUDENT_LOGIN');
                 }
