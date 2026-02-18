@@ -942,6 +942,17 @@ class StorageService {
       }
   }
 
+  // --- DELETE SPECIFIC RESULT ---
+  async deleteStudentResult(examCode: string, studentId: string): Promise<void> {
+      const { error } = await supabase
+          .from('results')
+          .delete()
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId);
+      
+      if (error) throw error;
+  }
+
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
 
   async uploadArchive(examCode: string, jsonString: string): Promise<string> {
