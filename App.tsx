@@ -507,7 +507,7 @@ const App: React.FC = () => {
                 onClose={resetToHome} 
                 exam={waitingExam}
                 schoolName={waitingExam.authorSchool}
-                // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
+                teacherName={waitingExam.authorName} // Pass authorName from DB
             />
         )}
 
