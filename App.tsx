@@ -14,12 +14,13 @@ import { TutorialPage } from './components/TutorialPage';
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
   const [previousView, setPreviousView] = useState<View>('SELECTOR');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
+  const [waitingExam, setWaitingExam] = useState<Exam | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
@@ -147,8 +148,35 @@ const App: React.FC = () => {
 
     const joinCode = params.get('join');
     if (joinCode) {
-        setPrefillCode(joinCode.toUpperCase());
-        setView('STUDENT_LOGIN');
+        const code = joinCode.toUpperCase();
+        // Check schedule before showing login
+        storageService.getExamForStudent(code, 'check_schedule', true)
+            .then(exam => {
+                if (exam) {
+                    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+                    const startTime = new Date(`${dateStr}T${exam.config.startTime}`);
+                    const now = new Date();
+
+                    if (now < startTime) {
+                        // Too early
+                        setWaitingExam(exam);
+                        setView('WAITING_ROOM');
+                    } else {
+                        // On time
+                        setPrefillCode(code);
+                        setView('STUDENT_LOGIN');
+                    }
+                } else {
+                    setPrefillCode(code);
+                    setView('STUDENT_LOGIN');
+                }
+            })
+            .catch(() => {
+                // Fallback on error
+                setPrefillCode(code);
+                setView('STUDENT_LOGIN');
+            });
+            
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
@@ -245,6 +273,7 @@ const App: React.FC = () => {
   const resetToHome = () => { 
     setView('SELECTOR'); 
     setCurrentExam(null); 
+    setWaitingExam(null);
     setCurrentStudent(null); 
     setStudentResult(null); 
     setResumedResult(null);
@@ -469,6 +498,16 @@ const App: React.FC = () => {
                 onClose={resetToHome}
                 onAllowContinuation={()=>{}}
                 isReadOnly={true}
+            />
+        )}
+
+        {view === 'WAITING_ROOM' && waitingExam && (
+            <InvitationModal 
+                isOpen={true} 
+                onClose={resetToHome} 
+                exam={waitingExam}
+                schoolName={waitingExam.authorSchool}
+                // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
             />
         )}
 
