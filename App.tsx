@@ -80,21 +80,19 @@ const App: React.FC = () => {
     try {
       // Pass studentId to ensure consistent shuffling (Fix #2)
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
-      if (!exam) { 
-        alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
-        return; 
-      }
-
+      
       // Check schedule (Jika siswa mencoba login manual sebelum waktu mulai)
-      if (!isPreview) {
+      if (!isPreview && exam) {
           const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-          const startTime = new Date(`${dateStr}T${exam.config.startTime}`);
+          // Ensure HH:mm:ss format for robust parsing
+          const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
+          const startTime = new Date(`${dateStr}T${timeStr}`);
           const now = new Date();
 
           if (now < startTime) {
               setWaitingExam(exam);
               setView('WAITING_ROOM');
-              return; // Hentikan proses login jika belum waktunya
+              return; 
           }
       }
       
@@ -136,7 +134,9 @@ const App: React.FC = () => {
       setView('STUDENT_EXAM');
     } catch (err: any) {
         if (err.message === 'EXAM_IS_DRAFT') {
-            alert("Ujian ini masih berupa draf.");
+            alert("Ujian ini masih berupa draf dan belum dipublikasikan.");
+        } else if (err.message === 'EXAM_NOT_FOUND') {
+            alert("Kode Ujian tidak ditemukan. Pastikan kode yang Anda masukkan benar.");
         } else {
             console.error(err);
             alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
@@ -168,7 +168,8 @@ const App: React.FC = () => {
             .then(exam => {
                 if (exam) {
                     const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-                    const startTime = new Date(`${dateStr}T${exam.config.startTime}`);
+                    const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
+                    const startTime = new Date(`${dateStr}T${timeStr}`);
                     const now = new Date();
 
                     if (now < startTime) {
