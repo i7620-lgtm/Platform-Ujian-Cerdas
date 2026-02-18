@@ -70,7 +70,7 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
-    if (!studentId || studentId === 'monitor') {
+    if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
         let questionsToProcess = [...exam.questions];
         if (exam.config.shuffleQuestions) {
             questionsToProcess = shuffleArray(questionsToProcess);
