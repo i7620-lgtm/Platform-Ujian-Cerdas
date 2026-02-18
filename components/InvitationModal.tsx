@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon } from './Icons';
+import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon } from './Icons';
 import type { Exam } from '../types';
 
 interface InvitationModalProps {
@@ -82,7 +82,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                         <XMarkIcon className="w-5 h-5"/>
                     </button>
 
-                    {/* Left Panel: QR Section - Lebih Rapat */}
+                    {/* Left Panel: QR Section */}
                     <div className="p-6 md:p-8 flex flex-col items-center justify-center landscape:w-5/12 bg-slate-50/50 dark:bg-slate-800/30 border-b landscape:border-b-0 landscape:border-r border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-2 mb-6 opacity-80">
                             <LogoIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
@@ -101,9 +101,40 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                 </div>
                             </div>
                         </div>
+
+                        {/* Link & Button Section (Visible on Screen, Hidden on Print) */}
+                        <div className="mt-6 w-full max-w-[240px] space-y-3 no-print">
+                            <div className="relative group/link">
+                                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-20 blur group-hover/link:opacity-40 transition-opacity"></div>
+                                <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center shadow-sm">
+                                    <input 
+                                        readOnly 
+                                        value={joinUrl} 
+                                        className="w-full bg-transparent text-[10px] text-slate-600 dark:text-slate-300 font-mono outline-none px-2 truncate"
+                                        onClick={(e) => e.currentTarget.select()}
+                                    />
+                                    <button 
+                                        onClick={() => { navigator.clipboard.writeText(joinUrl); alert('Tautan disalin!'); }}
+                                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 transition-colors"
+                                        title="Salin Link"
+                                    >
+                                        <DocumentDuplicateIcon className="w-3.5 h-3.5"/>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <a 
+                                href={joinUrl} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="block w-full py-2.5 bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl text-center shadow-md transition-all active:scale-95"
+                            >
+                                Click to Join
+                            </a>
+                        </div>
                     </div>
 
-                    {/* Right Panel: Content Section - Lebih Rapat & Ergonomis */}
+                    {/* Right Panel: Content Section */}
                     <div className="p-6 md:p-8 flex flex-col landscape:w-7/12 relative bg-white dark:bg-slate-900">
                         
                         {/* Header: Teacher Identity */}
