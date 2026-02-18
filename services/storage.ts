@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
@@ -369,6 +369,12 @@ class StorageService {
           config: data.config, questions: data.questions, status: data.status
       };
       return sanitizeExamForStudent(exam, studentId);
+  }
+
+  async getExamConfig(code: string): Promise<ExamConfig | null> {
+      const { data, error } = await supabase.from('exams').select('config').eq('code', code).maybeSingle();
+      if (error || !data) return null;
+      return data.config;
   }
 
   async saveExam(exam: Exam): Promise<void> {
