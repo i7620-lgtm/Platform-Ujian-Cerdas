@@ -394,21 +394,25 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const generalRecommendation = useMemo(() => {
         if (!archiveData) return '';
+        
+        // Prioritaskan rekomendasi berdasarkan kategori yang lemah (Merah < 50%, Oranye < 80%)
+        const redCats = categoryStats.filter(c => c.percentage < 50).map(c => c.name);
+        const orangeCats = categoryStats.filter(c => c.percentage >= 50 && c.percentage < 80).map(c => c.name);
+
+        if (redCats.length > 0) {
+            return `PERLU INTERVENSI KHUSUS: Ditemukan penguasaan rendah (<50%) pada materi "${redCats.join(', ')}". Disarankan REMEDIAL KLASIKAL atau pengajaran ulang konsep dasar pada topik tersebut sebelum melanjutkan pembelajaran.`;
+        }
+
+        if (orangeCats.length > 0) {
+            return `PERLU PENGUATAN: Materi "${orangeCats.join(', ')}" belum tuntas sepenuhnya (50-79%). Disarankan memberikan latihan tambahan, review singkat, atau diskusi kelompok agar pemahaman siswa meningkat menjadi kategori Hijau.`;
+        }
+
+        // Jika semua kategori Hijau (>= 80%)
         const { results } = archiveData;
         const totalStudents = results.length;
         const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-        
-        const weakest = [...categoryStats].sort((a,b) => a.percentage - b.percentage)[0];
 
-        if (averageScore < 60) {
-            return `Tingkat kelulusan rendah (${averageScore}%). Disarankan remedial klasikal dengan fokus pada dasar materi "${weakest?.name || 'Umum'}".`;
-        } else if (averageScore < 75) {
-            return `Hasil cukup baik, namun perlu penguatan pada kategori "${weakest?.name || 'tertentu'}". Adakan sesi review sebelum lanjut ke materi baru.`;
-        } else if (averageScore < 85) {
-            return `Hasil memuaskan. Sebagian besar siswa menguasai kompetensi dasar. Pertahankan metode pengajaran saat ini.`;
-        } else {
-            return `Hasil istimewa (${averageScore}%). Siswa siap untuk pengayaan atau materi tingkat lanjut (HOTS).`;
-        }
+        return `HASIL ISTIMEWA (Rata-rata ${averageScore}%). Seluruh kompetensi dasar telah dikuasai dengan baik. Siswa siap diberikan materi PENGAYAAN atau tantangan soal tingkat lanjut (HOTS).`;
     }, [archiveData, categoryStats]);
 
     if (!archiveData) {

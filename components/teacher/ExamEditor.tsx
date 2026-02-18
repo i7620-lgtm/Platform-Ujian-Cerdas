@@ -152,12 +152,35 @@ const WysiwygEditor: React.FC<{ value: string; onChange: (val: string) => void; 
     
     // NOTE: Styles are now handled globally in style.css to ensure consistency between Editor and Preview/Draft View.
     const Btn: React.FC<{ cmd?: string; label?: string; icon?: React.FC<any>; active?: boolean; onClick?: () => void }> = ({ cmd, label, icon: Icon, active, onClick }) => (<button type="button" onMouseDown={(e) => { e.preventDefault(); onClick ? onClick() : runCmd(cmd!); }} className={`min-w-[28px] h-7 px-1.5 rounded flex items-center justify-center transition-all ${active ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shadow-inner' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400'}`} title={label}>{Icon ? <Icon className="w-4 h-4"/> : <span className="text-xs font-bold font-serif">{label}</span>}</button>);
-    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end">{showTabs && (<div className="flex gap-1">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (<button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-1.5 text-[10px] font-bold tracking-wider rounded-t-lg transition-colors ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => {e.preventDefault(); setShowMath(true);}} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-800 dark:text-slate-200 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={saveSelection} onClick={checkActiveFormats} data-placeholder={placeholder} spellCheck={false} /><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /></div>);
+    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end">{showTabs && (<div className="flex gap-1">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (<button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-1.5 text-[10px] font-bold tracking-wider rounded-t-lg transition-colors ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-800 dark:text-slate-200 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={saveSelection} onClick={checkActiveFormats} data-placeholder={placeholder} spellCheck={false} /><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /></div>);
 };
 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
 }) => {
+    const [classTagInput, setClassTagInput] = useState('');
+
+    const handleAddClassTag = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && classTagInput.trim()) {
+            e.preventDefault();
+            const newTag = classTagInput.trim();
+            if (!config.targetClasses?.includes(newTag)) {
+                setConfig(prev => ({
+                    ...prev,
+                    targetClasses: [...(prev.targetClasses || []), newTag]
+                }));
+            }
+            setClassTagInput('');
+        }
+    };
+
+    const removeClassTag = (tag: string) => {
+        setConfig(prev => ({
+            ...prev,
+            targetClasses: prev.targetClasses?.filter(t => t !== tag) || []
+        }));
+    };
+
     // Check if Essay Exists
     const hasEssay = useMemo(() => questions.some(q => q.questionType === 'ESSAY'), [questions]);
 
@@ -186,14 +209,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             setConfig(prev => {
                 const newConfig = { ...prev, [name]: checked };
                 if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
-                // 'disableRealtime' is now handled by the radio group separately
                 return newConfig;
             });
         } else {
             setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' ? parseInt(value) : value }));
         }
     };
-    // ... existing handlers (handleSubjectSelect, handleQuestionTextChange, etc.) ...
+
     const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
@@ -288,13 +310,11 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         })); 
     };
     
-    // --- HANDLERS FOR TRUE/FALSE ---
     const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], text: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
     const handleTrueFalseRowAnswerChange = (qId: string, idx: number, val: boolean) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], answer: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
     const handleAddTrueFalseRow = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const nextNum = q.trueFalseRows.length + 1; return { ...q, trueFalseRows: [...q.trueFalseRows, { text: `Pernyataan ${nextNum}`, answer: true }] }; } return q; })); };
     const handleDeleteTrueFalseRow = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows && q.trueFalseRows.length > 1) { const newRows = q.trueFalseRows.filter((_, i) => i !== idx); return { ...q, trueFalseRows: newRows }; } return q; })); };
 
-    // --- HANDLERS FOR MATCHING ---
     const handleMatchingPairChange = (qId: string, idx: number, field: 'left' | 'right', value: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) { const newPairs = [...q.matchingPairs]; newPairs[idx] = { ...newPairs[idx], [field]: value }; return { ...q, matchingPairs: newPairs }; } return q; })); };
     const handleAddMatchingPair = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] }; return q; })); };
     const handleDeleteMatchingPair = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs && q.matchingPairs.length > 1) { const newPairs = q.matchingPairs.filter((_, i) => i !== idx); return { ...q, matchingPairs: newPairs }; } return q; })); };
@@ -303,7 +323,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     return (
         <div className="space-y-10 border-t-2 border-gray-200 dark:border-slate-700 pt-12">
-            {/* ... questions list ... */}
             <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
                  <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm">
                     <h2 className="text-xl font-bold text-neutral dark:text-white">{isEditing ? '1. Editor Soal' : '3. Editor Soal'}</h2>
@@ -336,7 +355,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 
-                                                {/* METADATA INPUTS */}
                                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                                     <div>
                                                         <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
@@ -362,7 +380,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
                                                 <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
                                                 
-                                                {/* MULTIPLE CHOICE */}
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => (
@@ -376,7 +393,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     </div>
                                                 )}
 
-                                                {/* COMPLEX MULTIPLE CHOICE */}
                                                 {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => {
@@ -402,7 +418,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     </div>
                                                 )}
 
-                                                {/* TRUE FALSE */}
                                                 {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                                     <div className="mt-6 space-y-4">
                                                         <div className="grid grid-cols-12 gap-4 mb-2 px-2">
@@ -440,7 +455,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     </div>
                                                 )}
 
-                                                {/* MATCHING */}
                                                 {q.questionType === 'MATCHING' && q.matchingPairs && (
                                                     <div className="mt-6 space-y-4">
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2 px-2">
@@ -495,13 +509,13 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 </div>
                  <div className="mt-12 mb-20 text-center"><button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary dark:text-indigo-400 font-bold hover:text-primary-focus mx-auto transition-all bg-white dark:bg-slate-800 border border-primary/20 dark:border-indigo-500/30 px-8 py-4 rounded-2xl hover:bg-primary dark:hover:bg-indigo-600 hover:text-white shadow-sm hover:shadow-lg active:scale-95 group"><PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" /> Tambah Soal Baru</button></div>
              </div>
-             {/* ... configuration section ... */}
+             
              <div className="pt-10">
                  <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm mb-6">
                     <h2 className="text-xl font-bold text-neutral dark:text-white">{isEditing ? '2. Konfigurasi' : '4. Konfigurasi'}</h2>
                      <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pengaturan waktu dan keamanan ujian.</p>
                 </div>
-                {/* ... config content ... */}
+                
                 <div className="bg-white dark:bg-slate-800 p-8 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                         <div className="md:col-span-2 pb-2 border-b border-gray-100 dark:border-slate-700 mb-2"><h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Informasi Umum</h4></div>
@@ -510,6 +524,28 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Kelas</label><div onClick={() => setIsClassModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
 
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jenis Evaluasi</label><div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Target Kelas (Opsional)</label>
+                            <div className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl min-h-[56px] flex flex-wrap gap-2 items-center">
+                                {config.targetClasses?.map(tag => (
+                                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold rounded-lg border border-indigo-200 dark:border-indigo-800">
+                                        {tag}
+                                        <button onClick={() => removeClassTag(tag)} className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full transition-colors"><XMarkIcon className="w-3 h-3"/></button>
+                                    </span>
+                                ))}
+                                <input 
+                                    type="text" 
+                                    value={classTagInput}
+                                    onChange={(e) => setClassTagInput(e.target.value)}
+                                    onKeyDown={handleAddClassTag}
+                                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-400 min-w-[150px]"
+                                    placeholder="Ketik nama kelas lalu tekan Enter..."
+                                />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Jika diisi, siswa wajib memilih dari daftar kelas ini pada halaman login (mencegah salah format).</p>
+                        </div>
+
                          <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Instruksi Pengerjaan</label><textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner text-slate-800 dark:text-slate-200" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." /></div>
                     </div>
 
@@ -552,11 +588,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                              </div>
 
-                             {/* Mode Selection Block */}
                              <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {/* Mode Normal (Left - Default) */}
                                     <div 
                                         onClick={() => setConfig(prev => ({ ...prev, disableRealtime: true, enablePublicStream: false }))}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200'}`}
@@ -575,7 +609,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                         </p>
                                     </div>
 
-                                    {/* Mode Realtime (Right) */}
                                     <div 
                                         onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
@@ -599,7 +632,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     </div>
                 </div>
             </div>
-            {/* ... footer buttons ... */}
+            
             <div className="text-center pt-10 pb-20">
                 {isEditing ? (
                     <div className="flex justify-center items-center gap-4">
