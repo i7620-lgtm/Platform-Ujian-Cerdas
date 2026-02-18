@@ -225,3 +225,4 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         </div>
     );
 };
+ 
