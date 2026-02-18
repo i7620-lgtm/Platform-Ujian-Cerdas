@@ -9,6 +9,7 @@ import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './type
 import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
+import { WaitingRoom } from './components/WaitingRoom'; // Import WaitingRoom
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 
@@ -81,25 +82,15 @@ const App: React.FC = () => {
       // Pass studentId to ensure consistent shuffling (Fix #2)
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
       
-      // Check schedule (Jika siswa mencoba login manual sebelum waktu mulai)
-      if (!isPreview && exam) {
-          const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-          // Ensure HH:mm:ss format for robust parsing
-          const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
-          const startTime = new Date(`${dateStr}T${timeStr}`);
-          const now = new Date();
-
-          if (now < startTime) {
-              setWaitingExam(exam);
-              setView('WAITING_ROOM');
-              return; 
-          }
-      }
+      // Note: We do NOT redirect to waiting room here anymore because
+      // if the student is here, they either came from WaitingRoom (which checks time)
+      // or manually entered code (which implies they are ready).
+      // However, a final server-side check is good practice, but for UX let's trust the WaitingRoom flow.
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
       if (res && res.status === 'completed' && !isPreview) {
-          if (!exam.config.allowRetakes) {
+          if (!exam?.config.allowRetakes) {
               setCurrentExam(exam);
               setCurrentStudent(student);
               setStudentResult(res);
@@ -163,31 +154,34 @@ const App: React.FC = () => {
     const joinCode = params.get('join');
     if (joinCode) {
         const code = joinCode.toUpperCase();
-        // Check schedule before showing login
+        
+        // Fetch exam meta-data only (lightweight) to check schedule
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
                     const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
                     const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
-                    const startTime = new Date(`${dateStr}T${timeStr}`);
-                    const now = new Date();
+                    const startTime = new Date(`${dateStr}T${timeStr}`).getTime();
+                    const now = new Date().getTime();
 
                     if (now < startTime) {
-                        // Too early
+                        // Too early -> Send to Waiting Room
                         setWaitingExam(exam);
                         setView('WAITING_ROOM');
                     } else {
-                        // On time
+                        // On time -> Send to Login with prefill
                         setPrefillCode(code);
                         setView('STUDENT_LOGIN');
                     }
                 } else {
+                    // Exam not found or other issue -> Default to login to let them try manual entry
                     setPrefillCode(code);
                     setView('STUDENT_LOGIN');
                 }
             })
-            .catch(() => {
-                // Fallback on error
+            .catch((err) => {
+                console.warn("Schedule check failed:", err);
+                // Fallback on error (e.g. offline): let them try to login manually
                 setPrefillCode(code);
                 setView('STUDENT_LOGIN');
             });
@@ -516,13 +510,12 @@ const App: React.FC = () => {
             />
         )}
 
+        {/* Use the new WaitingRoom component */}
         {view === 'WAITING_ROOM' && waitingExam && (
-            <InvitationModal 
-                isOpen={true} 
-                onClose={resetToHome} 
-                exam={waitingExam}
-                schoolName={waitingExam.authorSchool}
-                teacherName={waitingExam.authorName} // Pass authorName from DB
+            <WaitingRoom 
+                exam={waitingExam} 
+                onJoin={() => { setPrefillCode(waitingExam.code); setView('STUDENT_LOGIN'); }}
+                onBack={resetToHome}
             />
         )}
 
