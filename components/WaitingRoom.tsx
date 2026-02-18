@@ -15,8 +15,16 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack 
     useEffect(() => {
         const calculateTime = () => {
             const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-            // Pastikan format waktu HH:mm:ss
-            const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
+            let timeStr = exam.config.startTime;
+            
+            // Robust parsing logic to ensure HH:mm:00
+            const timeParts = timeStr.split(':');
+            if (timeParts.length >= 2) {
+                const h = timeParts[0].padStart(2, '0');
+                const m = timeParts[1].padStart(2, '0');
+                timeStr = `${h}:${m}:00`;
+            }
+
             const targetDate = new Date(`${dateStr}T${timeStr}`).getTime();
             const now = new Date().getTime();
             const diff = targetDate - now;
