@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
@@ -82,6 +83,19 @@ const App: React.FC = () => {
       if (!exam) { 
         alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
         return; 
+      }
+
+      // Check schedule (Jika siswa mencoba login manual sebelum waktu mulai)
+      if (!isPreview) {
+          const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+          const startTime = new Date(`${dateStr}T${exam.config.startTime}`);
+          const now = new Date();
+
+          if (now < startTime) {
+              setWaitingExam(exam);
+              setView('WAITING_ROOM');
+              return; // Hentikan proses login jika belum waktunya
+          }
       }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
