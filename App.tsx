@@ -178,16 +178,13 @@ const App: React.FC = () => {
     const joinCode = params.get('join');
     if (joinCode) {
         const code = joinCode.toUpperCase();
+        // LOGIC FIX: Always go to Waiting Room on join link
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    // MODIFIKASI: Selalu arahkan ke Waiting Room (Halaman Undangan)
-                    // terlepas dari apakah waktu sudah mulai atau belum.
-                    // WaitingRoom component yang akan menangani logika tombol "Masuk".
                     setWaitingExam(exam);
                     setView('WAITING_ROOM');
                 } else {
-                    // Jika ujian tidak ditemukan, fallback ke login manual
                     setPrefillCode(code);
                     setView('STUDENT_LOGIN');
                 }
