@@ -85,6 +85,35 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         };
     }, [displayExam?.code, selectedClass]);
 
+    // Lógica pengurutan: Locked -> Online -> Selesai. Kemudian Kelas & Absen.
+    const sortedResults = useMemo(() => {
+        const statusPriority: Record<string, number> = {
+            'force_closed': 1, // Locked
+            'in_progress': 2,  // Online
+            'completed': 3     // Selesai
+        };
+
+        const getAbsentNum = (id: string) => {
+            const parts = id.split('-');
+            const last = parts[parts.length - 1];
+            return parseInt(last) || 0;
+        };
+
+        return [...localResults].sort((a, b) => {
+            const pA = statusPriority[a.status || ''] || 99;
+            const pB = statusPriority[b.status || ''] || 99;
+
+            if (pA !== pB) return pA - pB;
+            
+            // Urutan kedua: Kelas
+            const classCompare = a.student.class.localeCompare(b.student.class);
+            if (classCompare !== 0) return classCompare;
+
+            // Urutan ketiga: No Absen (diambil dari studentId)
+            return getAbsentNum(a.student.studentId) - getAbsentNum(b.student.studentId);
+        });
+    }, [localResults]);
+
     if (!displayExam) return null;
 
     const handleGenerateToken = async (studentId: string, studentName: string) => {
@@ -187,34 +216,30 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </div>
                         )}
 
-                        {/* TABEL LIVE MONITOR - DESAIN BARU */}
+                        {/* TABEL LIVE MONITOR */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/60 dark:border-slate-700 shadow-sm overflow-hidden min-h-[300px] flex flex-col">
                             <div className="overflow-x-auto custom-scrollbar flex-1">
                                 <table className="w-full min-w-[900px] text-left border-collapse">
                                     <thead className="bg-slate-50/80 dark:bg-slate-700/80 backdrop-blur-md text-slate-500 dark:text-slate-400 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
                                         <tr>
-                                            {/* Kolom 1: Siswa */}
                                             <th className="px-5 py-4 w-64">
                                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <UserIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Identitas Siswa</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 2: Kelas */}
                                             <th className="px-5 py-4 w-32">
                                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <ListBulletIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Kelas</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 3: Status */}
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <div className="w-3 h-3 rounded-full border-2 border-slate-300 dark:border-slate-600 sm:hidden"></div>
                                                     <span className="hidden sm:inline">Status</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 4: Progress - HANYA DI MODE REALTIME */}
                                             {!isLargeScale && (
                                                 <th className="px-5 py-4 text-center w-40">
                                                     <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -223,21 +248,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </div>
                                                 </th>
                                             )}
-                                            {/* Kolom 5: Terakhir Aktif */}
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <ClockIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Aktif</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 6: Lokasi (BARU) */}
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <SignalIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Lokasi</span>
                                                 </div>
                                             </th>
-                                            {/* Kolom 7: Aksi */}
                                             <th className="px-5 py-4 text-right w-32">
                                                 <div className="flex items-center justify-end gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <LockClosedIcon className="w-3.5 h-3.5 sm:hidden" />
@@ -247,7 +269,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
-                                        {localResults.length > 0 ? localResults.map((r) => { 
+                                        {sortedResults.length > 0 ? sortedResults.map((r) => { 
                                             const totalQ = displayExam.questions.filter(q=>q.questionType!=='INFO').length; 
                                             const broadcastData = broadcastProgressRef.current[r.student.studentId]; 
                                             
@@ -258,7 +280,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             
                                             return (
                                                 <tr key={r.student.studentId} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors group">
-                                                    {/* 1. Siswa */}
                                                     <td className="px-5 py-3">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold border border-indigo-100 dark:border-indigo-800 shadow-sm">
@@ -270,11 +291,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    {/* 2. Kelas */}
                                                     <td className="px-5 py-3">
                                                         <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">{r.student.class}</span>
                                                     </td>
-                                                    {/* 3. Status */}
                                                     <td className="px-5 py-3">
                                                         <div className="flex justify-center">
                                                             {r.status === 'force_closed' ? (
@@ -292,7 +311,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    {/* 4. Progress - HANYA DI MODE REALTIME */}
                                                     {!isLargeScale && (
                                                         <td className="px-5 py-3">
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
@@ -303,7 +321,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </div>
                                                         </td>
                                                     )}
-                                                    {/* 5. Last Active */}
                                                     <td className="px-5 py-3 text-center">
                                                         {isLargeScale ? (
                                                             <span className="text-[10px] text-slate-300 dark:text-slate-600">-</span>
@@ -313,7 +330,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    {/* 6. Lokasi (NEW) */}
                                                     <td className="px-5 py-3 text-center">
                                                         {!displayExam.config.trackLocation ? (
                                                             <span className="text-[10px] text-slate-300 dark:text-slate-600 font-bold">-</span>
@@ -325,7 +341,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">N/A</span>
                                                         )}
                                                     </td>
-                                                    {/* 7. Aksi */}
                                                     <td className="px-5 py-3 text-right">
                                                         {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
                                                             <button 
@@ -380,13 +395,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </div>
             )}
 
-            {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
+            {isShareModalOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700"><div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Akses Pantauan</h3><button onClick={() => setIsShareModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><XMarkIcon className="w-5 h-5" /></button></div><div className="bg-white p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-lg mb-6 inline-block mx-auto relative group"><div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(liveUrl)}&margin=10`} alt="QR Code Live" className="w-48 h-48 object-contain relative bg-white rounded-xl"/></div><p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">Minta orang tua siswa untuk memindai QR Code di atas atau bagikan link di bawah ini.</p><div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-700"><div className="flex-1 px-3 py-1 overflow-hidden"><p className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate text-left">{liveUrl}</p></div><button onClick={() => { navigator.clipboard.writeText(liveUrl); alert("Link berhasil disalin!"); }} className="p-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors" title="Salin Link"><DocumentDuplicateIcon className="w-4 h-4" /></button></div></div></div>)}
             
             {/* MODAL QR CODE JOIN SISWA */}
             {isJoinQrModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700 relative">
-                        <button onClick={() => setIsJoinQrModalOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5" /></button>
+                        <button onClick={() => setIsJoinQrModalOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
                         <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">Gabung Ujian</h3></div>
                         <div className="bg-white p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-lg mb-6 inline-block mx-auto relative group">
                             <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-3xl opacity-20 blur group-hover:opacity-30 transition-opacity"></div>
@@ -406,7 +421,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     );
 };
 
-// --- FinishedExamModal (Updated) ---
+// --- FinishedExamModal ---
 interface FinishedExamModalProps {
     exam: Exam;
     teacherProfile: TeacherProfile;
@@ -642,7 +657,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </div>
                                                     </div>
                                                 ))}
-                                                {categoryStats.length === 0 && <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>}
                                             </div>
                                         </div>
 
@@ -662,7 +676,6 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </div>
                                                     </div>
                                                 ))}
-                                                {levelStats.length === 0 && <p className="text-xs text-slate-400 italic">Tidak ada data level.</p>}
                                             </div>
                                         </div>
                                     </div>
@@ -764,7 +777,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
                                                                         <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Penilaian Manual Soal Esai</h4>
                                                                         <div className="space-y-4">
-                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q, idx) => {
+                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q) => {
                                                                                 const ans = r.answers[q.id];
                                                                                 const manualStatus = r.answers[`_grade_${q.id}`];
                                                                                 
