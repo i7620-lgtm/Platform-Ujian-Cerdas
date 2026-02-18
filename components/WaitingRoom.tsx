@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CalendarDaysIcon, ClockIcon, UserIcon, ArrowLeftIcon, LogoIcon } from './Icons';
 import type { Exam } from '../types';
