@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarDaysIcon, ClockIcon, UserIcon, ArrowLeftIcon, LogoIcon } from './Icons';
+import { CalendarDaysIcon, ClockIcon, UserIcon, ArrowLeftIcon, LogoIcon, CheckCircleIcon } from './Icons';
 import type { Exam } from '../types';
 
 interface WaitingRoomProps {
@@ -22,6 +22,7 @@ const parseSchedule = (dateStr: string, timeStr: string): Date => {
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack }) => {
     const [timeLeft, setTimeLeft] = useState<{ d: number, h: number, m: number, s: number } | null>(null);
     const [isChecking, setIsChecking] = useState(true);
+    const [isStarted, setIsStarted] = useState(false);
 
     useEffect(() => {
         const calculateTime = () => {
@@ -30,9 +31,11 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack 
             const diff = targetDate - now;
 
             if (!isNaN(targetDate) && diff <= 0) {
-                // Waktu habis, masuk ke ujian
-                onEnter();
+                // Time passed, show enter button
+                setIsStarted(true);
+                setIsChecking(false);
             } else {
+                setIsStarted(false);
                 setTimeLeft({
                     d: Math.floor(diff / (1000 * 60 * 60 * 24)),
                     h: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
@@ -47,7 +50,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack 
         const timer = setInterval(calculateTime, 1000);
 
         return () => clearInterval(timer);
-    }, [exam, onEnter]);
+    }, [exam]);
 
     if (isChecking) {
         return (
@@ -99,45 +102,70 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack 
                             <span>{exam.authorSchool || 'Sekolah'}</span>
                         </div>
 
-                        {/* Countdown Grid */}
-                        <div className="grid grid-cols-4 gap-3 mb-8">
-                            {[
-                                { val: timeLeft?.d, label: 'Hari' },
-                                { val: timeLeft?.h, label: 'Jam' },
-                                { val: timeLeft?.m, label: 'Menit' },
-                                { val: timeLeft?.s, label: 'Detik' }
-                            ].map((item, idx) => (
-                                <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center">
-                                    <span className="text-2xl font-black text-slate-800 dark:text-white tabular-nums leading-none mb-1">
-                                        {String(item.val || 0).padStart(2, '0')}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                        {item.label}
-                                    </span>
+                        {/* Dynamic Content based on State */}
+                        {isStarted ? (
+                            <div className="animate-fade-in">
+                                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800 mb-6 flex flex-col items-center">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="relative flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                        </span>
+                                        <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Sedang Berlangsung</span>
+                                    </div>
+                                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Waktu ujian telah dimulai.</p>
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="space-y-4">
-                            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex items-center gap-4 text-left">
-                                <div className="bg-white dark:bg-slate-800 p-2 rounded-xl text-indigo-600 dark:text-indigo-400 shadow-sm">
-                                    <CalendarDaysIcon className="w-6 h-6" />
+                                <button 
+                                    onClick={onEnter}
+                                    className="w-full py-4 bg-slate-900 dark:bg-indigo-600 hover:bg-black dark:hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-xl hover:shadow-indigo-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+                                >
+                                    <span>Masuk Ruang Ujian</span>
+                                    <CheckCircleIcon className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="animate-fade-in">
+                                <div className="grid grid-cols-4 gap-3 mb-8">
+                                    {[
+                                        { val: timeLeft?.d, label: 'Hari' },
+                                        { val: timeLeft?.h, label: 'Jam' },
+                                        { val: timeLeft?.m, label: 'Menit' },
+                                        { val: timeLeft?.s, label: 'Detik' }
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center">
+                                            <span className="text-2xl font-black text-slate-800 dark:text-white tabular-nums leading-none mb-1">
+                                                {String(item.val || 0).padStart(2, '0')}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                {item.label}
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 uppercase tracking-widest">Jadwal Dimulai</p>
-                                    <p className="font-bold text-slate-800 dark:text-white">
-                                        {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
-                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                        Pukul {exam.config.startTime}
-                                    </p>
+
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex items-center gap-4 text-left">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded-xl text-indigo-600 dark:text-indigo-400 shadow-sm">
+                                            <CalendarDaysIcon className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 uppercase tracking-widest">Jadwal Dimulai</p>
+                                            <p className="font-bold text-slate-800 dark:text-white">
+                                                {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                            </p>
+                                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                                Pukul {exam.config.startTime}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-slate-400 dark:text-slate-500 text-center leading-relaxed px-4">
+                                        Halaman ini akan otomatis memuat formulir login saat waktu hitung mundur selesai.
+                                    </div>
                                 </div>
                             </div>
-
-                            <div className="text-xs text-slate-400 dark:text-slate-500 text-center leading-relaxed px-4">
-                                Halaman ini akan otomatis memuat formulir login saat waktu hitung mundur selesai.
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
                 
