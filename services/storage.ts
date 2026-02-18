@@ -361,12 +361,24 @@ class StorageService {
   }
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
+      // FIX: Fetch profile name for Waiting Room display
+      const { data, error } = await supabase
+          .from('exams')
+          .select('*, profiles:author_id(full_name)')
+          .eq('code', code)
+          .single();
+
       if (error || !data) throw new Error("EXAM_NOT_FOUND");
       if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
+      
       const exam: Exam = {
-          code: data.code, authorId: data.author_id, authorSchool: data.school,
-          config: data.config, questions: data.questions, status: data.status
+          code: data.code, 
+          authorId: data.author_id, 
+          authorName: data.profiles?.full_name, // Map authorName
+          authorSchool: data.school,
+          config: data.config, 
+          questions: data.questions, 
+          status: data.status
       };
       return sanitizeExamForStudent(exam, studentId);
   }
