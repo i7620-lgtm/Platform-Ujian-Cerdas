@@ -8,28 +8,28 @@ interface WaitingRoomProps {
     onBack: () => void;
 }
 
+const parseSchedule = (dateStr: string, timeStr: string): Date => {
+    try {
+        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const [year, month, day] = cleanDate.split('-').map(Number);
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return new Date(year, month - 1, day, hours, minutes, 0);
+    } catch (e) {
+        return new Date(NaN);
+    }
+};
+
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({ exam, onEnter, onBack }) => {
     const [timeLeft, setTimeLeft] = useState<{ d: number, h: number, m: number, s: number } | null>(null);
     const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
         const calculateTime = () => {
-            const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-            let timeStr = exam.config.startTime;
-            
-            // Robust parsing logic to ensure HH:mm:00
-            const timeParts = timeStr.split(':');
-            if (timeParts.length >= 2) {
-                const h = timeParts[0].padStart(2, '0');
-                const m = timeParts[1].padStart(2, '0');
-                timeStr = `${h}:${m}:00`;
-            }
-
-            const targetDate = new Date(`${dateStr}T${timeStr}`).getTime();
+            const targetDate = parseSchedule(exam.config.date, exam.config.startTime).getTime();
             const now = new Date().getTime();
             const diff = targetDate - now;
 
-            if (diff <= 0) {
+            if (!isNaN(targetDate) && diff <= 0) {
                 // Waktu habis, masuk ke ujian
                 onEnter();
             } else {
