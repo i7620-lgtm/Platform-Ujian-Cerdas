@@ -10,30 +10,11 @@ import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
-import { WaitingRoom } from './components/WaitingRoom';
 
-// Lazy Load Teacher Dashboard
+// Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM';
-
-// Helper for safe date parsing across browsers
-const parseExamSchedule = (dateStr: string, timeStr: string): Date => {
-    try {
-        // Ensure YYYY-MM-DD
-        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-        const [year, month, day] = cleanDate.split('-').map(Number);
-        
-        // Ensure HH:mm
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        
-        // Construct local date (month is 0-indexed)
-        return new Date(year, month - 1, day, hours, minutes, 0);
-    } catch (e) {
-        console.error("Date parsing error", e);
-        return new Date(NaN);
-    }
-};
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -96,20 +77,11 @@ const App: React.FC = () => {
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
     try {
+      // Pass studentId to ensure consistent shuffling (Fix #2)
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
-      
-      // Check schedule with robust parsing
-      if (!isPreview && exam) {
-          const startTime = parseExamSchedule(exam.config.date, exam.config.startTime);
-          const now = new Date();
-
-          // Only redirect to waiting room if startTime is valid and in future
-          if (!isNaN(startTime.getTime()) && now < startTime) {
-              setWaitingExam(exam);
-              setView('WAITING_ROOM');
-              setIsSyncing(false); // Stop syncing loading state
-              return; 
-          }
+      if (!exam) { 
+        alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
+        return; 
       }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
@@ -150,9 +122,7 @@ const App: React.FC = () => {
       setView('STUDENT_EXAM');
     } catch (err: any) {
         if (err.message === 'EXAM_IS_DRAFT') {
-            alert("Ujian ini masih berupa draf dan belum dipublikasikan.");
-        } else if (err.message === 'EXAM_NOT_FOUND') {
-            alert("Kode Ujian tidak ditemukan. Pastikan kode yang Anda masukkan benar.");
+            alert("Ujian ini masih berupa draf.");
         } else {
             console.error(err);
             alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
@@ -162,14 +132,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    
-    // 1. Check Preview (Teacher Mode)
     const previewCode = params.get('preview');
     if (previewCode) {
         const dummyStudent: Student = {
             fullName: 'Mode Pratinjau',
             class: 'PREVIEW',
             absentNumber: '00',
+            // Format ID Konsisten: Nama-Kelas-Absen
             studentId: `Mode Pratinjau-PREVIEW-00-${Date.now()}`
         };
         handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
@@ -177,41 +146,53 @@ const App: React.FC = () => {
         return;
     }
 
-    // 2. Check Join Code (Student Invitation)
     const joinCode = params.get('join');
     if (joinCode) {
         const code = joinCode.toUpperCase();
-        
-        // Fetch exam data FIRST before deciding logic
+        // Check schedule before showing login
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    setWaitingExam(exam);
-                    setView('WAITING_ROOM'); // Explicitly go to Waiting Room
+                    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+                    
+                    // ROBUST DATE PARSING: Fix for Mobile/Safari
+                    // Avoid string construction like "YYYY-MM-DDTHH:mm" which fails on some mobile browsers
+                    const [y, m, d] = dateStr.split('-').map(Number);
+                    const [h, min] = exam.config.startTime.split(':').map(Number);
+                    
+                    // Create date object manually (Month is 0-indexed)
+                    const startTime = new Date(y, m - 1, d, h, min, 0); 
+                    const now = new Date();
+
+                    // Strict check: Only go to waiting room if startTime is valid AND now < startTime
+                    if (!isNaN(startTime.getTime()) && now < startTime) {
+                        // Too early (Waiting Room)
+                        setWaitingExam(exam);
+                        setView('WAITING_ROOM');
+                    } else {
+                        // On time (Direct Login)
+                        setPrefillCode(code);
+                        setView('STUDENT_LOGIN');
+                    }
                 } else {
-                    // Fallback if exam not found
                     setPrefillCode(code);
                     setView('STUDENT_LOGIN');
                 }
             })
-            .catch((e) => {
-                console.error("Join link error:", e);
+            .catch(() => {
                 // Fallback on error
                 setPrefillCode(code);
                 setView('STUDENT_LOGIN');
-            })
-            .finally(() => {
-                // Clear URL only AFTER processing to prevent race conditions
-                window.history.replaceState({}, document.title, window.location.pathname);
             });
             
-        return; // Halt other checks
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
     }
 
-    // 3. Check Live Monitor
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
+        // Live monitor doesn't need student specific shuffling, pass generic ID or empty
         storageService.getExamForStudent(liveCode.toUpperCase(), 'monitor', true)
             .then(exam => {
                 if (exam && exam.config.enablePublicStream) {
@@ -226,10 +207,7 @@ const App: React.FC = () => {
                 alert("Gagal memuat data ujian.");
                 window.history.replaceState({}, '', '/');
             })
-            .finally(() => {
-                setIsSyncing(false);
-                window.history.replaceState({}, document.title, window.location.pathname);
-            });
+            .finally(() => setIsSyncing(false));
     }
   }, [handleStudentLoginSuccess]);
 
@@ -309,12 +287,14 @@ const App: React.FC = () => {
     setResumedResult(null);
     setTeacherProfile(null);
     setPrefillCode('');
+    // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     setExams({});
     setResults([]);
     window.history.replaceState({}, '', '/');
   };
 
   const handleLogout = async () => {
+    // Immediate state clear to prevent flash
     resetToHome();
     try {
         await storageService.signOut();
@@ -323,6 +303,7 @@ const App: React.FC = () => {
     }
   };
 
+  // Loading Fallback Component for Suspense
   const DashboardLoader = () => (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-900">
         <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -341,6 +322,7 @@ const App: React.FC = () => {
     );
   }
 
+  // Common Theme Toggle Button
   const ThemeToggle = ({ className = "" }: { className?: string }) => (
     <button 
         onClick={toggleTheme} 
@@ -355,7 +337,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-100 selection:text-indigo-800 overflow-x-hidden antialiased flex flex-col transition-colors duration-300">
         
+        {/* Status Jaringan Minimalis & Elegan */}
         <div className="fixed top-6 right-6 z-[100] pointer-events-none flex flex-col gap-2 items-end">
+            {/* Theme Toggle in Top Right for Selector View */}
             {view === 'SELECTOR' && (
                 <div className="pointer-events-auto mb-2">
                     <ThemeToggle />
@@ -377,6 +361,7 @@ const App: React.FC = () => {
             )}
         </div>
 
+        {/* Invite Button for Selector View */}
         {view === 'SELECTOR' && (
             <div className="fixed top-6 left-6 z-[100]">
                 <button 
@@ -391,6 +376,7 @@ const App: React.FC = () => {
         
         {view === 'SELECTOR' && (
             <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+                {/* Background Decor */}
                 <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
                     <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
@@ -467,7 +453,7 @@ const App: React.FC = () => {
         {view === 'TEACHER_DASHBOARD' && teacherProfile && (
             <Suspense fallback={<DashboardLoader />}>
                 <TeacherDashboard 
-                    key={teacherProfile.id}
+                    key={teacherProfile.id} /* FIX: Force remount to prevent ghosting */
                     teacherProfile={teacherProfile} 
                     exams={exams} 
                     results={results}
@@ -524,23 +510,22 @@ const App: React.FC = () => {
         )}
 
         {view === 'WAITING_ROOM' && waitingExam && (
-            <WaitingRoom
+            <InvitationModal 
+                isOpen={true} 
+                onClose={resetToHome} 
                 exam={waitingExam}
-                onEnter={() => {
-                    setPrefillCode(waitingExam.code);
-                    setView('STUDENT_LOGIN');
-                }}
-                onBack={() => {
-                    resetToHome();
-                }}
+                schoolName={waitingExam.authorSchool}
+                // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
             />
         )}
 
+        {/* Global Invitation Modal */}
         <InvitationModal 
             isOpen={isInviteOpen} 
             onClose={() => setIsInviteOpen(false)} 
         />
 
+        {/* Legal Pages */}
         {view === 'TERMS' && (
             <TermsPage onBack={() => setView(previousView)} />
         )}
@@ -549,6 +534,7 @@ const App: React.FC = () => {
             <PrivacyPage onBack={() => setView(previousView)} />
         )}
 
+        {/* Tutorial Page */}
         {view === 'TUTORIAL' && (
             <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
