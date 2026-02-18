@@ -154,23 +154,15 @@ const App: React.FC = () => {
             .then(exam => {
                 if (exam) {
                     const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-                    
-                    // ROBUST DATE PARSING: Fix for Mobile/Safari
-                    // Avoid string construction like "YYYY-MM-DDTHH:mm" which fails on some mobile browsers
-                    const [y, m, d] = dateStr.split('-').map(Number);
-                    const [h, min] = exam.config.startTime.split(':').map(Number);
-                    
-                    // Create date object manually (Month is 0-indexed)
-                    const startTime = new Date(y, m - 1, d, h, min, 0); 
+                    const startTime = new Date(`${dateStr}T${exam.config.startTime}`);
                     const now = new Date();
 
-                    // Strict check: Only go to waiting room if startTime is valid AND now < startTime
-                    if (!isNaN(startTime.getTime()) && now < startTime) {
-                        // Too early (Waiting Room)
+                    if (now < startTime) {
+                        // Too early
                         setWaitingExam(exam);
                         setView('WAITING_ROOM');
                     } else {
-                        // On time (Direct Login)
+                        // On time
                         setPrefillCode(code);
                         setView('STUDENT_LOGIN');
                     }
