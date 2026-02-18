@@ -80,17 +80,32 @@ const App: React.FC = () => {
     try {
       const exam = await storageService.getExamForStudent(examCode, student.studentId, isPreview);
       
-      // Check schedule
+      // Check schedule with robust parsing
       if (!isPreview && exam) {
-          const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-          const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
-          const startTime = new Date(`${dateStr}T${timeStr}`);
-          const now = new Date();
+          try {
+              const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+              let timeStr = exam.config.startTime;
+              
+              // Normalize time to HH:mm:00
+              const timeParts = timeStr.split(':');
+              if (timeParts.length >= 2) {
+                  const h = timeParts[0].padStart(2, '0');
+                  const m = timeParts[1].padStart(2, '0');
+                  timeStr = `${h}:${m}:00`;
+              }
 
-          if (now < startTime) {
-              setWaitingExam(exam);
-              setView('WAITING_ROOM');
-              return; 
+              const startTime = new Date(`${dateStr}T${timeStr}`);
+              const now = new Date();
+
+              // Only redirect to waiting room if startTime is valid and in future
+              if (!isNaN(startTime.getTime()) && now < startTime) {
+                  setWaitingExam(exam);
+                  setView('WAITING_ROOM');
+                  return; 
+              }
+          } catch (dateErr) {
+              console.error("Date parsing error in login success:", dateErr);
+              // Fallthrough to login if date check fails
           }
       }
       
@@ -163,15 +178,30 @@ const App: React.FC = () => {
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-                    const timeStr = exam.config.startTime.length === 5 ? `${exam.config.startTime}:00` : exam.config.startTime;
-                    const startTime = new Date(`${dateStr}T${timeStr}`);
-                    const now = new Date();
+                    try {
+                        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+                        let timeStr = exam.config.startTime;
+                        
+                        // Robust time normalization
+                        const timeParts = timeStr.split(':');
+                        if (timeParts.length >= 2) {
+                            const h = timeParts[0].padStart(2, '0');
+                            const m = timeParts[1].padStart(2, '0');
+                            timeStr = `${h}:${m}:00`;
+                        }
 
-                    if (now < startTime) {
-                        setWaitingExam(exam);
-                        setView('WAITING_ROOM');
-                    } else {
+                        const startTime = new Date(`${dateStr}T${timeStr}`);
+                        const now = new Date();
+
+                        if (!isNaN(startTime.getTime()) && now < startTime) {
+                            setWaitingExam(exam);
+                            setView('WAITING_ROOM');
+                        } else {
+                            setPrefillCode(code);
+                            setView('STUDENT_LOGIN');
+                        }
+                    } catch (e) {
+                        console.error("Date check error in join param:", e);
                         setPrefillCode(code);
                         setView('STUDENT_LOGIN');
                     }
