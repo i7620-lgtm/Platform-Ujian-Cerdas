@@ -1,7 +1,8 @@
+
  
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -451,6 +452,18 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         fetchData();
     }, [exam, teacherProfile]);
 
+    const handleDeleteResult = async (studentId: string, studentName: string) => {
+        if (!confirm(`Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`)) return;
+        
+        try {
+            await storageService.deleteStudentResult(exam.code, studentId);
+            setResults(prev => prev.filter(r => r.student.studentId !== studentId));
+        } catch (e) {
+            console.error("Gagal menghapus data:", e);
+            alert("Gagal menghapus data siswa.");
+        }
+    };
+
     const handleDownloadCorrected = () => {
         const fixedArchive = { exam: exam, results: results };
         const jsonString = JSON.stringify(fixedArchive, null, 2);
@@ -713,6 +726,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">B/S/K</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Aktivitas</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Lokasi</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
@@ -753,10 +767,19 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
                                                             ) : '-'}
                                                         </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteResult(r.student.studentId, r.student.fullName); }} 
+                                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
+                                                                title="Hapus Data Siswa"
+                                                            >
+                                                                <TrashIcon className="w-4 h-4"/>
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                     {expandedStudent === r.student.studentId && (
                                                         <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
-                                                            <td colSpan={6} className="p-6">
+                                                            <td colSpan={7} className="p-6">
                                                                 <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div> Benar</span>
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
