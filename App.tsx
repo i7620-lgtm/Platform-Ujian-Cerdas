@@ -17,6 +17,24 @@ const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard'
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM';
 
+// Helper for safe date parsing across browsers
+const parseExamSchedule = (dateStr: string, timeStr: string): Date => {
+    try {
+        // Ensure YYYY-MM-DD
+        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const [year, month, day] = cleanDate.split('-').map(Number);
+        
+        // Ensure HH:mm
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        
+        // Construct local date (month is 0-indexed)
+        return new Date(year, month - 1, day, hours, minutes, 0);
+    } catch (e) {
+        console.error("Date parsing error", e);
+        return new Date(NaN);
+    }
+};
+
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
   const [previousView, setPreviousView] = useState<View>('SELECTOR');
@@ -82,30 +100,15 @@ const App: React.FC = () => {
       
       // Check schedule with robust parsing
       if (!isPreview && exam) {
-          try {
-              const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-              let timeStr = exam.config.startTime;
-              
-              // Normalize time to HH:mm:00
-              const timeParts = timeStr.split(':');
-              if (timeParts.length >= 2) {
-                  const h = timeParts[0].padStart(2, '0');
-                  const m = timeParts[1].padStart(2, '0');
-                  timeStr = `${h}:${m}:00`;
-              }
+          const startTime = parseExamSchedule(exam.config.date, exam.config.startTime);
+          const now = new Date();
 
-              const startTime = new Date(`${dateStr}T${timeStr}`);
-              const now = new Date();
-
-              // Only redirect to waiting room if startTime is valid and in future
-              if (!isNaN(startTime.getTime()) && now < startTime) {
-                  setWaitingExam(exam);
-                  setView('WAITING_ROOM');
-                  return; 
-              }
-          } catch (dateErr) {
-              console.error("Date parsing error in login success:", dateErr);
-              // Fallthrough to login if date check fails
+          // Only redirect to waiting room if startTime is valid and in future
+          if (!isNaN(startTime.getTime()) && now < startTime) {
+              setWaitingExam(exam);
+              setView('WAITING_ROOM');
+              setIsSyncing(false); // Stop syncing loading state
+              return; 
           }
       }
       
@@ -178,30 +181,13 @@ const App: React.FC = () => {
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    try {
-                        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-                        let timeStr = exam.config.startTime;
-                        
-                        // Robust time normalization
-                        const timeParts = timeStr.split(':');
-                        if (timeParts.length >= 2) {
-                            const h = timeParts[0].padStart(2, '0');
-                            const m = timeParts[1].padStart(2, '0');
-                            timeStr = `${h}:${m}:00`;
-                        }
+                    const startTime = parseExamSchedule(exam.config.date, exam.config.startTime);
+                    const now = new Date();
 
-                        const startTime = new Date(`${dateStr}T${timeStr}`);
-                        const now = new Date();
-
-                        if (!isNaN(startTime.getTime()) && now < startTime) {
-                            setWaitingExam(exam);
-                            setView('WAITING_ROOM');
-                        } else {
-                            setPrefillCode(code);
-                            setView('STUDENT_LOGIN');
-                        }
-                    } catch (e) {
-                        console.error("Date check error in join param:", e);
+                    if (!isNaN(startTime.getTime()) && now < startTime) {
+                        setWaitingExam(exam);
+                        setView('WAITING_ROOM');
+                    } else {
                         setPrefillCode(code);
                         setView('STUDENT_LOGIN');
                     }
