@@ -162,6 +162,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // 1. Check Preview (Teacher Mode)
     const previewCode = params.get('preview');
     if (previewCode) {
         const dummyStudent: Student = {
@@ -175,29 +177,38 @@ const App: React.FC = () => {
         return;
     }
 
+    // 2. Check Join Code (Student Invitation)
     const joinCode = params.get('join');
     if (joinCode) {
         const code = joinCode.toUpperCase();
-        // LOGIC FIX: Always go to Waiting Room on join link
+        
+        // Fetch exam data FIRST before deciding logic
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
                     setWaitingExam(exam);
-                    setView('WAITING_ROOM');
+                    setView('WAITING_ROOM'); // Explicitly go to Waiting Room
                 } else {
+                    // Fallback if exam not found
                     setPrefillCode(code);
                     setView('STUDENT_LOGIN');
                 }
             })
-            .catch(() => {
+            .catch((e) => {
+                console.error("Join link error:", e);
+                // Fallback on error
                 setPrefillCode(code);
                 setView('STUDENT_LOGIN');
+            })
+            .finally(() => {
+                // Clear URL only AFTER processing to prevent race conditions
+                window.history.replaceState({}, document.title, window.location.pathname);
             });
             
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
+        return; // Halt other checks
     }
 
+    // 3. Check Live Monitor
     const liveCode = params.get('live');
     if (liveCode) {
         setIsSyncing(true);
@@ -215,7 +226,10 @@ const App: React.FC = () => {
                 alert("Gagal memuat data ujian.");
                 window.history.replaceState({}, '', '/');
             })
-            .finally(() => setIsSyncing(false));
+            .finally(() => {
+                setIsSyncing(false);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            });
     }
   }, [handleStudentLoginSuccess]);
 
