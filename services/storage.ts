@@ -361,20 +361,54 @@ class StorageService {
   }
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      // FIX: Fetch profile name for Waiting Room display
-      const { data, error } = await supabase
-          .from('exams')
-          .select('*, profiles:author_id(full_name)')
-          .eq('code', code)
-          .single();
+      let data = null;
+      let errorDetails = null;
 
-      if (error || !data) throw new Error("EXAM_NOT_FOUND");
+      // ATTEMPT 1: Full data fetch (with author profile)
+      // This is expected to FAIL for anonymous students if RLS on 'profiles' restricts access.
+      try {
+          const { data: fullData, error: fullError } = await supabase
+              .from('exams')
+              .select('*, profiles:author_id(full_name)')
+              .eq('code', code)
+              .maybeSingle(); // Use maybeSingle to avoid exception on 0 rows
+          
+          if (!fullError && fullData) {
+              data = fullData;
+          }
+      } catch (e) {
+          // Ignore failures here, we proceed to fallback
+          console.warn("Attempt 1 (Full Fetch) failed, retrying with fallback...");
+      }
+
+      // ATTEMPT 2: Fallback (Exam data only)
+      // If Attempt 1 returned null data (due to RLS or other error), we try this.
+      // This query should succeed for anonymous users as 'exams' is public.
+      if (!data) {
+          const { data: simpleData, error: simpleError } = await supabase
+              .from('exams')
+              .select('*')
+              .eq('code', code)
+              .maybeSingle();
+          
+          if (simpleError) {
+              console.error("Attempt 2 (Fallback) failed:", simpleError);
+              errorDetails = simpleError;
+          } else {
+              data = simpleData;
+          }
+      }
+
+      if (!data) {
+          throw new Error("EXAM_NOT_FOUND");
+      }
+
       if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
       
       const exam: Exam = {
           code: data.code, 
           authorId: data.author_id, 
-          authorName: data.profiles?.full_name, // Map authorName
+          authorName: data.profiles?.full_name || 'Pengajar', 
           authorSchool: data.school,
           config: data.config, 
           questions: data.questions, 

@@ -141,14 +141,14 @@ const App: React.FC = () => {
             // Format ID Konsisten: Nama-Kelas-Absen
             studentId: `Mode Pratinjau-PREVIEW-00-${Date.now()}`
         };
-        handleStudentLoginSuccess(previewCode.toUpperCase(), dummyStudent, true);
+        handleStudentLoginSuccess(previewCode.trim().toUpperCase(), dummyStudent, true);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
 
     const joinCode = params.get('join');
     if (joinCode) {
-        const code = joinCode.toUpperCase();
+        const code = joinCode.trim().toUpperCase();
         // Check schedule before showing login
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
@@ -156,7 +156,6 @@ const App: React.FC = () => {
                     const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
                     
                     // ROBUST DATE PARSING: Fix for Mobile/Safari
-                    // Avoid string construction like "YYYY-MM-DDTHH:mm" which fails on some mobile browsers
                     const [y, m, d] = dateStr.split('-').map(Number);
                     const [h, min] = exam.config.startTime.split(':').map(Number);
                     
@@ -180,7 +179,8 @@ const App: React.FC = () => {
                 }
             })
             .catch(() => {
-                // Fallback on error
+                // Fallback on error (Network or Not Found)
+                // Still prefill to let user try manually or see error in login form
                 setPrefillCode(code);
                 setView('STUDENT_LOGIN');
             });
@@ -193,7 +193,7 @@ const App: React.FC = () => {
     if (liveCode) {
         setIsSyncing(true);
         // Live monitor doesn't need student specific shuffling, pass generic ID or empty
-        storageService.getExamForStudent(liveCode.toUpperCase(), 'monitor', true)
+        storageService.getExamForStudent(liveCode.trim().toUpperCase(), 'monitor', true)
             .then(exam => {
                 if (exam && exam.config.enablePublicStream) {
                     setCurrentExam(exam);
@@ -424,7 +424,7 @@ const App: React.FC = () => {
                     </div>
 
                     <p className="mt-12 text-center text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">
-                        Versi 3.0 • Hemat Data
+                        Versi 3.0.1 • Hemat Data
                     </p>
                 </div>
             </div>
