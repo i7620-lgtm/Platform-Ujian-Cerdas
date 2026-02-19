@@ -84,6 +84,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
 
+    // Logic for Organizer Name in Invitations
+    const organizerName = teacherProfile.accountType === 'super_admin' ? 'Developer' :
+                          teacherProfile.accountType === 'admin_sekolah' ? teacherProfile.school :
+                          teacherProfile.fullName;
+
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
             onRefreshExams();
@@ -335,7 +340,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 )}
                 {view === 'DRAFTS' && <DraftsView exams={draftExams} onContinueDraft={continueDraft} onDeleteDraft={handleDeleteExam} />}
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
-                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={teacherProfile.fullName} schoolName={teacherProfile.school} />}
+                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={organizerName} schoolName={teacherProfile.school} />}
                 {view === 'FINISHED_EXAMS' && (
                     <FinishedExamsView 
                         exams={finishedExams} 
@@ -390,7 +395,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <InvitationModal 
                 isOpen={isInviteOpen} 
                 onClose={() => setIsInviteOpen(false)}
-                teacherName={teacherProfile.fullName}
+                teacherName={organizerName}
                 schoolName={teacherProfile.school}
             />
         </div>
