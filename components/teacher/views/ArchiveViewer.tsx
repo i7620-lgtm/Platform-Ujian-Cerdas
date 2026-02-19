@@ -996,8 +996,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     displayAns = orderedValues.join(', ');
                                                                     isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
                                                                 } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                                    const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
-                                                                    const cSet = new Set(normalize(originalQ.correctAnswer || '').split(',').map(s=>s.trim()));
+                                                                    // FIX: Use parseList to match print logic with digital view
+                                                                    const sSet = new Set(parseList(normalize(ans)).map(normalize));
+                                                                    const cSet = new Set(parseList(normalize(originalQ.correctAnswer || '')).map(normalize));
                                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                                 } else {
                                                                     const normAns = normalize(ans);
@@ -1021,98 +1022,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     </div>
                                 </div>
                             )
-                        })}
-                    </div>
-                </div>
-
-                <div className="page-break"></div>
-
-                {/* 5. BANK SOAL & KUNCI JAWABAN */}
-                <div>
-                    <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                        <h1 className="text-lg font-black uppercase tracking-tight">5. Bank Soal & Kunci Jawaban</h1>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        {exam.questions.map((q, index) => {
-                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                            return (
-                                <div key={q.id} className="avoid-break border-b border-slate-200 pb-4 last:border-0">
-                                    <div className="flex gap-3">
-                                        <span className="font-bold text-sm w-6">{q.questionType === 'INFO' ? 'i' : questionNumber}.</span>
-                                        <div className="flex-1">
-                                            <div className="text-xs text-slate-800 mb-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            
-                                            {q.options && (
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-                                                    {q.options.map((opt, i) => {
-                                                        const isCorrect = 
-                                                            (q.questionType === 'MULTIPLE_CHOICE' && opt === q.correctAnswer) ||
-                                                            (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer?.includes(opt));
-                                                        
-                                                        return (
-                                                            <div 
-                                                                key={i} 
-                                                                className={`flex gap-1 p-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'border-transparent'}`}
-                                                            >
-                                                                <span>{String.fromCharCode(65+i)}.</span>
-                                                                <div dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="mt-2 border border-slate-200 rounded overflow-hidden">
-                                                    <table className="w-full text-[10px]">
-                                                        <thead className="bg-slate-50">
-                                                            <tr>
-                                                                <th className="p-1.5 text-left font-bold text-slate-600">Pernyataan</th>
-                                                                <th className="p-1.5 text-center w-20 font-bold text-slate-600">Kunci</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {q.trueFalseRows.map((row, rIdx) => (
-                                                                <tr key={rIdx}>
-                                                                    <td className="p-1.5">{row.text}</td>
-                                                                    <td className={`p-1.5 text-center font-bold ${row.answer ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                        {row.answer ? 'BENAR' : 'SALAH'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                <div className="mt-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
-                                                    <p className="font-bold text-slate-500 text-[9px] uppercase mb-1">Kunci Pasangan:</p>
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {q.matchingPairs.map((pair, pIdx) => (
-                                                            <div key={pIdx} className="flex items-center gap-2">
-                                                                <span className="font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">{pair.left}</span>
-                                                                <span className="text-slate-400 text-[9px]">●──●</span>
-                                                                <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{pair.right}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
-                                                <div className="mt-2 text-[10px] bg-emerald-50 p-2 border border-emerald-200 rounded">
-                                                    <p className="font-bold text-emerald-700 text-[9px] uppercase mb-1">
-                                                        {q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban:' : 'Kunci Jawaban Singkat:'}
-                                                    </p>
-                                                    <div className="text-emerald-900 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
                         })}
                     </div>
                 </div>
