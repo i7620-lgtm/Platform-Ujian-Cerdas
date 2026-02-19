@@ -48,56 +48,54 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
     if (!isOpen) return null;
 
-    // --- MODE 1: BAGIKAN APP (SIMPLE CARD) ---
+    // --- MODE 1: BAGIKAN APP (COMPACT CARD) ---
     if (!exam) {
         return (
-            <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-fade-in font-sans">
-                <div className="relative bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-700 animate-slide-in-up">
-                    {/* Decorative Header */}
-                    <div className="h-32 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 relative overflow-hidden">
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in font-sans">
+                <div className="relative bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-3xl shadow-2xl overflow-hidden border border-white/20 dark:border-slate-700 animate-slide-in-up flex flex-col max-h-[90vh]">
+                    {/* Compact Decorative Header */}
+                    <div className="h-20 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 relative shrink-0">
                         <div className="absolute top-0 left-0 w-full h-full opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-10 rounded-full blur-3xl"></div>
-                        <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-sm">
-                            <XMarkIcon className="w-5 h-5"/>
+                        <button onClick={onClose} className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-sm">
+                            <XMarkIcon className="w-4 h-4"/>
                         </button>
                     </div>
 
-                    <div className="px-8 pb-8 -mt-12 relative flex flex-col items-center text-center">
-                        <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4 ring-4 ring-indigo-50 dark:ring-slate-700">
-                            <LogoIcon className="w-14 h-14" />
+                    <div className="px-6 pb-6 -mt-10 relative flex flex-col items-center text-center flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl shadow-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-3 ring-4 ring-white dark:ring-slate-900">
+                            <LogoIcon className="w-10 h-10" />
                         </div>
 
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-1">UjianCerdas</h2>
-                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6">Platform Evaluasi Modern</p>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-none">UjianCerdas</h2>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Platform Evaluasi</p>
 
-                        <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-lg mb-6 group relative">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-3xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-500"></div>
-                            <img src={qrUrl} alt="App QR" className="w-40 h-40 object-contain relative z-10 mix-blend-multiply dark:mix-blend-normal" />
+                        <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm mb-4 relative group shrink-0">
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity"></div>
+                            <img src={qrUrl} alt="App QR" className="w-32 h-32 object-contain relative z-10 mix-blend-multiply dark:mix-blend-normal" />
                         </div>
 
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed px-2">
-                            Pindai kode di atas atau bagikan tautan ini untuk mengajak orang lain menggunakan aplikasi.
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-4 leading-relaxed px-1">
+                            Pindai atau bagikan tautan ini untuk mengajak orang lain menggunakan aplikasi.
                         </p>
 
-                        <div className="w-full flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <div className="w-full flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
                             <div className="flex-1 px-2 overflow-hidden text-left">
-                                <p className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 mb-0.5">Tautan Aplikasi</p>
-                                <p className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate">{joinUrl}</p>
+                                <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate">{joinUrl}</p>
                             </div>
                             <button 
                                 onClick={() => { navigator.clipboard.writeText(joinUrl); alert('Tautan berhasil disalin!'); }}
-                                className="p-2.5 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg shadow-sm border border-slate-100 dark:border-slate-600 hover:border-indigo-100 transition-all"
-                                title="Salin Tautan"
+                                className="p-1.5 bg-white dark:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-300 rounded-md shadow-sm border border-slate-100 dark:border-slate-600 hover:border-indigo-100 transition-all"
+                                title="Salin"
                             >
-                                <DocumentDuplicateIcon className="w-4 h-4" />
+                                <DocumentDuplicateIcon className="w-3.5 h-3.5" />
                             </button>
                             {navigator.share && (
                                 <button 
                                     onClick={() => navigator.share({ title: 'UjianCerdas', text: 'Coba aplikasi ujian online modern ini!', url: joinUrl })}
-                                    className="p-2.5 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-all"
-                                    title="Bagikan via Aplikasi Lain"
+                                    className="p-1.5 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition-all"
+                                    title="Share"
                                 >
-                                    <ShareIcon className="w-4 h-4" />
+                                    <ShareIcon className="w-3.5 h-3.5" />
                                 </button>
                             )}
                         </div>
