@@ -201,7 +201,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                 <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-indigo-50 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                                     <UserIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 </div>
-                                <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{teacherName || 'Pengajar'}</span>
+                                <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{schoolName || teacherName || 'Sekolah'}</span>
                             </div>
                         </div>
 
