@@ -89,23 +89,30 @@
   .dark .wysiwyg-content { color: #f1f5f9; }
 
   /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
-  /* Tailwind preflight sets img to block, which ignores text-align on parent. */
-  /* Setting it to inline-block allows the parent div's text-align to affect the image position. */
   .wysiwyg-content img, 
   .prose img {
     display: inline-block;
   }
 
-  /* --- Dark Mode Text Visibility Fixes --- */
-  /* Overrides inline styles (often from copy-paste) that force black text in dark mode */
+  /* --- Aggressive Dark Mode Text Visibility Fixes --- */
+  /* Forces pasted content (which often carries inline styles like color: black or background: white) 
+     to inherit the light text color and transparent background in dark mode. */
   
-  .dark .option-content *, 
-  .dark .wysiwyg-content * {
-      /* Targets common inline black color definitions */
-      &[style*="color: black"], 
-      &[style*="color: rgb(0, 0, 0)"], 
-      &[style*="color: #000000"],
-      &[style*="color:rgb(0,0,0)"] {
+  .dark .option-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre), 
+  .dark .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre),
+  .dark .prose :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre) {
+      color: inherit !important;
+      background-color: transparent !important;
+  }
+
+  /* Ensure specific overrides for black text are definitely caught even if on the element itself */
+  .dark .option-content, 
+  .dark .wysiwyg-content,
+  .dark .prose {
+      & *[style*="color: black"], 
+      & *[style*="color: rgb(0, 0, 0)"], 
+      & *[style*="color: #000000"],
+      & *[style*="color:rgb(0,0,0)"] {
           color: inherit !important;
       }
   }
