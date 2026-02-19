@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
 import { ChartBarIcon, CheckCircleIcon, XMarkIcon, ListBulletIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
+import { parseList } from '../examUtils';
 
 // --- SHARED COMPONENTS ---
 
@@ -67,15 +68,19 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
 
     const isCorrectAnswer = (ans: string) => {
         if (!correctAnswerString) return false;
+        
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            // FIX: Use parseList to safely handle JSON array comparison independent of order
+            const sSet = new Set(parseList(ans).map(normalize));
+            const cSet = new Set(parseList(correctAnswerString).map(normalize));
+            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        }
+
         if (ans === correctAnswerString) return true;
         if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'MULTIPLE_CHOICE') {
             return normalize(ans) === normalize(correctAnswerString);
         }
-        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(normalize(ans).split(','));
-            const cSet = new Set(normalize(correctAnswerString).split(','));
-            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-        }
+        
         return false;
     };
 
@@ -154,6 +159,9 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             if (ans.startsWith('{')) {
                                                 const parsed = JSON.parse(ans);
                                                 displayAns = Object.entries(parsed).map(([k,v]) => `${v}`).join(', ');
+                                            } else if (ans.startsWith('[')) {
+                                                const parsed = JSON.parse(ans);
+                                                displayAns = parsed.join(', ');
                                             }
                                         } catch(e){}
 
