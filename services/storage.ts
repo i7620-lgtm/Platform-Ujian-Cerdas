@@ -361,20 +361,48 @@ class StorageService {
   }
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      // FIX: Fetch profile name for Waiting Room display
-      const { data, error } = await supabase
-          .from('exams')
-          .select('*, profiles:author_id(full_name)')
-          .eq('code', code)
-          .single();
+      // COBA 1: Ambil data lengkap dengan JOIN profil (untuk nama guru)
+      // Ini sering gagal jika RLS tabel 'profiles' tidak diatur benar untuk anonim
+      let data = null;
+      let fetchError = null;
 
-      if (error || !data) throw new Error("EXAM_NOT_FOUND");
+      try {
+          const result = await supabase
+              .from('exams')
+              .select('*, profiles:author_id(full_name)')
+              .eq('code', code)
+              .single();
+          
+          data = result.data;
+          fetchError = result.error;
+      } catch (e) {
+          // Abaikan error di tahap ini, kita akan coba fallback
+      }
+
+      // COBA 2 (FALLBACK): Jika gagal, ambil data ujian SAJA (tanpa nama guru)
+      // Ini menjamin siswa tetap bisa ujian meskipun permission profil bermasalah
+      if (!data || fetchError) {
+          console.warn("Retrying fetch exam without author details...");
+          const fallback = await supabase
+              .from('exams')
+              .select('*')
+              .eq('code', code)
+              .single();
+          
+          data = fallback.data;
+          if (fallback.error) {
+              // Jika ini juga gagal, berarti benar-benar tidak ada atau koneksi mati
+              throw new Error("EXAM_NOT_FOUND");
+          }
+      }
+
+      if (!data) throw new Error("EXAM_NOT_FOUND");
       if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
       
       const exam: Exam = {
           code: data.code, 
           authorId: data.author_id, 
-          authorName: data.profiles?.full_name, // Map authorName
+          authorName: data.profiles?.full_name || 'Pengajar', // Default name jika join gagal
           authorSchool: data.school,
           config: data.config, 
           questions: data.questions, 
