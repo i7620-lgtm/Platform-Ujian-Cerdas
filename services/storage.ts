@@ -361,48 +361,54 @@ class StorageService {
   }
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
-      // COBA 1: Ambil data lengkap dengan JOIN profil (untuk nama guru)
-      // Ini sering gagal jika RLS tabel 'profiles' tidak diatur benar untuk anonim
       let data = null;
-      let fetchError = null;
+      let errorDetails = null;
 
+      // ATTEMPT 1: Full data fetch (with author profile)
+      // This is expected to FAIL for anonymous students if RLS on 'profiles' restricts access.
       try {
-          const result = await supabase
+          const { data: fullData, error: fullError } = await supabase
               .from('exams')
               .select('*, profiles:author_id(full_name)')
               .eq('code', code)
-              .single();
+              .maybeSingle(); // Use maybeSingle to avoid exception on 0 rows
           
-          data = result.data;
-          fetchError = result.error;
+          if (!fullError && fullData) {
+              data = fullData;
+          }
       } catch (e) {
-          // Abaikan error di tahap ini, kita akan coba fallback
+          // Ignore failures here, we proceed to fallback
+          console.warn("Attempt 1 (Full Fetch) failed, retrying with fallback...");
       }
 
-      // COBA 2 (FALLBACK): Jika gagal, ambil data ujian SAJA (tanpa nama guru)
-      // Ini menjamin siswa tetap bisa ujian meskipun permission profil bermasalah
-      if (!data || fetchError) {
-          console.warn("Retrying fetch exam without author details...");
-          const fallback = await supabase
+      // ATTEMPT 2: Fallback (Exam data only)
+      // If Attempt 1 returned null data (due to RLS or other error), we try this.
+      // This query should succeed for anonymous users as 'exams' is public.
+      if (!data) {
+          const { data: simpleData, error: simpleError } = await supabase
               .from('exams')
               .select('*')
               .eq('code', code)
-              .single();
+              .maybeSingle();
           
-          data = fallback.data;
-          if (fallback.error) {
-              // Jika ini juga gagal, berarti benar-benar tidak ada atau koneksi mati
-              throw new Error("EXAM_NOT_FOUND");
+          if (simpleError) {
+              console.error("Attempt 2 (Fallback) failed:", simpleError);
+              errorDetails = simpleError;
+          } else {
+              data = simpleData;
           }
       }
 
-      if (!data) throw new Error("EXAM_NOT_FOUND");
+      if (!data) {
+          throw new Error("EXAM_NOT_FOUND");
+      }
+
       if (data.status === 'DRAFT' && !isPreview) throw new Error("EXAM_IS_DRAFT");
       
       const exam: Exam = {
           code: data.code, 
           authorId: data.author_id, 
-          authorName: data.profiles?.full_name || 'Pengajar', // Default name jika join gagal
+          authorName: data.profiles?.full_name || 'Pengajar', 
           authorSchool: data.school,
           config: data.config, 
           questions: data.questions, 
