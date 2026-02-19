@@ -330,6 +330,25 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
     }, [archiveData?.exam.code]);
 
+    // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
+    const sortedResults = useMemo(() => {
+        if (!archiveData) return [];
+        return [...archiveData.results].sort((a, b) => {
+            const classA = a.student.class || '';
+            const classB = b.student.class || '';
+            // Compare class alphanumerically
+            const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+            if (c !== 0) return c;
+
+            // Extract absent number from ID (last part)
+            const getAbs = (id: string) => {
+                const parts = id.split('-');
+                return parseInt(parts[parts.length-1]) || 0;
+            }
+            return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+        });
+    }, [archiveData]);
+
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
         else setExpandedStudent(id);
@@ -601,7 +620,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {results.map(r => {
+                                {sortedResults.map(r => {
                                     const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
                                     return (
                                     <React.Fragment key={r.student.studentId}>
@@ -713,7 +732,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             
             {/* PRINT VIEW (Clean & Sequential 5 Points) */}
             <div className="hidden print:block text-slate-900">
-                {/* ... (Print View remains unchanged except implicitly benefiting from the fix) ... */}
                 {/* Header Global */}
                 <div className="border-b-2 border-slate-900 pb-2 mb-6">
                     <h1 className="text-2xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
@@ -823,7 +841,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </tr>
                         </thead>
                         <tbody>
-                            {results.map((r, index) => {
+                            {sortedResults.map((r, index) => {
                                 const { score } = getCalculatedStats(r, exam);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
@@ -869,7 +887,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             </tr>
                         </thead>
                         <tbody>
-                            {results.map((r, index) => {
+                            {sortedResults.map((r, index) => {
                                 const analysis = analyzeStudentPerformance(exam, r);
                                 return (
                                     <tr key={r.student.studentId} className="avoid-break">
