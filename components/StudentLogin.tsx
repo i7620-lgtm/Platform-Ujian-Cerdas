@@ -121,30 +121,34 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         // Use IndexedDB helper instead of localStorage directly
         const hasLocalData = await storageService.getLocalProgress(localKey);
         
-        // Check session if no local data
-        if (!hasLocalData) {
-            const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
+        // VALIDASI UTAMA: Cek data remote (server) terlebih dahulu untuk memastikan kepemilikan kursi
+        const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
+        
+        if (remoteResult) {
+            // Jika data server ada, validasi apakah nama yang dimasukkan cocok dengan yang tersimpan
+            const storedName = normalizeId(remoteResult.student.fullName);
+            const inputName = normalizeId(fullName);
             
-            if (remoteResult) {
-                // VALIDASI NAMA: Jika nomor absen sudah dipakai tapi namanya beda jauh
-                const storedName = normalizeId(remoteResult.student.fullName);
-                const inputName = normalizeId(fullName);
-                
-                // Logika cek: jika nama input tidak mengandung nama tersimpan (dan sebaliknya)
-                if (storedName !== inputName && !storedName.includes(inputName) && !inputName.includes(storedName)) {
-                    setError(`Nomor Absen ${absentNumber} di Kelas ${studentClass} sudah digunakan oleh "${remoteResult.student.fullName}". Harap cek kembali data Anda.`);
-                    setIsLoading(false);
-                    return;
-                }
+            // Logika cek: Toleransi kesamaan nama (case insensitive & ignore spaces)
+            // Mengizinkan jika nama input mengandung nama tersimpan atau sebaliknya (untuk typo/singkatan)
+            const isNameMatch = storedName === inputName || storedName.includes(inputName) || inputName.includes(storedName);
+            
+            if (!isNameMatch) {
+                // BUG FIX: Pesan error spesifik sesuai permintaan
+                setError(`Sudah ada orang lain yang menggunakan kelas dan absen tersebut (dengan nama: ${remoteResult.student.fullName}, kelas: ${remoteResult.student.class}, dan absen: ${absentNumber}).`);
+                setIsLoading(false);
+                return;
+            }
 
-                if (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed') {
-                    setIsLocked(true);
-                    setIsLoading(false);
-                    return;
-                }
+            // Jika nama cocok tapi statusnya sedang berlangsung atau terkunci
+            if (!hasLocalData && (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed')) {
+                setIsLocked(true);
+                setIsLoading(false);
+                return;
             }
         }
 
+        // Jika lolos validasi atau data baru, lanjutkan login
         onLoginSuccess(cleanExamCode, studentData);
 
     } catch (e) {

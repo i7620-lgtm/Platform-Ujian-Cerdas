@@ -14,7 +14,7 @@ interface StudentResultPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: string) => (str || '').trim().toLowerCase();
+const normalize = (str: string) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
@@ -284,7 +284,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                     const cSet = new Set(parseList(normalizedCorrect).map(normalize));
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-                                                     isCorrect = JSON.stringify(studentAns) === JSON.stringify(correctAns); 
+                                                     isCorrect = false;
                                                      try {
                                                          if (q.questionType === 'TRUE_FALSE') {
                                                              const ansObj = JSON.parse(studentAns);
