@@ -1,5 +1,3 @@
-
- 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon } from '../Icons';
@@ -249,18 +247,22 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </div>
                                                 </th>
                                             )}
+                                            {!isLargeScale && (
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <ClockIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Aktif</span>
                                                 </div>
                                             </th>
+                                            )}
+                                            {displayExam.config.trackLocation && (
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <SignalIcon className="w-3.5 h-3.5 sm:hidden" />
                                                     <span className="hidden sm:inline">Lokasi</span>
                                                 </div>
                                             </th>
+                                            )}
                                             <th className="px-5 py-4 text-right w-32">
                                                 <div className="flex items-center justify-end gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <LockClosedIcon className="w-3.5 h-3.5 sm:hidden" />
@@ -322,19 +324,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </div>
                                                         </td>
                                                     )}
+                                                    {!isLargeScale && (
                                                     <td className="px-5 py-3 text-center">
-                                                        {isLargeScale ? (
-                                                            <span className="text-[10px] text-slate-300 dark:text-slate-600">-</span>
-                                                        ) : (
-                                                            <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-600">
-                                                                {getRelativeTime(lastActive)}
-                                                            </span>
-                                                        )}
+                                                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-600">
+                                                            {getRelativeTime(lastActive)}
+                                                        </span>
                                                     </td>
+                                                    )}
+                                                    {displayExam.config.trackLocation && (
                                                     <td className="px-5 py-3 text-center">
-                                                        {!displayExam.config.trackLocation ? (
-                                                            <span className="text-[10px] text-slate-300 dark:text-slate-600 font-bold">-</span>
-                                                        ) : r.location ? (
+                                                        {r.location ? (
                                                             <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2 py-1 rounded transition-colors border border-blue-100 dark:border-blue-900">
                                                                 Maps ↗
                                                             </a>
@@ -342,6 +341,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">N/A</span>
                                                         )}
                                                     </td>
+                                                    )}
                                                     <td className="px-5 py-3 text-right">
                                                         {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
                                                             <button 
@@ -356,7 +356,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             ); 
                                         }) : (
                                             <tr>
-                                                <td colSpan={!isLargeScale ? 7 : 6} className="px-6 py-20 text-center">
+                                                <td colSpan={4 + (!isLargeScale ? 2 : 0) + (displayExam.config.trackLocation ? 1 : 0)} className="px-6 py-20 text-center">
                                                     <div className="flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-2">
                                                         <UserIcon className="w-8 h-8 opacity-20"/>
                                                         <span className="text-sm font-medium italic">Belum ada siswa yang bergabung...</span>
