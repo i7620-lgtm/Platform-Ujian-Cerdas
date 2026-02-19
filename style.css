@@ -95,4 +95,18 @@
   .prose img {
     display: inline-block;
   }
+
+  /* --- Dark Mode Text Visibility Fixes --- */
+  /* Overrides inline styles (often from copy-paste) that force black text in dark mode */
+  
+  .dark .option-content *, 
+  .dark .wysiwyg-content * {
+      /* Targets common inline black color definitions */
+      &[style*="color: black"], 
+      &[style*="color: rgb(0, 0, 0)"], 
+      &[style*="color: #000000"],
+      &[style*="color:rgb(0,0,0)"] {
+          color: inherit !important;
+      }
+  }
 }
