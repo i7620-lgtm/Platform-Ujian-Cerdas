@@ -105,7 +105,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             if (pA !== pB) return pA - pB;
             
             // Urutan kedua: Kelas
-            const classCompare = a.student.class.localeCompare(b.student.class);
+            const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
             if (classCompare !== 0) return classCompare;
 
             // Urutan ketiga: No Absen (diambil dari studentId)
@@ -440,7 +440,24 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         setIsLoading(true);
         try {
             const data = await storageService.getResults(exam.code, undefined);
-            setResults(data);
+            
+            // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
+            const sortedData = data.sort((a, b) => {
+                const classA = a.student.class || '';
+                const classB = b.student.class || '';
+                // Compare class alphanumerically (e.g. 1A, 1B, 2, 10)
+                const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+                if (c !== 0) return c;
+
+                // Extract numeric absent number from ID (last part)
+                const getAbs = (id: string) => {
+                    const parts = id.split('-');
+                    return parseInt(parts[parts.length-1]) || 0;
+                }
+                return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+            });
+
+            setResults(sortedData);
         } catch (error) {
             console.error("Failed to fetch results", error);
         } finally {
