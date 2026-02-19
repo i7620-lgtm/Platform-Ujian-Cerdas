@@ -36,6 +36,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             const config = await storageService.getExamConfig(examCode.toUpperCase().trim());
             if (config && config.targetClasses && config.targetClasses.length > 0) {
                 setAvailableClasses(config.targetClasses);
+                // FIX: Reset kelas jika nilai saat ini tidak ada dalam daftar target
+                setStudentClass(prev => {
+                    if (prev && !config.targetClasses?.includes(prev)) return '';
+                    return prev;
+                });
             } else {
                 setAvailableClasses([]);
             }
@@ -68,14 +73,32 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       setError('Mohon lengkapi semua data identitas.');
       return;
     }
+
+    const cleanExamCode = examCode.toUpperCase().trim();
+
+    // FIX: Validasi ketat kelas target sebelum submit
+    if (cleanExamCode.length === 6) {
+        try {
+            const config = await storageService.getExamConfig(cleanExamCode);
+            if (config && config.targetClasses && config.targetClasses.length > 0) {
+                if (!config.targetClasses.includes(studentClass.trim())) {
+                    setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
+                    setAvailableClasses(config.targetClasses);
+                    setStudentClass(''); 
+                    return;
+                }
+            }
+        } catch (err) {
+            // Ignore error here to allow offline/fallback behavior in onLoginSuccess logic
+        }
+    }
+
     setError('');
 
     // Save preference (original text for display)
     localStorage.setItem('saved_student_fullname', fullName.trim());
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
-
-    const cleanExamCode = examCode.toUpperCase().trim();
     
     // COMPOSITE ID NORMALIZATION (THE CORE FIX)
     // We normalize all components to ensure "I Made" and "imade" produce the same ID segment.
