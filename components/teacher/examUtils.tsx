@@ -54,37 +54,50 @@ export const parseList = (str: string | undefined | null): string[] => {
     return str.split(',').map(s => s.trim()).filter(s => s !== '');
 };
 
+// --- CORE LOGIC: CHECK ANSWER (ROBUST & ORDER INSENSITIVE) ---
+export const checkQuestionAnswer = (q: Question, ans: string | undefined): boolean => {
+    if (!ans && ans !== "") return false; // Empty check, allow empty string passed if any
+    if (!ans) return false;
+
+    const normalize = (str: string) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+        return normalize(ans) === normalize(q.correctAnswer || '');
+    } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+        const sList = parseList(ans).map(normalize);
+        const cList = parseList(q.correctAnswer).map(normalize);
+        const sSet = new Set(sList);
+        const cSet = new Set(cList);
+        // Compare Sets: Size must be equal and every item in Student Set must exist in Correct Set
+        if (sSet.size !== cSet.size) return false;
+        for (let item of sSet) {
+            if (!cSet.has(item)) return false;
+        }
+        return true;
+    } else if (q.questionType === 'TRUE_FALSE') {
+        try {
+            const ansObj = JSON.parse(ans);
+            return q.trueFalseRows?.every((row, idx) => {
+                const val = ansObj[idx];
+                return val === row.answer;
+            }) ?? false;
+        } catch(e) { return false; }
+    } else if (q.questionType === 'MATCHING') {
+        try {
+            const ansObj = JSON.parse(ans);
+            return q.matchingPairs?.every((pair, idx) => {
+                return normalize(ansObj[idx]) === normalize(pair.right);
+            }) ?? false;
+        } catch(e) { return false; }
+    }
+    return false;
+};
+
 // --- ANALYTICS ENGINE (Pure Functions) ---
 
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     const catMap: Record<string, { total: number; correct: number }> = {};
     const lvlMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').trim().toLowerCase();
-
-    const checkAnswer = (q: Question, ans: string) => {
-        if (!ans) return false;
-        const normAns = normalize(String(ans));
-        const normKey = normalize(String(q.correctAnswer || ''));
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-            return normAns === normKey;
-        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(parseList(normAns).map(normalize));
-            const cSet = new Set(parseList(normKey).map(normalize));
-            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-        } else if (q.questionType === 'TRUE_FALSE') {
-            try {
-                const ansObj = JSON.parse(ans);
-                return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-            } catch(e) { return false; }
-        } else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(ans);
-                return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-            } catch(e) { return false; }
-        }
-        return false;
-    };
 
     // 1. Initialize Maps
     exam.questions.forEach(q => {
@@ -99,7 +112,7 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
         results.forEach(r => {
             catMap[cat].total++;
             lvlMap[lvl].total++;
-            if (checkAnswer(q, r.answers[q.id])) {
+            if (checkQuestionAnswer(q, r.answers[q.id])) {
                 catMap[cat].correct++;
                 lvlMap[lvl].correct++;
             }
@@ -122,7 +135,6 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
 export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
     const statsMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').trim().toLowerCase();
 
     // 1. Calculate Stats per Category
     exam.questions.forEach(q => {
@@ -136,34 +148,9 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
 
         statsMap[category].total += 1;
 
-        // Check Correctness (Simplified Logic matching StudentResultPage)
+        // Check Correctness using the centralized function
         const studentAns = result.answers[q.id];
-        let isCorrect = false;
-        
-        if (studentAns) {
-            const normAns = normalize(String(studentAns));
-            const normKey = normalize(String(q.correctAnswer || ''));
-
-            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                isCorrect = normAns === normKey;
-            } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(parseList(normAns).map(normalize));
-                const cSet = new Set(parseList(normKey).map(normalize));
-                isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-            } else if (q.questionType === 'TRUE_FALSE') {
-                try {
-                    const ansObj = JSON.parse(studentAns);
-                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-                } catch(e) {}
-            } else if (q.questionType === 'MATCHING') {
-                try {
-                    const ansObj = JSON.parse(studentAns);
-                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-                } catch(e) {}
-            }
-        }
-
-        if (isCorrect) {
+        if (checkQuestionAnswer(q, studentAns)) {
             statsMap[category].correct += 1;
         }
     });
