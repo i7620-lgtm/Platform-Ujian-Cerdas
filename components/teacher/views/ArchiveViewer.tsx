@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
-import { calculateAggregateStats, analyzeStudentPerformance, compressImage, checkQuestionAnswer, parseList } from '../examUtils';
+import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
     CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon 
@@ -240,13 +240,39 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const normalize = (str: string) => str.trim().toLowerCase();
 
-    // Enhanced checkAnswerStatus supporting Manual Grading Override and Robust Matching
     const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
         const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
-        // Use new robust helper
-        return checkQuestionAnswer(q, ans) ? 'CORRECT' : 'WRONG';
+        const studentAns = normalize(String(ans));
+        const correctAns = normalize(String(q.correctAnswer || ''));
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            // FIX: Use parseList to handle JSON arrays correctly and independent of order
+            const sSet = new Set(parseList(studentAns).map(normalize));
+            const cSet = new Set(parseList(correctAns).map(normalize));
+            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+            return 'WRONG';
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+             try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+                return allCorrect ? 'CORRECT' : 'WRONG';
+            } catch(e) { return 'WRONG'; }
+        }
+
+        return 'WRONG'; 
     };
 
     const getCalculatedStats = (r: Result, exam: Exam) => {
@@ -687,6 +713,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             
             {/* PRINT VIEW (Clean & Sequential 5 Points) */}
             <div className="hidden print:block text-slate-900">
+                {/* ... (Print View remains unchanged except implicitly benefiting from the fix) ... */}
                 {/* Header Global */}
                 <div className="border-b-2 border-slate-900 pb-2 mb-6">
                     <h1 className="text-2xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
@@ -955,13 +982,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             let isCorrect = false;
 
                                                             try {
-                                                                // Use centralized logic to check correctness for robust matching
-                                                                if (originalQ) isCorrect = checkQuestionAnswer(originalQ, ans);
-
                                                                 if (originalQ?.questionType === 'MATCHING') {
                                                                     const parsed = JSON.parse(ans);
                                                                     const orderedValues = (originalQ.matchingPairs || []).map((_, idx) => parsed[idx] || '—');
                                                                     displayAns = orderedValues.join(', ');
+                                                                    isCorrect = originalQ.matchingPairs?.every((pair, idx) => parsed[idx] === pair.right) ?? false;
                                                                 } else if (originalQ?.questionType === 'TRUE_FALSE') {
                                                                     const parsed = JSON.parse(ans);
                                                                     const orderedValues = (originalQ.trueFalseRows || []).map((_, idx) => {
@@ -969,7 +994,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                         return val === true ? 'Benar' : (val === false ? 'Salah' : '—');
                                                                     });
                                                                     displayAns = orderedValues.join(', ');
-                                                                } 
+                                                                    isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
+                                                                } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                                    const sSet = new Set(normalize(ans).split(',').map(s=>s.trim()));
+                                                                    const cSet = new Set(normalize(originalQ.correctAnswer || '').split(',').map(s=>s.trim()));
+                                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                                } else {
+                                                                    const normAns = normalize(ans);
+                                                                    const normKey = normalize(originalQ?.correctAnswer || '');
+                                                                    isCorrect = normAns === normKey;
+                                                                }
                                                             } catch(e) {}
 
                                                             return (
