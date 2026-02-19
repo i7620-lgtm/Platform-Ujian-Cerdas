@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon } from './Icons';
+import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon } from './Icons';
 import type { Exam } from '../types';
 
 interface InvitationModalProps {
@@ -49,6 +48,66 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
     if (!isOpen) return null;
 
+    // --- MODE 1: BAGIKAN APP (SIMPLE CARD) ---
+    if (!exam) {
+        return (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-fade-in font-sans">
+                <div className="relative bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-700 animate-slide-in-up">
+                    {/* Decorative Header */}
+                    <div className="h-32 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-full opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-10 rounded-full blur-3xl"></div>
+                        <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-sm">
+                            <XMarkIcon className="w-5 h-5"/>
+                        </button>
+                    </div>
+
+                    <div className="px-8 pb-8 -mt-12 relative flex flex-col items-center text-center">
+                        <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4 ring-4 ring-indigo-50 dark:ring-slate-700">
+                            <LogoIcon className="w-14 h-14" />
+                        </div>
+
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-1">UjianCerdas</h2>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6">Platform Evaluasi Modern</p>
+
+                        <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-lg mb-6 group relative">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-3xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-500"></div>
+                            <img src={qrUrl} alt="App QR" className="w-40 h-40 object-contain relative z-10 mix-blend-multiply dark:mix-blend-normal" />
+                        </div>
+
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed px-2">
+                            Pindai kode di atas atau bagikan tautan ini untuk mengajak orang lain menggunakan aplikasi.
+                        </p>
+
+                        <div className="w-full flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div className="flex-1 px-2 overflow-hidden text-left">
+                                <p className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 mb-0.5">Tautan Aplikasi</p>
+                                <p className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate">{joinUrl}</p>
+                            </div>
+                            <button 
+                                onClick={() => { navigator.clipboard.writeText(joinUrl); alert('Tautan berhasil disalin!'); }}
+                                className="p-2.5 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg shadow-sm border border-slate-100 dark:border-slate-600 hover:border-indigo-100 transition-all"
+                                title="Salin Tautan"
+                            >
+                                <DocumentDuplicateIcon className="w-4 h-4" />
+                            </button>
+                            {navigator.share && (
+                                <button 
+                                    onClick={() => navigator.share({ title: 'UjianCerdas', text: 'Coba aplikasi ujian online modern ini!', url: joinUrl })}
+                                    className="p-2.5 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-all"
+                                    title="Bagikan via Aplikasi Lain"
+                                >
+                                    <ShareIcon className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --- MODE 2: UNDANGAN UJIAN (FULL DETAIL) ---
     const handlePrint = () => { window.print(); };
 
     const getExamTypeBadge = (type: string) => {
