@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -95,25 +96,30 @@
   }
 
   /* --- Aggressive Dark Mode Text Visibility Fixes --- */
-  /* Forces pasted content (which often carries inline styles like color: black or background: white) 
-     to inherit the light text color and transparent background in dark mode. */
   
-  .dark .option-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre), 
+  /* 1. For Options: Force ALL content to inherit color. This is safe as options are usually simple text. */
+  .dark .option-content, 
+  .dark .option-content * {
+      color: inherit !important;
+      background-color: transparent !important;
+  }
+
+  /* 2. For General Content (Prose/Editor): Target text containers to strip black colors, but respect structure */
   .dark .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre),
   .dark .prose :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre) {
       color: inherit !important;
       background-color: transparent !important;
   }
 
-  /* Ensure specific overrides for black text are definitely caught even if on the element itself */
-  .dark .option-content, 
-  .dark .wysiwyg-content,
-  .dark .prose {
-      & *[style*="color: black"], 
-      & *[style*="color: rgb(0, 0, 0)"], 
-      & *[style*="color: #000000"],
-      & *[style*="color:rgb(0,0,0)"] {
-          color: inherit !important;
-      }
+  /* 3. Catch-all for explicit black styles that might be on other elements */
+  .dark .wysiwyg-content *[style*="color: black"], 
+  .dark .wysiwyg-content *[style*="color: rgb(0, 0, 0)"], 
+  .dark .wysiwyg-content *[style*="color: #000000"],
+  .dark .wysiwyg-content *[style*="color:rgb(0,0,0)"],
+  .dark .prose *[style*="color: black"], 
+  .dark .prose *[style*="color: rgb(0, 0, 0)"], 
+  .dark .prose *[style*="color: #000000"],
+  .dark .prose *[style*="color:rgb(0,0,0)"] {
+      color: inherit !important;
   }
 }
