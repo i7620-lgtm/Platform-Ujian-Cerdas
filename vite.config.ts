@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
     },
     build: {
+      target: 'es2015',
       outDir: 'dist',
       sourcemap: false,
       minify: 'terser',
