@@ -200,17 +200,22 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
+            
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
             storageService.saveLocalProgress(STORAGE_KEY, { answers: answersRef.current, logs: logRef.current });
+            
             if (activeExam.config.continueWithPermission) {
                 alert("PELANGGARAN TERDETEKSI: Sesi dikunci.");
                 handleSubmit(true, 'force_closed');
                 return;
             }
+            
             if (type === 'hard') {
                 violationsRef.current += 1;
-                if (violationsRef.current >= 3) { alert("PELANGGARAN BATAS MAKSIMUM!"); handleSubmit(true, 'force_closed'); }
-                else { setCheatingWarning(`PELANGGARAN! Sisa peringatan: ${3 - violationsRef.current}`); setTimeout(() => setCheatingWarning(''), 5000); }
+                // FIX: Jika mode 'Kunci Akses' tidak aktif, jangan pernah kunci ujian (hapus 3 strikes rule).
+                // Hanya tampilkan peringatan visual bahwa aktivitas tercatat.
+                setCheatingWarning(`PELANGGARAN TERDETEKSI! Aktivitas dicatat.`); 
+                setTimeout(() => setCheatingWarning(''), 5000); 
             }
         };
         const handleVisibilityChange = () => { if (document.hidden && !isSubmittingRef.current) handleViolation('hard', 'Meninggalkan halaman'); };
