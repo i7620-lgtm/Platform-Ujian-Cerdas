@@ -304,10 +304,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Soal {idx + 1}</span>
                                                             <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-                                                            <p className="flex justify-between"><span className="text-slate-400 dark:text-slate-500 font-bold">Jawaban Kamu:</span> <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-rose-600 dark:text-rose-400 font-black'}>{studentAns}</span></p>
-                                                            {!isCorrect && <p className="flex justify-between border-t border-slate-50 dark:border-slate-800 pt-2 mt-2"><span className="text-slate-400 dark:text-slate-500 font-bold">Kunci Jawaban:</span> <span className="font-black text-slate-700 dark:text-slate-300">{correctAns}</span></p>}
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
+                                                                <div className={`text-right font-black option-content ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: studentAns}}></div>
+                                                            </div>
+                                                            {!isCorrect && (
+                                                                <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
+                                                                    <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Kunci Jawaban:</span> 
+                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content" dangerouslySetInnerHTML={{__html: correctAns}}></div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );

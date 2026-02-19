@@ -51,6 +51,7 @@ export interface ExamConfig {
 export interface Exam {
   code: string;
   authorId?: string; 
+  authorName?: string; // Added to store creator's real name
   authorSchool?: string; 
   questions: Question[];
   config: ExamConfig;

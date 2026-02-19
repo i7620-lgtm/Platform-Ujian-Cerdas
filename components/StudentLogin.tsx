@@ -36,6 +36,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             const config = await storageService.getExamConfig(examCode.toUpperCase().trim());
             if (config && config.targetClasses && config.targetClasses.length > 0) {
                 setAvailableClasses(config.targetClasses);
+                // FIX: Reset kelas jika nilai saat ini tidak ada dalam daftar target
+                setStudentClass(prev => {
+                    if (prev && !config.targetClasses?.includes(prev)) return '';
+                    return prev;
+                });
             } else {
                 setAvailableClasses([]);
             }
@@ -68,21 +73,38 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       setError('Mohon lengkapi semua data identitas.');
       return;
     }
+
+    const cleanExamCode = examCode.toUpperCase().trim();
+
+    // FIX: Validasi ketat kelas target sebelum submit
+    if (cleanExamCode.length === 6) {
+        try {
+            const config = await storageService.getExamConfig(cleanExamCode);
+            if (config && config.targetClasses && config.targetClasses.length > 0) {
+                if (!config.targetClasses.includes(studentClass.trim())) {
+                    setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
+                    setAvailableClasses(config.targetClasses);
+                    setStudentClass(''); 
+                    return;
+                }
+            }
+        } catch (err) {
+            // Ignore error here to allow offline/fallback behavior in onLoginSuccess logic
+        }
+    }
+
     setError('');
 
     // Save preference (original text for display)
     localStorage.setItem('saved_student_fullname', fullName.trim());
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
-
-    const cleanExamCode = examCode.toUpperCase().trim();
     
-    // COMPOSITE ID NORMALIZATION (THE CORE FIX)
-    // We normalize all components to ensure "I Made" and "imade" produce the same ID segment.
-    const normName = normalizeId(fullName);
+    // COMPOSITE ID NORMALIZATION (FIXED: Removing Name from ID)
+    // ID hanya bergantung pada Kelas dan No Absen agar unik per kursi
     const normClass = normalizeId(studentClass);
     const normAbsent = normalizeId(absentNumber);
-    const compositeId = `${normName}-${normClass}-${normAbsent}`;
+    const compositeId = `${normClass}-${normAbsent}`;
     
     const studentData: Student = {
         fullName: fullName.trim(), // Keep original for result sheet
@@ -102,10 +124,24 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         // Check session if no local data
         if (!hasLocalData) {
             const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
-            if (remoteResult && (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed')) {
-                setIsLocked(true);
-                setIsLoading(false);
-                return;
+            
+            if (remoteResult) {
+                // VALIDASI NAMA: Jika nomor absen sudah dipakai tapi namanya beda jauh
+                const storedName = normalizeId(remoteResult.student.fullName);
+                const inputName = normalizeId(fullName);
+                
+                // Logika cek: jika nama input tidak mengandung nama tersimpan (dan sebaliknya)
+                if (storedName !== inputName && !storedName.includes(inputName) && !inputName.includes(storedName)) {
+                    setError(`Nomor Absen ${absentNumber} di Kelas ${studentClass} sudah digunakan oleh "${remoteResult.student.fullName}". Harap cek kembali data Anda.`);
+                    setIsLoading(false);
+                    return;
+                }
+
+                if (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed') {
+                    setIsLocked(true);
+                    setIsLoading(false);
+                    return;
+                }
             }
         }
 
@@ -120,10 +156,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   const handleUnlockAndResume = async (token: string) => {
       const cleanExamCode = examCode.toUpperCase().trim();
-      const normName = normalizeId(fullName);
+      // ID Fix: Konsisten dengan handleSubmit, tanpa nama
       const normClass = normalizeId(studentClass);
       const normAbsent = normalizeId(absentNumber);
-      const compositeId = `${normName}-${normClass}-${normAbsent}`;
+      const compositeId = `${normClass}-${normAbsent}`;
       
       try {
           const verified = await storageService.verifyUnlockToken(cleanExamCode, compositeId, token);
@@ -157,7 +193,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     </div>
                     <h2 className="text-xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Sesi Terkunci</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                        Akun Anda ("{fullName}") sedang aktif atau dihentikan paksa.<br/>
+                        Akun "{fullName}" (Kelas {studentClass}, No {absentNumber}) sedang aktif atau dihentikan paksa.<br/>
                         Masukkan <strong>Token Reset</strong> dari pengawas.
                     </p>
                     <UnlockForm onUnlock={handleUnlockAndResume} onCancel={() => { setIsLocked(false); setIsLoading(false); }} />

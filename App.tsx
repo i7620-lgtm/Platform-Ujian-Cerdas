@@ -361,15 +361,16 @@ const App: React.FC = () => {
             )}
         </div>
 
-        {/* Invite Button for Selector View */}
+        {/* Invite Button for Selector View (Redesigned) */}
         {view === 'SELECTOR' && (
             <div className="fixed top-6 left-6 z-[100]">
-                <button 
+                <button
                     onClick={() => setIsInviteOpen(true)}
-                    className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-md dark:shadow-none border border-slate-100 dark:border-slate-700"
-                    title="Cetak Undangan"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-200/60 dark:border-slate-700 backdrop-blur-sm group"
+                    title="Bagikan Aplikasi"
                 >
-                    <QrCodeIcon className="w-5 h-5" />
+                    <QrCodeIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Bagikan App</span>
                 </button>
             </div>
         )}

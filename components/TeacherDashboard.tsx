@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -83,6 +82,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+
+    // Logic for Organizer Name in Invitations
+    const organizerName = teacherProfile.accountType === 'super_admin' ? 'Developer' :
+                          teacherProfile.accountType === 'admin_sekolah' ? teacherProfile.school :
+                          teacherProfile.fullName;
 
     useEffect(() => {
         if (view === 'ONGOING' || view === 'UPCOMING_EXAMS' || view === 'FINISHED_EXAMS' || view === 'DRAFTS') {
@@ -239,7 +243,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     
     const ongoingExams = publishedExams.filter((exam) => {
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const start = new Date(`${dateStr}T${exam.config.startTime}`);
+        const start = new Date(`${dateStr}T${config.startTime}`);
         const end = new Date(start.getTime() + exam.config.timeLimit * 60 * 1000);
         return now >= start && now <= end;
     });
@@ -289,13 +293,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
                         <div className="flex items-center gap-4">
                             <button 
-                                onClick={() => setIsInviteOpen(true)}
-                                className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-800 shadow-sm"
-                            >
-                                <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Undangan</span>
-                            </button>
-                            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                            <button 
                                 onClick={toggleTheme} 
                                 className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
                                 title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
@@ -335,7 +332,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 )}
                 {view === 'DRAFTS' && <DraftsView exams={draftExams} onContinueDraft={continueDraft} onDeleteDraft={handleDeleteExam} />}
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
-                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={teacherProfile.fullName} schoolName={teacherProfile.school} />}
+                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={organizerName} schoolName={teacherProfile.school} />}
                 {view === 'FINISHED_EXAMS' && (
                     <FinishedExamsView 
                         exams={finishedExams} 
@@ -390,7 +387,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <InvitationModal 
                 isOpen={isInviteOpen} 
                 onClose={() => setIsInviteOpen(false)}
-                teacherName={teacherProfile.fullName}
+                teacherName={organizerName}
                 schoolName={teacherProfile.school}
             />
         </div>

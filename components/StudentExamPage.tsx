@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon, SignalIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
@@ -200,17 +200,22 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
+            
             logRef.current.push(`[${new Date().toLocaleTimeString()}] Pelanggaran: ${reason}`);
             storageService.saveLocalProgress(STORAGE_KEY, { answers: answersRef.current, logs: logRef.current });
+            
             if (activeExam.config.continueWithPermission) {
                 alert("PELANGGARAN TERDETEKSI: Sesi dikunci.");
                 handleSubmit(true, 'force_closed');
                 return;
             }
+            
             if (type === 'hard') {
                 violationsRef.current += 1;
-                if (violationsRef.current >= 3) { alert("PELANGGARAN BATAS MAKSIMUM!"); handleSubmit(true, 'force_closed'); }
-                else { setCheatingWarning(`PELANGGARAN! Sisa peringatan: ${3 - violationsRef.current}`); setTimeout(() => setCheatingWarning(''), 5000); }
+                // FIX: Jika mode 'Kunci Akses' tidak aktif, jangan pernah kunci ujian (hapus 3 strikes rule).
+                // Hanya tampilkan peringatan visual bahwa aktivitas tercatat.
+                setCheatingWarning(`PELANGGARAN TERDETEKSI! Aktivitas dicatat.`); 
+                setTimeout(() => setCheatingWarning(''), 5000); 
             }
         };
         const handleVisibilityChange = () => { if (document.hidden && !isSubmittingRef.current) handleViolation('hard', 'Meninggalkan halaman'); };
@@ -466,7 +471,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         return (
                                                             <button key={i} onClick={() => handleAnswerChange(q.id, opt)} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <span className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold shrink-0 mt-0.5 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800'}`}>{String.fromCharCode(65 + i)}</span>
-                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
+                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                             </button>
                                                         );
                                                     })}
@@ -484,7 +489,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
-                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
+                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                             </button>
                                                         );
                                                     })}
@@ -502,7 +507,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                 const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
                                                                 return (
                                                                     <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                                                        <td className="p-4 font-medium text-slate-700 dark:text-slate-300"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div></td>
+                                                                        <td className="p-4 font-medium text-slate-700 dark:text-slate-300 option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div></td>
                                                                         <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === true} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))} className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
                                                                         <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === false} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))} className="w-5 h-5 text-rose-600 focus:ring-rose-500 cursor-pointer" /></td>
                                                                     </tr>
@@ -528,7 +533,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
                                                             return (
                                                                 <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div></div>
+                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div></div>
                                                                     <div className="hidden sm:flex text-slate-300 dark:text-slate-600 items-center justify-center">→</div>
                                                                     <div className="flex-1 relative custom-dropdown-container">
                                                                         <button 
@@ -538,7 +543,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                         >
                                                                             <div className="truncate flex-1">
                                                                                 {selectedValue ? (
-                                                                                    <div className="line-clamp-1" dangerouslySetInnerHTML={{__html: optimizeHtml(selectedValue)}}></div>
+                                                                                    <div className="line-clamp-1 option-content" dangerouslySetInnerHTML={{__html: optimizeHtml(selectedValue)}}></div>
                                                                                 ) : (
                                                                                     <span className="text-slate-400 dark:text-slate-600 font-medium">Pilih Jawaban...</span>
                                                                                 )}
@@ -557,7 +562,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                                         }}
                                                                                         className={`p-3 text-sm cursor-pointer border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors ${selectedValue === opt ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}
                                                                                     >
-                                                                                        <div dangerouslySetInnerHTML={{__html: optimizeHtml(opt)}}></div>
+                                                                                        <div className="option-content" dangerouslySetInnerHTML={{__html: optimizeHtml(opt)}}></div>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>
