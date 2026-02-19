@@ -4,7 +4,7 @@ import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon, SignalIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
-import { checkQuestionAnswer, parseList } from './teacher/examUtils';
+import { parseList } from './teacher/examUtils';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -16,14 +16,43 @@ interface StudentExamPageProps {
   toggleTheme?: () => void;
 }
 
+const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correctCount = 0;
     const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
     
     scorableQuestions.forEach((q: any) => {
         const studentAnswer = answers[q.id];
-        if (checkQuestionAnswer(q, studentAnswer)) {
-            correctCount++;
+        if (!studentAnswer) return;
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+             if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+             const studentSet = new Set(parseList(studentAnswer).map(normalize));
+             const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                 correctCount++;
+             }
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.trueFalseRows?.every((row: any, idx: number) => {
+                    return ansObj[idx] === row.answer;
+                });
+                if (allCorrect) correctCount++;
+            } catch (e) {}
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.matchingPairs?.every((pair: any, idx: number) => {
+                    return ansObj[idx] === pair.right;
+                });
+                if (allCorrect) correctCount++;
+            } catch (e) {}
         }
     });
 
