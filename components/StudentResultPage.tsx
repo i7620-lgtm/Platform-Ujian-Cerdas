@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance, checkQuestionAnswer } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList } from './teacher/examUtils';
 
 interface StudentResultPageProps {
   result: Result;
@@ -14,7 +14,7 @@ interface StudentResultPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: string) => (str || '').trim().toLowerCase();
+const normalize = (str: string) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
@@ -70,8 +70,33 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 return;
             }
 
-            // USE CENTRALIZED LOGIC
-            const isCorrect = checkQuestionAnswer(q, ans);
+            const studentAns = normalize(String(ans));
+            const correctAns = normalize(String(q.correctAnswer || ''));
+            let isCorrect = false;
+
+            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                isCorrect = studentAns === correctAns;
+            } 
+            else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                const sSet = new Set(parseList(studentAns).map(normalize));
+                const cSet = new Set(parseList(correctAns).map(normalize));
+                isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+            }
+            else if (q.questionType === 'TRUE_FALSE') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                } catch(e) {}
+            }
+            else if (q.questionType === 'MATCHING') {
+                try {
+                    const ansObj = JSON.parse(ans);
+                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                } catch(e) {}
+            } else if (q.questionType === 'ESSAY') {
+                isCorrect = false; // Default until graded
+            }
+
             if (isCorrect) correct++;
         });
 
@@ -248,8 +273,28 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 const studentAns = result.answers[q.id] || '-';
                                                 const correctAns = q.correctAnswer || '-';
                                                 
-                                                // USE CENTRALIZED CHECK
-                                                const isCorrect = checkQuestionAnswer(q, studentAns);
+                                                let isCorrect = false;
+                                                const normalizedStudent = normalize(studentAns);
+                                                const normalizedCorrect = normalize(correctAns);
+
+                                                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                                                    isCorrect = normalizedStudent === normalizedCorrect;
+                                                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                    const sSet = new Set(parseList(normalizedStudent).map(normalize));
+                                                    const cSet = new Set(parseList(normalizedCorrect).map(normalize));
+                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                                     isCorrect = false;
+                                                     try {
+                                                         if (q.questionType === 'TRUE_FALSE') {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.trueFalseRows?.every((row, i) => ansObj[i] === row.answer) ?? false;
+                                                         } else {
+                                                             const ansObj = JSON.parse(studentAns);
+                                                             isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
+                                                         }
+                                                     } catch(e) {}
+                                                }
 
                                                 if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
 
