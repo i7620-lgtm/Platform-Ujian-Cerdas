@@ -7,7 +7,7 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
-import { calculateAggregateStats, parseList } from './examUtils';
+import { calculateAggregateStats, parseList, checkQuestionAnswer } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
@@ -491,36 +491,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
-        const studentAns = normalize(String(ans));
-        const correctAns = normalize(String(q.correctAnswer || ''));
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(parseList(studentAns).map(normalize));
-            const cSet = new Set(parseList(correctAns).map(normalize));
-            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
-            return 'WRONG';
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-             try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-
-        // For Essay, if no manual grade, default to wrong (needs grading) or just unverified.
-        // We return 'WRONG' to indicate it doesn't add points yet.
-        return 'WRONG'; 
+        // USE THE NEW HELPER HERE
+        return checkQuestionAnswer(q, ans) ? 'CORRECT' : 'WRONG';
     };
 
     const getCalculatedStats = (r: Result) => {
