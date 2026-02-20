@@ -443,21 +443,19 @@ class StorageService {
     }
 
     const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-        if (!html || !html.includes('data:image')) return html;
+        if (!html || (!html.includes('data:image') && !html.includes('data:audio'))) return html;
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        const images = doc.getElementsByTagName('img');
         
+        const images = doc.getElementsByTagName('img');
         for (let i = 0; i < images.length; i++) {
             const img = images[i];
             const src = img.getAttribute('src');
-            
             if (src && src.startsWith('data:image')) {
                 try {
                     const blob = base64ToBlob(src);
                     const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
-                    const filename = `${examCode}/${contextId}_${Date.now()}_${i}.${ext}`;
-                    
+                    const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
@@ -467,6 +465,26 @@ class StorageService {
                 } catch (e) { console.error("Gagal upload gambar", e); }
             }
         }
+
+        const audios = doc.getElementsByTagName('audio');
+        for (let i = 0; i < audios.length; i++) {
+            const audio = audios[i];
+            const src = audio.getAttribute('src');
+            if (src && src.startsWith('data:audio')) {
+                try {
+                    const blob = base64ToBlob(src);
+                    const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                    const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                    if (data) {
+                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                        audio.setAttribute('src', publicUrlData.publicUrl);
+                        audio.setAttribute('data-bucket-path', filename);
+                    }
+                } catch (e) { console.error("Gagal upload audio", e); }
+            }
+        }
+
         return doc.body.innerHTML;
     };
 
