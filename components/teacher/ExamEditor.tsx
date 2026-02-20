@@ -448,12 +448,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                                     <div className="mt-6 space-y-4">
                                                         <div className="grid grid-cols-12 gap-4 mb-2 px-2">
-                                                            <div className="col-span-8 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pernyataan (Dukung Rumus & Gambar)</div>
-                                                            <div className="col-span-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Jawaban Benar</div>
+                                                            <div className="col-span-12 sm:col-span-8 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pernyataan (Dukung Rumus & Gambar)</div>
+                                                            <div className="hidden sm:block sm:col-span-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Jawaban Benar</div>
                                                         </div>
                                                         {q.trueFalseRows.map((row, i) => (
-                                                            <div key={i} className="group/row relative grid grid-cols-12 gap-4 items-start p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all">
-                                                                <div className="col-span-8">
+                                                            <div key={i} className="group/row relative flex flex-col sm:grid sm:grid-cols-12 gap-4 items-start p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all">
+                                                                <div className="w-full sm:col-span-8">
                                                                     <WysiwygEditor 
                                                                         value={row.text} 
                                                                         onChange={(val) => handleTrueFalseRowTextChange(q.id, i, val)} 
@@ -461,7 +461,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                         placeholder={`Pernyataan ${i+1}`}
                                                                     />
                                                                 </div>
-                                                                <div className="col-span-4 flex items-center justify-center gap-2 h-full pt-2">
+                                                                <div className="w-full sm:col-span-4 flex items-center justify-center gap-2 h-full pt-2">
                                                                     <button 
                                                                         onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)}
                                                                         className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${row.answer ? 'bg-emerald-500 text-white shadow-emerald-100 dark:shadow-emerald-900/50' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
