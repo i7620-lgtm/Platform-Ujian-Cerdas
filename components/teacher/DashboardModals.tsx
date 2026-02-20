@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -21,6 +21,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
+    const [editingStudent, setEditingStudent] = useState<{ id: string, fullName: string, class: string, absentNumber: string } | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -125,6 +126,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             alert("Gagal membuat token akses.");
         } finally {
             setTimeout(() => processingIdsRef.current.delete(studentId), 1000);
+        }
+    };
+
+    const handleUpdateStudentSubmit = async () => {
+        if (!editingStudent) return;
+        try {
+            await storageService.updateStudentData(displayExam.code, editingStudent.id, {
+                fullName: editingStudent.fullName,
+                class: editingStudent.class,
+                absentNumber: editingStudent.absentNumber
+            });
+            fetchLatest(true);
+            setEditingStudent(null);
+            alert("Data siswa berhasil diperbarui.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal memperbarui data siswa.");
         }
     };
 
@@ -344,12 +362,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     )}
                                                     <td className="px-5 py-3 text-right">
                                                         {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
-                                                            <button 
-                                                                onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
-                                                                className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
-                                                            >
-                                                                Buat Token
-                                                            </button>
+                                                            <div className="flex justify-end gap-2">
+                                                                <button 
+                                                                    onClick={() => setEditingStudent({ id: r.student.studentId, fullName: r.student.fullName, class: r.student.class, absentNumber: r.student.absentNumber })}
+                                                                    className="p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600 shadow-sm"
+                                                                    title="Edit Data Siswa"
+                                                                >
+                                                                    <PencilIcon className="w-4 h-4" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
+                                                                    className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                >
+                                                                    Buat Token
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -376,6 +403,55 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </div>
             </div>
             
+            {/* Edit Student Modal */}
+            {editingStudent && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-white dark:border-slate-700 relative animate-slide-in-up">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg text-slate-800 dark:text-white">Edit Data Siswa</h3>
+                            <button onClick={() => setEditingStudent(null)} className="p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Nama Lengkap</label>
+                                <input 
+                                    type="text" 
+                                    value={editingStudent.fullName} 
+                                    onChange={e => setEditingStudent({...editingStudent, fullName: e.target.value})}
+                                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Kelas</label>
+                                    <input 
+                                        type="text" 
+                                        value={editingStudent.class} 
+                                        onChange={e => setEditingStudent({...editingStudent, class: e.target.value})}
+                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">No. Absen</label>
+                                    <input 
+                                        type="text" 
+                                        value={editingStudent.absentNumber} 
+                                        onChange={e => setEditingStudent({...editingStudent, absentNumber: e.target.value})}
+                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex gap-3">
+                            <button onClick={() => setEditingStudent(null)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors">Batal</button>
+                            <button onClick={handleUpdateStudentSubmit} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Generated Token Modal */}
             {generatedTokenData && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
