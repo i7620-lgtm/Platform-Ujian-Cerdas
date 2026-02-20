@@ -487,26 +487,53 @@ class StorageService {
   }
 
   async updateStudentData(examCode: string, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
-      const { data: currentResult, error: fetchError } = await supabase
+      // Try exact match first
+      let { data: currentResult, error: fetchError } = await supabase
           .from('results')
-          .select('student')
+          .select('student, student_id')
           .eq('exam_code', examCode)
           .eq('student_id', oldStudentId)
-          .single();
+          .maybeSingle();
       
-      if (fetchError || !currentResult) throw new Error("Data siswa tidak ditemukan.");
+      // If not found, try case-insensitive match (handle 6a-40 vs 6A-40)
+      if (!currentResult) {
+          const { data: retryResult, error: retryError } = await supabase
+              .from('results')
+              .select('student, student_id')
+              .eq('exam_code', examCode)
+              .ilike('student_id', oldStudentId)
+              .maybeSingle();
+          
+          if (retryResult) {
+              currentResult = retryResult;
+              // Use the actual ID found in DB for the update clause
+              oldStudentId = retryResult.student_id; 
+          }
+      }
 
-      // Construct new Student ID while preserving the timestamp suffix
-      // Old ID format: Name-Class-Absent-Timestamp
+      if (!currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${oldStudentId})`);
+
+      // Construct new Student ID
+      // Logic: If old ID was simple (Class-Absent), keep it simple but update values.
+      // If old ID was complex (Name-Class-Absent-Timestamp), preserve timestamp.
+      
       const idParts = oldStudentId.split('-');
-      const timestamp = idParts.length > 3 ? idParts[idParts.length - 1] : Date.now().toString();
-      
-      // Sanitize inputs for ID generation (remove spaces, uppercase)
+      let newStudentId = '';
+
+      // Sanitize inputs
       const safeName = newData.fullName.trim().replace(/\s+/g, '_').toUpperCase();
-      const safeClass = newData.class.trim().replace(/\s+/g, '_').toUpperCase();
+      const safeClass = newData.class.trim().replace(/\s+/g, '').toUpperCase(); // Remove all spaces for class
       const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '');
-      
-      const newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
+
+      if (idParts.length <= 2) {
+          // Format: Class-Absent (e.g. 6a-40)
+          // We keep this format to maintain consistency with how these students were registered
+          newStudentId = `${safeClass}-${safeAbsent}`.toLowerCase(); // usually short IDs are lowercase in this system
+      } else {
+          // Format: Name-Class-Absent-Timestamp
+          const timestamp = idParts.length > 3 ? idParts[idParts.length - 1] : Date.now().toString();
+          newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
+      }
 
       const updatedStudent = { 
           ...currentResult.student, 
@@ -521,7 +548,7 @@ class StorageService {
               student_id: newStudentId 
           })
           .eq('exam_code', examCode)
-          .eq('student_id', oldStudentId);
+          .eq('student_id', oldStudentId); // Use the confirmed old ID
 
       if (updateError) throw updateError;
   }
