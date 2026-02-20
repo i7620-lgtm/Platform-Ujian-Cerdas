@@ -604,7 +604,14 @@ class StorageService {
 
       // 6. ATTEMPT CLOUD UPLOAD (Transaction Step 3)
       try {
-          await this.uploadArchive(exam.code, jsonString);
+          await this.uploadArchive(exam.code, jsonString, {
+              school: exam.authorSchool,
+              subject: exam.config.subject,
+              classLevel: exam.config.classLevel,
+              examType: exam.config.examType,
+              targetClasses: exam.config.targetClasses,
+              date: exam.config.date
+          });
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
           await this.deleteExam(exam.code);
@@ -1098,9 +1105,27 @@ class StorageService {
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
 
-  async uploadArchive(examCode: string, jsonString: string): Promise<string> {
+  async uploadArchive(examCode: string, jsonString: string, metadata?: any): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
-      const filename = `${examCode}_${Date.now()}.json`;
+      
+      let filename = `${examCode}_${Date.now()}.json`;
+      if (metadata) {
+          // Shorten keys to save space
+          const minMeta = {
+              s: metadata.school,
+              su: metadata.subject,
+              c: metadata.classLevel,
+              t: metadata.examType,
+              tc: metadata.targetClasses,
+              d: metadata.date
+          };
+          try {
+              const b64 = btoa(JSON.stringify(minMeta));
+              filename = `${examCode}_meta_${b64}_.json`;
+          } catch (e) {
+              console.warn("Failed to encode metadata for filename", e);
+          }
+      }
       
       const { data, error } = await supabase.storage
           .from('archives')
@@ -1110,7 +1135,7 @@ class StorageService {
       return data?.path || filename;
   }
 
-  async getArchivedList(): Promise<{name: string, created_at: string, size: number}[]> {
+  async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: any}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
           limit: 100,
           offset: 0,
@@ -1123,11 +1148,39 @@ class StorageService {
           return [];
       }
       
-      return data.map((f: any) => ({
-          name: f.name,
-          created_at: f.created_at,
-          size: f.metadata?.size || 0
-      }));
+      return data.map((f: any) => {
+          let metadata = null;
+          if (f.name.includes('_meta_')) {
+              try {
+                  const parts = f.name.split('_meta_');
+                  if (parts.length > 1) {
+                      const b64 = parts[1].split('_')[0]; // Take until next underscore or end
+                      // Handle potential trailing .json if it was part of the split (though split('_') handles it if we are careful)
+                      // My filename format: CODE_meta_B64_.json
+                      // parts[1] will be B64_.json
+                      const b64Clean = b64.replace('.json', '');
+                      const parsed = JSON.parse(atob(b64Clean));
+                      metadata = {
+                          school: parsed.s,
+                          subject: parsed.su,
+                          classLevel: parsed.c,
+                          examType: parsed.t,
+                          targetClasses: parsed.tc,
+                          date: parsed.d
+                      };
+                  }
+              } catch (e) {
+                  console.warn("Failed to parse metadata from filename:", f.name);
+              }
+          }
+          
+          return {
+              name: f.name,
+              created_at: f.created_at,
+              size: f.metadata?.size || 0,
+              metadata
+          };
+      });
   }
 
   async downloadArchive(path: string): Promise<any> {
