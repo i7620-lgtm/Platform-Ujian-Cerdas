@@ -477,6 +477,22 @@ class StorageService {
                 q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
             }
         }
+
+        // Handle Audio Upload
+        if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
+             try {
+                const blob = base64ToBlob(q.audioUrl);
+                const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
+                const ext = mime.split('/')[1] || 'mp3';
+                const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
+                
+                const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                if (data) {
+                    const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                    q.audioUrl = publicUrlData.publicUrl;
+                }
+            } catch (e) { console.error("Gagal upload audio", e); }
+        }
     }
 
     const { error } = await supabase.from('exams').upsert({
