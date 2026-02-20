@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -8,6 +8,7 @@ export interface Question {
   options?: string[];
   correctAnswer?: string; 
   imageUrl?: string; 
+  audioUrl?: string; // URL Audio
   optionImages?: (string | null)[];
   
   // Metadata Baru
