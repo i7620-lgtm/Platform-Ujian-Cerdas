@@ -364,7 +364,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         {!isReadOnly && (
                                                             <div className="flex justify-end gap-2">
                                                                 <button 
-                                                                    onClick={() => setEditingStudent({ id: r.student.studentId, fullName: r.student.fullName, class: r.student.class, absentNumber: r.student.absentNumber })}
+                                                                    onClick={() => {
+                                                                        const parts = r.student.studentId.split('-');
+                                                                        // Extract absent number from ID (2nd to last part) to ensure consistency
+                                                                        const derivedAbsent = parts.length > 2 ? parts[parts.length - 2] : r.student.absentNumber;
+                                                                        setEditingStudent({ 
+                                                                            id: r.student.studentId, 
+                                                                            fullName: r.student.fullName, 
+                                                                            class: r.student.class, 
+                                                                            absentNumber: derivedAbsent 
+                                                                        });
+                                                                    }}
                                                                     className="p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600 shadow-sm"
                                                                     title="Edit Data Siswa"
                                                                 >
