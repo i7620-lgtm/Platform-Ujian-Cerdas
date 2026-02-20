@@ -27,11 +27,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number}[]>([]);
+    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: any}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
     const [isRegisteringStats, setIsRegisteringStats] = useState(false);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
         const loadCloudList = async () => {
@@ -43,6 +44,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             }
         };
         loadCloudList();
+        storageService.getCurrentUser().then(u => setUserRole(u?.accountType || null));
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,7 +188,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             setLoadingMessage('Mengunggah ke Cloud...');
             const finalPayload = { ...archiveData, exam: optimizedExam };
             const jsonString = JSON.stringify(finalPayload, null, 2);
-            await storageService.uploadArchive(optimizedExam.code, jsonString);
+            await storageService.uploadArchive(optimizedExam.code, jsonString, {
+                school: optimizedExam.authorSchool,
+                subject: optimizedExam.config.subject,
+                classLevel: optimizedExam.config.classLevel,
+                examType: optimizedExam.config.examType,
+                targetClasses: optimizedExam.config.targetClasses,
+                date: optimizedExam.config.date
+            });
             
             // Refresh list
             const list = await storageService.getArchivedList();
@@ -466,10 +475,43 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
                                         >
                                             <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
-                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400">
-                                                <span>{new Date(file.created_at).toLocaleDateString()}</span>
-                                                <span>{(file.size / 1024).toFixed(1)} KB</span>
-                                            </div>
+                                            
+                                            {file.metadata ? (
+                                                <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
+                                                    {userRole === 'super_admin' && (
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            <span className="font-bold text-slate-400">Sekolah</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.school || '-'}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Mapel/Kelas</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.subject} ({file.metadata.classLevel})</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Evaluasi</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.examType}</span>
+                                                    </div>
+                                                    {file.metadata.targetClasses && file.metadata.targetClasses.length > 0 && (
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            <span className="font-bold text-slate-400">Target</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.targetClasses.join(', ')}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Tanggal</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.metadata.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                    </div>
+                                                    <div className="text-[9px] text-right text-slate-300 mt-1">
+                                                        {(file.size / 1024).toFixed(1)} KB
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between mt-1 text-[10px] text-slate-400">
+                                                    <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                                                    <span>{(file.size / 1024).toFixed(1)} KB</span>
+                                                </div>
+                                            )}
                                         </button>
                                         <button 
                                             onClick={(e) => handleDeleteArchive(file.name, e)}
