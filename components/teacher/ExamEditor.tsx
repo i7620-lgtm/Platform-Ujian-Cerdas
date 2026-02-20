@@ -2,13 +2,14 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
-    TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, 
+    TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, SpeakerWaveIcon, StopIcon, PlayIcon,
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
 import { compressImage, parseList } from './examUtils';
+import { AudioPlayer } from '../AudioPlayer';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -220,6 +221,24 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
     const handleLevelChange = (id: string, level: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, level } : q));
+    
+    const handleAudioUpload = (questionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (file.size > 5 * 1024 * 1024) { alert("Ukuran file audio terlalu besar (Maks 5MB)"); return; }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const result = ev.target?.result as string;
+                setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, audioUrl: result } : q));
+            };
+            reader.readAsDataURL(file);
+        }
+        e.target.value = '';
+    };
+
+    const handleDeleteAudio = (questionId: string) => {
+        setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, audioUrl: undefined } : q));
+    };
 
     const handleTypeChange = (qId: string, newType: QuestionType) => {
         setQuestions(prev => prev.map(q => {
@@ -376,6 +395,21 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                             placeholder="Contoh: 1, 2, HOTS, LOTS"
                                                         />
                                                     </div>
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2">Audio Soal (Opsional)</label>
+                                                    {q.audioUrl ? (
+                                                        <AudioPlayer src={q.audioUrl} onDelete={() => handleDeleteAudio(q.id)} />
+                                                    ) : (
+                                                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group/audio">
+                                                            <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400 group-hover/audio:text-indigo-700">
+                                                                <SpeakerWaveIcon className="w-4 h-4" />
+                                                            </div>
+                                                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Upload Audio (MP3/WAV)</span>
+                                                            <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(q.id, e)} />
+                                                        </label>
+                                                    )}
                                                 </div>
 
                                                 <WysiwygEditor value={q.questionText} onChange={(val) => handleQuestionTextChange(q.id, val)} placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} minHeight="80px" />
