@@ -366,8 +366,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 <button 
                                                                     onClick={() => {
                                                                         const parts = r.student.studentId.split('-');
-                                                                        // Extract absent number from ID (2nd to last part) to ensure consistency
-                                                                        const derivedAbsent = parts.length > 2 ? parts[parts.length - 2] : r.student.absentNumber;
+                                                                        // Format is typically "Class-Absent" (e.g., "6a-40") or "Name-Class-Absent-Timestamp"
+                                                                        // We take the last part if it's numeric, otherwise fallback to the part before timestamp
+                                                                        let derivedAbsent = r.student.absentNumber;
+                                                                        
+                                                                        if (parts.length >= 2) {
+                                                                            const lastPart = parts[parts.length - 1];
+                                                                            // Check if last part is numeric (simple check)
+                                                                            if (!isNaN(parseInt(lastPart))) {
+                                                                                derivedAbsent = lastPart;
+                                                                            } else if (parts.length > 2) {
+                                                                                // Fallback for timestamped IDs: take 2nd to last
+                                                                                derivedAbsent = parts[parts.length - 2];
+                                                                            }
+                                                                        }
+
                                                                         setEditingStudent({ 
                                                                             id: r.student.studentId, 
                                                                             fullName: r.student.fullName, 
