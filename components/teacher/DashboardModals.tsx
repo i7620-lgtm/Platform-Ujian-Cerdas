@@ -21,7 +21,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
-    const [editingStudent, setEditingStudent] = useState<{ id: string, fullName: string, class: string, absentNumber: string } | null>(null);
+    const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, class: string, absentNumber: string } | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -132,7 +132,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const handleUpdateStudentSubmit = async () => {
         if (!editingStudent) return;
         try {
-            await storageService.updateStudentData(displayExam.code, editingStudent.id, {
+            await storageService.updateStudentData(editingStudent.id, editingStudent.studentId, {
                 fullName: editingStudent.fullName,
                 class: editingStudent.class,
                 absentNumber: editingStudent.absentNumber
@@ -382,7 +382,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                         }
 
                                                                         setEditingStudent({ 
-                                                                            id: r.student.studentId, 
+                                                                            id: r.id!, // Pass the primary key ID
+                                                                            studentId: r.student.studentId, // Keep original studentId for reference if needed
                                                                             fullName: r.student.fullName, 
                                                                             class: r.student.class, 
                                                                             absentNumber: derivedAbsent 
