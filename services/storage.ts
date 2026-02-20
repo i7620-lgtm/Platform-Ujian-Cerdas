@@ -488,9 +488,10 @@ class StorageService {
 
   async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
       // Find by Primary Key ID
+      // Note: 'student' column does not exist, we use flat columns
       const { data: currentResult, error: fetchError } = await supabase
           .from('results')
-          .select('student, student_id, exam_code')
+          .select('student_name, class_name, student_id, exam_code')
           .eq('id', resultId)
           .single();
       
@@ -514,16 +515,11 @@ class StorageService {
           newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
       }
 
-      const updatedStudent = { 
-          ...currentResult.student, 
-          ...newData,
-          studentId: newStudentId 
-      };
-
       const { error: updateError } = await supabase
           .from('results')
           .update({ 
-              student: updatedStudent,
+              student_name: newData.fullName,
+              class_name: newData.class,
               student_id: newStudentId 
           })
           .eq('id', resultId);
