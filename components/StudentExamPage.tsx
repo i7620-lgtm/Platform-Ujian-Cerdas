@@ -5,6 +5,7 @@ import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, Chevro
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { parseList } from './teacher/examUtils';
+import { AudioPlayer } from './AudioPlayer';
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -459,6 +460,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                         </span>
                                     </div>
                                     <div className="flex-1 min-w-0">
+                                        {q.audioUrl && (
+                                            <div className="mb-4">
+                                                <AudioPlayer src={q.audioUrl} />
+                                            </div>
+                                        )}
                                         <div className="prose prose-slate dark:prose-invert max-w-none font-medium leading-relaxed mb-6">
                                             <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
                                         </div>
