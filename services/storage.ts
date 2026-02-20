@@ -1120,7 +1120,10 @@ class StorageService {
               d: metadata.date
           };
           try {
-              const b64 = btoa(JSON.stringify(minMeta));
+              const b64 = btoa(JSON.stringify(minMeta))
+                  .replace(/\+/g, '-')
+                  .replace(/\//g, '_')
+                  .replace(/=+$/, '');
               filename = `${examCode}_meta_${b64}_.json`;
           } catch (e) {
               console.warn("Failed to encode metadata for filename", e);
@@ -1154,12 +1157,13 @@ class StorageService {
               try {
                   const parts = f.name.split('_meta_');
                   if (parts.length > 1) {
-                      const b64 = parts[1].split('_')[0]; // Take until next underscore or end
-                      // Handle potential trailing .json if it was part of the split (though split('_') handles it if we are careful)
-                      // My filename format: CODE_meta_B64_.json
-                      // parts[1] will be B64_.json
-                      const b64Clean = b64.replace('.json', '');
-                      const parsed = JSON.parse(atob(b64Clean));
+                      let b64 = parts[1].split('_')[0]; // Take until next underscore or end
+                      // Restore Base64 standard chars
+                      b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+                      // Add padding
+                      while (b64.length % 4) b64 += '=';
+                      
+                      const parsed = JSON.parse(atob(b64));
                       metadata = {
                           school: parsed.s,
                           subject: parsed.su,
