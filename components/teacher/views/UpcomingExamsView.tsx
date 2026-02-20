@@ -44,6 +44,9 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
                                         <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
+                                        {exam.config.targetClasses && exam.config.targetClasses.length > 0 && (
+                                            <MetaBadge text={exam.config.targetClasses.join(', ')} colorClass="bg-orange-50 text-orange-700 border-orange-100" />
+                                        )}
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-3 font-medium">
                                         <span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {exam.config.startTime} Waktu Setempat</span>
