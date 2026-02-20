@@ -486,23 +486,42 @@ class StorageService {
     if (error) throw error;
   }
 
-  async updateStudentData(examCode: string, studentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
+  async updateStudentData(examCode: string, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
       const { data: currentResult, error: fetchError } = await supabase
           .from('results')
           .select('student')
           .eq('exam_code', examCode)
-          .eq('student_id', studentId)
+          .eq('student_id', oldStudentId)
           .single();
       
       if (fetchError || !currentResult) throw new Error("Data siswa tidak ditemukan.");
 
-      const updatedStudent = { ...currentResult.student, ...newData };
+      // Construct new Student ID while preserving the timestamp suffix
+      // Old ID format: Name-Class-Absent-Timestamp
+      const idParts = oldStudentId.split('-');
+      const timestamp = idParts.length > 3 ? idParts[idParts.length - 1] : Date.now().toString();
+      
+      // Sanitize inputs for ID generation (remove spaces, uppercase)
+      const safeName = newData.fullName.trim().replace(/\s+/g, '_').toUpperCase();
+      const safeClass = newData.class.trim().replace(/\s+/g, '_').toUpperCase();
+      const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '');
+      
+      const newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
+
+      const updatedStudent = { 
+          ...currentResult.student, 
+          ...newData,
+          studentId: newStudentId 
+      };
 
       const { error: updateError } = await supabase
           .from('results')
-          .update({ student: updatedStudent })
+          .update({ 
+              student: updatedStudent,
+              student_id: newStudentId 
+          })
           .eq('exam_code', examCode)
-          .eq('student_id', studentId);
+          .eq('student_id', oldStudentId);
 
       if (updateError) throw updateError;
   }
