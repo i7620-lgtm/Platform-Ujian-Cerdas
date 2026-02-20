@@ -70,6 +70,7 @@ export interface Student {
 export type ResultStatus = 'in_progress' | 'completed' | 'force_closed' | 'pending_grading';
 
 export interface Result {
+    id?: number; // Primary Key from DB
     student: Student;
     examCode: string;
     answers: Record<string, string>;
