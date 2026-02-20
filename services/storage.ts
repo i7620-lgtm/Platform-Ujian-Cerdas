@@ -486,6 +486,27 @@ class StorageService {
     if (error) throw error;
   }
 
+  async updateStudentData(examCode: string, studentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
+      const { data: currentResult, error: fetchError } = await supabase
+          .from('results')
+          .select('student')
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId)
+          .single();
+      
+      if (fetchError || !currentResult) throw new Error("Data siswa tidak ditemukan.");
+
+      const updatedStudent = { ...currentResult.student, ...newData };
+
+      const { error: updateError } = await supabase
+          .from('results')
+          .update({ student: updatedStudent })
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId);
+
+      if (updateError) throw updateError;
+  }
+
   async deleteExam(code: string): Promise<void> {
       await supabase.from('results').delete().eq('exam_code', code);
       await supabase.from('exams').delete().eq('code', code);
