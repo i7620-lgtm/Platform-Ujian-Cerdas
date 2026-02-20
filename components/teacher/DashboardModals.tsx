@@ -361,7 +361,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </td>
                                                     )}
                                                     <td className="px-5 py-3 text-right">
-                                                        {(r.status === 'in_progress' || r.status === 'force_closed') && !isReadOnly && (
+                                                        {!isReadOnly && (
                                                             <div className="flex justify-end gap-2">
                                                                 <button 
                                                                     onClick={() => setEditingStudent({ id: r.student.studentId, fullName: r.student.fullName, class: r.student.class, absentNumber: r.student.absentNumber })}
@@ -370,12 +370,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 >
                                                                     <PencilIcon className="w-4 h-4" />
                                                                 </button>
-                                                                <button 
-                                                                    onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
-                                                                    className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
-                                                                >
-                                                                    Buat Token
-                                                                </button>
+                                                                {(r.status === 'in_progress' || r.status === 'force_closed') && (
+                                                                    <button 
+                                                                        onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
+                                                                        className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                    >
+                                                                        Buat Token
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </td>
