@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
@@ -864,18 +864,40 @@ class StorageService {
     const { data, error } = await query;
     if (error) return [];
     
-    return data.map((row: any) => ({
-        student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, 
-        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
-        score: row.score, 
-        correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, 
-        status: row.status, 
-        activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), 
-        location: row.location
-    }));
+    return data.map((row: any) => {
+        // Derive absent number if not present in student object
+        let absentNumber = row.student?.absentNumber || '00';
+        if (absentNumber === '00' && row.student_id) {
+            const parts = row.student_id.split('-');
+            if (parts.length >= 2) {
+                const lastPart = parts[parts.length - 1];
+                if (!isNaN(parseInt(lastPart))) {
+                    absentNumber = lastPart;
+                } else if (parts.length > 2) {
+                    absentNumber = parts[parts.length - 2];
+                }
+            }
+        }
+
+        return {
+            id: row.id, // Primary Key
+            student: { 
+                studentId: row.student_id, 
+                fullName: row.student_name, 
+                class: row.class_name, 
+                absentNumber: absentNumber 
+            },
+            examCode: row.exam_code, 
+            answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
+            score: row.score, 
+            correctAnswers: row.correct_answers,
+            totalQuestions: row.total_questions, 
+            status: row.status, 
+            activityLog: row.activity_log,
+            timestamp: new Date(row.updated_at).getTime(), 
+            location: row.location
+        };
+    });
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
