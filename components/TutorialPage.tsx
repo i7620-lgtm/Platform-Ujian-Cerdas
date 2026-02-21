@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeftIcon, AcademicCapIcon, PresentationChartLineIcon, CloudArrowUpIcon, ShareIcon, ClockIcon, CheckCircleIcon, SparklesIcon, QrCodeIcon, ChartBarIcon, LightBulbIcon, EnvelopeIcon } from './Icons';
+import { ArrowLeftIcon, AcademicCapIcon, PresentationChartLineIcon, CloudArrowUpIcon, ShareIcon, ClockIcon, CheckCircleIcon, SparklesIcon, QrCodeIcon, ChartBarIcon, LightBulbIcon, EnvelopeIcon, ShieldCheckIcon } from './Icons';
 
 interface TutorialPageProps {
     onBack: () => void;
@@ -10,60 +10,60 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
 
     const teacherSteps = [
         {
-            title: "Buat Akun & Masuk",
-            desc: "Daftar sebagai pengajar menggunakan email sekolah. Akses dashboard untuk mulai mengelola ujian.",
+            title: "1. Buat Akun & Masuk",
+            desc: "Daftar sebagai pengajar menggunakan email aktif Anda. Akses dashboard guru yang intuitif untuk mulai mengelola kelas, bank soal, dan sesi ujian Anda.",
             icon: PresentationChartLineIcon,
             color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
         },
         {
-            title: "Buat Soal Otomatis (AI)",
-            desc: "Unggah file PDF soal lama Anda. Sistem kami akan otomatis memotong dan mengubahnya menjadi format ujian digital.",
+            title: "2. Buat Soal Otomatis (AI)",
+            desc: "Unggah file PDF soal lama Anda atau ketik topik materi. Sistem AI kami akan otomatis memotong gambar, mengekstrak teks, dan mengubahnya menjadi format ujian digital siap pakai dalam hitungan detik.",
             icon: CloudArrowUpIcon,
             color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         },
         {
-            title: "Konfigurasi & Bagikan",
-            desc: "Atur waktu, acak soal, dan keamanan. Dapatkan KODE UNIK atau QR Code untuk dibagikan ke siswa.",
+            title: "3. Konfigurasi Ujian",
+            desc: "Atur durasi waktu, acak urutan soal/jawaban, bobot nilai, dan mode keamanan (Anti-Curang). Anda juga bisa mengatur apakah nilai langsung ditampilkan ke siswa atau tidak.",
+            icon: SparklesIcon,
+            color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+        },
+        {
+            title: "4. Bagikan Kode Akses",
+            desc: "Dapatkan KODE UNIK 6 digit atau QR Code untuk dibagikan ke siswa. Siswa tidak perlu mendaftar akun, cukup masukkan kode dan nama untuk mulai mengerjakan.",
             icon: ShareIcon,
             color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
         },
         {
-            title: "Monitor Real-time",
-            desc: "Pantau pengerjaan siswa secara langsung. Lihat siapa yang sedang online, selesai, atau terkunci karena kecurangan.",
-            icon: ClockIcon,
-            color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-        },
-        {
-            title: "Analisis Hasil",
-            desc: "Dapatkan analisis otomatis: Nilai rata-rata, butir soal sulit, dan rekomendasi perbaikan pembelajaran.",
+            title: "5. Monitor & Analisis",
+            desc: "Pantau pengerjaan siswa secara Real-time. Lihat siapa yang sedang online, selesai, atau terkunci karena kecurangan. Setelah selesai, unduh analisis butir soal lengkap (daya beda, tingkat kesulitan) dalam format Excel/PDF.",
             icon: ChartBarIcon,
-            color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+            color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
         }
     ];
 
     const studentSteps = [
         {
-            title: "Masuk Ujian",
-            desc: "Pindai QR Code dari guru atau masukkan KODE UJIAN pada halaman depan.",
+            title: "1. Masuk Ujian",
+            desc: "Buka aplikasi, lalu pindai QR Code dari guru atau masukkan KODE UJIAN 6 digit pada halaman depan. Pastikan koneksi internet stabil.",
             icon: QrCodeIcon,
             color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
         },
         {
-            title: "Isi Identitas",
-            desc: "Lengkapi Nama, Kelas, dan Nomor Absen dengan benar agar nilai terekam.",
+            title: "2. Isi Identitas",
+            desc: "Lengkapi Nama Lengkap, Kelas, dan Nomor Absen dengan benar. Data ini akan digunakan guru untuk rekap nilai.",
             icon: AcademicCapIcon,
             color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         },
         {
-            title: "Kerjakan Soal",
-            desc: "Jawab soal Pilihan Ganda, Isian, atau Menjodohkan. Waktu akan berjalan mundur otomatis.",
+            title: "3. Kerjakan Soal",
+            desc: "Jawab soal Pilihan Ganda, Isian Singkat, Benar/Salah, atau Menjodohkan. Waktu berjalan mundur otomatis. Jawaban tersimpan otomatis setiap kali Anda memilih.",
             icon: CheckCircleIcon,
             color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
         },
         {
-            title: "Fokus & Jujur",
-            desc: "Jangan keluar aplikasi! Sistem akan mendeteksi jika Anda membuka aplikasi lain dan dapat mengunci ujian.",
-            icon: SparklesIcon,
+            title: "4. Mode Aman (Anti-Curang)",
+            desc: "PENTING: Jangan keluar aplikasi, membuka tab lain, atau mematikan layar! Sistem akan mendeteksi aktivitas mencurigakan dan dapat mengunci ujian Anda secara otomatis.",
+            icon: ShieldCheckIcon,
             color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
         }
     ];
@@ -155,6 +155,34 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
                                     </div>
                                 </li>
                             </ul>
+                        </div>
+
+                        {/* Free & Limits Card */}
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 rounded-bl-full -mr-4 -mt-4"></div>
+                            
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2 relative z-10">
+                                <SparklesIcon className="w-5 h-5 text-emerald-500"/> Komitmen Gratis
+                            </h3>
+                            
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed relative z-10">
+                                Aplikasi ini diusahakan untuk tetap gratis bagi seluruh guru di Indonesia. Saat ini tidak ada biaya langganan, namun terdapat batasan penggunaan server untuk menjaga stabilitas:
+                            </p>
+
+                            <div className="space-y-3 relative z-10">
+                                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Mode Normal</span>
+                                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-lg">Max 1000 Siswa</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Mode Realtime</span>
+                                    <span className="text-xs font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-2 py-1 rounded-lg">Max 200 Siswa</span>
+                                </div>
+                            </div>
+                            
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-4 italic text-center">
+                                *Batasan berlaku untuk penggunaan bersamaan (concurrent users).
+                            </p>
                         </div>
 
                         <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm">

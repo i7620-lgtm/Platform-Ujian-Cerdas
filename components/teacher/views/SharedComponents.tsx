@@ -97,14 +97,15 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                     </span>
                 </div>
                 
-                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                
-                {(q.category || q.level) && (
-                    <div className="flex gap-2">
+                {(q.category || q.level || q.scoreWeight) && (
+                    <div className="flex gap-2 mb-2">
                         {q.category && <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{q.category}</span>}
                         {q.level && <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">{q.level}</span>}
+                        <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">Bobot: {q.scoreWeight || 1}</span>
                     </div>
                 )}
+                
+                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
 
                 <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
                     <div 

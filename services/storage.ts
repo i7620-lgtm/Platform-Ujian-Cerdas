@@ -22,8 +22,9 @@ const base64ToBlob = (base64: string): Blob => {
 };
 
 // Helper: Convert URL to Base64 for Archiving
-const urlToBase64 = async (url: string): Promise<string> => {
+const urlToBase64 = async (url: string): Promise<string | null> => {
     try {
+        // Attempt 1: Fetch (Works for same-origin or CORS-enabled)
         const response = await fetch(url);
         const blob = await response.blob();
         return new Promise((resolve, reject) => {
@@ -33,8 +34,31 @@ const urlToBase64 = async (url: string): Promise<string> => {
             reader.readAsDataURL(blob);
         });
     } catch (error) {
-        console.warn("Failed to convert image for archive:", url);
-        return url; // Fallback keep URL
+        // Attempt 2: Image Object with CrossOrigin (Works if server supports it but fetch failed for some reason)
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(null);
+                try {
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                } catch (e) {
+                    // Canvas tainted - cannot export
+                    console.warn("Canvas tainted, cannot convert to base64:", url);
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                console.warn("Failed to load image for base64 conversion:", url);
+                resolve(null);
+            };
+            img.src = url;
+        });
     }
 };
 
@@ -443,21 +467,19 @@ class StorageService {
     }
 
     const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-        if (!html || !html.includes('data:image')) return html;
+        if (!html || (!html.includes('data:image') && !html.includes('data:audio'))) return html;
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        const images = doc.getElementsByTagName('img');
         
+        const images = doc.getElementsByTagName('img');
         for (let i = 0; i < images.length; i++) {
             const img = images[i];
             const src = img.getAttribute('src');
-            
             if (src && src.startsWith('data:image')) {
                 try {
                     const blob = base64ToBlob(src);
                     const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
-                    const filename = `${examCode}/${contextId}_${Date.now()}_${i}.${ext}`;
-                    
+                    const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
@@ -467,6 +489,26 @@ class StorageService {
                 } catch (e) { console.error("Gagal upload gambar", e); }
             }
         }
+
+        const audios = doc.getElementsByTagName('audio');
+        for (let i = 0; i < audios.length; i++) {
+            const audio = audios[i];
+            const src = audio.getAttribute('src');
+            if (src && src.startsWith('data:audio')) {
+                try {
+                    const blob = base64ToBlob(src);
+                    const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                    const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                    if (data) {
+                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                        audio.setAttribute('src', publicUrlData.publicUrl);
+                        audio.setAttribute('data-bucket-path', filename);
+                    }
+                } catch (e) { console.error("Gagal upload audio", e); }
+            }
+        }
+
         return doc.body.innerHTML;
     };
 
@@ -477,6 +519,22 @@ class StorageService {
                 q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
             }
         }
+
+        // Handle Audio Upload
+        if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
+             try {
+                const blob = base64ToBlob(q.audioUrl);
+                const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
+                const ext = mime.split('/')[1] || 'mp3';
+                const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
+                
+                const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                if (data) {
+                    const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                    q.audioUrl = publicUrlData.publicUrl;
+                }
+            } catch (e) { console.error("Gagal upload audio", e); }
+        }
     }
 
     const { error } = await supabase.from('exams').upsert({
@@ -484,6 +542,47 @@ class StorageService {
         config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
     });
     if (error) throw error;
+  }
+
+  async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
+      // Find by Primary Key ID
+      // Note: 'student' column does not exist, we use flat columns
+      const { data: currentResult, error: fetchError } = await supabase
+          .from('results')
+          .select('student_name, class_name, student_id, exam_code')
+          .eq('id', resultId)
+          .single();
+      
+      if (fetchError || !currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${resultId})`);
+
+      // Construct new Student ID
+      const idParts = currentResult.student_id.split('-');
+      let newStudentId = '';
+
+      // Sanitize inputs
+      const safeName = newData.fullName.trim().replace(/\s+/g, '_').toUpperCase();
+      const safeClass = newData.class.trim().replace(/\s+/g, '').toUpperCase();
+      const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '');
+
+      if (idParts.length <= 2) {
+          // Format: Class-Absent (e.g. 6a-40)
+          newStudentId = `${safeClass}-${safeAbsent}`.toLowerCase();
+      } else {
+          // Format: Name-Class-Absent-Timestamp
+          const timestamp = idParts.length > 3 ? idParts[idParts.length - 1] : Date.now().toString();
+          newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
+      }
+
+      const { error: updateError } = await supabase
+          .from('results')
+          .update({ 
+              student_name: newData.fullName,
+              class_name: newData.class,
+              student_id: newStudentId 
+          })
+          .eq('id', resultId);
+
+      if (updateError) throw updateError;
   }
 
   async deleteExam(code: string): Promise<void> {
@@ -529,7 +628,14 @@ class StorageService {
 
       // 6. ATTEMPT CLOUD UPLOAD (Transaction Step 3)
       try {
-          await this.uploadArchive(exam.code, jsonString);
+          await this.uploadArchive(exam.code, jsonString, {
+              school: exam.authorSchool,
+              subject: exam.config.subject,
+              classLevel: exam.config.classLevel,
+              examType: exam.config.examType,
+              targetClasses: exam.config.targetClasses,
+              date: exam.config.date
+          });
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
           await this.deleteExam(exam.code);
@@ -769,10 +875,11 @@ class StorageService {
               }
 
               if (!rawBase64 && src && src.startsWith('http')) {
-                  rawBase64 = await urlToBase64(src);
+                  const converted = await urlToBase64(src);
+                  if (converted) rawBase64 = converted;
               }
 
-              if (rawBase64) {
+              if (rawBase64 && rawBase64.startsWith('data:image')) {
                   try {
                       // OPTIMIZATION PIPELINE:
                       // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
@@ -785,6 +892,9 @@ class StorageService {
                       img.setAttribute('src', rawBase64);
                   }
                   img.removeAttribute('data-bucket-path');
+              } else if (!rawBase64 && src) {
+                  // Keep original src if conversion failed (CORS blocked)
+                  // No changes needed, src is already there
               }
           }
           return doc.body.innerHTML;
@@ -819,18 +929,40 @@ class StorageService {
     const { data, error } = await query;
     if (error) return [];
     
-    return data.map((row: any) => ({
-        student: { studentId: row.student_id, fullName: row.student_name, class: row.class_name, absentNumber: '00' },
-        examCode: row.exam_code, 
-        answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
-        score: row.score, 
-        correctAnswers: row.correct_answers,
-        totalQuestions: row.total_questions, 
-        status: row.status, 
-        activityLog: row.activity_log,
-        timestamp: new Date(row.updated_at).getTime(), 
-        location: row.location
-    }));
+    return data.map((row: any) => {
+        // Derive absent number if not present in student object
+        let absentNumber = row.student?.absentNumber || '00';
+        if (absentNumber === '00' && row.student_id) {
+            const parts = row.student_id.split('-');
+            if (parts.length >= 2) {
+                const lastPart = parts[parts.length - 1];
+                if (!isNaN(parseInt(lastPart))) {
+                    absentNumber = lastPart;
+                } else if (parts.length > 2) {
+                    absentNumber = parts[parts.length - 2];
+                }
+            }
+        }
+
+        return {
+            id: row.id, // Primary Key
+            student: { 
+                studentId: row.student_id, 
+                fullName: row.student_name, 
+                class: row.class_name, 
+                absentNumber: absentNumber 
+            },
+            examCode: row.exam_code, 
+            answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
+            score: row.score, 
+            correctAnswers: row.correct_answers,
+            totalQuestions: row.total_questions, 
+            status: row.status, 
+            activityLog: row.activity_log,
+            timestamp: new Date(row.updated_at).getTime(), 
+            location: row.location
+        };
+    });
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
@@ -1001,9 +1133,30 @@ class StorageService {
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
 
-  async uploadArchive(examCode: string, jsonString: string): Promise<string> {
+  async uploadArchive(examCode: string, jsonString: string, metadata?: any): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
-      const filename = `${examCode}_${Date.now()}.json`;
+      
+      let filename = `${examCode}_${Date.now()}.json`;
+      if (metadata) {
+          // Shorten keys to save space
+          const minMeta = {
+              s: metadata.school,
+              su: metadata.subject,
+              c: metadata.classLevel,
+              t: metadata.examType,
+              tc: metadata.targetClasses,
+              d: metadata.date
+          };
+          try {
+              const b64 = btoa(JSON.stringify(minMeta))
+                  .replace(/\+/g, '-')
+                  .replace(/\//g, '_')
+                  .replace(/=+$/, '');
+              filename = `${examCode}_meta_${b64}_.json`;
+          } catch (e) {
+              console.warn("Failed to encode metadata for filename", e);
+          }
+      }
       
       const { data, error } = await supabase.storage
           .from('archives')
@@ -1013,7 +1166,7 @@ class StorageService {
       return data?.path || filename;
   }
 
-  async getArchivedList(): Promise<{name: string, created_at: string, size: number}[]> {
+  async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: any}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
           limit: 100,
           offset: 0,
@@ -1026,11 +1179,40 @@ class StorageService {
           return [];
       }
       
-      return data.map((f: any) => ({
-          name: f.name,
-          created_at: f.created_at,
-          size: f.metadata?.size || 0
-      }));
+      return data.map((f: any) => {
+          let metadata = null;
+          if (f.name.includes('_meta_')) {
+              try {
+                  const parts = f.name.split('_meta_');
+                  if (parts.length > 1) {
+                      let b64 = parts[1].split('_')[0]; // Take until next underscore or end
+                      // Restore Base64 standard chars
+                      b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+                      // Add padding
+                      while (b64.length % 4) b64 += '=';
+                      
+                      const parsed = JSON.parse(atob(b64));
+                      metadata = {
+                          school: parsed.s,
+                          subject: parsed.su,
+                          classLevel: parsed.c,
+                          examType: parsed.t,
+                          targetClasses: parsed.tc,
+                          date: parsed.d
+                      };
+                  }
+              } catch (e) {
+                  console.warn("Failed to parse metadata from filename:", f.name);
+              }
+          }
+          
+          return {
+              name: f.name,
+              created_at: f.created_at,
+              size: f.metadata?.size || 0,
+              metadata
+          };
+      });
   }
 
   async downloadArchive(path: string): Promise<any> {

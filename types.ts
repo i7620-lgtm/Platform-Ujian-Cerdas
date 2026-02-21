@@ -8,11 +8,13 @@ export interface Question {
   options?: string[];
   correctAnswer?: string; 
   imageUrl?: string; 
+  audioUrl?: string; // URL Audio
   optionImages?: (string | null)[];
   
   // Metadata Baru
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
   level?: string;    // e.g., "1", "HOTS", "LOTS"
+  scoreWeight?: number; // Bobot Nilai (Default: 1)
 
   matchingPairs?: {
     left: string;
@@ -70,6 +72,7 @@ export interface Student {
 export type ResultStatus = 'in_progress' | 'completed' | 'force_closed' | 'pending_grading';
 
 export interface Result {
+    id?: number; // Primary Key from DB
     student: Student;
     examCode: string;
     answers: Record<string, string>;
