@@ -22,8 +22,9 @@ const base64ToBlob = (base64: string): Blob => {
 };
 
 // Helper: Convert URL to Base64 for Archiving
-const urlToBase64 = async (url: string): Promise<string> => {
+const urlToBase64 = async (url: string): Promise<string | null> => {
     try {
+        // Attempt 1: Fetch (Works for same-origin or CORS-enabled)
         const response = await fetch(url);
         const blob = await response.blob();
         return new Promise((resolve, reject) => {
@@ -33,8 +34,31 @@ const urlToBase64 = async (url: string): Promise<string> => {
             reader.readAsDataURL(blob);
         });
     } catch (error) {
-        console.warn("Failed to convert image for archive:", url);
-        return url; // Fallback keep URL
+        // Attempt 2: Image Object with CrossOrigin (Works if server supports it but fetch failed for some reason)
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(null);
+                try {
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                } catch (e) {
+                    // Canvas tainted - cannot export
+                    console.warn("Canvas tainted, cannot convert to base64:", url);
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                console.warn("Failed to load image for base64 conversion:", url);
+                resolve(null);
+            };
+            img.src = url;
+        });
     }
 };
 
@@ -851,10 +875,11 @@ class StorageService {
               }
 
               if (!rawBase64 && src && src.startsWith('http')) {
-                  rawBase64 = await urlToBase64(src);
+                  const converted = await urlToBase64(src);
+                  if (converted) rawBase64 = converted;
               }
 
-              if (rawBase64) {
+              if (rawBase64 && rawBase64.startsWith('data:image')) {
                   try {
                       // OPTIMIZATION PIPELINE:
                       // Resize to max 800px & Compress (WebP q=0.7) - improved from 0.6
@@ -867,6 +892,9 @@ class StorageService {
                       img.setAttribute('src', rawBase64);
                   }
                   img.removeAttribute('data-bucket-path');
+              } else if (!rawBase64 && src) {
+                  // Keep original src if conversion failed (CORS blocked)
+                  // No changes needed, src is already there
               }
           }
           return doc.body.innerHTML;
