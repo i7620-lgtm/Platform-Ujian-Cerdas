@@ -145,7 +145,15 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                     <div className="mb-2 p-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded text-xs text-indigo-700 dark:text-indigo-300">
                                         <span className="font-bold">Kunci Jawaban: </span> 
                                         {q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? 
-                                            q.trueFalseRows.map(r => `${r.text} (${r.answer?'Benar':'Salah'})`).join(', ') :
+                                            <div className="inline">
+                                                {q.trueFalseRows.map((r, i) => (
+                                                    <span key={i}>
+                                                        <span dangerouslySetInnerHTML={{__html: r.text}} className="inline [&_p]:inline [&_span]:inline" />
+                                                        <span className="font-bold"> ({r.answer ? 'Benar' : 'Salah'})</span>
+                                                        {i < q.trueFalseRows!.length - 1 && ', '}
+                                                    </span>
+                                                ))}
+                                            </div> :
                                         q.questionType === 'MATCHING' && q.matchingPairs ?
                                             q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
                                             <span dangerouslySetInnerHTML={{__html: q.correctAnswer || ''}}></span>
