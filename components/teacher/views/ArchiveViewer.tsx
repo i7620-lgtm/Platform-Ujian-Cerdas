@@ -651,6 +651,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">{q.questionType === 'INFO' ? 'i' : questionNumber}</span>
                                         <div className="flex-1 space-y-4 min-w-0">
                                             <div className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            
+                                            {/* Metadata Badge */}
+                                            {(q.category || q.level || q.scoreWeight) && (
+                                                <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                                                    {q.category && <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600 uppercase tracking-wide">Kategori: {q.category}</span>}
+                                                    {q.level && <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 uppercase tracking-wide">Level: {q.level}</span>}
+                                                    <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 uppercase tracking-wide">Bobot: {q.scoreWeight || 1}</span>
+                                                </div>
+                                            )}
                                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer === opt ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer === opt && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
@@ -1114,6 +1123,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             {q.questionType === 'INFO' ? 'i' : questionNumber}
                                         </span>
                                         <div className="flex-1 min-w-0">
+                                            {/* Metadata Print */}
+                                            {(q.category || q.level || q.scoreWeight) && (
+                                                <div className="flex flex-wrap gap-2 mb-2 border-b border-slate-100 pb-2">
+                                                    {q.category && <span className="text-[9px] font-bold bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase">Kat: {q.category}</span>}
+                                                    {q.level && <span className="text-[9px] font-bold bg-slate-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 uppercase">Lvl: {q.level}</span>}
+                                                    <span className="text-[9px] font-bold bg-slate-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 uppercase">Bobot: {q.scoreWeight || 1}</span>
+                                                </div>
+                                            )}
                                             <div className="prose prose-sm max-w-none text-xs text-slate-800 mb-2 [&_p]:m-0 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
                                             {/* Options / Answer Display */}
