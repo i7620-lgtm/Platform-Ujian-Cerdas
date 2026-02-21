@@ -377,7 +377,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 
-                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                                                     <div>
                                                         <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
                                                         <input 
@@ -396,6 +396,20 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                             onChange={(e) => handleLevelChange(q.id, e.target.value)}
                                                             className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                                             placeholder="Contoh: 1, 2, HOTS, LOTS"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Bobot Nilai</label>
+                                                        <input 
+                                                            type="number" 
+                                                            min="1"
+                                                            value={q.scoreWeight || 1} 
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value) || 1;
+                                                                setQuestions(prev => prev.map(item => item.id === q.id ? { ...item, scoreWeight: val } : item));
+                                                            }}
+                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                            placeholder="Default: 1"
                                                         />
                                                     </div>
                                                 </div>
