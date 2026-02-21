@@ -125,40 +125,83 @@
 
   /* --- Text Normalization (Smarter Approach) --- */
   
-  /* 1. Reset Font Size & Line Height ONLY for generic containers (p, div, span, font, li) 
-     This fixes copy-paste issues from Word/PDF without breaking Headings (h1-h6) or Alignment */
-  .prose:not(.prose-sm) :is(p, div, span, font, li):not([class*="text-"]), 
-  .wysiwyg-content :is(p, div, span, font, li):not([class*="text-"]) {
+  /* 1. Reset Font Size & Line Height for generic containers */
+  /* Exclude elements with 'katex' or 'math' classes to protect equations */
+  .prose:not(.prose-sm) :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]), 
+  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
       font-size: 1rem !important;
       line-height: 1.75 !important;
-      /* Removed text-align: left !important to respect user alignment */
+  }
+
+  /* Only reset spans/fonts that have NO class (likely copy-paste junk) */
+  /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
+  .prose:not(.prose-sm) :is(span, font):not([class]), 
+  .wysiwyg-content :is(span, font):not([class]) {
+      font-size: 1rem !important;
+      line-height: 1.75 !important;
   }
 
   /* 2. Small Prose (Result/Archive View) - Force 14px */
-  .prose.prose-sm :is(p, div, span, font, li):not([class*="text-"]) {
+  .prose.prose-sm :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
+      font-size: 0.875rem !important;
+      line-height: 1.5 !important;
+  }
+  .prose.prose-sm :is(span, font):not([class]) {
       font-size: 0.875rem !important;
       line-height: 1.5 !important;
   }
 
   /* 3. Options - Force 14px */
-  .option-content :is(p, div, span, font, li):not([class*="text-"]) {
+  .option-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
+      font-size: 0.875rem !important;
+      line-height: 1.5 !important;
+  }
+  .option-content :is(span, font):not([class]) {
       font-size: 0.875rem !important;
       line-height: 1.5 !important;
   }
 
-  /* 4. Fix specific "font-size" inline styles from Word/GDocs that are too small/large 
-     Only targets inline styles, preserving class-based sizing */
-  .prose [style*="font-size"], .wysiwyg-content [style*="font-size"] {
-      font-size: 1em !important; 
-  }
+  /* 4. Fix specific "font-size" inline styles from Word/GDocs */
+  /* We remove the aggressive inline style reset as it breaks KaTeX. 
+     Instead, we rely on the tag-based resets above for unclassed elements. */
 
   /* Exceptions for Superscript/Subscript */
+  /* Use line-height: normal to prevent cursor trapping in contentEditable */
   .prose sup, .prose sub, .wysiwyg-content sup, .wysiwyg-content sub { 
-      font-size: 75% !important; 
-      line-height: 0 !important; 
-      vertical-align: baseline !important;
-      position: relative !important;
+      font-size: 75%; 
+      line-height: normal; 
+      vertical-align: baseline;
+      position: relative;
   }
-  .prose sup, .wysiwyg-content sup { top: -0.5em !important; }
-  .prose sub, .wysiwyg-content sub { bottom: -0.25em !important; }
+  .prose sup, .wysiwyg-content sup { top: -0.5em; }
+  .prose sub, .wysiwyg-content sub { bottom: -0.25em; }
+
+  /* --- Answer Key Specific Reset --- */
+  /* This class forces text to be small and clean, but protects Math */
+  .answer-key-reset {
+      font-size: 0.75rem; /* text-xs */
+      line-height: 1.5;
+  }
+  /* Reset unstyled/unclassed elements */
+  .answer-key-reset :is(p, div, li, span, font, b, i, u, strong, em):not([class]):not([style]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      background-color: transparent !important;
+      color: inherit !important;
+      margin: 0 !important;
+      padding: 0 !important;
+  }
+  
+  /* Target elements with inline FONT-SIZE styles that are NOT math related */
+  .answer-key-reset :is(p, div, li, span, font)[style*="font-size"]:not([class*="katex"]):not([class*="math"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+  }
+  
+  /* Target elements with inline COLOR/BG styles that are NOT math related */
+  .answer-key-reset :is(p, div, li, span, font)[style*="color"]:not([class*="katex"]):not([class*="math"]),
+  .answer-key-reset :is(p, div, li, span, font)[style*="background"]:not([class*="katex"]):not([class*="math"]) {
+      background-color: transparent !important;
+      color: inherit !important;
+  }
 }
