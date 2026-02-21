@@ -148,7 +148,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             <div className="inline">
                                                 {q.trueFalseRows.map((r, i) => (
                                                     <span key={i}>
-                                                        <span dangerouslySetInnerHTML={{__html: r.text}} className="inline [&_p]:inline [&_span]:inline [&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" />
+                                                        <span dangerouslySetInnerHTML={{__html: r.text}} className="inline [&_p]:inline [&_span]:inline [&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 [&_:not(sup):not(sub):not(.math):not(.math-inline):not(.katex):not(.mjx-container)]:!text-xs [&_:not(sup):not(sub):not(.math):not(.math-inline):not(.katex):not(.mjx-container)]:!leading-normal" />
                                                         <span className="font-bold"> ({r.answer ? 'Benar' : 'Salah'})</span>
                                                         {i < q.trueFalseRows!.length - 1 && ', '}
                                                     </span>
