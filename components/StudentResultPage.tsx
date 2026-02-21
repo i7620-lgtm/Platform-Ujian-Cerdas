@@ -60,13 +60,18 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
     // REAL-TIME CALCULATION LOGIC
     const calculatedStats = useMemo(() => {
         const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-        let correct = 0;
-        let empty = 0;
+        let totalScore = 0;
+        let maxPossibleScore = 0;
+        let correctCount = 0;
+        let emptyCount = 0;
 
         scorableQuestions.forEach(q => {
+            const weight = q.scoreWeight || 1;
+            maxPossibleScore += weight;
+
             const ans = result.answers[q.id];
             if (!ans) {
-                empty++;
+                emptyCount++;
                 return;
             }
 
@@ -97,18 +102,20 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 isCorrect = false; // Default until graded
             }
 
-            if (isCorrect) correct++;
+            if (isCorrect) {
+                correctCount++;
+                totalScore += weight;
+            }
         });
 
-        const total = scorableQuestions.length;
-        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const finalScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
         
         return {
-            score,
-            correctAnswers: correct,
-            totalQuestions: total,
-            wrongAnswers: total - correct - empty,
-            hasDiscrepancy: score !== result.score // Check logic
+            score: finalScore,
+            correctAnswers: correctCount,
+            totalQuestions: scorableQuestions.length,
+            wrongAnswers: scorableQuestions.length - correctCount - emptyCount,
+            hasDiscrepancy: finalScore !== result.score // Check logic
         };
     }, [exam.questions, result.answers, result.score]);
 
