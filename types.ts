@@ -14,6 +14,7 @@ export interface Question {
   // Metadata Baru
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
   level?: string;    // e.g., "1", "HOTS", "LOTS"
+  scoreWeight?: number; // Bobot Nilai (Default: 1)
 
   matchingPairs?: {
     left: string;
