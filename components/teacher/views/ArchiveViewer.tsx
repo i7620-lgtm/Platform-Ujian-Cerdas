@@ -1097,6 +1097,92 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         })}
                     </div>
                 </div>
+                <div className="page-break"></div>
+
+                {/* 5. BANK SOAL & KUNCI JAWABAN */}
+                <div className="mb-4">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">5. Bank Soal & Kunci Jawaban</h3>
+                    <div className="space-y-4">
+                        {exam.questions.map((q, index) => {
+                            const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
+                            return (
+                                <div key={q.id} className="avoid-break border border-slate-300 rounded p-3 bg-white">
+                                    <div className="flex items-start gap-3">
+                                        <span className="flex-shrink-0 mt-0.5 text-xs font-bold w-6 h-6 flex items-center justify-center rounded bg-slate-100 border border-slate-200 text-slate-600">
+                                            {q.questionType === 'INFO' ? 'i' : questionNumber}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="prose prose-sm max-w-none text-xs text-slate-800 mb-2 [&_p]:m-0" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            
+                                            {/* Options / Answer Display */}
+                                            <div className="pl-2 border-l-2 border-slate-200 ml-1">
+                                                {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
+                                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
+                                                        {q.options.map((opt, i) => (
+                                                            <div key={i} className={`flex gap-2 ${q.correctAnswer === opt ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>
+                                                                <span className="w-3">{String.fromCharCode(65 + i)}.</span>
+                                                                <div className="flex-1 [&_p]:inline" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                                {q.correctAnswer === opt && <span className="text-[9px] px-1 bg-emerald-100 text-emerald-800 rounded border border-emerald-200">KUNCI</span>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                
+                                                {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
+                                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
+                                                        {q.options.map((opt, i) => {
+                                                            const isCorrect = q.correctAnswer?.includes(opt);
+                                                            return (
+                                                                <div key={i} className={`flex gap-2 ${isCorrect ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>
+                                                                    <span className="w-3">{String.fromCharCode(65 + i)}.</span>
+                                                                    <div className="flex-1 [&_p]:inline" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                                    {isCorrect && <span className="text-[9px] px-1 bg-emerald-100 text-emerald-800 rounded border border-emerald-200">BENAR</span>}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
+                                                    <table className="w-full text-[10px] border-collapse border border-slate-300 mt-1">
+                                                        <thead className="bg-slate-50"><tr><th className="border p-1 text-left">Pernyataan</th><th className="border p-1 w-16 text-center">Kunci</th></tr></thead>
+                                                        <tbody>
+                                                            {q.trueFalseRows.map((r, i) => (
+                                                                <tr key={i}>
+                                                                    <td className="border p-1"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td>
+                                                                    <td className={`border p-1 text-center font-bold ${r.answer ? 'text-emerald-700' : 'text-rose-700'}`}>{r.answer ? 'Benar' : 'Salah'}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+
+                                                {q.questionType === 'MATCHING' && q.matchingPairs && (
+                                                    <div className="mt-1 space-y-1 text-[10px]">
+                                                        {q.matchingPairs.map((p, i) => (
+                                                            <div key={i} className="flex gap-2 items-center bg-slate-50 p-1 rounded border border-slate-200">
+                                                                <span className="flex-1 font-medium">{p.left}</span>
+                                                                <span className="text-slate-400">→</span>
+                                                                <span className="flex-1 font-bold text-emerald-700">{p.right}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && (
+                                                    <div className="mt-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
+                                                        <span className="font-bold text-slate-500 uppercase text-[9px] block mb-1">Kunci Jawaban:</span>
+                                                        <div className="prose prose-sm max-w-none text-emerald-800 font-medium" dangerouslySetInnerHTML={{ __html: q.correctAnswer || '-' }}></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );
