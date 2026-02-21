@@ -577,9 +577,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     .print-bar-green { background-color: #10b981 !important; -webkit-print-color-adjust: exact !important; }
                     .print-bar-orange { background-color: #f97316 !important; -webkit-print-color-adjust: exact !important; }
                     .print-bar-red { background-color: #ef4444 !important; -webkit-print-color-adjust: exact !important; }
-                    table { width: 100% !important; border-collapse: collapse !important; font-size: 8pt !important; }
+                    table { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
                     th, td { border: 1px solid #94a3b8 !important; padding: 3px 5px !important; color: #0f172a !important; }
                     thead th { background-color: #f8fafc !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; }
+                    .print-question-text, .print-question-text * { font-size: 9pt !important; line-height: 1.4 !important; color: #0f172a !important; background-color: transparent !important; }
+                    .print-question-text img { max-width: 100% !important; height: auto !important; }
                     .no-print, .print\\:hidden { display: none !important; }
                     .page-break { page-break-before: always; }
                     .avoid-break { break-inside: avoid; page-break-inside: avoid; }
@@ -1112,12 +1114,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             {q.questionType === 'INFO' ? 'i' : questionNumber}
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                            <div className="prose prose-sm max-w-none text-xs text-slate-800 mb-2 [&_p]:m-0" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            <div className="prose prose-sm max-w-none text-xs text-slate-800 mb-2 [&_p]:m-0 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
                                             {/* Options / Answer Display */}
                                             <div className="pl-2 border-l-2 border-slate-200 ml-1">
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
+                                                    <div className="grid grid-cols-1 gap-1 text-[10px] print-question-text">
                                                         {q.options.map((opt, i) => (
                                                             <div key={i} className={`flex gap-2 ${q.correctAnswer === opt ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>
                                                                 <span className="w-3">{String.fromCharCode(65 + i)}.</span>
@@ -1129,7 +1131,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 )}
                                                 
                                                 {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
+                                                    <div className="grid grid-cols-1 gap-1 text-[10px] print-question-text">
                                                         {q.options.map((opt, i) => {
                                                             const isCorrect = q.correctAnswer?.includes(opt);
                                                             return (
@@ -1144,7 +1146,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 )}
 
                                                 {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                    <table className="w-full text-[10px] border-collapse border border-slate-300 mt-1">
+                                                    <table className="w-full text-[10px] border-collapse border border-slate-300 mt-1 print-question-text">
                                                         <thead className="bg-slate-50"><tr><th className="border p-1 text-left">Pernyataan</th><th className="border p-1 w-16 text-center">Kunci</th></tr></thead>
                                                         <tbody>
                                                             {q.trueFalseRows.map((r, i) => (
@@ -1158,7 +1160,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 )}
 
                                                 {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                    <div className="mt-1 space-y-1 text-[10px]">
+                                                    <div className="mt-1 space-y-1 text-[10px] print-question-text">
                                                         {q.matchingPairs.map((p, i) => (
                                                             <div key={i} className="flex gap-2 items-center bg-slate-50 p-1 rounded border border-slate-200">
                                                                 <span className="flex-1 font-medium">{p.left}</span>
@@ -1170,7 +1172,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 )}
 
                                                 {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && (
-                                                    <div className="mt-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
+                                                    <div className="mt-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200 print-question-text">
                                                         <span className="font-bold text-slate-500 uppercase text-[9px] block mb-1">Kunci Jawaban:</span>
                                                         <div className="prose prose-sm max-w-none text-emerald-800 font-medium" dangerouslySetInnerHTML={{ __html: q.correctAnswer || '-' }}></div>
                                                     </div>
