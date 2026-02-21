@@ -507,9 +507,21 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="flex justify-between mt-1 text-[10px] text-slate-400">
-                                                    <span>{new Date(file.created_at).toLocaleDateString()}</span>
-                                                    <span>{(file.size / 1024).toFixed(1)} KB</span>
+                                                <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-200 dark:border-slate-600">Arsip Lama</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Tanggal</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Ukuran</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {(file.size / 1024).toFixed(1)} KB</span>
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 italic mt-1">
+                                                        Detail lengkap tidak tersedia di pratinjau.
+                                                    </div>
                                                 </div>
                                             )}
                                         </button>
