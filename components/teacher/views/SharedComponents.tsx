@@ -44,7 +44,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                 totalAnswered++;
             }
         });
-        return { counts, totalAnswered };
+        return { counts, totalAnswered, totalStudents: examResults.length };
     }, [examResults, q.id]);
 
     const correctAnswerString = useMemo(() => {
@@ -122,7 +122,7 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                             <div className="space-y-2">
                                 {q.options.map((opt, i) => {
                                     const count = distribution.counts[opt] || 0;
-                                    const percentage = distribution.totalAnswered > 0 ? Math.round((count / distribution.totalAnswered) * 100) : 0;
+                                    const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
                                     const isCorrect = opt === q.correctAnswer;
                                     
                                     return (

@@ -11,31 +11,31 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
     const teacherSteps = [
         {
             title: "1. Buat Akun & Masuk",
-            desc: "Daftar sebagai pengajar menggunakan email aktif Anda. Akses dashboard guru yang intuitif untuk mulai mengelola kelas, bank soal, dan sesi ujian Anda.",
+            desc: "Daftar sebagai pengajar menggunakan email aktif Anda. Akses dashboard guru yang intuitif untuk mulai mengelola kelas, bank soal, dan sesi ujian Anda. Mendukung Light/Dark mode untuk kenyamanan mata Anda.",
             icon: PresentationChartLineIcon,
             color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
         },
         {
-            title: "2. Buat Soal Otomatis (AI)",
-            desc: "Unggah file PDF soal lama Anda atau ketik topik materi. Sistem AI kami akan otomatis memotong gambar, mengekstrak teks, dan mengubahnya menjadi format ujian digital siap pakai dalam hitungan detik.",
+            title: "2. Editor Soal Canggih & Lengkap",
+            desc: "Buat soal dengan mudah menggunakan editor WYSIWYG yang mendukung penyematan Audio, Gambar, dan Rumus Matematika (Equation). Tersedia berbagai jenis soal: Pilihan Ganda, Pilihan Ganda Kompleks, Benar/Salah, Menjodohkan, Isian Singkat, dan Uraian/Esai.",
             icon: CloudArrowUpIcon,
             color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         },
         {
-            title: "3. Konfigurasi Ujian",
-            desc: "Atur durasi waktu, acak urutan soal/jawaban, bobot nilai, dan mode keamanan (Anti-Curang). Anda juga bisa mengatur apakah nilai langsung ditampilkan ke siswa atau tidak.",
+            title: "3. Konfigurasi & Keamanan Ekstra",
+            desc: "Atur durasi, acak soal/opsi, dan aktifkan fitur GPS Location Tracking untuk memantau posisi siswa. Gunakan fitur Kartu Undangan untuk membagikan info ujian secara profesional. Tersedia juga fitur Preview Soal untuk mengecek tampilan sebelum dipublikasikan.",
             icon: SparklesIcon,
             color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
         },
         {
-            title: "4. Bagikan Kode Akses",
-            desc: "Dapatkan KODE UNIK 6 digit atau QR Code untuk dibagikan ke siswa. Siswa tidak perlu mendaftar akun, cukup masukkan kode dan nama untuk mulai mengerjakan.",
+            title: "4. Bagikan & Monitor Real-time",
+            desc: "Bagikan KODE UNIK atau QR Code. Pantau progres siswa secara Real-time. Sistem otomatis menyimpan jawaban siswa ke Cloud (Penyimpanan Aman). Jika waktu habis, jawaban siswa otomatis terkirim.",
             icon: ShareIcon,
             color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
         },
         {
-            title: "5. Monitor & Analisis",
-            desc: "Pantau pengerjaan siswa secara Real-time. Lihat siapa yang sedang online, selesai, atau terkunci karena kecurangan. Setelah selesai, unduh analisis butir soal lengkap (daya beda, tingkat kesulitan) dalam format Excel/PDF.",
+            title: "5. Analisis, Penilaian & Arsip",
+            desc: "Analisis butir soal (tingkat kesulitan, daya beda) tersedia otomatis. Lakukan penilaian manual untuk soal Esai secara personal. Finalisasi data nilai, lalu unduh rekap nilai atau Cetak Arsip Soal & Jawaban dalam format PDF rapi.",
             icon: ChartBarIcon,
             color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
         }
@@ -43,26 +43,26 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
 
     const studentSteps = [
         {
-            title: "1. Masuk Ujian",
-            desc: "Buka aplikasi, lalu pindai QR Code dari guru atau masukkan KODE UJIAN 6 digit pada halaman depan. Pastikan koneksi internet stabil.",
+            title: "1. Akses Mudah Tanpa Akun",
+            desc: "Cukup masukkan KODE UJIAN dan Nama untuk mulai mengerjakan. Tidak perlu repot mendaftar akun. Mendukung mode Light/Dark sesuai preferensi perangkat Anda.",
             icon: QrCodeIcon,
             color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
         },
         {
-            title: "2. Isi Identitas",
-            desc: "Lengkapi Nama Lengkap, Kelas, dan Nomor Absen dengan benar. Data ini akan digunakan guru untuk rekap nilai.",
+            title: "2. Pengerjaan Fleksibel (Online/Offline)",
+            desc: "Aplikasi dirancang ringan dan hemat kuota. Jawaban tersimpan aman di perangkat dan otomatis disinkronkan ke server. Jika koneksi terputus, Anda tetap bisa melanjutkan pengerjaan.",
             icon: AcademicCapIcon,
             color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         },
         {
-            title: "3. Kerjakan Soal",
-            desc: "Jawab soal Pilihan Ganda, Isian Singkat, Benar/Salah, atau Menjodohkan. Waktu berjalan mundur otomatis. Jawaban tersimpan otomatis setiap kali Anda memilih.",
+            title: "3. Navigasi & Fitur Lengkap",
+            desc: "Gunakan menu Daftar Soal untuk melompat ke nomor tertentu. Sistem akan mengingatkan jika ada soal yang masih kosong sebelum Anda mengumpulkan.",
             icon: CheckCircleIcon,
             color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
         },
         {
-            title: "4. Mode Aman (Anti-Curang)",
-            desc: "PENTING: Jangan keluar aplikasi, membuka tab lain, atau mematikan layar! Sistem akan mendeteksi aktivitas mencurigakan dan dapat mengunci ujian Anda secara otomatis.",
+            title: "4. Keamanan & Pengumpulan Otomatis",
+            desc: "Sistem Anti-Curang mendeteksi perpindahan aplikasi. Fokuslah mengerjakan! Jika waktu habis, jawaban Anda akan otomatis dikirim ke server, jadi tidak perlu khawatir jawaban hilang.",
             icon: ShieldCheckIcon,
             color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
         }

@@ -16,13 +16,14 @@ import {
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
-import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer, UserManagementView } from './teacher/DashboardViews';
+import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage';
 import { InvitationModal } from './InvitationModal';
 
-// Lazy Load Analytics View for Super Admin
+// Lazy Load Admin Views for Super Admin
 const AnalyticsView = React.lazy(() => import('./teacher/AnalyticsView'));
+const UserManagementView = React.lazy(() => import('./teacher/DashboardViews').then(module => ({ default: module.UserManagementView })));
 
 interface TeacherDashboardProps {
     teacherProfile: TeacherProfile;
@@ -343,7 +344,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     />
                 )}
                 {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
-                {view === 'ADMIN_USERS' && accountType === 'super_admin' && <UserManagementView />}
+                {view === 'ADMIN_USERS' && accountType === 'super_admin' && (
+                    <Suspense fallback={<div className="text-center p-10 text-slate-400">Memuat Manajemen Pengguna...</div>}>
+                        <UserManagementView />
+                    </Suspense>
+                )}
                 {view === 'ANALYTICS' && accountType === 'super_admin' && (
                     <Suspense fallback={<div className="text-center p-10 text-slate-400">Memuat Modul Analisis...</div>}>
                         <AnalyticsView />
