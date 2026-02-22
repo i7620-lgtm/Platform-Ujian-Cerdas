@@ -56,7 +56,7 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
         },
         {
             title: "3. Navigasi & Fitur Lengkap",
-            desc: "Gunakan menu Daftar Soal (Hamburger) untuk melompat ke nomor tertentu. Tandai ragu-ragu jika belum yakin. Sistem akan mengingatkan jika ada soal yang masih kosong sebelum Anda mengumpulkan.",
+            desc: "Gunakan menu Daftar Soal untuk melompat ke nomor tertentu. Sistem akan mengingatkan jika ada soal yang masih kosong sebelum Anda mengumpulkan.",
             icon: CheckCircleIcon,
             color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
         },
