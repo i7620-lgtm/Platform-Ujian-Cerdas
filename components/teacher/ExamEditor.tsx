@@ -152,7 +152,11 @@ const WysiwygEditor: React.FC<{
     const restoreSelection = () => { const sel = window.getSelection(); if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); } else if (editorRef.current) { editorRef.current.focus(); const range = document.createRange(); range.selectNodeContents(editorRef.current); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); } };
     const checkActiveFormats = () => { saveSelection(); const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList']; const active = cmds.filter(cmd => document.queryCommandState(cmd)); setActiveCmds(active); const selection = window.getSelection(); let inTable = false; if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE' || node.nodeName === 'TD' || node.nodeName === 'TH') { inTable = true; break; } node = node.parentNode; } } setIsInsideTable(inTable); };
     const runCmd = (cmd: string, val?: string) => { 
-        restoreSelection(); 
+        // Only restore selection if the editor lost focus. 
+        // Restoring selection when already focused can reset pending format states (like toggling off superscript).
+        if (document.activeElement !== editorRef.current) {
+            restoreSelection(); 
+        }
         if(editorRef.current) editorRef.current.focus(); 
         
         if (cmd === 'superscript') {
@@ -165,7 +169,7 @@ const WysiwygEditor: React.FC<{
             execCmd(cmd, val); 
         }
         
-        saveSelection(); 
+        // checkActiveFormats calls saveSelection internally
         checkActiveFormats(); 
     };
     const insertTable = (rows: number, cols: number) => { let html = '<table class="border-collapse border border-slate-300 dark:border-slate-600 my-2 w-full text-sm"><thead><tr>'; for(let c=0; c<cols; c++) html += `<th class="border border-slate-300 dark:border-slate-600 p-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100">H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td class="border border-slate-300 dark:border-slate-600 p-2 text-slate-800 dark:text-slate-200">Data</td>`; html += '</tr>'; } html += '</tbody></table><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
