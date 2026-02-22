@@ -166,15 +166,26 @@
      Instead, we rely on the tag-based resets above for unclassed elements. */
 
   /* Exceptions for Superscript/Subscript */
-  /* Use line-height: normal to prevent cursor trapping in contentEditable */
-  .prose sup, .prose sub, .wysiwyg-content sup, .wysiwyg-content sub { 
+  
+  /* Viewer (Prose) - Pretty styling that doesn't affect line height */
+  .prose sup, .prose sub { 
       font-size: 75%; 
-      line-height: normal; 
+      line-height: 0; 
       vertical-align: baseline;
       position: relative;
   }
-  .prose sup, .wysiwyg-content sup { top: -0.5em; }
-  .prose sub, .wysiwyg-content sub { bottom: -0.25em; }
+  .prose sup { top: -0.5em; }
+  .prose sub { bottom: -0.25em; }
+
+  /* Editor (Wysiwyg) - Native styling for robust editing behavior */
+  /* We use standard vertical-align to ensure the browser's cursor logic works as expected */
+  .wysiwyg-content sup, .wysiwyg-content sub { 
+      font-size: 75%; 
+      line-height: normal; 
+      position: static;
+  }
+  .wysiwyg-content sup { vertical-align: super; top: auto; }
+  .wysiwyg-content sub { vertical-align: sub; bottom: auto; }
 
   /* --- Answer Key Specific Reset --- */
   /* This class forces text to be small and clean, but protects Math */
