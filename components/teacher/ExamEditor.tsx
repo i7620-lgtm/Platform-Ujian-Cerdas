@@ -151,7 +151,23 @@ const WysiwygEditor: React.FC<{
     const saveSelection = () => { const sel = window.getSelection(); if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) { savedRange.current = sel.getRangeAt(0).cloneRange(); } };
     const restoreSelection = () => { const sel = window.getSelection(); if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); } else if (editorRef.current) { editorRef.current.focus(); const range = document.createRange(); range.selectNodeContents(editorRef.current); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); } };
     const checkActiveFormats = () => { saveSelection(); const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList']; const active = cmds.filter(cmd => document.queryCommandState(cmd)); setActiveCmds(active); const selection = window.getSelection(); let inTable = false; if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE' || node.nodeName === 'TD' || node.nodeName === 'TH') { inTable = true; break; } node = node.parentNode; } } setIsInsideTable(inTable); };
-    const runCmd = (cmd: string, val?: string) => { restoreSelection(); if(editorRef.current) editorRef.current.focus(); execCmd(cmd, val); saveSelection(); checkActiveFormats(); };
+    const runCmd = (cmd: string, val?: string) => { 
+        restoreSelection(); 
+        if(editorRef.current) editorRef.current.focus(); 
+        
+        if (cmd === 'superscript') {
+            if (document.queryCommandState('subscript')) execCmd('subscript');
+            execCmd('superscript');
+        } else if (cmd === 'subscript') {
+            if (document.queryCommandState('superscript')) execCmd('superscript');
+            execCmd('subscript');
+        } else {
+            execCmd(cmd, val); 
+        }
+        
+        saveSelection(); 
+        checkActiveFormats(); 
+    };
     const insertTable = (rows: number, cols: number) => { let html = '<table class="border-collapse border border-slate-300 dark:border-slate-600 my-2 w-full text-sm"><thead><tr>'; for(let c=0; c<cols; c++) html += `<th class="border border-slate-300 dark:border-slate-600 p-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100">H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td class="border border-slate-300 dark:border-slate-600 p-2 text-slate-800 dark:text-slate-200">Data</td>`; html += '</tr>'; } html += '</tbody></table><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
     const deleteCurrentTable = () => { const selection = window.getSelection(); if (selection && selection.rangeCount > 0) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE') { node.parentNode?.removeChild(node); handleInput(); setIsInsideTable(false); return; } node = node.parentNode; } } };
     const insertMath = (latex: string) => { if ((window as any).katex) { const html = (window as any).katex.renderToString(latex, { throwOnError: false }); const wrapper = `&nbsp;<span class="math-visual inline-block px-0.5 rounded select-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-slate-700 align-middle" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 100%; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`; runCmd('insertHTML', wrapper); handleInput(); } };
