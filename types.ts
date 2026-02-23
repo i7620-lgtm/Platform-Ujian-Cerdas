@@ -67,6 +67,7 @@ export interface Student {
   class: string;
   absentNumber: string; 
   studentId: string; 
+  resultId?: number; // Added to track DB Primary Key
 }
 
 export type ResultStatus = 'in_progress' | 'completed' | 'force_closed' | 'pending_grading';
