@@ -3,6 +3,7 @@ import type { Exam, Result } from '../../../types';
 import { ClockIcon, QrCodeIcon, ShareIcon, DocumentDuplicateIcon, XMarkIcon } from '../../Icons';
 import { RemainingTime, MetaBadge } from './SharedComponents';
 import { supabase } from '../../../lib/supabase';
+import { storageService } from '../../../services/storage';
 
 export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     const [joinQrExam, setJoinQrExam] = useState<Exam | null>(null);
@@ -22,64 +23,13 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
                     schema: 'public', 
                     table: 'results', 
                     filter: `exam_code=eq.${exam.code}` 
-                }, (payload) => {
-                    const newData = payload.new as any;
-                    const oldData = payload.old as any;
-                    const eventType = payload.eventType;
-
+                }, async () => {
+                    // Fetch latest results for this exam to ensure consistency
+                    // This matches the robust logic used in Live Monitoring
+                    const latest = await storageService.getResults(exam.code);
                     setLocalResults(prev => {
-                        if (eventType === 'INSERT') {
-                            const newResult: Result = {
-                                id: newData.id,
-                                student: { 
-                                    studentId: newData.student_id, 
-                                    fullName: newData.student_name, 
-                                    class: newData.class_name, 
-                                    absentNumber: '00' 
-                                },
-                                examCode: newData.exam_code,
-                                answers: newData.answers || {},
-                                score: newData.score,
-                                correctAnswers: newData.correct_answers,
-                                totalQuestions: newData.total_questions,
-                                status: newData.status,
-                                activityLog: newData.activity_log,
-                                timestamp: new Date(newData.updated_at).getTime(),
-                                location: newData.location
-                            };
-                            // Avoid duplicates
-                            if (prev.some(r => r.id === newResult.id)) return prev;
-                            return [...prev, newResult];
-                        } 
-                        else if (eventType === 'UPDATE') {
-                            return prev.map(r => {
-                                if (r.id === newData.id || (r.examCode === newData.exam_code && r.student.studentId === newData.student_id)) {
-                                    return {
-                                        ...r,
-                                        id: newData.id,
-                                        student: { 
-                                            ...r.student,
-                                            studentId: newData.student_id, 
-                                            fullName: newData.student_name, 
-                                            class: newData.class_name
-                                        },
-                                        answers: newData.answers || {},
-                                        score: newData.score,
-                                        correctAnswers: newData.correct_answers,
-                                        totalQuestions: newData.total_questions,
-                                        status: newData.status,
-                                        activityLog: newData.activity_log,
-                                        timestamp: new Date(newData.updated_at).getTime(),
-                                        location: newData.location
-                                    };
-                                }
-                                return r;
-                            });
-                        } 
-                        else if (eventType === 'DELETE') {
-                            return prev.filter(r => r.id !== oldData.id);
-                        }
-                        return prev;
+                        const others = prev.filter(r => r.examCode !== exam.code);
+                        return [...others, ...latest];
                     });
                 })
                 .subscribe();
