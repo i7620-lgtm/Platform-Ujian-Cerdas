@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { UserIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon, SunIcon, MoonIcon } from './Icons';
+import { UserIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon, SunIcon, MoonIcon, GoogleIcon } from './Icons';
 import type { TeacherProfile } from '../types';
 import { storageService } from '../services/storage';
 
@@ -59,6 +59,17 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
         setError(e.message || 'Terjadi kesalahan sistem.'); 
     } finally { 
         setIsLoading(false); 
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+        await storageService.signInWithGoogle();
+    } catch (e: any) {
+        setError(e.message || 'Gagal login dengan Google.');
+        setIsLoading(false);
     }
   };
 
@@ -221,6 +232,29 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                             <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
                         ) : (isRegistering ? 'Daftar Sekarang' : 'Masuk Akun')}
                     </button>
+
+                    {!isRegistering && (
+                        <>
+                            <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold">
+                                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-400">Atau</span>
+                                </div>
+                            </div>
+
+                            <button 
+                                type="button"
+                                onClick={handleGoogleLogin}
+                                disabled={isLoading}
+                                className="w-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-sm py-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm flex items-center justify-center gap-3 active:scale-[0.98]"
+                            >
+                                <GoogleIcon className="w-5 h-5" />
+                                <span>Masuk dengan Google</span>
+                            </button>
+                        </>
+                    )}
                 </form>
 
                 <div className="mt-10 pt-6 border-t border-slate-50 dark:border-slate-800">
