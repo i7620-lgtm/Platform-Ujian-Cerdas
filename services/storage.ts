@@ -1008,24 +1008,63 @@ class StorageService {
     }
 
     try {
-        const { error } = await supabase.from('results').upsert({
-            exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, 
-            student_name: resultPayload.student.fullName,
-            class_name: resultPayload.student.class, 
-            answers: resultPayload.answers || {}, // Ensure not null
-            status: resultPayload.status,
-            activity_log: resultPayload.activityLog || [], 
-            score: resultPayload.score || 0, 
-            correct_answers: resultPayload.correctAnswers || 0,
-            total_questions: resultPayload.totalQuestions || 0, 
-            location: resultPayload.location, 
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'exam_code,student_id' });
+        let data, error;
+
+        // CRITICAL FIX: If resultId exists, update by Primary Key ID.
+        // This ensures that if a teacher edits student data (changing student_id),
+        // the student's submission still updates the correct record without reverting the identity changes.
+        if (resultPayload.student.resultId) {
+             const { data: updatedData, error: updateError } = await supabase
+                .from('results')
+                .update({
+                    answers: resultPayload.answers || {},
+                    status: resultPayload.status,
+                    activity_log: resultPayload.activityLog || [],
+                    score: resultPayload.score || 0,
+                    correct_answers: resultPayload.correctAnswers || 0,
+                    total_questions: resultPayload.totalQuestions || 0,
+                    location: resultPayload.location,
+                    updated_at: new Date().toISOString()
+                    // NOTE: We intentionally DO NOT update student_id, student_name, class_name here.
+                    // This allows teacher edits to persist even if the student client has old data.
+                })
+                .eq('id', resultPayload.student.resultId)
+                .select()
+                .single();
+             
+             data = updatedData;
+             error = updateError;
+        } else {
+            // Fallback: Upsert by Composite Key (exam_code, student_id) for initial creation
+            const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
+                exam_code: resultPayload.examCode, 
+                student_id: resultPayload.student.studentId, 
+                student_name: resultPayload.student.fullName,
+                class_name: resultPayload.student.class, 
+                answers: resultPayload.answers || {}, 
+                status: resultPayload.status,
+                activity_log: resultPayload.activityLog || [], 
+                score: resultPayload.score || 0, 
+                correct_answers: resultPayload.correctAnswers || 0,
+                total_questions: resultPayload.totalQuestions || 0, 
+                location: resultPayload.location, 
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'exam_code,student_id' })
+            .select()
+            .single();
+
+            data = upsertData;
+            error = upsertError;
+        }
 
         if (error) throw error;
         
-        return { ...resultPayload, isSynced: true };
+        return { 
+            ...resultPayload, 
+            id: data?.id,
+            student: { ...resultPayload.student, resultId: data?.id },
+            isSynced: true 
+        };
     } catch (error: any) {
         console.error("CRITICAL DB ERROR:", error);
         
@@ -1087,6 +1126,7 @@ class StorageService {
       const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
       if (error || !data) return null;
       return {
+        id: data.id, // Include Primary Key
         student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
         examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
