@@ -258,6 +258,15 @@ class StorageService {
       };
   }
 
+  // SECURITY HELPER: Verify role against server data
+  private async _verifyRole(allowedRoles: AccountType[]): Promise<TeacherProfile> {
+      const profile = await this.getCurrentUser();
+      if (!profile || !allowedRoles.includes(profile.accountType)) {
+          throw new Error("Akses Ditolak: Peran pengguna tidak valid atau telah dimodifikasi.");
+      }
+      return profile;
+  }
+
   async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
       const auth = supabase.auth as any;
       const { data: authData, error: authError } = await auth.signUp({ 
@@ -323,6 +332,9 @@ class StorageService {
   // --- USER MANAGEMENT (SUPER ADMIN) ---
   
   async getAllUsers(): Promise<UserProfile[]> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
       const { data: profiles, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
       
@@ -336,6 +348,9 @@ class StorageService {
   }
 
   async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole, school: newSchool })
@@ -347,6 +362,17 @@ class StorageService {
   // --- EXAM METHODS ---
 
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
+    // SECURITY CHECK: Verify identity if privileged access is requested
+    // This prevents "Inspect Element" attacks where user modifies local state to 'super_admin'
+    if (profile && (profile.accountType === 'super_admin' || profile.accountType === 'admin_sekolah')) {
+        const verified = await this.getCurrentUser();
+        // If verification fails or role mismatch, force use of verified profile (which might be 'guru' or null)
+        if (!verified || verified.accountType !== profile.accountType) {
+            console.warn("Security Alert: Profile mismatch detected in getExams. Enforcing server-side profile.");
+            profile = verified || undefined;
+        }
+    }
+
     let query = supabase.from('exams').select('*');
 
     if (profile) {
@@ -748,6 +774,9 @@ class StorageService {
   }
 
   async getAnalyticsData(filters?: { region?: string, subject?: string }): Promise<ExamSummary[]> {
+      // SECURITY: Verify Admin Access
+      await this._verifyRole(['super_admin', 'admin_sekolah']);
+
       let query = supabase.from('exam_summaries').select('*');
       if (filters?.region) query = query.ilike('school_name', `%${filters.region}%`); // Simple proxy for region
       if (filters?.subject) query = query.eq('exam_subject', filters.subject);
