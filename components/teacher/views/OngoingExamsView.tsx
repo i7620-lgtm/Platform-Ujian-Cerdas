@@ -8,7 +8,15 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
 
     return (
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500 dark:text-slate-400">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
-            {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { const activeCount = results.filter(r => r.examCode === exam.code).length; return (<div key={exam.code} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900 shadow-sm hover:shadow-xl hover:shadow-emerald-50 dark:hover:shadow-emerald-900/10 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
+            {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { 
+                const examResults = results.filter(r => r.examCode === exam.code);
+                const activeCount = examResults.length;
+                
+                const lockedCount = examResults.filter(r => r.status === 'force_closed').length;
+                const onlineCount = examResults.filter(r => r.status === 'in_progress').length;
+                const completedCount = examResults.filter(r => r.status === 'completed').length;
+
+                return (<div key={exam.code} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900 shadow-sm hover:shadow-xl hover:shadow-emerald-50 dark:hover:shadow-emerald-900/10 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 relative group cursor-pointer" onClick={() => onSelectExam(exam)}>
             
             {/* ACTION BUTTONS */}
             <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -40,7 +48,43 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
                 </button>
             </div>
 
-            <div className="flex justify-between items-start mb-2"><div className="flex flex-col"><span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>Sedang Berlangsung</span><h3 className="font-bold text-xl text-neutral dark:text-white">{exam.config.subject || exam.code}</h3><p className="text-sm font-mono text-gray-400 dark:text-slate-500 mt-0.5">{exam.code}</p></div></div><div className="flex flex-wrap gap-2 mt-3 mb-5"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />{exam.config.targetClasses && exam.config.targetClasses.length > 0 && <MetaBadge text={exam.config.targetClasses.join(', ')} colorClass="bg-orange-50 text-orange-700 border-orange-100" />}</div><div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Partisipan</span><div className="flex items-center gap-2 mt-1"><div className="flex -space-x-2">{[...Array(Math.min(3, activeCount))].map((_, i) => (<div key={i} className="w-6 h-6 rounded-full bg-emerald-200 dark:bg-emerald-800 border-2 border-white dark:border-slate-700"></div>))}</div><span className="text-sm font-bold text-gray-700 dark:text-slate-300">{activeCount} Siswa</span></div></div><div className="text-right"><span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Sisa Waktu</span><div className="mt-1"><RemainingTime exam={exam} /></div></div></div></div>)})}</div>) : (<div className="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700"><div className="bg-gray-50 dark:bg-slate-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-gray-300 dark:text-slate-500" /></div><h3 className="text-base font-bold text-gray-900 dark:text-white">Tidak Ada Ujian Aktif</h3><p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Saat ini tidak ada ujian yang sedang berlangsung.</p></div>)}
+            <div className="flex justify-between items-start mb-2"><div className="flex flex-col"><span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>Sedang Berlangsung</span><h3 className="font-bold text-xl text-neutral dark:text-white">{exam.config.subject || exam.code}</h3><p className="text-sm font-mono text-gray-400 dark:text-slate-500 mt-0.5">{exam.code}</p></div></div><div className="flex flex-wrap gap-2 mt-3 mb-5"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />{exam.config.targetClasses && exam.config.targetClasses.length > 0 && <MetaBadge text={exam.config.targetClasses.join(', ')} colorClass="bg-orange-50 text-orange-700 border-orange-100" />}</div>            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Total Partisipan</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-lg font-black text-slate-800 dark:text-white">{activeCount}</span>
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Siswa</span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Sisa Waktu</span>
+                        <div className="mt-0.5"><RemainingTime exam={exam} /></div>
+                    </div>
+                </div>
+                
+                {/* Status Counters */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-slate-600/50">
+                    <div className="flex items-center gap-2" title="Locked (Terkunci)">
+                        <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xs font-bold border border-rose-200 dark:border-rose-800 shadow-sm">
+                            {lockedCount}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase hidden sm:inline">Locked</span>
+                    </div>
+                    <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
+                        <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm">
+                            {onlineCount}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase hidden sm:inline">Online</span>
+                    </div>
+                    <div className="flex items-center gap-2" title="Selesai">
+                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold border border-slate-300 dark:border-slate-500 shadow-sm">
+                            {completedCount}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase hidden sm:inline">Selesai</span>
+                    </div>
+                </div>
+            </div></div>)})}</div>) : (<div className="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700"><div className="bg-gray-50 dark:bg-slate-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-gray-300 dark:text-slate-500" /></div><h3 className="text-base font-bold text-gray-900 dark:text-white">Tidak Ada Ujian Aktif</h3><p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Saat ini tidak ada ujian yang sedang berlangsung.</p></div>)}
             
             {/* Modal QR Code Join */}
             {joinQrExam && (
