@@ -89,7 +89,7 @@ const App: React.FC = () => {
       if (res && res.status === 'completed' && !isPreview) {
           if (!exam.config.allowRetakes) {
               setCurrentExam(exam);
-              setCurrentStudent(student);
+              setCurrentStudent({ ...student, resultId: res.id });
               setStudentResult(res);
               setView('STUDENT_RESULT');
               return;
@@ -98,27 +98,33 @@ const App: React.FC = () => {
 
       if (res && res.status === 'force_closed' && !isPreview) {
           setCurrentExam(exam);
-          setCurrentStudent(student);
+          setCurrentStudent({ ...student, resultId: res.id });
           setStudentResult(res);
           setView('STUDENT_RESULT');
           return;
       }
 
-      setCurrentExam(exam);
-      setCurrentStudent(student);
+      // Initialize with potential resultId if resuming
+      let studentWithId = { ...student, resultId: res?.id };
       
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
+        studentWithId = { ...student, resultId: res.id };
       } else if (!isPreview) {
-        await storageService.submitExamResult({
+        // Initial creation
+        const newRes = await storageService.submitExamResult({
           student,
           examCode,
           answers: {},
           status: 'in_progress',
           timestamp: Date.now()
         });
+        // Capture the new ID
+        studentWithId = { ...student, resultId: newRes.id };
       }
       
+      setCurrentExam(exam);
+      setCurrentStudent(studentWithId);
       setView('STUDENT_EXAM');
     } catch (err: any) {
         if (err.message === 'EXAM_IS_DRAFT') {

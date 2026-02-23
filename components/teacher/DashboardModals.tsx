@@ -160,6 +160,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const joinUrl = `${window.location.origin}/?join=${displayExam.code}`;
     const isLargeScale = displayExam.config.disableRealtime;
 
+    const lockedCount = localResults.filter(r => r.status === 'force_closed').length;
+    const onlineCount = localResults.filter(r => r.status === 'in_progress').length;
+    const completedCount = localResults.filter(r => r.status === 'completed').length;
+
     return (
         <>
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
@@ -202,6 +206,28 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </div>
                         </div>
                         
+                        {/* Status Counters */}
+                        <div className="flex items-center gap-6 py-2 border-y border-slate-50 dark:border-slate-700/50">
+                            <div className="flex items-center gap-2" title="Locked (Terkunci)">
+                                <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
+                                    {lockedCount}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
+                            </div>
+                            <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
+                                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
+                                    {onlineCount}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Online</span>
+                            </div>
+                            <div className="flex items-center gap-2" title="Selesai">
+                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold border border-slate-300 dark:border-slate-500">
+                                    {completedCount}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Selesai</span>
+                            </div>
+                        </div>
+
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
                                 <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>

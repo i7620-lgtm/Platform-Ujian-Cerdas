@@ -258,6 +258,15 @@ class StorageService {
       };
   }
 
+  // SECURITY HELPER: Verify role against server data
+  private async _verifyRole(allowedRoles: AccountType[]): Promise<TeacherProfile> {
+      const profile = await this.getCurrentUser();
+      if (!profile || !allowedRoles.includes(profile.accountType)) {
+          throw new Error("Akses Ditolak: Peran pengguna tidak valid atau telah dimodifikasi.");
+      }
+      return profile;
+  }
+
   async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
       const auth = supabase.auth as any;
       const { data: authData, error: authError } = await auth.signUp({ 
@@ -323,6 +332,9 @@ class StorageService {
   // --- USER MANAGEMENT (SUPER ADMIN) ---
   
   async getAllUsers(): Promise<UserProfile[]> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
       const { data: profiles, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
       
@@ -336,6 +348,9 @@ class StorageService {
   }
 
   async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole, school: newSchool })
@@ -347,6 +362,17 @@ class StorageService {
   // --- EXAM METHODS ---
 
   async getExams(profile?: TeacherProfile): Promise<Record<string, Exam>> {
+    // SECURITY CHECK: Verify identity if privileged access is requested
+    // This prevents "Inspect Element" attacks where user modifies local state to 'super_admin'
+    if (profile && (profile.accountType === 'super_admin' || profile.accountType === 'admin_sekolah')) {
+        const verified = await this.getCurrentUser();
+        // If verification fails or role mismatch, force use of verified profile (which might be 'guru' or null)
+        if (!verified || verified.accountType !== profile.accountType) {
+            console.warn("Security Alert: Profile mismatch detected in getExams. Enforcing server-side profile.");
+            profile = verified || undefined;
+        }
+    }
+
     let query = supabase.from('exams').select('*');
 
     if (profile) {
@@ -452,12 +478,19 @@ class StorageService {
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
-    const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
+    // SECURITY FIX: Fetch existing author_id to prevent ownership hijacking
+    const { data: existing } = await supabase.from('exams').select('code, author_id').eq('code', examCode).maybeSingle();
     
-    if (!existing) {
+    let finalAuthorId = exam.authorId;
+
+    if (existing) {
+        // CRITICAL: If exam exists, enforce original ownership.
+        // This prevents admins/users from changing author_id via Inspect Element or payload manipulation.
+        finalAuthorId = existing.author_id;
+    } else {
         const { error: initError } = await supabase.from('exams').insert({
             code: exam.code, 
-            author_id: exam.authorId, 
+            author_id: finalAuthorId, 
             school: exam.authorSchool,
             config: exam.config, 
             questions: [], 
@@ -538,7 +571,7 @@ class StorageService {
     }
 
     const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
+        code: exam.code, author_id: finalAuthorId, school: exam.authorSchool,
         config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
     });
     if (error) throw error;
@@ -748,6 +781,9 @@ class StorageService {
   }
 
   async getAnalyticsData(filters?: { region?: string, subject?: string }): Promise<ExamSummary[]> {
+      // SECURITY: Verify Admin Access
+      await this._verifyRole(['super_admin', 'admin_sekolah']);
+
       let query = supabase.from('exam_summaries').select('*');
       if (filters?.region) query = query.ilike('school_name', `%${filters.region}%`); // Simple proxy for region
       if (filters?.subject) query = query.eq('exam_subject', filters.subject);
@@ -972,24 +1008,63 @@ class StorageService {
     }
 
     try {
-        const { error } = await supabase.from('results').upsert({
-            exam_code: resultPayload.examCode, 
-            student_id: resultPayload.student.studentId, 
-            student_name: resultPayload.student.fullName,
-            class_name: resultPayload.student.class, 
-            answers: resultPayload.answers || {}, // Ensure not null
-            status: resultPayload.status,
-            activity_log: resultPayload.activityLog || [], 
-            score: resultPayload.score || 0, 
-            correct_answers: resultPayload.correctAnswers || 0,
-            total_questions: resultPayload.totalQuestions || 0, 
-            location: resultPayload.location, 
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'exam_code,student_id' });
+        let data, error;
+
+        // CRITICAL FIX: If resultId exists, update by Primary Key ID.
+        // This ensures that if a teacher edits student data (changing student_id),
+        // the student's submission still updates the correct record without reverting the identity changes.
+        if (resultPayload.student.resultId) {
+             const { data: updatedData, error: updateError } = await supabase
+                .from('results')
+                .update({
+                    answers: resultPayload.answers || {},
+                    status: resultPayload.status,
+                    activity_log: resultPayload.activityLog || [],
+                    score: resultPayload.score || 0,
+                    correct_answers: resultPayload.correctAnswers || 0,
+                    total_questions: resultPayload.totalQuestions || 0,
+                    location: resultPayload.location,
+                    updated_at: new Date().toISOString()
+                    // NOTE: We intentionally DO NOT update student_id, student_name, class_name here.
+                    // This allows teacher edits to persist even if the student client has old data.
+                })
+                .eq('id', resultPayload.student.resultId)
+                .select()
+                .single();
+             
+             data = updatedData;
+             error = updateError;
+        } else {
+            // Fallback: Upsert by Composite Key (exam_code, student_id) for initial creation
+            const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
+                exam_code: resultPayload.examCode, 
+                student_id: resultPayload.student.studentId, 
+                student_name: resultPayload.student.fullName,
+                class_name: resultPayload.student.class, 
+                answers: resultPayload.answers || {}, 
+                status: resultPayload.status,
+                activity_log: resultPayload.activityLog || [], 
+                score: resultPayload.score || 0, 
+                correct_answers: resultPayload.correctAnswers || 0,
+                total_questions: resultPayload.totalQuestions || 0, 
+                location: resultPayload.location, 
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'exam_code,student_id' })
+            .select()
+            .single();
+
+            data = upsertData;
+            error = upsertError;
+        }
 
         if (error) throw error;
         
-        return { ...resultPayload, isSynced: true };
+        return { 
+            ...resultPayload, 
+            id: data?.id,
+            student: { ...resultPayload.student, resultId: data?.id },
+            isSynced: true 
+        };
     } catch (error: any) {
         console.error("CRITICAL DB ERROR:", error);
         
@@ -1051,6 +1126,7 @@ class StorageService {
       const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
       if (error || !data) return null;
       return {
+        id: data.id, // Include Primary Key
         student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
         examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
