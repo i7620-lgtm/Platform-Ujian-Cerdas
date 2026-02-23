@@ -1,15 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Exam, Result } from '../../../types';
 import { ClockIcon, QrCodeIcon, ShareIcon, DocumentDuplicateIcon, XMarkIcon } from '../../Icons';
 import { RemainingTime, MetaBadge } from './SharedComponents';
+import { supabase } from '../../../lib/supabase';
 
 export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
     const [joinQrExam, setJoinQrExam] = useState<Exam | null>(null);
+    const [localResults, setLocalResults] = useState<Result[]>(results);
+
+    useEffect(() => {
+        setLocalResults(results);
+    }, [results]);
+
+    useEffect(() => {
+        if (exams.length === 0) return;
+
+        const channels = exams.map(exam => {
+            return supabase.channel(`dashboard-ongoing-${exam.code}`)
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'results', 
+                    filter: `exam_code=eq.${exam.code}` 
+                }, (payload) => {
+                    const newData = payload.new as any;
+                    const oldData = payload.old as any;
+                    const eventType = payload.eventType;
+
+                    setLocalResults(prev => {
+                        if (eventType === 'INSERT') {
+                            const newResult: Result = {
+                                id: newData.id,
+                                student: { 
+                                    studentId: newData.student_id, 
+                                    fullName: newData.student_name, 
+                                    class: newData.class_name, 
+                                    absentNumber: '00' 
+                                },
+                                examCode: newData.exam_code,
+                                answers: newData.answers || {},
+                                score: newData.score,
+                                correctAnswers: newData.correct_answers,
+                                totalQuestions: newData.total_questions,
+                                status: newData.status,
+                                activityLog: newData.activity_log,
+                                timestamp: new Date(newData.updated_at).getTime(),
+                                location: newData.location
+                            };
+                            // Avoid duplicates
+                            if (prev.some(r => r.id === newResult.id)) return prev;
+                            return [...prev, newResult];
+                        } 
+                        else if (eventType === 'UPDATE') {
+                            return prev.map(r => {
+                                if (r.id === newData.id || (r.examCode === newData.exam_code && r.student.studentId === newData.student_id)) {
+                                    return {
+                                        ...r,
+                                        id: newData.id,
+                                        student: { 
+                                            ...r.student,
+                                            studentId: newData.student_id, 
+                                            fullName: newData.student_name, 
+                                            class: newData.class_name
+                                        },
+                                        answers: newData.answers || {},
+                                        score: newData.score,
+                                        correctAnswers: newData.correct_answers,
+                                        totalQuestions: newData.total_questions,
+                                        status: newData.status,
+                                        activityLog: newData.activity_log,
+                                        timestamp: new Date(newData.updated_at).getTime(),
+                                        location: newData.location
+                                    };
+                                }
+                                return r;
+                            });
+                        } 
+                        else if (eventType === 'DELETE') {
+                            return prev.filter(r => r.id !== oldData.id);
+                        }
+                        return prev;
+                    });
+                })
+                .subscribe();
+        });
+
+        return () => {
+            channels.forEach(c => supabase.removeChannel(c));
+        };
+    }, [exams]);
 
     return (
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500 dark:text-slate-400">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
             {exams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">{exams.map(exam => { 
-                const examResults = results.filter(r => r.examCode === exam.code);
+                const examResults = localResults.filter(r => r.examCode === exam.code);
                 const activeCount = examResults.length;
                 
                 const lockedCount = examResults.filter(r => r.status === 'force_closed').length;
