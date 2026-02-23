@@ -244,7 +244,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     
     const ongoingExams = publishedExams.filter((exam) => {
         const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const start = new Date(`${dateStr}T${config.startTime}`);
+        const start = new Date(`${dateStr}T${exam.config.startTime}`);
         const end = new Date(start.getTime() + exam.config.timeLimit * 60 * 1000);
         return now >= start && now <= end;
     });
