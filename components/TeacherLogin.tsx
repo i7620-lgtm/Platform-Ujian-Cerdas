@@ -68,7 +68,12 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     try {
         await storageService.signInWithGoogle();
     } catch (e: any) {
-        setError(e.message || 'Gagal login dengan Google.');
+        console.error("Google Login Error:", e);
+        if (e.message?.includes('provider is not enabled') || JSON.stringify(e).includes('provider is not enabled')) {
+            setError('Login Google belum diaktifkan di server. Harap hubungi Admin untuk mengaktifkan Provider Google di Supabase.');
+        } else {
+            setError(e.message || 'Gagal login dengan Google.');
+        }
         setIsLoading(false);
     }
   };
