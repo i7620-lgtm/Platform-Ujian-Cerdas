@@ -478,12 +478,19 @@ class StorageService {
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
-    const { data: existing } = await supabase.from('exams').select('code').eq('code', examCode).maybeSingle();
+    // SECURITY FIX: Fetch existing author_id to prevent ownership hijacking
+    const { data: existing } = await supabase.from('exams').select('code, author_id').eq('code', examCode).maybeSingle();
     
-    if (!existing) {
+    let finalAuthorId = exam.authorId;
+
+    if (existing) {
+        // CRITICAL: If exam exists, enforce original ownership.
+        // This prevents admins/users from changing author_id via Inspect Element or payload manipulation.
+        finalAuthorId = existing.author_id;
+    } else {
         const { error: initError } = await supabase.from('exams').insert({
             code: exam.code, 
-            author_id: exam.authorId, 
+            author_id: finalAuthorId, 
             school: exam.authorSchool,
             config: exam.config, 
             questions: [], 
@@ -564,7 +571,7 @@ class StorageService {
     }
 
     const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: exam.authorId, school: exam.authorSchool,
+        code: exam.code, author_id: finalAuthorId, school: exam.authorSchool,
         config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
     });
     if (error) throw error;
