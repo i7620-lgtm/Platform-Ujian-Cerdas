@@ -315,17 +315,6 @@ class StorageService {
       return profile;
   }
 
-  async signInWithGoogle(): Promise<void> {
-      const auth = supabase.auth as any;
-      const { error } = await auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-              redirectTo: window.location.origin
-          }
-      });
-      if (error) throw error;
-  }
-
   async signOut() {
       const auth = supabase.auth as any;
       await auth.signOut();
