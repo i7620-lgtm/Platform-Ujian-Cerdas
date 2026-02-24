@@ -646,57 +646,30 @@ class StorageService {
       };
       const jsonString = JSON.stringify(archivePayload, null, 2);
 
-      // 4. Calculate Statistics
+      // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summary = this.calculateExamStatistics(fatExam, examResults);
       
-      let backupUrl: string | undefined;
-      let archivePath: string | undefined;
-
-      // 5. ATTEMPT CLOUD UPLOAD FIRST
-      try {
-          archivePath = await this.uploadArchive(exam.code, jsonString, {
-              school: exam.authorSchool,
-              subject: exam.config.subject,
-              classLevel: exam.config.classLevel,
-              examType: exam.config.examType,
-              targetClasses: exam.config.targetClasses,
-              date: exam.config.date,
-              authorId: exam.authorId // Preserve original author ID
-          });
-      } catch (cloudError: any) {
-          console.error("Cloud upload failed:", cloudError);
-          // FALLBACK: Generate Blob URL for local download
-          const blob = new Blob([jsonString], { type: "application/json" });
-          backupUrl = URL.createObjectURL(blob);
-      }
-
-      // 6. Insert Summary into SQL (Transaction Step 2)
-      // We include the archive_path if upload succeeded.
-      // Use upsert to handle retries if summary already exists.
-      const summaryPayload = {
-          ...summary,
-          archive_path: archivePath
-      };
-
-      const { error: summaryError } = await supabase.from('exam_summaries').upsert(summaryPayload, { onConflict: 'exam_code' });
+      // 5. Insert Summary into SQL (Transaction Step 2)
+      // If this fails, we abort.
+      const { error: summaryError } = await supabase.from('exam_summaries').insert(summary);
       if (summaryError) {
           console.error("Summary Insert Failed:", summaryError);
           throw new Error("Gagal menyimpan ringkasan statistik. Arsip dibatalkan.");
       }
 
-      // 7. CLEANUP (Only if upload success)
-      if (archivePath) {
-          try {
-              await this.cleanupExamAssets(exam.code);
-              await this.deleteExam(exam.code);
-          } catch (cleanupError) {
-              console.warn("Cleanup failed but archive succeeded:", cleanupError);
-              // We don't throw here because the archive is safe.
-          }
-      }
+      let backupUrl: string | undefined;
 
-      return { backupUrl };
-  }
+      // 6. ATTEMPT CLOUD UPLOAD (Transaction Step 3)
+      try {
+          await this.uploadArchive(exam.code, jsonString, {
+              school: exam.authorSchool,
+              subject: exam.config.subject,
+              classLevel: exam.config.classLevel,
+              examType: exam.config.examType,
+              targetClasses: exam.config.targetClasses,
+              date: exam.config.date
+          });
+          // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
           await this.deleteExam(exam.code);
       } catch (cloudError: any) {
