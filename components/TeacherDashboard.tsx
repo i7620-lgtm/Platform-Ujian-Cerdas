@@ -171,6 +171,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // ARCHIVE & EXCEL LOGIC (Refactored to use Transaction Safe Service)
     const handleArchiveExam = async (exam: Exam) => {
+        if (exam.authorId !== teacherProfile.id) {
+            alert("Akses Ditolak: Hanya guru pembuat soal asli yang dapat melakukan finalisasi dan arsip ke penyimpanan cloud.");
+            return;
+        }
+
         setIsLoadingArchive(true);
         try {
             // --- VALIDATION FOR ESSAY GRADING ---
