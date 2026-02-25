@@ -86,8 +86,8 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
                             value={role}
                             onChange={e => setRole(e.target.value as any)}
                         >
-                            <option value="viewer">Viewer</option>
-                            <option value="editor">Editor</option>
+                            <option value="viewer">Pengawas (Live Monitor)</option>
+                            <option value="editor">Editor (Edit Soal)</option>
                         </select>
                         <button 
                             onClick={handleAdd}
@@ -112,7 +112,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
                                             <div>
                                                 <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{c.label}</p>
                                                 <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${c.role === 'editor' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                    {c.role}
+                                                    {c.role === 'editor' ? 'Editor' : 'Pengawas'}
                                                 </span>
                                             </div>
                                         </div>
@@ -148,4 +148,3 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
         </div>
     );
 };
- 
