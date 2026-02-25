@@ -338,7 +338,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 )}
                 {view === 'DRAFTS' && <DraftsView exams={draftExams} onContinueDraft={continueDraft} onDeleteDraft={handleDeleteExam} />}
                 {view === 'ONGOING' && <OngoingExamsView exams={ongoingExams} results={results} onSelectExam={setSelectedOngoingExam} onDuplicateExam={handleDuplicateExam} />}
-                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={organizerName} schoolName={teacherProfile.school} />}
+                {view === 'UPCOMING_EXAMS' && <UpcomingExamsView exams={upcomingExams} onEditExam={openEditModal} teacherName={organizerName} schoolName={teacherProfile.school} onRefresh={onRefreshExams} />}
                 {view === 'FINISHED_EXAMS' && (
                     <FinishedExamsView 
                         exams={finishedExams} 
