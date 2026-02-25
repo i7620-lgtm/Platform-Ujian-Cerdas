@@ -10,11 +10,12 @@ import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
+import { CollaboratorView } from './components/CollaboratorView';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' } | null>(null);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -138,6 +140,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // COLLABORATOR CHECK
+    const collabCode = params.get('collab_code');
+    const collabToken = params.get('collab_token');
+    
+    if (collabCode && collabToken) {
+        setIsSyncing(true);
+        storageService.getExamByCollaboratorToken(collabCode, collabToken)
+            .then(data => {
+                if (data) {
+                    setCollaboratorData(data);
+                    setView('COLLABORATOR_MODE');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    alert("Link kolaborator tidak valid atau kadaluarsa.");
+                    window.history.replaceState({}, '', '/');
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                alert("Gagal memuat sesi kolaborator.");
+                window.history.replaceState({}, '', '/');
+            })
+            .finally(() => setIsSyncing(false));
+        return;
+    }
+
     const previewCode = params.get('preview');
     if (previewCode) {
         const dummyStudent: Student = {
@@ -293,6 +322,7 @@ const App: React.FC = () => {
     setResumedResult(null);
     setTeacherProfile(null);
     setPrefillCode('');
+    setCollaboratorData(null);
     // FIX: Clear shared state to prevent data leakage/ghosting between sessions
     setExams({});
     setResults([]);
@@ -523,6 +553,16 @@ const App: React.FC = () => {
                 exam={waitingExam}
                 schoolName={waitingExam.authorSchool}
                 // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
+            />
+        )}
+
+        {view === 'COLLABORATOR_MODE' && collaboratorData && (
+            <CollaboratorView 
+                exam={collaboratorData.exam}
+                role={collaboratorData.role}
+                onExit={resetToHome}
+                isDarkMode={darkMode}
+                toggleTheme={toggleTheme}
             />
         )}
 

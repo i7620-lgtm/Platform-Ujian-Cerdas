@@ -1,19 +1,22 @@
-
+ 
 import React, { useState } from 'react';
 import type { Exam } from '../../../types';
-import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon } from '../../Icons';
+import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon } from '../../Icons';
 import { MetaBadge } from './SharedComponents';
 import { InvitationModal } from '../../InvitationModal';
+import { CollaboratorModal } from '../CollaboratorModal';
 
 interface UpcomingExamsViewProps {
     exams: Exam[];
     onEditExam: (exam: Exam) => void;
     teacherName?: string;
     schoolName?: string;
+    onRefresh?: () => void;
 }
 
-export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, teacherName, schoolName }) => {
+export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, teacherName, schoolName, onRefresh }) => {
     const [selectedInviteExam, setSelectedInviteExam] = useState<Exam | null>(null);
+    const [selectedCollaboratorExam, setSelectedCollaboratorExam] = useState<Exam | null>(null);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -56,7 +59,15 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                 </div>
                             </div>
                             
-                            <div className="flex gap-2 self-end md:self-center w-full md:w-auto">
+                            <div className="flex gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
+                                <button 
+                                    onClick={() => setSelectedCollaboratorExam(exam)}
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 text-sm rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all font-bold shadow-sm border border-emerald-100 dark:border-emerald-800"
+                                    title="Kelola Kolaborator"
+                                >
+                                    <UserIcon className="w-4 h-4" /> 
+                                    <span className="hidden lg:inline">Tim</span>
+                                </button>
                                 <button 
                                     onClick={() => setSelectedInviteExam(exam)}
                                     className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-5 py-2.5 text-sm rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-bold shadow-sm border border-indigo-100 dark:border-indigo-800"
@@ -93,6 +104,17 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                 teacherName={teacherName}
                 schoolName={schoolName}
             />
+
+            {/* Modal Kolaborator */}
+            {selectedCollaboratorExam && (
+                <CollaboratorModal
+                    exam={exams.find(e => e.code === selectedCollaboratorExam.code) || selectedCollaboratorExam}
+                    onClose={() => setSelectedCollaboratorExam(null)}
+                    onUpdate={() => {
+                        if (onRefresh) onRefresh();
+                    }}
+                />
+            )}
         </div>
     );
 };

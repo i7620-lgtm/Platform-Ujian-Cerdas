@@ -1303,6 +1303,91 @@ class StorageService {
       const { error } = await supabase.storage.from('archives').remove([filename]);
       if (error) throw error;
   }
+  // --- COLLABORATOR METHODS ---
+
+  async addCollaborator(examCode: string, label: string, role: 'editor' | 'viewer'): Promise<string> {
+      // Fetch raw to avoid status checks
+      const { data, error } = await supabase
+          .from('exams')
+          .select('config')
+          .eq('code', examCode)
+          .single();
+          
+      if (error || !data) throw new Error("Exam not found");
+
+      const config = data.config as ExamConfig;
+      const token = crypto.randomUUID();
+      const newCollaborator = {
+          token,
+          label,
+          role,
+          createdAt: Date.now()
+      };
+
+      const currentCollaborators = config.collaborators || [];
+      const updatedCollaborators = [...currentCollaborators, newCollaborator];
+      
+      const updatedConfig = { ...config, collaborators: updatedCollaborators };
+      
+      const { error: updateError } = await supabase
+          .from('exams')
+          .update({ config: updatedConfig })
+          .eq('code', examCode);
+
+      if (updateError) throw updateError;
+      return token;
+  }
+
+  async removeCollaborator(examCode: string, token: string): Promise<void> {
+      const { data, error } = await supabase
+          .from('exams')
+          .select('config')
+          .eq('code', examCode)
+          .single();
+          
+      if (error || !data) throw new Error("Exam not found");
+
+      const config = data.config as ExamConfig;
+      const currentCollaborators = config.collaborators || [];
+      const updatedCollaborators = currentCollaborators.filter(c => c.token !== token);
+      
+      const updatedConfig = { ...config, collaborators: updatedCollaborators };
+      
+      const { error: updateError } = await supabase
+          .from('exams')
+          .update({ config: updatedConfig })
+          .eq('code', examCode);
+
+      if (updateError) throw updateError;
+  }
+
+  async getExamByCollaboratorToken(code: string, token: string): Promise<{ exam: Exam, role: 'editor' | 'viewer' } | null> {
+      const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('code', code)
+          .maybeSingle();
+
+      if (error || !data) return null;
+
+      const config = data.config as ExamConfig;
+      const collaborators = config.collaborators || [];
+      const collaborator = collaborators.find(c => c.token === token);
+
+      if (!collaborator) return null;
+
+      const exam: Exam = {
+          code: data.code,
+          authorId: data.author_id,
+          authorName: 'Pengajar Utama',
+          authorSchool: data.school,
+          config: data.config,
+          questions: data.questions,
+          status: data.status
+      };
+
+      return { exam, role: collaborator.role };
+  }
 }
 
 export const storageService = new StorageService();

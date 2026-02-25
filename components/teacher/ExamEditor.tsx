@@ -205,7 +205,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleAddClassTag = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && classTagInput.trim()) {
             e.preventDefault();
-            const newTag = classTagInput.trim();
+            let newTag = classTagInput.trim();
+            
+            // Check if input matches "Class Count" pattern (e.g. "6a 40")
+            const spaceMatch = newTag.match(/^(.+)\s+(\d+)$/);
+            if (spaceMatch) {
+                newTag = `${spaceMatch[1]}(${spaceMatch[2]})`;
+            }
+
             if (!config.targetClasses?.includes(newTag)) {
                 setConfig(prev => ({
                     ...prev,
@@ -601,10 +608,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     onChange={(e) => setClassTagInput(e.target.value)}
                                     onKeyDown={handleAddClassTag}
                                     className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-400 min-w-[150px]"
-                                    placeholder="Ketik nama kelas lalu tekan Enter..."
+                                    placeholder="Ketik kelas (contoh: 6A) atau kelas & jumlah (contoh: 6A 40)..."
                                 />
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Jika diisi, siswa wajib memilih dari daftar kelas ini pada halaman login (mencegah salah format).</p>
+                            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Biarkan kosong agar siswa bebas mengisi kelas. Ketik "6A" untuk membatasi kelas, atau "6A 40" untuk membatasi kelas dan jumlah siswa (otomatis menjadi "6A(40)").</p>
                         </div>
 
                          <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Instruksi Pengerjaan</label><textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner text-slate-800 dark:text-slate-200" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." /></div>
