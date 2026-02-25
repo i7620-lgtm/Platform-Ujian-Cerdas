@@ -48,6 +48,7 @@ export interface ExamConfig {
   targetClasses?: string[]; 
   examType: string;
   description: string;
+  collaborators?: Collaborator[]; // Moved here for JSONB persistence
 }
 
 export interface Exam {
@@ -60,6 +61,13 @@ export interface Exam {
   isSynced?: boolean; 
   createdAt?: string; 
   status?: 'DRAFT' | 'PUBLISHED'; 
+}
+
+export interface Collaborator {
+    token: string;
+    label: string; // e.g. "Pak Budi"
+    role: 'editor' | 'viewer';
+    createdAt: number;
 }
 
 export interface Student {
@@ -88,7 +96,7 @@ export interface Result {
     location?: string; 
 }
 
-export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru';
+export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru' | 'collaborator';
 
 export interface TeacherProfile {
     id: string; 
