@@ -12,6 +12,18 @@ interface StudentLoginProps {
   initialCode?: string;
 }
 
+// Helper to parse "ClassName(Limit)" format
+const parseClassConfig = (classString: string) => {
+    const match = classString.match(/^(.+?)(?:\((\d+)\))?$/);
+    if (match) {
+        return {
+            name: match[1].trim(),
+            limit: match[2] ? parseInt(match[2], 10) : null
+        };
+    }
+    return { name: classString, limit: null };
+};
+
 export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme, initialCode }) => {
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +40,9 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [isFocused, setIsFocused] = useState<string | null>(null);
   const examCodeInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Derived state for absent limit
+  const { limit: absentLimit } = parseClassConfig(studentClass);
 
   // Auto-fetch config when code changes to determine if dropdown should be used
   useEffect(() => {
@@ -100,15 +115,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     localStorage.setItem('saved_student_class', studentClass.trim());
     localStorage.setItem('saved_student_absent', absentNumber.trim());
     
+    // Parse class name (remove limit if present) for ID and Data
+    const { name: cleanClassName } = parseClassConfig(studentClass);
+
     // COMPOSITE ID NORMALIZATION (FIXED: Removing Name from ID)
     // ID hanya bergantung pada Kelas dan No Absen agar unik per kursi
-    const normClass = normalizeId(studentClass);
+    const normClass = normalizeId(cleanClassName);
     const normAbsent = normalizeId(absentNumber);
     const compositeId = `${normClass}-${normAbsent}`;
     
     const studentData: Student = {
         fullName: fullName.trim(), // Keep original for result sheet
-        class: studentClass.trim(),
+        class: cleanClassName,
         absentNumber: absentNumber.trim(),
         studentId: compositeId // This is the PK-safe ID
     };
@@ -160,8 +178,12 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   const handleUnlockAndResume = async (token: string) => {
       const cleanExamCode = examCode.toUpperCase().trim();
+      
+      // Parse class name (remove limit if present)
+      const { name: cleanClassName } = parseClassConfig(studentClass);
+
       // ID Fix: Konsisten dengan handleSubmit, tanpa nama
-      const normClass = normalizeId(studentClass);
+      const normClass = normalizeId(cleanClassName);
       const normAbsent = normalizeId(absentNumber);
       const compositeId = `${normClass}-${normAbsent}`;
       
@@ -170,7 +192,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
           if (verified) {
              const studentData: Student = {
                 fullName: fullName.trim(),
-                class: studentClass.trim(),
+                class: cleanClassName,
                 absentNumber: absentNumber.trim(),
                 studentId: compositeId
              };
@@ -284,7 +306,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                                 required
                                             >
                                                 <option value="" disabled className="dark:bg-slate-900">Pilih...</option>
-                                                {availableClasses.map(c => <option key={c} value={c} className="dark:bg-slate-900">{c}</option>)}
+                                                {availableClasses.map(c => {
+                                                    const { name } = parseClassConfig(c);
+                                                    return <option key={c} value={c} className="dark:bg-slate-900">{name}</option>;
+                                                })}
                                             </select>
                                             <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
                                                 <ChevronDownIcon className="w-4 h-4"/>
@@ -308,16 +333,37 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                              <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'absent' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">No. Absen</label>
-                                    <input
-                                        type="text"
-                                        value={absentNumber}
-                                        onChange={(e) => setAbsentNumber(e.target.value)}
-                                        onFocus={() => setIsFocused('absent')}
-                                        onBlur={() => setIsFocused(null)}
-                                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-center"
-                                        placeholder="00"
-                                        required
-                                    />
+                                    {absentLimit && absentLimit > 0 ? (
+                                        <div className="relative group">
+                                            <select
+                                                value={absentNumber}
+                                                onChange={(e) => setAbsentNumber(e.target.value)}
+                                                onFocus={() => setIsFocused('absent')}
+                                                onBlur={() => setIsFocused(null)}
+                                                className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-center"
+                                                required
+                                            >
+                                                <option value="" disabled className="dark:bg-slate-900">No...</option>
+                                                {Array.from({ length: absentLimit }, (_, i) => i + 1).map(num => (
+                                                    <option key={num} value={num.toString()} className="dark:bg-slate-900">{num}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
+                                                <ChevronDownIcon className="w-4 h-4"/>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={absentNumber}
+                                            onChange={(e) => setAbsentNumber(e.target.value)}
+                                            onFocus={() => setIsFocused('absent')}
+                                            onBlur={() => setIsFocused(null)}
+                                            className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-center"
+                                            placeholder="00"
+                                            required
+                                        />
+                                    )}
                                 </div>
                             </div>
                         </div>
