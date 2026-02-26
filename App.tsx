@@ -85,6 +85,23 @@ const App: React.FC = () => {
         alert("Kode Ujian tidak ditemukan atau belum dipublikasikan."); 
         return; 
       }
+
+      // FIX: Check schedule before allowing entry (Manual Login)
+      if (!isPreview) {
+          const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+          // ROBUST DATE PARSING
+          const [y, m, d] = dateStr.split('-').map(Number);
+          const [h, min] = exam.config.startTime.split(':').map(Number);
+          
+          const startTime = new Date(y, m - 1, d, h, min, 0); 
+          const now = new Date();
+
+          if (!isNaN(startTime.getTime()) && now < startTime) {
+              setWaitingExam(exam);
+              setView('WAITING_ROOM');
+              return;
+          }
+      }
       
       const res = await storageService.getStudentResult(examCode, student.studentId);
       
