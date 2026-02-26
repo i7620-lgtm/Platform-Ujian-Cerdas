@@ -121,18 +121,23 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
                             <div className="space-y-2">
                                 {q.options.map((opt, i) => {
-                                    const count = distribution.counts[opt] || 0;
+                                    // FIX: Sum counts of all answers that match this option (normalized)
+                                    const count = Object.entries(distribution.counts).reduce((acc, [ans, c]) => {
+                                        return normalize(ans) === normalize(opt) ? acc + c : acc;
+                                    }, 0);
+                                    
                                     const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
                                     const isCorrect = opt === q.correctAnswer;
                                     
                                     return (
                                         <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800' : count > 0 ? 'bg-slate-50 dark:bg-slate-700/50' : ''}`}>
-                                            <div className="flex items-center gap-2 z-10 w-full">
-                                                <span className={`w-5 h-5 flex items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300'}`}>
+                                            <div className="flex items-center gap-2 z-10 w-full overflow-hidden">
+                                                <span className={`w-5 h-5 flex shrink-0 items-center justify-center rounded font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300'}`}>
                                                     {String.fromCharCode(65+i)}
                                                 </span>
-                                                <div className="flex-1 truncate [&_p]:inline [&_br]:hidden dark:text-slate-300 option-content" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                <span className="font-bold text-slate-600 dark:text-slate-300">{count} Siswa ({percentage}%)</span>
+                                                {/* FIX: Removed truncate, added max-w-full and image styling */}
+                                                <div className="flex-1 min-w-0 [&_p]:inline [&_br]:hidden dark:text-slate-300 option-content [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                <span className="font-bold text-slate-600 dark:text-slate-300 shrink-0 ml-2">{count} Siswa ({percentage}%)</span>
                                             </div>
                                             <div className={`absolute top-0 left-0 h-full rounded-lg opacity-10 ${isCorrect ? 'bg-emerald-500' : 'bg-slate-500'}`} style={{ width: `${percentage}%` }}></div>
                                         </div>
@@ -178,7 +183,8 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                                             <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 dark:border-slate-700 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 p-1 rounded -mx-1 border-emerald-100 dark:border-emerald-800' : 'text-slate-600 dark:text-slate-300'}`}>
                                                 <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                                                     {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
-                                                    <div className={`truncate italic ${isCorrect ? 'text-emerald-700 dark:text-emerald-400 font-medium' : ''} [&_p]:inline [&_br]:hidden option-content`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                    {/* FIX: Removed truncate, added image styling */}
+                                                    <div className={`italic ${isCorrect ? 'text-emerald-700 dark:text-emerald-400 font-medium' : ''} [&_p]:inline [&_br]:hidden option-content [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                 </div>
                                                 <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{count} Siswa</span>
                                             </li>

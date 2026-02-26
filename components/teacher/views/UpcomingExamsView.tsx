@@ -1,7 +1,7 @@
  
 import React, { useState } from 'react';
 import type { Exam } from '../../../types';
-import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon } from '../../Icons';
+import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon, DocumentDuplicateIcon } from '../../Icons';
 import { MetaBadge } from './SharedComponents';
 import { InvitationModal } from '../../InvitationModal';
 import { CollaboratorModal } from '../CollaboratorModal';
@@ -9,12 +9,13 @@ import { CollaboratorModal } from '../CollaboratorModal';
 interface UpcomingExamsViewProps {
     exams: Exam[];
     onEditExam: (exam: Exam) => void;
+    onDuplicateExam: (exam: Exam) => void;
     teacherName?: string;
     schoolName?: string;
     onRefresh?: () => void;
 }
 
-export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, teacherName, schoolName, onRefresh }) => {
+export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, onDuplicateExam, teacherName, schoolName, onRefresh }) => {
     const [selectedInviteExam, setSelectedInviteExam] = useState<Exam | null>(null);
     const [selectedCollaboratorExam, setSelectedCollaboratorExam] = useState<Exam | null>(null);
 
@@ -61,12 +62,20 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                             
                             <div className="flex gap-2 self-end md:self-center w-full md:w-auto flex-wrap">
                                 <button 
+                                    onClick={() => onDuplicateExam(exam)} 
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-slate-400 px-5 py-2.5 text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-primary dark:hover:text-white transition-all font-bold shadow-sm border border-gray-200 dark:border-slate-600"
+                                    title="Duplikasi Soal"
+                                >
+                                    <DocumentDuplicateIcon className="w-4 h-4" /> 
+                                    <span className="hidden lg:inline">Duplikasi</span>
+                                </button>
+                                <button 
                                     onClick={() => setSelectedCollaboratorExam(exam)}
                                     className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 text-sm rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all font-bold shadow-sm border border-emerald-100 dark:border-emerald-800"
                                     title="Kelola Kolaborator"
                                 >
                                     <UserIcon className="w-4 h-4" /> 
-                                    <span className="hidden lg:inline">Tim</span>
+                                    <span className="hidden lg:inline">Kolaborator</span>
                                 </button>
                                 <button 
                                     onClick={() => setSelectedInviteExam(exam)}
