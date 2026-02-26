@@ -26,6 +26,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [fixMessage, setFixMessage] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
+    const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: any}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
@@ -82,6 +83,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         setArchiveData(data);
                         setActiveTab('DETAIL');
                         setSourceType('LOCAL');
+                        setSelectedClass('ALL');
                     } else {
                         setError('File JSON tidak valid atau bukan format arsip lengkap.');
                     }
@@ -104,6 +106,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 setArchiveData(data);
                 setActiveTab('DETAIL');
                 setSourceType('CLOUD');
+                setSelectedClass('ALL');
             } else {
                 setError("Data arsip cloud rusak.");
             }
@@ -357,6 +360,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             return getAbs(a.student.studentId) - getAbs(b.student.studentId);
         });
     }, [archiveData]);
+
+    const uniqueClasses = useMemo(() => {
+        if (!archiveData) return [];
+        const classes = new Set(archiveData.results.map(r => r.student.class));
+        return Array.from(classes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [archiveData]);
+
+    const filteredResults = useMemo(() => {
+        if (selectedClass === 'ALL') return sortedResults;
+        return sortedResults.filter(r => r.student.class === selectedClass);
+    }, [sortedResults, selectedClass]);
 
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
@@ -674,6 +688,26 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
                 {activeTab === 'STUDENTS' && (
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        {uniqueClasses.length > 1 && (
+                            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-500 uppercase">Filter Kelas:</span>
+                                    <select 
+                                        value={selectedClass} 
+                                        onChange={(e) => setSelectedClass(e.target.value)}
+                                        className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                    >
+                                        <option value="ALL">Semua Kelas ({sortedResults.length})</option>
+                                        {uniqueClasses.map(c => (
+                                            <option key={c} value={c}>{c} ({sortedResults.filter(r => r.student.class === c).length})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="text-xs font-bold text-slate-400">
+                                    Menampilkan {filteredResults.length} Siswa
+                                </div>
+                            </div>
+                        )}
                          <table className="w-full text-left">
                             <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                                 <tr>
@@ -685,7 +719,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {sortedResults.map(r => {
+                                {filteredResults.map(r => {
                                     const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
                                     return (
                                     <React.Fragment key={r.student.studentId}>
@@ -892,9 +926,56 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 2. REKAPITULASI HASIL */}
+                {/* 2. ANALISIS PER KELAS (NEW) */}
+                {uniqueClasses.length > 0 && (
+                    <div className="mb-8 avoid-break">
+                        <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2. Analisis Per Kelas</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            {uniqueClasses.map(className => {
+                                const classResults = sortedResults.filter(r => r.student.class === className);
+                                const classTotal = classResults.length;
+                                const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
+                                const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
+                                const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
+                                const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
+                                const passedCount = classScores.filter(s => s >= 75).length; 
+
+                                return (
+                                    <div key={className} className="border border-slate-300 rounded p-3 bg-white avoid-break">
+                                        <div className="flex justify-between items-center mb-2 border-b border-slate-100 pb-2">
+                                            <h4 className="font-black text-sm uppercase">Kelas {className}</h4>
+                                            <span className="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{classTotal} Siswa</span>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                                            <div>
+                                                <span className="block text-slate-500 uppercase text-[8px]">Rata-rata</span>
+                                                <span className="font-bold text-sm">{classAvg}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-slate-500 uppercase text-[8px]">Tertinggi</span>
+                                                <span className="font-bold text-sm text-emerald-600">{classMax}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-slate-500 uppercase text-[8px]">Terendah</span>
+                                                <span className="font-bold text-sm text-rose-600">{classMin}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-slate-500 uppercase text-[8px]">Tuntas</span>
+                                                <span className="font-bold text-sm text-blue-600">{passedCount} ({Math.round((passedCount/classTotal)*100)}%)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                <div className="page-break"></div>
+
+                {/* 3. REKAPITULASI HASIL */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2. Rekapitulasi Hasil</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">3. Rekapitulasi Hasil</h3>
                     <table className="w-full border-collapse border border-slate-300 text-[9px]">
                         <thead>
                             <tr className="bg-slate-100">
@@ -939,9 +1020,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 3. ANALISIS INDIVIDU (NEW) */}
+                {/* 4. ANALISIS INDIVIDU (NEW) */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">3. Analisis Individu</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">4. Analisis Individu</h3>
                     <table className="w-full border-collapse border border-slate-300 text-[9px]">
                         <thead>
                             <tr className="bg-slate-100">
@@ -989,9 +1070,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 4. ANALISIS BUTIR SOAL */}
+                {/* 5. ANALISIS BUTIR SOAL */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">4. Analisis Butir Soal</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">5. Analisis Butir Soal</h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                         {questionAnalysisData.map((data, idx) => {
@@ -1110,9 +1191,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 </div>
                 <div className="page-break"></div>
 
-                {/* 5. BANK SOAL & KUNCI JAWABAN */}
+                {/* 6. BANK SOAL & KUNCI JAWABAN */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">5. Bank Soal & Kunci Jawaban</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">6. Bank Soal & Kunci Jawaban</h3>
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
