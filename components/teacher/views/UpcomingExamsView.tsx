@@ -1,4 +1,4 @@
- 
+
 import React, { useState } from 'react';
 import type { Exam } from '../../../types';
 import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon } from '../../Icons';
@@ -66,7 +66,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                     title="Kelola Kolaborator"
                                 >
                                     <UserIcon className="w-4 h-4" /> 
-                                    <span className="hidden lg:inline">Tim</span>
+                                    <span className="hidden lg:inline">Kolaborator</span>
                                 </button>
                                 <button 
                                     onClick={() => setSelectedInviteExam(exam)}
