@@ -561,6 +561,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
+    const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [fixMessage, setFixMessage] = useState('');
 
@@ -595,6 +596,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
     useEffect(() => {
         fetchData();
+        setSelectedClass('ALL');
     }, [exam, teacherProfile]);
 
     const handleDeleteResult = async (studentId: string, studentName: string) => {
@@ -692,6 +694,16 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const averageScore = totalStudents > 0 ? Math.round(calculatedResults.reduce((acc, s) => acc + s, 0) / totalStudents) : 0;
     const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
+
+    const uniqueClasses = useMemo(() => {
+        const classes = new Set(results.map(r => r.student.class));
+        return Array.from(classes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [results]);
+
+    const filteredResults = useMemo(() => {
+        if (selectedClass === 'ALL') return results;
+        return results.filter(r => r.student.class === selectedClass);
+    }, [results, selectedClass]);
 
     // --- NEW: CATEGORY & LEVEL ANALYSIS ---
     const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(exam, results), [exam, results]);
@@ -862,6 +874,26 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                             </div>
                         ) : (
                             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                                {uniqueClasses.length > 1 && (
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">Filter Kelas:</span>
+                                            <select 
+                                                value={selectedClass} 
+                                                onChange={(e) => setSelectedClass(e.target.value)}
+                                                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                            >
+                                                <option value="ALL">Semua Kelas ({results.length})</option>
+                                                {uniqueClasses.map(c => (
+                                                    <option key={c} value={c}>{c} ({results.filter(r => r.student.class === c).length})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-400">
+                                            Menampilkan {filteredResults.length} Siswa
+                                        </div>
+                                    </div>
+                                )}
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                                         <tr>
@@ -875,7 +907,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
-                                        {results.map(r => {
+                                        {filteredResults.map(r => {
                                             const { correct, wrong, empty, score } = getCalculatedStats(r);
                                             return (
                                                 <React.Fragment key={r.student.studentId}>
