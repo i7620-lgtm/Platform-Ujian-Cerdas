@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import type { Exam, Result } from '../../../types';
-import { ClockIcon, QrCodeIcon, ShareIcon, DocumentDuplicateIcon, XMarkIcon } from '../../Icons';
+import { ClockIcon, QrCodeIcon, ShareIcon, DocumentDuplicateIcon, XMarkIcon, UserIcon } from '../../Icons';
 import { RemainingTime, MetaBadge } from './SharedComponents';
+import { CollaboratorModal } from '../CollaboratorModal';
 
-export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSelectExam: (exam: Exam) => void; onDuplicateExam: (exam: Exam) => void; }> = ({ exams, results, onSelectExam, onDuplicateExam }) => {
+export const OngoingExamsView: React.FC<{ 
+    exams: Exam[]; 
+    results: Result[]; 
+    onSelectExam: (exam: Exam) => void; 
+    onDuplicateExam: (exam: Exam) => void;
+    onRefresh?: () => void;
+}> = ({ exams, results, onSelectExam, onDuplicateExam, onRefresh }) => {
     const [joinQrExam, setJoinQrExam] = useState<Exam | null>(null);
+    const [collabExam, setCollabExam] = useState<Exam | null>(null);
 
     return (
         <div className="space-y-6 animate-fade-in"><div className="flex items-center gap-2"><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><ClockIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" /></div><div><h2 className="text-2xl font-bold text-neutral dark:text-white">Ujian Sedang Berlangsung</h2><p className="text-sm text-gray-500 dark:text-slate-400">Pantau kemajuan ujian yang sedang berjalan secara real-time.</p></div></div>
@@ -19,6 +27,14 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
                     title="QR Code Gabung Siswa"
                 >
                     <QrCodeIcon className="w-4 h-4" />
+                </button>
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setCollabExam(exam); }}
+                    className="p-2 bg-white dark:bg-slate-700 text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg border border-slate-100 dark:border-slate-600 hover:border-blue-100 dark:hover:border-blue-800 transition-all shadow-sm"
+                    title="Akses Kolaborasi"
+                >
+                    <UserIcon className="w-4 h-4" />
                 </button>
                 {exam.config.enablePublicStream && (
                     <button 
@@ -63,6 +79,17 @@ export const OngoingExamsView: React.FC<{ exams: Exam[]; results: Result[]; onSe
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal Collaborator */}
+            {collabExam && (
+                <CollaboratorModal
+                    exam={exams.find(e => e.code === collabExam.code) || collabExam}
+                    onClose={() => setCollabExam(null)}
+                    onUpdate={() => {
+                        if (onRefresh) onRefresh();
+                    }}
+                />
             )}
         </div>
     );
