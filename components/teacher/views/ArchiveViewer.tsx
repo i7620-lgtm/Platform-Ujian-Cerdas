@@ -1107,7 +1107,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="grid grid-cols-1 gap-1 text-[9px]">
                                                 {data.options.map((opt, i) => {
                                                     const label = String.fromCharCode(65+i);
-                                                    const count = data.distribution[opt] || 0;
+                                                    // FIX: Sum counts of all answers that match this option (normalized)
+                                                    const count = Object.entries(data.distribution).reduce((acc, [ans, c]) => {
+                                                        return normalize(ans) === normalize(opt) ? acc + (c as number) : acc;
+                                                    }, 0);
+                                                    
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
                                                     
                                                     const isCorrect = 
@@ -1116,11 +1120,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     
                                                     return (
                                                         <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'border-slate-100 text-slate-600'}`}>
-                                                            <div className="flex gap-2 truncate max-w-[70%]">
-                                                                <span className="w-4 font-bold">{label}.</span>
-                                                                <div className="truncate [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div className="flex gap-2 items-start w-full overflow-hidden">
+                                                                <span className="w-4 font-bold shrink-0">{label}.</span>
+                                                                {/* FIX: Removed truncate, added image styling */}
+                                                                <div className="min-w-0 [&_p]:inline [&_br]:hidden [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
-                                                            <span className="shrink-0"><b>{count}</b> ({pct}%)</span>
+                                                            <span className="shrink-0 ml-2"><b>{count}</b> ({pct}%)</span>
                                                         </div>
                                                     )
                                                 })}
@@ -1167,7 +1172,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                                                                    <div className="truncate flex-1 mr-2 [&_p]:inline [&_br]:hidden" dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                                    {/* FIX: Removed truncate, added image styling */}
+                                                                    <div className="flex-1 mr-2 min-w-0 [&_p]:inline [&_br]:hidden [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
