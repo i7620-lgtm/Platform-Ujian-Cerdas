@@ -926,153 +926,147 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 2. ANALISIS PER KELAS (NEW) */}
-                {uniqueClasses.length > 0 && (
-                    <div className="mb-8 avoid-break">
-                        <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2. Analisis Per Kelas</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {uniqueClasses.map(className => {
-                                const classResults = sortedResults.filter(r => r.student.class === className);
-                                const classTotal = classResults.length;
-                                const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
-                                const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
-                                const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
-                                const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                                const passedCount = classScores.filter(s => s >= 75).length; 
+                {/* 2. LAPORAN PER KELAS */}
+                {uniqueClasses.length > 0 ? (
+                    uniqueClasses.map((className, classIdx) => {
+                        const classResults = sortedResults.filter(r => r.student.class === className);
+                        const classTotal = classResults.length;
+                        const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
+                        const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
+                        const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
+                        const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
+                        const passedCount = classScores.filter(s => s >= 75).length; 
 
-                                return (
-                                    <div key={className} className="border border-slate-300 rounded p-3 bg-white avoid-break">
-                                        <div className="flex justify-between items-center mb-2 border-b border-slate-100 pb-2">
-                                            <h4 className="font-black text-sm uppercase">Kelas {className}</h4>
-                                            <span className="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{classTotal} Siswa</span>
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
-                                            <div>
-                                                <span className="block text-slate-500 uppercase text-[8px]">Rata-rata</span>
-                                                <span className="font-bold text-sm">{classAvg}</span>
+                        return (
+                            <div key={className}>
+                                <div className="mb-8 avoid-break">
+                                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2.{classIdx + 1}. Laporan Kelas {className}</h3>
+                                    
+                                    {/* A. ANALISIS KELAS */}
+                                    <div className="mb-4 bg-white border border-slate-300 rounded p-4">
+                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">A. Analisis Kelas {className}</h4>
+                                        <div className="grid grid-cols-4 gap-4 text-center">
+                                            <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                                                <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
+                                                <span className="font-black text-lg text-slate-800">{classAvg}</span>
                                             </div>
-                                            <div>
-                                                <span className="block text-slate-500 uppercase text-[8px]">Tertinggi</span>
-                                                <span className="font-bold text-sm text-emerald-600">{classMax}</span>
+                                            <div className="p-2 bg-emerald-50 rounded border border-emerald-100">
+                                                <span className="block text-emerald-600 uppercase text-[9px] font-bold">Tertinggi</span>
+                                                <span className="font-black text-lg text-emerald-700">{classMax}</span>
                                             </div>
-                                            <div>
-                                                <span className="block text-slate-500 uppercase text-[8px]">Terendah</span>
-                                                <span className="font-bold text-sm text-rose-600">{classMin}</span>
+                                            <div className="p-2 bg-rose-50 rounded border border-rose-100">
+                                                <span className="block text-rose-600 uppercase text-[9px] font-bold">Terendah</span>
+                                                <span className="font-black text-lg text-rose-700">{classMin}</span>
                                             </div>
-                                            <div>
-                                                <span className="block text-slate-500 uppercase text-[8px]">Tuntas</span>
-                                                <span className="font-bold text-sm text-blue-600">{passedCount} ({Math.round((passedCount/classTotal)*100)}%)</span>
+                                            <div className="p-2 bg-blue-50 rounded border border-blue-100">
+                                                <span className="block text-blue-600 uppercase text-[9px] font-bold">Ketuntasan</span>
+                                                <span className="font-black text-lg text-blue-700">{passedCount} <span className="text-xs font-medium">({Math.round((passedCount/classTotal)*100)}%)</span></span>
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+
+                                    {/* B. REKAPITULASI HASIL KELAS */}
+                                    <div className="mb-4">
+                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">B. Rekapitulasi Hasil Kelas {className}</h4>
+                                        <table className="w-full border-collapse border border-slate-300 text-[9px]">
+                                            <thead>
+                                                <tr className="bg-slate-100">
+                                                    <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                    <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
+                                                    <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
+                                                    <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {classResults.map((r, index) => {
+                                                    const { score } = getCalculatedStats(r, exam);
+                                                    return (
+                                                        <tr key={r.student.studentId} className="avoid-break">
+                                                            <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                            <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                            <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
+                                                            <td className="border border-slate-300 p-1">
+                                                                <div className="flex flex-wrap gap-0.5">
+                                                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                        const status = checkAnswerStatus(q, r.answers);
+                                                                        let bgClass = 'print-bg-gray'; 
+                                                                        if (status === 'CORRECT') bgClass = 'print-bg-green';
+                                                                        else if (status === 'WRONG') bgClass = 'print-bg-red';
+                                                                        
+                                                                        return (
+                                                                            <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
+                                                                                {idx + 1}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* C. ANALISIS INDIVIDU KELAS */}
+                                    <div className="mb-4">
+                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">C. Analisis Individu Kelas {className}</h4>
+                                        <table className="w-full border-collapse border border-slate-300 text-[9px]">
+                                            <thead>
+                                                <tr className="bg-slate-100">
+                                                    <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                    <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
+                                                    <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
+                                                    <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {classResults.map((r, index) => {
+                                                    const analysis = analyzeStudentPerformance(exam, r);
+                                                    return (
+                                                        <tr key={r.student.studentId} className="avoid-break">
+                                                            <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                            <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                            <td className="border border-slate-300 p-1">
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {analysis.stats.map(stat => {
+                                                                        let textClass = 'text-emerald-700';
+                                                                        if (stat.percentage < 50) textClass = 'text-rose-700';
+                                                                        else if (stat.percentage < 80) textClass = 'text-amber-700';
+
+                                                                        return (
+                                                                            <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                                                <span className="font-semibold">{stat.name}:</span>
+                                                                                <span className={`font-bold ${textClass}`}>
+                                                                                    {stat.percentage}%
+                                                                                </span>
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                    {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
+                                                                "{analysis.recommendation}"
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div className="page-break"></div>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <div className="mb-4 italic text-slate-500">Data kelas tidak tersedia.</div>
                 )}
 
-                <div className="page-break"></div>
-
-                {/* 3. REKAPITULASI HASIL */}
+                {/* 3. ANALISIS BUTIR SOAL */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">3. Rekapitulasi Hasil</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[9px]">
-                        <thead>
-                            <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
-                                <th className="border border-slate-300 p-1 text-left w-16">Kelas</th>
-                                <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
-                                <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedResults.map((r, index) => {
-                                const { score } = getCalculatedStats(r, exam);
-                                return (
-                                    <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-1 uppercase">{r.student.class}</td>
-                                        <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
-                                        <td className="border border-slate-300 p-1">
-                                            <div className="flex flex-wrap gap-0.5">
-                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                    const status = checkAnswerStatus(q, r.answers);
-                                                    let bgClass = 'print-bg-gray'; 
-                                                    if (status === 'CORRECT') bgClass = 'print-bg-green';
-                                                    else if (status === 'WRONG') bgClass = 'print-bg-red';
-                                                    
-                                                    return (
-                                                        <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
-                                                            {idx + 1}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="page-break"></div>
-
-                {/* 4. ANALISIS INDIVIDU (NEW) */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">4. Analisis Individu</h3>
-                    <table className="w-full border-collapse border border-slate-300 text-[9px]">
-                        <thead>
-                            <tr className="bg-slate-100">
-                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
-                                <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
-                                <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedResults.map((r, index) => {
-                                const analysis = analyzeStudentPerformance(exam, r);
-                                return (
-                                    <tr key={r.student.studentId} className="avoid-break">
-                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                        <td className="border border-slate-300 p-1">
-                                            <div className="flex flex-wrap gap-2">
-                                                {analysis.stats.map(stat => {
-                                                    let textClass = 'text-emerald-700';
-                                                    if (stat.percentage < 50) textClass = 'text-rose-700';
-                                                    else if (stat.percentage < 80) textClass = 'text-amber-700';
-
-                                                    return (
-                                                        <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                                            <span className="font-semibold">{stat.name}:</span>
-                                                            <span className={`font-bold ${textClass}`}>
-                                                                {stat.percentage}%
-                                                            </span>
-                                                        </span>
-                                                    );
-                                                })}
-                                                {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
-                                            </div>
-                                        </td>
-                                        <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
-                                            "{analysis.recommendation}"
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="page-break"></div>
-
-                {/* 5. ANALISIS BUTIR SOAL */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">5. Analisis Butir Soal</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">3. Analisis Butir Soal</h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                         {questionAnalysisData.map((data, idx) => {
@@ -1191,9 +1185,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 </div>
                 <div className="page-break"></div>
 
-                {/* 6. BANK SOAL & KUNCI JAWABAN */}
+                {/* 4. BANK SOAL & KUNCI JAWABAN */}
                 <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">6. Bank Soal & Kunci Jawaban</h3>
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">4. Bank Soal & Kunci Jawaban</h3>
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
