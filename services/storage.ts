@@ -101,6 +101,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
         }
         const sanitizedQuestions = questionsToProcess.map(q => {
             const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+            // Verified: Shuffling options here is safe because answers are stored/graded by text value, not index.
             if (exam.config.shuffleAnswers) {
                 if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
                     sanitizedQ.options = shuffleArray(sanitizedQ.options);
