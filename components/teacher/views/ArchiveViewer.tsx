@@ -959,8 +959,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 <span className="font-black text-lg text-rose-700">{classMin}</span>
                                             </div>
                                             <div className="p-2 bg-blue-50 rounded border border-blue-100">
-                                                <span className="block text-blue-600 uppercase text-[9px] font-bold">Ketuntasan</span>
-                                                <span className="font-black text-lg text-blue-700">{passedCount} <span className="text-xs font-medium">({Math.round((passedCount/classTotal)*100)}%)</span></span>
+                                                <span className="block text-blue-600 uppercase text-[9px] font-bold">Partisipan</span>
+                                                <span className="font-black text-lg text-blue-700">{classTotal} <span className="text-xs font-medium">Siswa</span></span>
                                             </div>
                                         </div>
                                     </div>
