@@ -960,7 +960,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             </div>
                                             <div className="p-2 bg-blue-50 rounded border border-blue-100">
                                                 <span className="block text-blue-600 uppercase text-[9px] font-bold">Partisipan</span>
-                                                <span className="font-black text-lg text-blue-700">{classTotal} <span className="text-xs font-medium">Siswa</span></span>
                                             </div>
                                         </div>
                                     </div>
