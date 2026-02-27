@@ -805,7 +805,8 @@ class StorageService {
               classLevel: exam.config.classLevel,
               examType: exam.config.examType,
               targetClasses: exam.config.targetClasses,
-              date: exam.config.date
+              date: exam.config.date,
+              participantCount: examResults.length
           });
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
@@ -1350,14 +1351,32 @@ class StorageService {
   async uploadArchive(examCode: string, jsonString: string, metadata?: any): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
       
-      // Use a simpler filename format to avoid potential RLS or path validation issues
-      // Format: examCode_timestamp.json
-      // We will store metadata inside the file content itself if needed, or rely on a separate DB table in the future.
-      // For now, to fix the upload error, we simplify the filename.
-      const filename = `${examCode}_${Date.now()}.json`;
+      // Default simple filename
+      let filename = `${examCode}_${Date.now()}.json`;
       
-      // If metadata is provided, we could prepend it to the content, but for now let's just upload the content.
-      // The previous complex filename with base64 metadata might be triggering WAF or RLS rules.
+      // Attempt to encode metadata into filename for list view availability
+      if (metadata) {
+          try {
+              const minMeta = {
+                  s: metadata.school,
+                  su: metadata.subject,
+                  c: metadata.classLevel,
+                  t: metadata.examType,
+                  tc: metadata.targetClasses,
+                  d: metadata.date,
+                  p: metadata.participantCount // NEW: Participant Count
+              };
+              // URL-safe Base64 encoding
+              const b64 = btoa(JSON.stringify(minMeta))
+                  .replace(/\+/g, '-')
+                  .replace(/\//g, '_')
+                  .replace(/=+$/, '');
+              
+              filename = `${examCode}_meta_${b64}_${Date.now()}.json`;
+          } catch (e) {
+              console.warn("Failed to encode metadata into filename, using simple name", e);
+          }
+      }
       
       const { data, error } = await supabase.storage
           .from('archives')
@@ -1399,7 +1418,8 @@ class StorageService {
                           classLevel: parsed.c,
                           examType: parsed.t,
                           targetClasses: parsed.tc,
-                          date: parsed.d
+                          date: parsed.d,
+                          participantCount: parsed.p // NEW: Parse Participant Count
                       };
                   }
               } catch (e) {
