@@ -33,8 +33,18 @@ export const QuestionAnalysisItem: React.FC<{
     
     // Initialize tempKey based on question type
     const getInitialKey = () => {
-        if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) return JSON.stringify(q.trueFalseRows);
-        if (q.questionType === 'MATCHING' && q.matchingPairs) return JSON.stringify(q.matchingPairs);
+        if (q.questionType === 'TRUE_FALSE') {
+            if (q.trueFalseRows && q.trueFalseRows.length > 0) return JSON.stringify(q.trueFalseRows);
+            // Fallback: try to parse correctAnswer if it looks like JSON array
+            if (q.correctAnswer && q.correctAnswer.startsWith('[')) return q.correctAnswer;
+            return '[]';
+        }
+        if (q.questionType === 'MATCHING') {
+            if (q.matchingPairs && q.matchingPairs.length > 0) return JSON.stringify(q.matchingPairs);
+             // Fallback: try to parse correctAnswer if it looks like JSON array
+            if (q.correctAnswer && q.correctAnswer.startsWith('[')) return q.correctAnswer;
+            return '[]';
+        }
         return q.correctAnswer || '';
     };
 
