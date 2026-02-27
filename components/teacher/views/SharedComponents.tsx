@@ -30,8 +30,21 @@ export const QuestionAnalysisItem: React.FC<{
 }> = ({ q, index, stats, examResults, onUpdateKey }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isEditingKey, setIsEditingKey] = useState(false);
-    const [tempKey, setTempKey] = useState(q.correctAnswer || '');
+    
+    // Initialize tempKey based on question type
+    const getInitialKey = () => {
+        if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) return JSON.stringify(q.trueFalseRows);
+        if (q.questionType === 'MATCHING' && q.matchingPairs) return JSON.stringify(q.matchingPairs);
+        return q.correctAnswer || '';
+    };
+
+    const [tempKey, setTempKey] = useState(getInitialKey());
     const [isSaving, setIsSaving] = useState(false);
+
+    // Update tempKey when q changes (e.g. after save)
+    useEffect(() => {
+        setTempKey(getInitialKey());
+    }, [q]);
 
     const handleSaveKey = async () => {
         if (onUpdateKey) {
@@ -215,6 +228,69 @@ export const QuestionAnalysisItem: React.FC<{
                                                         </label>
                                                     );
                                                 })}
+                                            </div>
+                                        ) : q.questionType === 'TRUE_FALSE' ? (
+                                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {(() => {
+                                                    try {
+                                                        const rows = JSON.parse(tempKey);
+                                                        return rows.map((row: any, i: number) => (
+                                                            <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
+                                                                <div className="flex gap-2 shrink-0">
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const newRows = [...rows];
+                                                                            newRows[i].answer = true;
+                                                                            setTempKey(JSON.stringify(newRows));
+                                                                        }}
+                                                                        className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${row.answer ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                                    >
+                                                                        Benar
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const newRows = [...rows];
+                                                                            newRows[i].answer = false;
+                                                                            setTempKey(JSON.stringify(newRows));
+                                                                        }}
+                                                                        className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${!row.answer ? 'bg-rose-500 text-white border-rose-600 shadow-sm' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                                    >
+                                                                        Salah
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                })()}
+                                            </div>
+                                        ) : q.questionType === 'MATCHING' ? (
+                                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {(() => {
+                                                    try {
+                                                        const pairs = JSON.parse(tempKey);
+                                                        return pairs.map((pair: any, i: number) => (
+                                                            <div key={i} className="flex flex-col gap-1 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Pasangan {i+1}</div>
+                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700" dangerouslySetInnerHTML={{__html: pair.left}}></div>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={pair.right} 
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onChange={(e) => {
+                                                                        const newPairs = [...pairs];
+                                                                        newPairs[i].right = e.target.value;
+                                                                        setTempKey(JSON.stringify(newPairs));
+                                                                    }}
+                                                                    className="w-full text-xs p-2 border rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                    placeholder="Jawaban Pasangan..."
+                                                                />
+                                                            </div>
+                                                        ));
+                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                })()}
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
