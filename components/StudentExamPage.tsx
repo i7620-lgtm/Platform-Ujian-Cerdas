@@ -379,12 +379,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                      <div className="flex items-center gap-2">
                         {/* Compact Monitoring Badge - Visible ONLY when Nav is Closed */}
                         {isMonitoring && !isNavOpen && (
-                            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-1 animate-fade-in">
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-1 animate-fade-in">
                                 <span className="relative flex h-2 w-2">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                                 </span>
-                                <span className="text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                                <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                                     {monitoringLabel}
                                 </span>
                             </div>
@@ -503,24 +503,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             )}
 
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                    <table className="w-full text-sm min-w-[500px]">
-                                                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider">
-                                                            <tr><th className="p-4 text-left">Pernyataan</th><th className="p-4 text-center w-20">Benar</th><th className="p-4 text-center w-20">Salah</th></tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                                            {q.trueFalseRows.map((row, i) => {
-                                                                const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
-                                                                return (
-                                                                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                                                        <td className="p-4 font-medium text-slate-700 dark:text-slate-300 option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div></td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === true} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))} className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === false} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))} className="w-5 h-5 text-rose-600 focus:ring-rose-500 cursor-pointer" /></td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
+                                                <div className="space-y-3">
+                                                    {q.trueFalseRows.map((row, i) => {
+                                                        const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
+                                                        const isTrue = currentAnsObj[i] === true;
+                                                        const isFalse = currentAnsObj[i] === false;
+                                                        
+                                                        return (
+                                                            <div key={i} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                                                <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content">
+                                                                    <div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div>
+                                                                </div>
+                                                                <div className="flex gap-3">
+                                                                    <button 
+                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))}
+                                                                        className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isTrue ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                    >
+                                                                        {isTrue && <CheckCircleIcon className="w-4 h-4" />}
+                                                                        Benar
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))}
+                                                                        className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isFalse ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                    >
+                                                                        {isFalse && <CheckCircleIcon className="w-4 h-4" />}
+                                                                        Salah
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
 
@@ -538,9 +550,20 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                             const isOpen = openDropdownId === `${q.id}-${i}`;
 
                                                             return (
-                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div></div>
+                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
+                                                                        <div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
+                                                                    </div>
+                                                                    
+                                                                    {/* Mobile Connector */}
+                                                                    <div className="sm:hidden flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
+                                                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                                                        <span>Pasangkan Dengan</span>
+                                                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                                                    </div>
+
                                                                     <div className="hidden sm:flex text-slate-300 dark:text-slate-600 items-center justify-center">→</div>
+                                                                    
                                                                     <div className="flex-1 relative custom-dropdown-container">
                                                                         <button 
                                                                             type="button"
@@ -600,7 +623,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             <div className="fixed bottom-8 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
                 <div className="bg-white dark:bg-slate-900 p-2 rounded-[1.2rem] shadow-2xl border border-white dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800 pointer-events-auto flex items-center gap-4 transition-transform hover:scale-105">
                     <div className="pl-4 flex flex-col justify-center">
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Progres</span>
+                        <span className="hidden sm:inline text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Progres</span>
                         <div className="flex items-baseline gap-1"><span className="text-lg font-black text-slate-800 dark:text-white">{answeredCount}</span><span className="text-xs font-bold text-slate-400 dark:text-slate-500">/ {totalQuestions}</span></div>
                     </div>
                     <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="bg-slate-900 dark:bg-indigo-600 text-white pl-6 pr-6 py-3 rounded-xl font-bold text-xs hover:bg-indigo-600 dark:hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-70">

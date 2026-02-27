@@ -12,7 +12,11 @@ import {
     MoonIcon,
     SunIcon,
     TableCellsIcon,
-    QrCodeIcon
+    QrCodeIcon,
+    FileTextIcon,
+    PlayIcon,
+    BookOpenIcon,
+    UserIcon
 } from './Icons';
 import { generateExamCode } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
@@ -279,8 +283,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             )}
 
             <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40 transition-colors duration-300">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="py-5 flex justify-between items-center">
+                <div className="max-w-7xl mx-auto px-4 md:px-6">
+                    <div className="py-3 md:py-5 flex justify-between items-center">
                         <div>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard Guru</h1>
@@ -310,24 +314,48 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             </button>
                         </div>
                     </div>
-                    <nav className="flex gap-8 overflow-x-auto whitespace-nowrap custom-scrollbar pb-1">
-                         <button onClick={() => setView('UPLOAD')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Buat Ujian</button>
-                         <button onClick={() => setView('DRAFTS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Draf</button>
-                         <button onClick={() => setView('ONGOING')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Berlangsung</button>
-                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Terjadwal</button>
-                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Selesai</button>
-                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Buka Arsip</button>
+                    <nav className="flex gap-4 sm:gap-8 overflow-x-auto whitespace-nowrap custom-scrollbar pb-1 px-1">
+                         <button onClick={() => setView('UPLOAD')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <PencilIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Buat Ujian</span>
+                         </button>
+                         <button onClick={() => setView('DRAFTS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <FileTextIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Draf</span>
+                         </button>
+                         <button onClick={() => setView('ONGOING')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <PlayIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Berlangsung</span>
+                         </button>
+                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <CalendarDaysIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Terjadwal</span>
+                         </button>
+                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <CheckCircleIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Selesai</span>
+                         </button>
+                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                            <BookOpenIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Buka Arsip</span>
+                         </button>
                          {accountType === 'super_admin' && (
                             <>
-                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Kelola Pengguna</button>
-                                <button onClick={() => setView('ANALYTICS')} className={`pb-4 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>Analisis Daerah</button>
+                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                                    <UserIcon className="w-5 h-5" />
+                                    <span className="hidden sm:inline">Kelola Pengguna</span>
+                                </button>
+                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
+                                    <ChartBarIcon className="w-5 h-5" />
+                                    <span className="hidden sm:inline">Analisis Daerah</span>
+                                </button>
                             </>
                          )}
                     </nav>
                 </div>
             </header>
             
-            <main className="max-w-7xl mx-auto p-6 md:p-10">
+            <main className="max-w-7xl mx-auto p-4 md:p-10">
                 {view === 'UPLOAD' && (
                     <>
                         <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
@@ -386,7 +414,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <h2 className="font-black text-slate-800 dark:text-white">Edit Detail Ujian</h2>
                             <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 transition-colors"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
-                        <div className="p-8 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-900/50">
+                        <div className="p-4 md:p-8 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-900/50">
                             <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} />
                         </div>
                     </div>

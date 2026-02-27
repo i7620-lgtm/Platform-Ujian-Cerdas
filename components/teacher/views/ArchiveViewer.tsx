@@ -197,7 +197,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 classLevel: optimizedExam.config.classLevel,
                 examType: optimizedExam.config.examType,
                 targetClasses: optimizedExam.config.targetClasses,
-                date: optimizedExam.config.date
+                date: optimizedExam.config.date,
+                participantCount: archiveData.results.length
             });
             
             // Refresh list
@@ -326,9 +327,40 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
         if (mismatchCount > 0) {
             setFixMessage(`Ditemukan ${mismatchCount} data nilai tidak sinkron. File perbaikan telah diunduh otomatis.`);
-            setArchiveData(prev => prev ? ({ ...prev, results: fixedResults }) : null);
+            
+            // ENRICHMENT: Ensure data matches latest Cloud JSON format
+            const enrichedExam: Exam = {
+                ...archiveData.exam,
+                authorName: archiveData.exam.authorName || 'Unknown',
+                authorSchool: archiveData.exam.authorSchool || 'Unknown School',
+                createdAt: archiveData.exam.createdAt || new Date().toISOString(),
+                status: archiveData.exam.status || 'PUBLISHED',
+                config: {
+                    ...archiveData.exam.config,
+                    disableRealtime: archiveData.exam.config.disableRealtime ?? false,
+                    trackLocation: archiveData.exam.config.trackLocation ?? false,
+                    collaborators: archiveData.exam.config.collaborators || []
+                }
+            };
 
-            const fixedArchive = { ...archiveData, results: fixedResults };
+            const enrichedResults: Result[] = fixedResults.map(r => ({
+                ...r,
+                examCode: r.examCode || enrichedExam.code,
+                timestamp: r.timestamp || Date.now(),
+                status: r.status || 'completed',
+                isSynced: r.isSynced ?? true
+            }));
+
+            const fixedArchive = { 
+                ...archiveData, 
+                exam: enrichedExam, 
+                results: enrichedResults,
+                version: "2.0",
+                repairedAt: new Date().toISOString()
+            };
+
+            setArchiveData(fixedArchive);
+
             const jsonString = JSON.stringify(fixedArchive, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -515,6 +547,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Tanggal</span>
                                                         <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.metadata.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Partisipan</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.participantCount ? `${file.metadata.participantCount} Siswa` : '-'}</span>
                                                     </div>
                                                     <div className="text-[9px] text-right text-slate-300 mt-1">
                                                         {(file.size / 1024).toFixed(1)} KB
