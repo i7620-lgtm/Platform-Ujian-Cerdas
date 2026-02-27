@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-// Use type-only import to prevent Rollup resolution errors during build
-import type { Html5Qrcode } from "html5-qrcode";
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
@@ -34,10 +32,23 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
         
         const initScanner = async () => {
             try {
-                // Dynamic import to bypass build resolution issues
-                const { Html5Qrcode } = await import("html5-qrcode");
+                // Load from CDN to avoid build-time resolution issues with the package
+                if (!(window as any).Html5Qrcode) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement("script");
+                        script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+                        script.async = true;
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error("Failed to load QR scanner script"));
+                        document.body.appendChild(script);
+                    });
+                }
                 
                 if (!isMounted) return;
+
+                // Access global variable
+                const Html5Qrcode = (window as any).Html5Qrcode;
+                if (!Html5Qrcode) throw new Error("Html5Qrcode not found");
 
                 const html5QrCode = new Html5Qrcode("reader", false);
                 scannerRef.current = html5QrCode;
@@ -57,7 +68,7 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
             } catch (err) {
                 console.error("Error starting scanner", err);
                 if (isMounted) {
-                    alert("Gagal mengakses kamera atau memuat modul scanner.");
+                    alert("Gagal memuat pemindai kamera. Pastikan koneksi internet stabil.");
                     onClose();
                 }
             }
