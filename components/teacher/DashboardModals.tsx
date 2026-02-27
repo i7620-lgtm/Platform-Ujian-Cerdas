@@ -826,8 +826,14 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                     <div className="flex gap-2">
                         <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-xl flex">
-                            <button onClick={() => setActiveTab('ANALYSIS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'ANALYSIS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Analisis Soal</button>
-                            <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'STUDENTS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Rekap Siswa</button>
+                            <button onClick={() => setActiveTab('ANALYSIS')} className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'ANALYSIS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                <ChartBarIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline">Analisis Soal</span>
+                            </button>
+                            <button onClick={() => setActiveTab('STUDENTS')} className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'STUDENTS' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                <ListBulletIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline">Rekap Siswa</span>
+                            </button>
                         </div>
                         <button onClick={onClose} className="p-2.5 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all">
                             <XMarkIcon className="w-6 h-6"/>
@@ -856,7 +862,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                 )}
 
-                <div className="flex-1 overflow-auto p-6 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50">
                     {isLoading ? (
                         <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 font-bold">Memuat data...</div>
                     ) : (
@@ -935,7 +941,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
                                 {uniqueClasses.length > 1 && (
                                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
                                         <div className="flex items-center gap-2">
@@ -956,8 +962,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                         </div>
                                     </div>
                                 )}
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50/50 dark:bg-slate-700/50">
+                                <div className="overflow-x-auto custom-scrollbar">
+                                    <table className="w-full min-w-[800px] text-left">
+                                        <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                                         <tr>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Siswa</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kelas</th>
@@ -1107,6 +1114,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                         })}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         )
                     )}
