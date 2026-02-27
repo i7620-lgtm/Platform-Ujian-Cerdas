@@ -1198,84 +1198,76 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
                             return (
-                                <div key={q.id} className="avoid-break border border-slate-300 rounded p-3 bg-white">
-                                    <div className="flex items-start gap-3">
-                                        <span className="flex-shrink-0 mt-0.5 text-xs font-bold w-6 h-6 flex items-center justify-center rounded bg-slate-100 border border-slate-200 text-slate-600">
-                                            {q.questionType === 'INFO' ? 'i' : questionNumber}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                            {/* Metadata Print */}
+                                <div key={q.id} className="avoid-break bg-white p-4 rounded-xl border border-slate-300 shadow-none mb-4">
+                                    <div className="flex items-start gap-4">
+                                        <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-200">{q.questionType === 'INFO' ? 'i' : questionNumber}</span>
+                                        <div className="flex-1 space-y-3 min-w-0">
+                                            {/* Metadata Badge */}
                                             {(q.category || q.level || q.scoreWeight) && (
-                                                <div className="flex flex-wrap gap-2 mb-2 border-b border-slate-100 pb-2">
-                                                    {q.category && <span className="text-[9px] font-bold bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase">Kat: {q.category}</span>}
-                                                    {q.level && <span className="text-[9px] font-bold bg-slate-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 uppercase">Lvl: {q.level}</span>}
-                                                    <span className="text-[9px] font-bold bg-slate-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 uppercase">Bobot: {q.scoreWeight || 1}</span>
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {q.category && <span className="text-[9px] font-bold bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wide">Kategori: {q.category}</span>}
+                                                    {q.level && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 uppercase tracking-wide">Level: {q.level}</span>}
+                                                    <span className="text-[9px] font-bold bg-purple-50 text-purple-600 px-2 py-0.5 rounded border border-purple-100 uppercase tracking-wide">Bobot: {q.scoreWeight || 1}</span>
                                                 </div>
                                             )}
-                                            <div className="prose prose-sm max-w-none text-xs text-slate-800 mb-2 [&_p]:m-0 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
-                                            {/* Options / Answer Display */}
-                                            <div className="pl-2 border-l-2 border-slate-200 ml-1">
-                                                {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="grid grid-cols-1 gap-1 text-[10px] print-question-text">
-                                                        {q.options.map((opt, i) => (
-                                                            <div key={i} className={`flex gap-2 ${q.correctAnswer === opt ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>
-                                                                <span className="w-3">{String.fromCharCode(65 + i)}.</span>
-                                                                <div className="flex-1 [&_p]:inline" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                                {q.correctAnswer === opt && <span className="text-[9px] px-1 bg-emerald-100 text-emerald-800 rounded border border-emerald-200">KUNCI</span>}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                
-                                                {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="grid grid-cols-1 gap-1 text-[10px] print-question-text">
-                                                        {q.options.map((opt, i) => {
-                                                            const isCorrect = q.correctAnswer?.includes(opt);
-                                                            return (
-                                                                <div key={i} className={`flex gap-2 ${isCorrect ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>
-                                                                    <span className="w-3">{String.fromCharCode(65 + i)}.</span>
-                                                                    <div className="flex-1 [&_p]:inline" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                                    {isCorrect && <span className="text-[9px] px-1 bg-emerald-100 text-emerald-800 rounded border border-emerald-200">BENAR</span>}
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                )}
-
-                                                {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                    <table className="w-full text-[10px] border-collapse border border-slate-300 mt-1 print-question-text">
-                                                        <thead className="bg-slate-50"><tr><th className="border p-1 text-left">Pernyataan</th><th className="border p-1 w-16 text-center">Kunci</th></tr></thead>
-                                                        <tbody>
+                                            <div className="prose prose-sm max-w-none text-slate-800 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                                            
+                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
+                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${q.correctAnswer === opt ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                    <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
+                                                    <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                    {q.correctAnswer === opt && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
+                                                </div>
+                                            ))}
+                                            
+                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
+                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                    <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
+                                                    <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                    {q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
+                                                </div>
+                                            ))}
+                                            
+                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
+                                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-slate-50">
+                                                            <tr>
+                                                                <th className="p-2 font-bold text-slate-600 text-left border-b border-slate-200">Pernyataan</th>
+                                                                <th className="p-2 font-bold text-slate-600 text-center w-24 border-b border-slate-200">Jawaban</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
                                                             {q.trueFalseRows.map((r, i) => (
-                                                                <tr key={i}>
-                                                                    <td className="border p-1"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td>
-                                                                    <td className={`border p-1 text-center font-bold ${r.answer ? 'text-emerald-700' : 'text-rose-700'}`}>{r.answer ? 'Benar' : 'Salah'}</td>
+                                                                <tr key={i} className="bg-white">
+                                                                    <td className="p-2"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td>
+                                                                    <td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 bg-emerald-50 print-bg-green':'text-rose-700 bg-rose-50 print-bg-red'}`}>{r.answer ? 'Benar':'Salah'}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
                                                     </table>
-                                                )}
-
-                                                {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                    <div className="mt-1 space-y-1 text-[10px] print-question-text">
-                                                        {q.matchingPairs.map((p, i) => (
-                                                            <div key={i} className="flex gap-2 items-center bg-slate-50 p-1 rounded border border-slate-200">
-                                                                <span className="flex-1 font-medium">{p.left}</span>
-                                                                <span className="text-slate-400">→</span>
-                                                                <span className="flex-1 font-bold text-emerald-700">{p.right}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && (
-                                                    <div className="mt-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200 print-question-text">
-                                                        <span className="font-bold text-slate-500 uppercase text-[9px] block mb-1">Kunci Jawaban:</span>
-                                                        <div className="prose prose-sm max-w-none text-emerald-800 font-medium" dangerouslySetInnerHTML={{ __html: q.correctAnswer || '-' }}></div>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
+                                            
+                                            {q.questionType === 'MATCHING' && q.matchingPairs && (
+                                                <div className="space-y-1">
+                                                    {q.matchingPairs.map((p,i) => (
+                                                        <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                                                            <div className="flex-1 font-medium">{p.left}</div>
+                                                            <div className="text-slate-400">→</div>
+                                                            <div className="flex-1 font-bold text-emerald-700">{p.right}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && (
+                                                <div className="mt-2 pt-2 border-t border-slate-200">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Kunci Jawaban</p>
+                                                    <div className="mt-1 p-2 rounded-lg bg-slate-50 text-xs prose prose-sm max-w-none text-emerald-800 font-medium border border-slate-200" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
