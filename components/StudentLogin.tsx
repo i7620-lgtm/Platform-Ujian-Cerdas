@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon } from './Icons';
+import { Html5Qrcode } from "html5-qrcode";
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
 
@@ -24,11 +25,69 @@ const parseClassConfig = (classString: string) => {
     return { name: classString, limit: null };
 };
 
+const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const html5QrCode = new Html5Qrcode("reader");
+            scannerRef.current = html5QrCode;
+            
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                (decodedText) => {
+                    onScanSuccess(decodedText);
+                },
+                (errorMessage) => {
+                    // ignore parse errors
+                }
+            ).catch(err => {
+                console.error("Error starting scanner", err);
+                alert("Gagal mengakses kamera. Pastikan Anda memberikan izin akses kamera pada browser.");
+                onClose();
+            });
+        }, 100);
+
+        return () => {
+            clearTimeout(timer);
+            if (scannerRef.current) {
+                scannerRef.current.stop().then(() => {
+                    scannerRef.current?.clear();
+                }).catch(console.error);
+            }
+        };
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
+             <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm relative animate-slide-in-up border border-white dark:border-slate-700">
+                 <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">Pindai QR Code</h3>
+                 <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
+                    <div id="reader" className="w-full h-full"></div>
+                    <div className="absolute inset-0 border-2 border-white/30 pointer-events-none"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-400 rounded-xl pointer-events-none animate-pulse"></div>
+                 </div>
+                 <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
+                    Arahkan kamera ke QR Code ujian.<br/>
+                    Pastikan cahaya cukup terang.
+                 </p>
+                 <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                    <XMarkIcon className="w-5 h-5" />
+                 </button>
+             </div>
+        </div>
+    );
+};
+
 export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme, initialCode }) => {
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
@@ -385,9 +444,14 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     <div className={`relative group transition-all duration-300 ${isFocused === 'code' ? 'scale-[1.02]' : ''}`}>
                         <div className={`absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-20 transition duration-500 blur ${isFocused === 'code' ? 'opacity-30' : ''}`}></div>
                         <div className={`relative bg-white dark:bg-slate-900 rounded-xl p-1 flex items-center shadow-sm border transition-colors ${isFocused === 'code' ? 'border-indigo-100 dark:border-indigo-500' : 'border-slate-100 dark:border-slate-800'}`}>
-                           <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 shrink-0">
+                           <button 
+                                type="button"
+                                onClick={() => setIsQrScannerOpen(true)}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 shrink-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer active:scale-95"
+                                title="Pindai QR Code"
+                           >
                               <QrCodeIcon className="w-5 h-5" />
-                           </div>
+                           </button>
                            <div className="h-6 w-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
                            <input
                                 ref={examCodeInputRef}
@@ -437,6 +501,22 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 <p className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">Platform Ujian Cerdas</p>
             </div>
         </div>
+
+        {isQrScannerOpen && (
+            <QrScannerModal 
+                onScanSuccess={(text) => {
+                    let code = text;
+                    try {
+                        const url = new URL(text);
+                        const joinCode = url.searchParams.get('join');
+                        if (joinCode) code = joinCode;
+                    } catch (e) {}
+                    setExamCode(code);
+                    setIsQrScannerOpen(false);
+                }} 
+                onClose={() => setIsQrScannerOpen(false)} 
+            />
+        )}
     </div>
   );
 };
