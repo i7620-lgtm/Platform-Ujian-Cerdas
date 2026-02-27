@@ -726,23 +726,16 @@ class StorageService {
       
       if (fetchError || !currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${resultId})`);
 
-      // Construct new Student ID
-      const idParts = currentResult.student_id.split('-');
+      // Construct new Student ID (Standardized: class-absent)
       let newStudentId = '';
-
+      
       // Sanitize inputs
-      const safeName = newData.fullName.trim().replace(/\s+/g, '_').toUpperCase();
-      const safeClass = newData.class.trim().replace(/\s+/g, '').toUpperCase();
-      const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '');
+      // Remove (limit) from class name if present
+      const cleanClassName = newData.class.replace(/\(\d+\)$/, '').trim();
+      const safeClass = cleanClassName.replace(/\s+/g, '').toLowerCase();
+      const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '').toLowerCase();
 
-      if (idParts.length <= 2) {
-          // Format: Class-Absent (e.g. 6a-40)
-          newStudentId = `${safeClass}-${safeAbsent}`.toLowerCase();
-      } else {
-          // Format: Name-Class-Absent-Timestamp
-          const timestamp = idParts.length > 3 ? idParts[idParts.length - 1] : Date.now().toString();
-          newStudentId = `${safeName}-${safeClass}-${safeAbsent}-${timestamp}`;
-      }
+      newStudentId = `${safeClass}-${safeAbsent}`;
 
       const { error: updateError } = await supabase
           .from('results')
