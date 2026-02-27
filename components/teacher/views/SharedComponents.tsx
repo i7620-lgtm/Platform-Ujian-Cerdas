@@ -21,8 +21,32 @@ export const StatWidget: React.FC<{ label: string; value: string | number; color
     );
 };
 
-export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; examResults: Result[] }> = ({ q, index, stats, examResults }) => {
+export const QuestionAnalysisItem: React.FC<{ 
+    q: Question; 
+    index: number; 
+    stats: any; 
+    examResults: Result[];
+    onUpdateKey?: (qId: string, newKey: string) => Promise<void>;
+}> = ({ q, index, stats, examResults, onUpdateKey }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isEditingKey, setIsEditingKey] = useState(false);
+    const [tempKey, setTempKey] = useState(q.correctAnswer || '');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSaveKey = async () => {
+        if (onUpdateKey) {
+            setIsSaving(true);
+            try {
+                await onUpdateKey(q.id, tempKey);
+                setIsEditingKey(false);
+            } catch (e) {
+                alert('Gagal memperbarui kunci jawaban');
+                console.error(e);
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
 
     const difficultyColor = stats.correctRate >= 80 
         ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' 
@@ -116,6 +140,110 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                 
                 {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 animate-fade-in">
+                        {/* NEW: Edit Key Section */}
+                        {onUpdateKey && (
+                            <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase flex items-center gap-2">
+                                        <CheckCircleIcon className="w-4 h-4"/> Kunci Jawaban
+                                    </span>
+                                    {!isEditingKey ? (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setTempKey(q.correctAnswer || ''); setIsEditingKey(true); }} 
+                                            className="text-[10px] font-bold bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 px-2 py-1 rounded text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors"
+                                        >
+                                            Ubah Kunci
+                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setIsEditingKey(false); }} 
+                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                disabled={isSaving}
+                                            >
+                                                Batal
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleSaveKey(); }} 
+                                                className="text-[10px] font-bold bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1"
+                                                disabled={isSaving}
+                                            >
+                                                {isSaving ? 'Menyimpan...' : 'Simpan'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {isEditingKey ? (
+                                    <div className="mt-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                                        {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
+                                            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {q.options.map((opt, i) => (
+                                                    <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${tempKey === opt ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                                                        <input 
+                                                            type="radio" 
+                                                            name={`key-${q.id}`} 
+                                                            value={opt} 
+                                                            checked={tempKey === opt} 
+                                                            onChange={(e) => setTempKey(e.target.value)}
+                                                            className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                                        />
+                                                        <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        ) : q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options ? (
+                                            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {q.options.map((opt, i) => {
+                                                    const currentKeys = parseList(tempKey);
+                                                    const isChecked = currentKeys.includes(opt);
+                                                    return (
+                                                        <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                value={opt} 
+                                                                checked={isChecked} 
+                                                                onChange={(e) => {
+                                                                    const newKeys = e.target.checked 
+                                                                        ? [...currentKeys, opt]
+                                                                        : currentKeys.filter(k => k !== opt);
+                                                                    setTempKey(JSON.stringify(newKeys));
+                                                                }}
+                                                                className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
+                                                            />
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] text-slate-500 italic">Masukkan kunci jawaban baru (teks persis):</p>
+                                                <input 
+                                                    type="text" 
+                                                    value={tempKey} 
+                                                    onChange={(e) => setTempKey(e.target.value)} 
+                                                    className="w-full text-xs p-2 border rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    placeholder="Contoh: Jawaban Benar"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">
+                                        {q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK' ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-400 text-[10px] uppercase font-bold">Saat ini:</span>
+                                                <div className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: q.correctAnswer || '<span class="text-rose-500 italic">Belum diset</span>'}}></div>
+                                            </div>
+                                        ) : (
+                                            <span className="italic text-slate-500">Edit kunci untuk tipe soal ini belum didukung penuh di tampilan ini.</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
                         
                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
