@@ -211,7 +211,23 @@ class StorageService {
       if (qIndex === -1) throw new Error("Question not found");
 
       // 2. Update Question
-      questions[qIndex].correctAnswer = newCorrectAnswer;
+      if (questions[qIndex].questionType === 'TRUE_FALSE') {
+          try {
+              questions[qIndex].trueFalseRows = JSON.parse(newCorrectAnswer);
+          } catch (e) {
+              console.error("Failed to parse TRUE_FALSE rows", e);
+              throw new Error("Invalid data format for TRUE_FALSE");
+          }
+      } else if (questions[qIndex].questionType === 'MATCHING') {
+          try {
+              questions[qIndex].matchingPairs = JSON.parse(newCorrectAnswer);
+          } catch (e) {
+              console.error("Failed to parse MATCHING pairs", e);
+              throw new Error("Invalid data format for MATCHING");
+          }
+      } else {
+          questions[qIndex].correctAnswer = newCorrectAnswer;
+      }
 
       // 3. Save Exam
       const { error: updateError } = await supabase
