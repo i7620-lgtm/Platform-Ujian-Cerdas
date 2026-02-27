@@ -197,7 +197,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 classLevel: optimizedExam.config.classLevel,
                 examType: optimizedExam.config.examType,
                 targetClasses: optimizedExam.config.targetClasses,
-                date: optimizedExam.config.date
+                date: optimizedExam.config.date,
+                participantCount: archiveData.results.length
             });
             
             // Refresh list
@@ -546,6 +547,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Tanggal</span>
                                                         <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.metadata.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-1">
+                                                        <span className="font-bold text-slate-400">Partisipan</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.participantCount ? `${file.metadata.participantCount} Siswa` : '-'}</span>
                                                     </div>
                                                     <div className="text-[9px] text-right text-slate-300 mt-1">
                                                         {(file.size / 1024).toFixed(1)} KB
