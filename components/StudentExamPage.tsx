@@ -379,12 +379,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                      <div className="flex items-center gap-2">
                         {/* Compact Monitoring Badge - Visible ONLY when Nav is Closed */}
                         {isMonitoring && !isNavOpen && (
-                            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-1 animate-fade-in">
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg mr-1 animate-fade-in">
                                 <span className="relative flex h-2 w-2">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                                 </span>
-                                <span className="text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                                <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                                     {monitoringLabel}
                                 </span>
                             </div>
@@ -600,7 +600,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             <div className="fixed bottom-8 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
                 <div className="bg-white dark:bg-slate-900 p-2 rounded-[1.2rem] shadow-2xl border border-white dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800 pointer-events-auto flex items-center gap-4 transition-transform hover:scale-105">
                     <div className="pl-4 flex flex-col justify-center">
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Progres</span>
+                        <span className="hidden sm:inline text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Progres</span>
                         <div className="flex items-baseline gap-1"><span className="text-lg font-black text-slate-800 dark:text-white">{answeredCount}</span><span className="text-xs font-bold text-slate-400 dark:text-slate-500">/ {totalQuestions}</span></div>
                     </div>
                     <button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="bg-slate-900 dark:bg-indigo-600 text-white pl-6 pr-6 py-3 rounded-xl font-bold text-xs hover:bg-indigo-600 dark:hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-70">
