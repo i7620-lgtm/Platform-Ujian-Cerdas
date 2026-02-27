@@ -21,8 +21,55 @@ export const StatWidget: React.FC<{ label: string; value: string | number; color
     );
 };
 
-export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats: any; examResults: Result[] }> = ({ q, index, stats, examResults }) => {
+export const QuestionAnalysisItem: React.FC<{ 
+    q: Question; 
+    index: number; 
+    stats: any; 
+    examResults: Result[];
+    onUpdateKey?: (qId: string, newKey: string) => Promise<void>;
+}> = ({ q, index, stats, examResults, onUpdateKey }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isEditingKey, setIsEditingKey] = useState(false);
+    
+    // Initialize tempKey based on question type
+    const getInitialKey = () => {
+        if (q.questionType === 'TRUE_FALSE') {
+            if (q.trueFalseRows && q.trueFalseRows.length > 0) return JSON.stringify(q.trueFalseRows);
+            // Fallback: try to parse correctAnswer if it looks like JSON array
+            if (q.correctAnswer && q.correctAnswer.startsWith('[')) return q.correctAnswer;
+            return '[]';
+        }
+        if (q.questionType === 'MATCHING') {
+            if (q.matchingPairs && q.matchingPairs.length > 0) return JSON.stringify(q.matchingPairs);
+             // Fallback: try to parse correctAnswer if it looks like JSON array
+            if (q.correctAnswer && q.correctAnswer.startsWith('[')) return q.correctAnswer;
+            return '[]';
+        }
+        return q.correctAnswer || '';
+    };
+
+    const [tempKey, setTempKey] = useState(getInitialKey());
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Update tempKey when q changes (e.g. after save)
+    useEffect(() => {
+        setTempKey(getInitialKey());
+    }, [q]);
+
+    const handleSaveKey = async () => {
+        if (onUpdateKey) {
+            setIsSaving(true);
+            try {
+                await onUpdateKey(q.id, tempKey);
+                setIsEditingKey(false);
+            } catch (e) {
+                alert('Gagal memperbarui kunci jawaban');
+                console.error(e);
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
 
     const difficultyColor = stats.correctRate >= 80 
         ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' 
@@ -116,6 +163,173 @@ export const QuestionAnalysisItem: React.FC<{ q: Question; index: number; stats:
                 
                 {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 animate-fade-in">
+                        {/* NEW: Edit Key Section */}
+                        {onUpdateKey && (
+                            <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase flex items-center gap-2">
+                                        <CheckCircleIcon className="w-4 h-4"/> Kunci Jawaban
+                                    </span>
+                                    {!isEditingKey ? (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setTempKey(q.correctAnswer || ''); setIsEditingKey(true); }} 
+                                            className="text-[10px] font-bold bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 px-2 py-1 rounded text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors"
+                                        >
+                                            Ubah Kunci
+                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setIsEditingKey(false); }} 
+                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                disabled={isSaving}
+                                            >
+                                                Batal
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleSaveKey(); }} 
+                                                className="text-[10px] font-bold bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1"
+                                                disabled={isSaving}
+                                            >
+                                                {isSaving ? 'Menyimpan...' : 'Simpan'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {isEditingKey ? (
+                                    <div className="mt-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                                        {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
+                                            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {q.options.map((opt, i) => (
+                                                    <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${tempKey === opt ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                                                        <input 
+                                                            type="radio" 
+                                                            name={`key-${q.id}`} 
+                                                            value={opt} 
+                                                            checked={tempKey === opt} 
+                                                            onChange={(e) => setTempKey(e.target.value)}
+                                                            className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                                        />
+                                                        <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        ) : q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options ? (
+                                            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {q.options.map((opt, i) => {
+                                                    const currentKeys = parseList(tempKey);
+                                                    const isChecked = currentKeys.includes(opt);
+                                                    return (
+                                                        <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                value={opt} 
+                                                                checked={isChecked} 
+                                                                onChange={(e) => {
+                                                                    const newKeys = e.target.checked 
+                                                                        ? [...currentKeys, opt]
+                                                                        : currentKeys.filter(k => k !== opt);
+                                                                    setTempKey(JSON.stringify(newKeys));
+                                                                }}
+                                                                className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
+                                                            />
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : q.questionType === 'TRUE_FALSE' ? (
+                                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {(() => {
+                                                    try {
+                                                        const rows = JSON.parse(tempKey);
+                                                        return rows.map((row: any, i: number) => (
+                                                            <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
+                                                                <div className="flex gap-2 shrink-0">
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const newRows = [...rows];
+                                                                            newRows[i].answer = true;
+                                                                            setTempKey(JSON.stringify(newRows));
+                                                                        }}
+                                                                        className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${row.answer ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                                    >
+                                                                        Benar
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const newRows = [...rows];
+                                                                            newRows[i].answer = false;
+                                                                            setTempKey(JSON.stringify(newRows));
+                                                                        }}
+                                                                        className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${!row.answer ? 'bg-rose-500 text-white border-rose-600 shadow-sm' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                                    >
+                                                                        Salah
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                })()}
+                                            </div>
+                                        ) : q.questionType === 'MATCHING' ? (
+                                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {(() => {
+                                                    try {
+                                                        const pairs = JSON.parse(tempKey);
+                                                        return pairs.map((pair: any, i: number) => (
+                                                            <div key={i} className="flex flex-col gap-1 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Pasangan {i+1}</div>
+                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700" dangerouslySetInnerHTML={{__html: pair.left}}></div>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={pair.right} 
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onChange={(e) => {
+                                                                        const newPairs = [...pairs];
+                                                                        newPairs[i].right = e.target.value;
+                                                                        setTempKey(JSON.stringify(newPairs));
+                                                                    }}
+                                                                    className="w-full text-xs p-2 border rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                    placeholder="Jawaban Pasangan..."
+                                                                />
+                                                            </div>
+                                                        ));
+                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] text-slate-500 italic">Masukkan kunci jawaban baru (teks persis):</p>
+                                                <input 
+                                                    type="text" 
+                                                    value={tempKey} 
+                                                    onChange={(e) => setTempKey(e.target.value)} 
+                                                    className="w-full text-xs p-2 border rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    placeholder="Contoh: Jawaban Benar"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">
+                                        {q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK' ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-400 text-[10px] uppercase font-bold">Saat ini:</span>
+                                                <div className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: q.correctAnswer || '<span class="text-rose-500 italic">Belum diset</span>'}}></div>
+                                            </div>
+                                        ) : (
+                                            <span className="italic text-slate-500">Edit kunci untuk tipe soal ini belum didukung penuh di tampilan ini.</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
                         
                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (

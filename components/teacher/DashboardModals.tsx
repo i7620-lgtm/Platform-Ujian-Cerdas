@@ -558,6 +558,7 @@ interface FinishedExamModalProps {
 }
 
 export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teacherProfile, onClose }) => {
+    const [displayExam, setDisplayExam] = useState<Exam>(exam);
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
@@ -565,10 +566,14 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [fixMessage, setFixMessage] = useState('');
 
+    useEffect(() => {
+        setDisplayExam(exam);
+    }, [exam]);
+
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const data = await storageService.getResults(exam.code, undefined);
+            const data = await storageService.getResults(displayExam.code, undefined);
             
             // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
             const sortedData = data.sort((a, b) => {
@@ -597,7 +602,28 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     useEffect(() => {
         fetchData();
         setSelectedClass('ALL');
-    }, [exam, teacherProfile]);
+    }, [displayExam.code, teacherProfile]);
+
+    const handleUpdateKey = async (qId: string, newKey: string) => {
+        if (!confirm('Apakah Anda yakin ingin mengubah kunci jawaban? Nilai semua siswa akan dihitung ulang.')) return;
+        try {
+            await storageService.updateExamAnswerKey(displayExam.code, qId, newKey);
+            
+            // Update local state for questions
+            setDisplayExam(prev => ({
+                ...prev,
+                questions: prev.questions.map(q => q.id === qId ? { ...q, correctAnswer: newKey } : q)
+            }));
+
+            // Refresh results to get new scores
+            await fetchData();
+            
+            alert('Kunci jawaban berhasil diperbarui.');
+        } catch (e) {
+            console.error(e);
+            alert('Gagal memperbarui kunci jawaban: ' + (e as Error).message);
+        }
+    };
 
     const handleDeleteResult = async (studentId: string, studentName: string) => {
         if (!confirm(`Hapus hasil ujian siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`)) return;
@@ -673,7 +699,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const getCalculatedStats = (r: Result) => {
         let correct = 0;
         let empty = 0;
-        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        const scorableQuestions = displayExam.questions.filter(q => q.questionType !== 'INFO');
         
         scorableQuestions.forEach(q => {
             const status = checkAnswerStatus(q, r.answers);
@@ -706,10 +732,10 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     }, [results, selectedClass]);
 
     // --- NEW: CATEGORY & LEVEL ANALYSIS ---
-    const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(exam, results), [exam, results]);
+    const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(displayExam, results), [displayExam, results]);
 
     const questionStats = useMemo(() => {
-        return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
+        return displayExam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
             results.forEach(r => {
                 if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
@@ -721,7 +747,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                 correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
             };
         });
-    }, [results, exam.questions, totalStudents]);
+    }, [results, displayExam.questions, totalStudents]);
 
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
@@ -734,7 +760,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         
         // Recalculate Score locally
         let correct = 0;
-        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        const scorableQuestions = displayExam.questions.filter(q => q.questionType !== 'INFO');
         scorableQuestions.forEach(q => {
             // Using newAnswers which contains the override
             const status = checkAnswerStatus(q, newAnswers);
@@ -756,7 +782,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                 answers: newAnswers,
                 score: newScore,
                 correct_answers: correct
-            }).eq('exam_code', exam.code).eq('student_id', studentResult.student.studentId);
+            }).eq('exam_code', displayExam.code).eq('student_id', studentResult.student.studentId);
         } catch (e) {
             console.error("Grading failed", e);
             alert("Gagal menyimpan nilai.");
@@ -770,7 +796,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-slate-800 sticky top-0 z-10 gap-4">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Analisis Hasil Ujian</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{exam.config.subject} • {exam.code}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{displayExam.config.subject} • {displayExam.code}</p>
                     </div>
                     <div className="flex gap-2">
                         <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-xl flex">
@@ -857,7 +883,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                         Analisis Butir Soal
                                     </h3>
                                     <div className="grid grid-cols-1 gap-4">
-                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                        {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                             const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 };
                                             return (
                                                 <QuestionAnalysisItem 
@@ -866,6 +892,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                     index={idx} 
                                                     stats={stats} 
                                                     examResults={results}
+                                                    onUpdateKey={handleUpdateKey}
                                                 />
                                             );
                                         })}
@@ -940,7 +967,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                             )}
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                                            {exam.config.trackLocation && r.location ? (
+                                                            {displayExam.config.trackLocation && r.location ? (
                                                                 <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
                                                             ) : '-'}
                                                         </td>
@@ -963,7 +990,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1 mt-2 mb-4">
-                                                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                    {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
                                                                         let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
                                                                         if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
@@ -972,41 +999,46 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     })}
                                                                 </div>
 
-                                                                {/* MANUAL ESSAY GRADING UI */}
-                                                                {exam.questions.some(q => q.questionType === 'ESSAY') && (
-                                                                    <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                                                                        <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Penilaian Manual Soal Esai</h4>
-                                                                        <div className="space-y-4">
-                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q) => {
-                                                                                const ans = r.answers[q.id];
-                                                                                const manualStatus = r.answers[`_grade_${q.id}`];
-                                                                                
-                                                                                return (
-                                                                                    <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
-                                                                                        <p className="font-bold text-slate-700 dark:text-slate-200 mb-1" dangerouslySetInnerHTML={{__html: q.questionText}}></p>
-                                                                                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2">
-                                                                                            {ans || <span className="text-slate-400">Tidak menjawab</span>}
-                                                                                        </div>
-                                                                                        <div className="flex gap-2">
-                                                                                            <button 
-                                                                                                onClick={() => rateQuestion(r, q.id, true)}
-                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                            >
-                                                                                                <CheckCircleIcon className="w-3 h-3"/> Benar
-                                                                                            </button>
-                                                                                            <button 
-                                                                                                onClick={() => rateQuestion(r, q.id, false)}
-                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                            >
-                                                                                                <XMarkIcon className="w-3 h-3"/> Salah
-                                                                                            </button>
-                                                                                        </div>
+                                                                {/* MANUAL GRADING UI (ALL QUESTIONS) */}
+                                                                <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                                    <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Detail Jawaban & Koreksi Manual</h4>
+                                                                    <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                                                                        {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                            const ans = r.answers[q.id];
+                                                                            const manualStatus = r.answers[`_grade_${q.id}`];
+                                                                            const systemStatus = checkAnswerStatus(q, r.answers);
+                                                                            
+                                                                            return (
+                                                                                <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
+                                                                                    <div className="flex justify-between items-start mb-1">
+                                                                                        <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">#{idx + 1}</span>
+                                                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${systemStatus === 'CORRECT' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : systemStatus === 'WRONG' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                                                                            {systemStatus === 'CORRECT' ? 'Benar' : systemStatus === 'WRONG' ? 'Salah' : 'Kosong'}
+                                                                                        </span>
                                                                                     </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
+                                                                                    <div className="font-bold text-slate-700 dark:text-slate-200 mb-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                                                    <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2 break-words text-xs">
+                                                                                        {ans || <span className="text-slate-400">Tidak menjawab</span>}
+                                                                                    </div>
+                                                                                    <div className="flex gap-2 justify-end">
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, true); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                        >
+                                                                                            <CheckCircleIcon className="w-3 h-3"/> Benar
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, false); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                        >
+                                                                                            <XMarkIcon className="w-3 h-3"/> Salah
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                )}
+                                                                </div>
 
                                                                 {r.activityLog && r.activityLog.length > 0 && (
                                                                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
