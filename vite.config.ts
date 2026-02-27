@@ -19,9 +19,6 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 3000,
     },
-    optimizeDeps: {
-      include: ['html5-qrcode'],
-    },
     build: {
       target: 'es2015',
       outDir: 'dist',
