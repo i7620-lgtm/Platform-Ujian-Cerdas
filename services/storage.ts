@@ -1350,27 +1350,14 @@ class StorageService {
   async uploadArchive(examCode: string, jsonString: string, metadata?: any): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
       
-      let filename = `${examCode}_${Date.now()}.json`;
-      if (metadata) {
-          // Shorten keys to save space
-          const minMeta = {
-              s: metadata.school,
-              su: metadata.subject,
-              c: metadata.classLevel,
-              t: metadata.examType,
-              tc: metadata.targetClasses,
-              d: metadata.date
-          };
-          try {
-              const b64 = btoa(JSON.stringify(minMeta))
-                  .replace(/\+/g, '-')
-                  .replace(/\//g, '_')
-                  .replace(/=+$/, '');
-              filename = `${examCode}_meta_${b64}_.json`;
-          } catch (e) {
-              console.warn("Failed to encode metadata for filename", e);
-          }
-      }
+      // Use a simpler filename format to avoid potential RLS or path validation issues
+      // Format: examCode_timestamp.json
+      // We will store metadata inside the file content itself if needed, or rely on a separate DB table in the future.
+      // For now, to fix the upload error, we simplify the filename.
+      const filename = `${examCode}_${Date.now()}.json`;
+      
+      // If metadata is provided, we could prepend it to the content, but for now let's just upload the content.
+      // The previous complex filename with base64 metadata might be triggering WAF or RLS rules.
       
       const { data, error } = await supabase.storage
           .from('archives')
