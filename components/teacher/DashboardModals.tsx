@@ -972,41 +972,46 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                     })}
                                                                 </div>
 
-                                                                {/* MANUAL ESSAY GRADING UI */}
-                                                                {exam.questions.some(q => q.questionType === 'ESSAY') && (
-                                                                    <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                                                                        <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Penilaian Manual Soal Esai</h4>
-                                                                        <div className="space-y-4">
-                                                                            {exam.questions.filter(q => q.questionType === 'ESSAY').map((q) => {
-                                                                                const ans = r.answers[q.id];
-                                                                                const manualStatus = r.answers[`_grade_${q.id}`];
-                                                                                
-                                                                                return (
-                                                                                    <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
-                                                                                        <p className="font-bold text-slate-700 dark:text-slate-200 mb-1" dangerouslySetInnerHTML={{__html: q.questionText}}></p>
-                                                                                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2">
-                                                                                            {ans || <span className="text-slate-400">Tidak menjawab</span>}
-                                                                                        </div>
-                                                                                        <div className="flex gap-2">
-                                                                                            <button 
-                                                                                                onClick={() => rateQuestion(r, q.id, true)}
-                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                            >
-                                                                                                <CheckCircleIcon className="w-3 h-3"/> Benar
-                                                                                            </button>
-                                                                                            <button 
-                                                                                                onClick={() => rateQuestion(r, q.id, false)}
-                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                            >
-                                                                                                <XMarkIcon className="w-3 h-3"/> Salah
-                                                                                            </button>
-                                                                                        </div>
+                                                                {/* MANUAL GRADING UI (ALL QUESTIONS) */}
+                                                                <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                                    <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Detail Jawaban & Koreksi Manual</h4>
+                                                                    <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                            const ans = r.answers[q.id];
+                                                                            const manualStatus = r.answers[`_grade_${q.id}`];
+                                                                            const systemStatus = checkAnswerStatus(q, r.answers);
+                                                                            
+                                                                            return (
+                                                                                <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
+                                                                                    <div className="flex justify-between items-start mb-1">
+                                                                                        <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">#{idx + 1}</span>
+                                                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${systemStatus === 'CORRECT' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : systemStatus === 'WRONG' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                                                                            {systemStatus === 'CORRECT' ? 'Benar' : systemStatus === 'WRONG' ? 'Salah' : 'Kosong'}
+                                                                                        </span>
                                                                                     </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
+                                                                                    <div className="font-bold text-slate-700 dark:text-slate-200 mb-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                                                    <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2 break-words text-xs">
+                                                                                        {ans || <span className="text-slate-400">Tidak menjawab</span>}
+                                                                                    </div>
+                                                                                    <div className="flex gap-2 justify-end">
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, true); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                        >
+                                                                                            <CheckCircleIcon className="w-3 h-3"/> Benar
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, false); }}
+                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                        >
+                                                                                            <XMarkIcon className="w-3 h-3"/> Salah
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                )}
+                                                                </div>
 
                                                                 {r.activityLog && r.activityLog.length > 0 && (
                                                                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
