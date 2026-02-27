@@ -503,24 +503,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             )}
 
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                    <table className="w-full text-sm min-w-[500px]">
-                                                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider">
-                                                            <tr><th className="p-4 text-left">Pernyataan</th><th className="p-4 text-center w-20">Benar</th><th className="p-4 text-center w-20">Salah</th></tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                                            {q.trueFalseRows.map((row, i) => {
-                                                                const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
-                                                                return (
-                                                                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                                                        <td className="p-4 font-medium text-slate-700 dark:text-slate-300 option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div></td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === true} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))} className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
-                                                                        <td className="p-4 text-center"><input type="radio" name={`tf-${q.id}-${i}`} checked={currentAnsObj[i] === false} onChange={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))} className="w-5 h-5 text-rose-600 focus:ring-rose-500 cursor-pointer" /></td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
+                                                <div className="space-y-3">
+                                                    {q.trueFalseRows.map((row, i) => {
+                                                        const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
+                                                        const isTrue = currentAnsObj[i] === true;
+                                                        const isFalse = currentAnsObj[i] === false;
+                                                        
+                                                        return (
+                                                            <div key={i} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                                                <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content">
+                                                                    <div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div>
+                                                                </div>
+                                                                <div className="flex gap-3">
+                                                                    <button 
+                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))}
+                                                                        className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isTrue ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                    >
+                                                                        {isTrue && <CheckCircleIcon className="w-4 h-4" />}
+                                                                        Benar
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))}
+                                                                        className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isFalse ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                    >
+                                                                        {isFalse && <CheckCircleIcon className="w-4 h-4" />}
+                                                                        Salah
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
 
@@ -538,9 +550,20 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                             const isOpen = openDropdownId === `${q.id}-${i}`;
 
                                                             return (
-                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content"><div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div></div>
+                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
+                                                                        <div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
+                                                                    </div>
+                                                                    
+                                                                    {/* Mobile Connector */}
+                                                                    <div className="sm:hidden flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
+                                                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                                                        <span>Pasangkan Dengan</span>
+                                                                        <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                                                                    </div>
+
                                                                     <div className="hidden sm:flex text-slate-300 dark:text-slate-600 items-center justify-center">→</div>
+                                                                    
                                                                     <div className="flex-1 relative custom-dropdown-container">
                                                                         <button 
                                                                             type="button"
