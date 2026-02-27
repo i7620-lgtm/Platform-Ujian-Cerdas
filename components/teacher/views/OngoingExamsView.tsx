@@ -73,10 +73,22 @@ export const OngoingExamsView: React.FC<{
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6 leading-relaxed px-2">
                             Minta siswa memindai kode ini untuk langsung masuk ke halaman login dengan kode ujian terisi.
                         </p>
-                        <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800 mb-4">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kode Ujian</p>
                             <p className="text-xl font-mono font-black text-slate-800 dark:text-white tracking-widest">{joinQrExam.code}</p>
                         </div>
+
+                        <button 
+                            onClick={() => {
+                                const url = `${window.location.origin}/?join=${joinQrExam.code}`;
+                                navigator.clipboard.writeText(url);
+                                alert("Link ujian berhasil disalin!");
+                            }}
+                            className="w-full py-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center justify-center gap-2 text-sm border border-indigo-100 dark:border-indigo-800"
+                        >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
+                            Salin Link Ujian
+                        </button>
                     </div>
                 </div>
             )}
