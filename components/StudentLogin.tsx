@@ -70,10 +70,17 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     // Logic fokus kursor cerdas
     if (initialCode) {
         setTimeout(() => nameInputRef.current?.focus(), 100);
-    } else if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
-        examCodeInputRef.current.focus();
+    } else {
+        // Cek localStorage langsung untuk menghindari dependency cycle
+        const savedName = localStorage.getItem('saved_student_fullname');
+        const savedClass = localStorage.getItem('saved_student_class');
+        const savedAbsent = localStorage.getItem('saved_student_absent');
+        
+        if (savedName && savedClass && savedAbsent && examCodeInputRef.current) {
+            examCodeInputRef.current.focus();
+        }
     }
-  }, [initialCode, fullName, studentClass, absentNumber]);
+  }, [initialCode]);
 
   // STRICTOR NORMALIZATION HELPER
   const normalizeId = (text: string) => {
