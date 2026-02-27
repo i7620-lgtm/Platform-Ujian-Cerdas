@@ -312,8 +312,7 @@ class StorageService {
               id: r.id,
               score: score,
               correct_answers: correctCount,
-              wrong_answers: total - correctCount - emptyCount,
-              empty_answers: emptyCount
+              wrong_answers: total - correctCount - emptyCount
           };
       });
 
