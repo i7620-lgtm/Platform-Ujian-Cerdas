@@ -566,6 +566,12 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [fixMessage, setFixMessage] = useState('');
 
+    const ungradedCount = useMemo(() => {
+        const essayQuestions = displayExam.questions.filter(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK');
+        if (essayQuestions.length === 0) return 0;
+        return results.filter(r => essayQuestions.some(q => !r.answers[`_grade_${q.id}`])).length;
+    }, [results, displayExam.questions]);
+
     useEffect(() => {
         setDisplayExam(exam);
     }, [exam]);
@@ -809,6 +815,15 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                 </div>
 
+                {ungradedCount > 0 && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/30 px-6 py-3 border-b border-yellow-100 dark:border-yellow-800 flex items-center gap-4 animate-slide-in-up">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+                        <p className="text-xs font-bold text-yellow-800 dark:text-yellow-200">
+                            Peringatan: Terdapat {ungradedCount} siswa dengan jawaban Esai / Isian Singkat yang belum dinilai manual. Mohon periksa dan beri nilai sebelum finalisasi.
+                        </p>
+                    </div>
+                )}
+
                 {fixMessage && (
                     <div className="bg-amber-50 dark:bg-amber-900/30 px-6 py-3 border-b border-amber-100 dark:border-amber-800 flex items-center justify-between gap-4 animate-slide-in-up">
                         <div className="flex items-center gap-3 text-amber-800 dark:text-amber-200">
@@ -992,53 +1007,67 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 <div className="flex flex-wrap gap-1 mt-2 mb-4">
                                                                     {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
                                                                         const status = checkAnswerStatus(q, r.answers);
+                                                                        const isManual = (q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK');
+                                                                        const isGraded = r.answers[`_grade_${q.id}`];
+                                                                        
                                                                         let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
-                                                                        if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
-                                                                        else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
-                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
+                                                                        
+                                                                        if (isManual && !isGraded) {
+                                                                            bgClass = 'bg-yellow-300 dark:bg-yellow-600 text-slate-900 dark:text-white';
+                                                                        } else if (status === 'CORRECT') {
+                                                                            bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
+                                                                        } else if (status === 'WRONG') {
+                                                                            bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
+                                                                        }
+                                                                        
+                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${isManual && !isGraded ? 'Belum Dinilai' : status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
                                                                     })}
                                                                 </div>
 
-                                                                {/* MANUAL GRADING UI (ALL QUESTIONS) */}
-                                                                <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                                                                    <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Detail Jawaban & Koreksi Manual</h4>
-                                                                    <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                                                                        {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                                            const ans = r.answers[q.id];
-                                                                            const manualStatus = r.answers[`_grade_${q.id}`];
-                                                                            const systemStatus = checkAnswerStatus(q, r.answers);
-                                                                            
-                                                                            return (
-                                                                                <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
-                                                                                    <div className="flex justify-between items-start mb-1">
-                                                                                        <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">#{idx + 1}</span>
-                                                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${systemStatus === 'CORRECT' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : systemStatus === 'WRONG' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                                                                                            {systemStatus === 'CORRECT' ? 'Benar' : systemStatus === 'WRONG' ? 'Salah' : 'Kosong'}
-                                                                                        </span>
+                                                                {/* MANUAL GRADING UI (ONLY ESSAY & FILL_IN_THE_BLANK) */}
+                                                                {displayExam.questions.some(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && (
+                                                                    <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                                        <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Detail Jawaban & Koreksi Manual</h4>
+                                                                        <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                                                                            {displayExam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                                if (q.questionType !== 'ESSAY' && q.questionType !== 'FILL_IN_THE_BLANK') return null;
+
+                                                                                const ans = r.answers[q.id];
+                                                                                const manualStatus = r.answers[`_grade_${q.id}`];
+                                                                                const systemStatus = checkAnswerStatus(q, r.answers);
+                                                                                
+                                                                                return (
+                                                                                    <div key={q.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-3 last:border-0">
+                                                                                        <div className="flex justify-between items-start mb-1">
+                                                                                            <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">#{idx + 1}</span>
+                                                                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${systemStatus === 'CORRECT' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : systemStatus === 'WRONG' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                                                                                {systemStatus === 'CORRECT' ? 'Benar' : systemStatus === 'WRONG' ? 'Salah' : 'Kosong'}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div className="font-bold text-slate-700 dark:text-slate-200 mb-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                                                        <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2 break-words text-xs">
+                                                                                            {ans || <span className="text-slate-400">Tidak menjawab</span>}
+                                                                                        </div>
+                                                                                        <div className="flex gap-2 justify-end">
+                                                                                            <button 
+                                                                                                onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, true); }}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <CheckCircleIcon className="w-3 h-3"/> Benar
+                                                                                            </button>
+                                                                                            <button 
+                                                                                                onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, false); }}
+                                                                                                className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                                                            >
+                                                                                                <XMarkIcon className="w-3 h-3"/> Salah
+                                                                                            </button>
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div className="font-bold text-slate-700 dark:text-slate-200 mb-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
-                                                                                    <div className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-slate-600 dark:text-slate-300 italic mb-2 break-words text-xs">
-                                                                                        {ans || <span className="text-slate-400">Tidak menjawab</span>}
-                                                                                    </div>
-                                                                                    <div className="flex gap-2 justify-end">
-                                                                                        <button 
-                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, true); }}
-                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'CORRECT' ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                        >
-                                                                                            <CheckCircleIcon className="w-3 h-3"/> Benar
-                                                                                        </button>
-                                                                                        <button 
-                                                                                            onClick={(e) => { e.stopPropagation(); rateQuestion(r, q.id, false); }}
-                                                                                            className={`px-3 py-1 text-xs font-bold rounded border flex items-center gap-1 ${manualStatus === 'WRONG' ? 'bg-rose-100 border-rose-500 text-rose-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                                        >
-                                                                                            <XMarkIcon className="w-3 h-3"/> Salah
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
+                                                                                );
+                                                                            })}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
+                                                                )}
 
                                                                 {r.activityLog && r.activityLog.length > 0 && (
                                                                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
