@@ -230,15 +230,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         }));
     };
 
-    // Check if Essay Exists
-    const hasEssay = useMemo(() => questions.some(q => q.questionType === 'ESSAY'), [questions]);
+    // Check if Essay or Short Answer Exists (Requires Manual Grading)
+    const hasManualGrading = useMemo(() => questions.some(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK'), [questions]);
 
-    // Force disable automatic result showing if Essay exists
+    // Force disable automatic result showing if Manual Grading questions exist
     useEffect(() => {
-        if (hasEssay && config.showResultToStudent) {
+        if (hasManualGrading && config.showResultToStudent) {
             setConfig(prev => ({ ...prev, showResultToStudent: false }));
         }
-    }, [hasEssay]);
+    }, [hasManualGrading]);
 
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
@@ -645,12 +645,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
                              <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Hasil & Monitor</h4>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className={`flex flex-col p-3 rounded-xl border transition-colors shadow-sm ${hasEssay ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 opacity-80' : 'border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer group'}`}>
-                                    <label className={`flex items-center ${hasEssay ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} disabled={hasEssay} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400" />
-                                        <span className={`ml-3 text-sm font-medium ${hasEssay ? 'text-gray-500 dark:text-slate-500' : 'text-gray-700 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-primary'}`}>Umumkan Nilai Otomatis</span>
+                                <div className={`flex flex-col p-3 rounded-xl border transition-colors shadow-sm ${hasManualGrading ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 opacity-80' : 'border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer group'}`}>
+                                    <label className={`flex items-center ${hasManualGrading ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                        <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} disabled={hasManualGrading} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400" />
+                                        <span className={`ml-3 text-sm font-medium ${hasManualGrading ? 'text-gray-500 dark:text-slate-500' : 'text-gray-700 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-primary'}`}>Umumkan Nilai Otomatis</span>
                                     </label>
-                                    {hasEssay && <div className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai.</div>}
+                                    {hasManualGrading && <div className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai atau Isian Singkat.</div>}
                                 </div>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
