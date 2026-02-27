@@ -122,13 +122,20 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
 
     if (!orderMap) {
         let questionsToProcess = [...exam.questions];
+        
+        // INDEPENDENT LOGIC: Shuffle Questions
+        // Only shuffles the order of questions if enabled. Does NOT affect options.
         if (exam.config.shuffleQuestions) {
             questionsToProcess = shuffleArray(questionsToProcess);
         }
+        
         const qOrder = questionsToProcess.map(q => q.id);
         const optOrders: Record<string, string[]> = {};
 
+        // INDEPENDENT LOGIC: Shuffle Answers
+        // Iterates through questions (whether shuffled or not) and shuffles options if enabled.
         questionsToProcess.forEach(q => {
+             // Only shuffle options if explicitly enabled in config
              if (exam.config.shuffleAnswers && q.options && 
                 (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
                  const shuffledOpts = shuffleArray([...q.options]);
@@ -188,6 +195,121 @@ class StorageService {
             }, 30000);
         }
     }
+
+  async updateExamAnswerKey(examCode: string, questionId: string, newCorrectAnswer: string): Promise<void> {
+      // 1. Fetch Exam
+      const { data: examData, error: examError } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('code', examCode)
+          .single();
+      
+      if (examError || !examData) throw new Error("Exam not found");
+
+      const questions = examData.questions as Question[];
+      const qIndex = questions.findIndex(q => q.id === questionId);
+      if (qIndex === -1) throw new Error("Question not found");
+
+      // 2. Update Question
+      questions[qIndex].correctAnswer = newCorrectAnswer;
+
+      // 3. Save Exam
+      const { error: updateError } = await supabase
+          .from('exams')
+          .update({ questions: questions })
+          .eq('code', examCode);
+
+      if (updateError) throw updateError;
+
+      // 4. Fetch Results
+      const { data: results, error: resultsError } = await supabase
+          .from('results')
+          .select('*')
+          .eq('exam_code', examCode);
+
+      if (resultsError) throw resultsError;
+
+      // 5. Recalculate Scores
+      const updates = results.map((r: any) => {
+          const answers = r.answers;
+          let correctCount = 0;
+          let emptyCount = 0;
+          
+          const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
+          
+          scorableQuestions.forEach(q => {
+              // Logic from checkAnswerStatus
+              const manualGradeKey = `_grade_${q.id}`;
+              if (answers[manualGradeKey]) {
+                  if (answers[manualGradeKey] === 'CORRECT') correctCount++;
+                  return;
+              }
+
+              const ans = answers[q.id];
+              if (!ans) {
+                  emptyCount++;
+                  return;
+              }
+
+              const normalize = (str: string) => (str || '').trim().toLowerCase();
+              const studentAns = normalize(String(ans));
+              const correctAns = normalize(String(q.correctAnswer || ''));
+
+              let isCorrect = false;
+               if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                  isCorrect = studentAns === correctAns;
+              } 
+              else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                  // parseList logic
+                  const parseList = (str: string) => {
+                      if (!str) return [];
+                      try {
+                          const parsed = JSON.parse(str);
+                          if (Array.isArray(parsed)) return parsed.map(String);
+                      } catch(e) {}
+                      return str.split(',').map(s => s.trim()).filter(s => s !== '');
+                  };
+                  const sSet = new Set(parseList(studentAns).map(normalize));
+                  const cSet = new Set(parseList(correctAns).map(normalize));
+                  isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+              }
+              else if (q.questionType === 'TRUE_FALSE') {
+                   try {
+                      const ansObj = JSON.parse(ans);
+                      isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                  } catch(e) { isCorrect = false; }
+              }
+              else if (q.questionType === 'MATCHING') {
+                  try {
+                      const ansObj = JSON.parse(ans);
+                      isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                  } catch(e) { isCorrect = false; }
+              }
+
+              if (isCorrect) correctCount++;
+          });
+
+          const total = scorableQuestions.length;
+          const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+
+          return {
+              id: r.id,
+              score: score,
+              correct_answers: correctCount,
+              wrong_answers: total - correctCount - emptyCount,
+              empty_answers: emptyCount
+          };
+      });
+
+      // 6. Bulk Update Results
+      if (updates.length > 0) {
+          const { error: bulkError } = await supabase
+              .from('results')
+              .upsert(updates);
+          
+          if (bulkError) throw bulkError;
+      }
+  }
 
   // --- INDEXED DB METHODS (LOCAL PROGRESS) ---
   
