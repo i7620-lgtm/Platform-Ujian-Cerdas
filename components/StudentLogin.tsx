@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Html5Qrcode } from "html5-qrcode";
+// Use type-only import to prevent Rollup resolution errors during build
+import type { Html5Qrcode } from "html5-qrcode";
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
@@ -26,37 +27,53 @@ const parseClassConfig = (classString: string) => {
 };
 
 const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
-    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const scannerRef = useRef<any>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            const html5QrCode = new Html5Qrcode("reader");
-            scannerRef.current = html5QrCode;
-            
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                config, 
-                (decodedText) => {
-                    onScanSuccess(decodedText);
-                },
-                (errorMessage) => {
-                    // ignore parse errors
-                }
-            ).catch(err => {
+        let isMounted = true;
+        
+        const initScanner = async () => {
+            try {
+                // Dynamic import to bypass build resolution issues
+                const { Html5Qrcode } = await import("html5-qrcode");
+                
+                if (!isMounted) return;
+
+                const html5QrCode = new Html5Qrcode("reader", false);
+                scannerRef.current = html5QrCode;
+                
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                
+                await html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (decodedText: string) => {
+                        if (isMounted) onScanSuccess(decodedText);
+                    },
+                    (errorMessage: any) => {
+                        // ignore parse errors
+                    }
+                );
+            } catch (err) {
                 console.error("Error starting scanner", err);
-                alert("Gagal mengakses kamera. Pastikan Anda memberikan izin akses kamera pada browser.");
-                onClose();
-            });
-        }, 100);
+                if (isMounted) {
+                    alert("Gagal mengakses kamera atau memuat modul scanner.");
+                    onClose();
+                }
+            }
+        };
+
+        // Small delay to ensure DOM is ready
+        const timer = setTimeout(initScanner, 100);
 
         return () => {
+            isMounted = false;
             clearTimeout(timer);
             if (scannerRef.current) {
+                // Use catch to ignore errors during stop if it wasn't fully started
                 scannerRef.current.stop().then(() => {
-                    scannerRef.current?.clear();
-                }).catch(console.error);
+                    try { scannerRef.current?.clear(); } catch(e) {}
+                }).catch((e: any) => console.log("Stop failed", e));
             }
         };
     }, []);
