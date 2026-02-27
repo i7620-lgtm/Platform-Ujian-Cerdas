@@ -146,6 +146,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         }
     };
 
+    const handleDeleteStudent = async (studentId: string, studentName: string) => {
+        if (!window.confirm(`Apakah Anda yakin ingin menghapus data siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`)) return;
+        
+        try {
+            await storageService.deleteStudentResult(displayExam.code, studentId);
+            fetchLatest(true);
+            alert("Data siswa berhasil dihapus.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal menghapus data siswa.");
+        }
+    };
+
     const handleAddTimeSubmit = async () => { if (!addTimeValue || typeof addTimeValue !== 'number') return; try { await storageService.extendExamTime(displayExam.code, addTimeValue); fetchLatest(true); setIsAddTimeOpen(false); setAddTimeValue(''); } catch(e) { alert("Gagal."); } };
     
     const getRelativeTime = (timestamp?: number) => { 
@@ -419,6 +432,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                     title="Edit Data Siswa"
                                                                 >
                                                                     <PencilIcon className="w-4 h-4" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteStudent(r.student.studentId, r.student.fullName)}
+                                                                    className="p-1.5 bg-white dark:bg-slate-700 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors border border-slate-200 dark:border-slate-600 shadow-sm"
+                                                                    title="Hapus Data Siswa"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
                                                                 </button>
                                                                 {(r.status === 'in_progress' || r.status === 'force_closed') && (
                                                                     <button 
