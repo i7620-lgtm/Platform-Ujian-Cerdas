@@ -5,6 +5,7 @@ export const AudioPlayer: React.FC<{ src: string; onDelete?: () => void }> = ({ 
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
     useEffect(() => {
@@ -13,6 +14,7 @@ export const AudioPlayer: React.FC<{ src: string; onDelete?: () => void }> = ({ 
 
         const updateProgress = () => {
             if (audio.duration) {
+                setCurrentTime(audio.currentTime);
                 setProgress((audio.currentTime / audio.duration) * 100);
             }
         };
@@ -57,7 +59,7 @@ export const AudioPlayer: React.FC<{ src: string; onDelete?: () => void }> = ({ 
             </button>
             <div className="flex-1 min-w-0">
                 <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
-                    <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+                    <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                 </div>
                 <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative cursor-pointer" onClick={(e) => {
