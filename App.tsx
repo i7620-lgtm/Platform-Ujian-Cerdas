@@ -429,14 +429,14 @@ const App: React.FC = () => {
         )}
         
         {view === 'SELECTOR' && (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+            <div className="flex-1 flex flex-col p-6 relative overflow-y-auto">
                 {/* Background Decor */}
-                <div className="absolute inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
+                <div className="fixed inset-0 z-0 opacity-40 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100 dark:bg-slate-800 blur-[100px]"></div>
                     <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-50 dark:bg-slate-800 blur-[100px]"></div>
                 </div>
                 
-                <div className="w-full max-w-sm z-10 animate-gentle-slide">
+                <div className="w-full max-w-sm z-10 animate-gentle-slide mx-auto my-auto">
                     <div className="text-center mb-10">
                         <div className="inline-flex p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-slate-700 ring-1 ring-slate-100 dark:ring-slate-800">
                             <LogoIcon className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
