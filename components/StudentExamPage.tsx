@@ -313,6 +313,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     </div>
                                 </div>
 
+                                {activeExam.config.kkm && (
+                                    <div className="flex items-center gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <CheckCircleIcon className="w-5 h-5 text-emerald-500 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-emerald-400 dark:text-emerald-500 tracking-widest">Target Nilai</p>
+                                            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">KKM Minimal {activeExam.config.kkm}</p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {activeExam.config.detectBehavior && (
                                     <div className="flex items-center gap-4 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30">
                                         <LockClosedIcon className="w-5 h-5 text-rose-500 shrink-0" />
