@@ -303,11 +303,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   if (isLocked) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans transition-colors duration-300">
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans transition-colors duration-300">
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-rose-50/60 to-orange-50/60 dark:from-rose-900/20 dark:to-orange-900/20 rounded-full blur-[100px] animate-pulse"></div>
             </div>
-            <div className="w-full max-w-[420px] px-4 relative z-10">
+            <div className="w-full max-w-[420px] px-4 relative z-10 py-10 my-auto">
                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.03)] dark:shadow-none border border-white dark:border-slate-800 ring-1 ring-slate-50 dark:ring-slate-800 text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-rose-50 dark:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded-full mb-4 ring-8 ring-rose-50/50 dark:ring-rose-900/20">
                         <LockClosedIcon className="w-8 h-8"/>
@@ -325,8 +325,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '8s'}}></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-gradient-to-tl from-blue-50/60 to-emerald-50/60 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '10s'}}></div>
         </div>
@@ -342,7 +342,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             </div>
         )}
 
-        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col h-full sm:h-auto justify-center">
+        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col h-full sm:h-auto justify-center py-10 my-auto">
             <button 
                 onClick={onBack} 
                 className="group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-4 text-[10px] font-bold uppercase tracking-widest transition-all pl-2 py-2"
