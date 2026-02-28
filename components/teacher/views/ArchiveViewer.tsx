@@ -1087,7 +1087,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     {/* A. ANALISIS KELAS */}
                                     <div className="mb-4 bg-white border border-slate-300 rounded p-4">
                                         <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">A. Analisis Kelas {className}</h4>
-                                        <div className="grid grid-cols-4 gap-4 text-center">
+                                        
+                                        {/* Stat Grid */}
+                                        <div className="grid grid-cols-4 gap-4 text-center mb-6">
                                             <div className="p-2 bg-slate-50 rounded border border-slate-200">
                                                 <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
                                                 <span className="font-black text-lg text-slate-800">{classAvg}</span>
@@ -1105,6 +1107,84 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 <span className="font-black text-lg text-blue-700">{classTotal}</span>
                                             </div>
                                         </div>
+
+                                        {/* Detailed Stats Grid (Category, Level, Type) */}
+                                        {(() => {
+                                            // Calculate stats specific to this class
+                                            const { categoryStats: classCatStats, levelStats: classLevelStats } = calculateAggregateStats(exam, classResults);
+                                            const classTypeStats = analyzeQuestionTypePerformance(exam, classResults);
+
+                                            return (
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    {/* Kategori */}
+                                                    <div>
+                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi</p>
+                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
+                                                            <tbody>
+                                                                {classCatStats.length > 0 ? classCatStats.map(s => {
+                                                                    let bgClass = '';
+                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                    else bgClass = 'print-bg-red';
+                                                                    
+                                                                    return (
+                                                                        <tr key={s.name}>
+                                                                            <td className="border p-1">{s.name}</td>
+                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                        </tr>
+                                                                    )
+                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    {/* Level */}
+                                                    <div>
+                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Tingkat Kesulitan</p>
+                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Level</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                                                            <tbody>
+                                                                {classLevelStats.length > 0 ? classLevelStats.map(s => {
+                                                                    let bgClass = '';
+                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                    else bgClass = 'print-bg-red';
+
+                                                                    return (
+                                                                        <tr key={s.name}>
+                                                                            <td className="border p-1">{s.name}</td>
+                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                        </tr>
+                                                                    )
+                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    {/* Jenis Soal */}
+                                                    <div>
+                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Jenis Soal</p>
+                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Jenis</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                                                            <tbody>
+                                                                {classTypeStats.length > 0 ? classTypeStats.map(s => {
+                                                                    let bgClass = '';
+                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                    else bgClass = 'print-bg-red';
+
+                                                                    return (
+                                                                        <tr key={s.type}>
+                                                                            <td className="border p-1">{s.typeName}</td>
+                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                        </tr>
+                                                                    )
+                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* B. REKAPITULASI HASIL KELAS */}
