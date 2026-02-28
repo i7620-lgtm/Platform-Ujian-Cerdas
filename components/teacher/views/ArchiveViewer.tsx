@@ -904,7 +904,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Min / Max</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Ketuntasan (KKM 75)</th>
+                                        {archiveData.exam.config.kkm && <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Ketuntasan (KKM {archiveData.exam.config.kkm})</th>}
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Detail Performa Soal</th>
                                     </tr>
                                 </thead>
@@ -921,14 +921,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
                                                 {c.lowestScore} - {c.highestScore}
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className={`font-bold text-sm ${c.passRate >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                        {c.passRate}%
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400">({c.passCount} Tuntas)</span>
-                                                </div>
-                                            </td>
+                                            {archiveData.exam.config.kkm && (
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className={`font-bold text-sm ${c.passRate >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                            {c.passRate}%
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">({c.passCount} Tuntas)</span>
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-wrap gap-2">
                                                     {c.questionTypeStats.slice(0, 3).map((qt, i) => (
@@ -1077,7 +1079,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
                         const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
                         const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                        const passedCount = classScores.filter(s => s >= 75).length; 
+                        const kkm = exam.config.kkm || 75;
+                        const passedCount = classScores.filter(s => s >= kkm).length; 
 
                         return (
                             <div key={className}>
