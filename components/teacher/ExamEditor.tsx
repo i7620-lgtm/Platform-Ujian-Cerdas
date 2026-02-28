@@ -617,6 +617,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jenis Evaluasi</label><div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
 
+                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">KKM (Opsional)</label><input type="number" name="kkm" value={config.kkm || ''} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" placeholder="Contoh: 75" /></div>
+
                         <div className="md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Target Kelas (Opsional)</label>
                             <div className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl min-h-[56px] flex flex-wrap gap-2 items-center">
