@@ -993,7 +993,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         {/* Kategori */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi (Kategori)</p>
+                            <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi</p>
                             <table className="w-full border-collapse border border-slate-300 text-[10px]">
                                 <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
                                 <tbody>
