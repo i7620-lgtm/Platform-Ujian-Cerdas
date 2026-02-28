@@ -1,6 +1,6 @@
  
-import React, { useState, useEffect } from 'react';
-import { ChartBarIcon, TableCellsIcon, CheckCircleIcon, ArrowPathIcon } from '../Icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ChartBarIcon, ArrowPathIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import type { ExamSummary } from '../../types';
 
@@ -20,16 +20,16 @@ const AnalyticsView: React.FC = () => {
     const [aiResult, setAiResult] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async (region: string, subject: string) => {
         setIsLoading(true);
-        const data = await storageService.getAnalyticsData({ region: filterRegion, subject: filterSubject });
+        const data = await storageService.getAnalyticsData({ region, subject });
         setSummaries(data);
         setIsLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData('', '');
+    }, [fetchData]);
 
     const toggleSelect = (id: string) => {
         const newSet = new Set(selectedIds);
@@ -69,7 +69,7 @@ const AnalyticsView: React.FC = () => {
                         onChange={e => setFilterRegion(e.target.value)}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
-                    <button onClick={fetchData} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
+                    <button onClick={() => fetchData(filterRegion, filterSubject)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
                 </div>
             </div>
 
