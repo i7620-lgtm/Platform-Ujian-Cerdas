@@ -153,8 +153,9 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
         const averageScore = studentCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / studentCount) : 0;
         const highestScore = studentCount > 0 ? Math.max(...scores) : 0;
         const lowestScore = studentCount > 0 ? Math.min(...scores) : 0;
-        // Asumsi KKM 75
-        const passCount = scores.filter(s => s >= 75).length; 
+        
+        const kkm = exam.config.kkm || 75;
+        const passCount = scores.filter(s => s >= kkm).length; 
         const passRate = studentCount > 0 ? Math.round((passCount / studentCount) * 100) : 0;
         
         // Analyze question type performance for this class specifically
