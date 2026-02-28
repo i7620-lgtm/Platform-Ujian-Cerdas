@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon } from './Icons';
+import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
 
@@ -24,11 +24,99 @@ const parseClassConfig = (classString: string) => {
     return { name: classString, limit: null };
 };
 
+const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
+    const scannerRef = useRef<any>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        
+        const initScanner = async () => {
+            try {
+                // Load from CDN to avoid build-time resolution issues with the package
+                if (!(window as any).Html5Qrcode) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement("script");
+                        script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+                        script.async = true;
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error("Failed to load QR scanner script"));
+                        document.body.appendChild(script);
+                    });
+                }
+                
+                if (!isMounted) return;
+
+                // Access global variable
+                const Html5Qrcode = (window as any).Html5Qrcode;
+                if (!Html5Qrcode) throw new Error("Html5Qrcode not found");
+
+                const html5QrCode = new Html5Qrcode("reader", false);
+                scannerRef.current = html5QrCode;
+                
+                // Remove qrbox to prevent the library from rendering the white bracket overlay
+                const config = { fps: 10 };
+                
+                await html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (decodedText: string) => {
+                        if (isMounted) onScanSuccess(decodedText);
+                    },
+                    (errorMessage: any) => {
+                        // ignore parse errors
+                    }
+                );
+            } catch (err) {
+                console.error("Error starting scanner", err);
+                if (isMounted) {
+                    alert("Gagal memuat pemindai kamera. Pastikan koneksi internet stabil.");
+                    onClose();
+                }
+            }
+        };
+
+        // Small delay to ensure DOM is ready
+        const timer = setTimeout(initScanner, 100);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
+            if (scannerRef.current) {
+                // Use catch to ignore errors during stop if it wasn't fully started
+                scannerRef.current.stop().then(() => {
+                    try { scannerRef.current?.clear(); } catch(e) {}
+                }).catch((e: any) => console.log("Stop failed", e));
+            }
+        };
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
+             <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm relative animate-slide-in-up border border-white dark:border-slate-700">
+                 <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">Pindai QR Code</h3>
+                 <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
+                    <div id="reader" className="w-full h-full"></div>
+                    {/* Removed white border div to clean up UI */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-400 rounded-xl pointer-events-none animate-pulse"></div>
+                 </div>
+                 <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
+                    Arahkan kamera ke QR Code ujian.<br/>
+                    Pastikan cahaya cukup terang.
+                 </p>
+                 <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                    <XMarkIcon className="w-5 h-5" />
+                 </button>
+             </div>
+        </div>
+    );
+};
+
 export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBack, isDarkMode, toggleTheme, initialCode }) => {
   // Logic State
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
@@ -70,10 +158,17 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     // Logic fokus kursor cerdas
     if (initialCode) {
         setTimeout(() => nameInputRef.current?.focus(), 100);
-    } else if (fullName && studentClass && absentNumber && examCodeInputRef.current) {
-        examCodeInputRef.current.focus();
+    } else {
+        // Cek localStorage langsung untuk menghindari dependency cycle
+        const savedName = localStorage.getItem('saved_student_fullname');
+        const savedClass = localStorage.getItem('saved_student_class');
+        const savedAbsent = localStorage.getItem('saved_student_absent');
+        
+        if (savedName && savedClass && savedAbsent && examCodeInputRef.current) {
+            examCodeInputRef.current.focus();
+        }
     }
-  }, [initialCode, fullName, studentClass, absentNumber]);
+  }, [initialCode]);
 
   // STRICTOR NORMALIZATION HELPER
   const normalizeId = (text: string) => {
@@ -208,11 +303,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   if (isLocked) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans transition-colors duration-300">
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans transition-colors duration-300">
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-rose-50/60 to-orange-50/60 dark:from-rose-900/20 dark:to-orange-900/20 rounded-full blur-[100px] animate-pulse"></div>
             </div>
-            <div className="w-full max-w-[420px] px-4 relative z-10">
+            <div className="w-full max-w-[420px] px-4 relative z-10 py-10 my-auto">
                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.03)] dark:shadow-none border border-white dark:border-slate-800 ring-1 ring-slate-50 dark:ring-slate-800 text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-rose-50 dark:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded-full mb-4 ring-8 ring-rose-50/50 dark:ring-rose-900/20">
                         <LockClosedIcon className="w-8 h-8"/>
@@ -230,8 +325,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 relative font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br from-indigo-50/60 to-purple-50/60 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '8s'}}></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-gradient-to-tl from-blue-50/60 to-emerald-50/60 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '10s'}}></div>
         </div>
@@ -247,7 +342,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             </div>
         )}
 
-        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col h-full sm:h-auto justify-center">
+        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col h-full sm:h-auto justify-center py-10 my-auto">
             <button 
                 onClick={onBack} 
                 className="group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-4 text-[10px] font-bold uppercase tracking-widest transition-all pl-2 py-2"
@@ -378,9 +473,14 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     <div className={`relative group transition-all duration-300 ${isFocused === 'code' ? 'scale-[1.02]' : ''}`}>
                         <div className={`absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-20 transition duration-500 blur ${isFocused === 'code' ? 'opacity-30' : ''}`}></div>
                         <div className={`relative bg-white dark:bg-slate-900 rounded-xl p-1 flex items-center shadow-sm border transition-colors ${isFocused === 'code' ? 'border-indigo-100 dark:border-indigo-500' : 'border-slate-100 dark:border-slate-800'}`}>
-                           <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 shrink-0">
+                           <button 
+                                type="button"
+                                onClick={() => setIsQrScannerOpen(true)}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 shrink-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer active:scale-95"
+                                title="Pindai QR Code"
+                           >
                               <QrCodeIcon className="w-5 h-5" />
-                           </div>
+                           </button>
                            <div className="h-6 w-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
                            <input
                                 ref={examCodeInputRef}
@@ -430,6 +530,22 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 <p className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">Platform Ujian Cerdas</p>
             </div>
         </div>
+
+        {isQrScannerOpen && (
+            <QrScannerModal 
+                onScanSuccess={(text) => {
+                    let code = text;
+                    try {
+                        const url = new URL(text);
+                        const joinCode = url.searchParams.get('join');
+                        if (joinCode) code = joinCode;
+                    } catch (e) {}
+                    setExamCode(code);
+                    setIsQrScannerOpen(false);
+                }} 
+                onClose={() => setIsQrScannerOpen(false)} 
+            />
+        )}
     </div>
   );
 };

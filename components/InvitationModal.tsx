@@ -115,6 +115,31 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         return 'bg-blue-600 text-white';
     };
 
+    const getFormattedStartDate = () => {
+        if (!exam) return '';
+        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        try {
+            const date = new Date(`${dateStr}T${exam.config.startTime}`);
+            if (isNaN(date.getTime())) return `${dateStr} ${exam.config.startTime}`;
+            
+            const datePart = date.toLocaleDateString('id-ID', { 
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric'
+            });
+            const timePart = date.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            
+            return `${datePart} pukul ${timePart} waktu setempat`;
+        } catch (e) {
+            return `${dateStr} ${exam.config.startTime}`;
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-6 bg-slate-900/70 backdrop-blur-md animate-fade-in font-sans overflow-hidden">
             <style>{`
@@ -236,6 +261,13 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                 </div>
                             ) : timeLeft ? (
                                 <div className="w-full">
+                                    <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-700/50">
+                                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Jadwal Pelaksanaan</p>
+                                        <p className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-200 capitalize">
+                                            {getFormattedStartDate()}
+                                        </p>
+                                    </div>
+
                                     <div className="flex items-center justify-center gap-1.5 mb-2 sm:mb-3 opacity-60">
                                         <ClockIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                         <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em]">Waktu Tersisa</span>

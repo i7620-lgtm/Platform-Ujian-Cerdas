@@ -74,7 +74,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-6 bg-[#EEF2FF] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300 relative">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#EEF2FF] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300 relative overflow-y-auto">
         {/* Theme Toggle Top Right */}
         {toggleTheme && (
             <div className="absolute top-6 right-6 z-50">
@@ -87,7 +87,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
             </div>
         )}
 
-        <div className="w-full max-w-[440px] animate-fade-in flex flex-col">
+        <div className="w-full max-w-[440px] animate-fade-in flex flex-col p-6 my-auto">
             <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 mb-4 font-bold transition-all self-start text-xs uppercase tracking-widest">
                 <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> 
                 Kembali
