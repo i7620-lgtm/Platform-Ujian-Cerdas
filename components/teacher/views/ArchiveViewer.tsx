@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
-import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList } from '../examUtils';
+import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
     CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon 
@@ -18,7 +18,7 @@ type ArchiveData = {
     results: Result[];
 };
 
-type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS';
+type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
 
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
@@ -467,6 +467,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         return calculateAggregateStats(archiveData.exam, archiveData.results);
     }, [archiveData]);
 
+    const classAnalysisData = useMemo(() => {
+        if (!archiveData) return [];
+        return analyzeClassPerformance(archiveData.exam, archiveData.results);
+    }, [archiveData]);
+
+    const questionTypeStats = useMemo(() => {
+        if (!archiveData) return [];
+        return analyzeQuestionTypePerformance(archiveData.exam, archiveData.results);
+    }, [archiveData]);
+
     const generalRecommendation = useMemo(() => {
         if (!archiveData) return '';
         
@@ -682,8 +692,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-4">
-                    {(['DETAIL', 'STUDENTS', 'ANALYSIS'] as ArchiveTab[]).map(tab => {
-                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${totalStudents})` : 'Analisis Soal';
+                    {(['DETAIL', 'STUDENTS', 'ANALYSIS', 'CLASS_ANALYSIS'] as ArchiveTab[]).map(tab => {
+                        const label = tab === 'DETAIL' ? 'Detail Ujian' : tab === 'STUDENTS' ? `Rekap Siswa (${totalStudents})` : tab === 'ANALYSIS' ? 'Analisis Soal' : 'Analisis Kelas';
                         return <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{label}</button>
                     })}
                 </div>
@@ -830,37 +840,111 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                              <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                              <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
                         </div>
-                        {(categoryStats.length > 0 || levelStats.length > 0) && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {(categoryStats.length > 0 || levelStats.length > 0 || questionTypeStats.length > 0) && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                     <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ListBulletIcon className="w-4 h-4"/> Penguasaan Materi (Kategori)</h3>
                                     <div className="space-y-3">
-                                        {categoryStats.map(stat => (
+                                        {categoryStats.length > 0 ? categoryStats.map(stat => (
                                             <div key={stat.name}>
                                                 <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                                                     <span>{stat.name}</span><span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
                                                 </div>
                                                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div></div>
                                             </div>
-                                        ))}
+                                        )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
                                     </div>
                                 </div>
                                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                     <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ChartBarIcon className="w-4 h-4"/> Tingkat Kesulitan (Level)</h3>
                                     <div className="space-y-3">
-                                        {levelStats.map(stat => (
+                                        {levelStats.length > 0 ? levelStats.map(stat => (
                                             <div key={stat.name}>
                                                 <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                                                     <span>{stat.name}</span><span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
                                                 </div>
                                                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div></div>
                                             </div>
-                                        ))}
+                                        )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
+                                    </div>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TableCellsIcon className="w-4 h-4"/> Jenis Soal</h3>
+                                    <div className="space-y-3">
+                                        {questionTypeStats.length > 0 ? questionTypeStats.map(stat => (
+                                            <div key={stat.type}>
+                                                <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                    <span>{stat.typeName}</span><span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div></div>
+                                            </div>
+                                        )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
                                     </div>
                                 </div>
                             </div>
                         )}
                         <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={results} />; })}</div></div>
+                    </div>
+                )}
+                {activeTab === 'CLASS_ANALYSIS' && (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+                            <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                                <ChartBarIcon className="w-5 h-5 text-indigo-500"/> Analisis Umum Per Kelas
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Ringkasan performa dan ketuntasan belajar siswa dikelompokkan berdasarkan kelas.
+                            </p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 dark:bg-slate-700">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Min / Max</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Ketuntasan (KKM 75)</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Detail Performa Soal</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                                    {classAnalysisData.map((c, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{c.className}</td>
+                                            <td className="px-6 py-4 text-center text-sm text-slate-600 dark:text-slate-300">{c.studentCount} Siswa</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`px-2 py-1 rounded font-bold text-xs ${c.averageScore >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                    {c.averageScore}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
+                                                {c.lowestScore} - {c.highestScore}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className={`font-bold text-sm ${c.passRate >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                        {c.passRate}%
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400">({c.passCount} Tuntas)</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {c.questionTypeStats.slice(0, 3).map((qt, i) => (
+                                                        <div key={i} className="text-[10px] px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1" title={`${qt.typeName}: ${qt.percentage}% Benar`}>
+                                                            <span className="text-slate-500 dark:text-slate-400 uppercase font-bold">{qt.type.substring(0, 3)}</span>
+                                                            <span className={`font-bold ${qt.percentage >= 70 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{qt.percentage}%</span>
+                                                        </div>
+                                                    ))}
+                                                    {c.questionTypeStats.length > 3 && <span className="text-[10px] text-slate-400 self-center">+{c.questionTypeStats.length - 3} lainnya</span>}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
@@ -906,7 +990,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 mb-4">
+                    <div className="grid grid-cols-3 gap-4 mb-4">
                         {/* Kategori */}
                         <div>
                             <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi (Kategori)</p>
@@ -944,6 +1028,28 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         return (
                                             <tr key={s.name}>
                                                 <td className="border p-1">{s.name}</td>
+                                                <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                            </tr>
+                                        )
+                                    }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Jenis Soal */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Jenis Soal</p>
+                            <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Jenis</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                                <tbody>
+                                    {questionTypeStats.length > 0 ? questionTypeStats.map(s => {
+                                        let bgClass = '';
+                                        if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                        else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                        else bgClass = 'print-bg-red';
+
+                                        return (
+                                            <tr key={s.type}>
+                                                <td className="border p-1">{s.typeName}</td>
                                                 <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
                                             </tr>
                                         )
