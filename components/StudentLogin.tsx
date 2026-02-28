@@ -53,7 +53,8 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
                 const html5QrCode = new Html5Qrcode("reader", false);
                 scannerRef.current = html5QrCode;
                 
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                // Remove qrbox to prevent the library from rendering the white bracket overlay
+                const config = { fps: 10 };
                 
                 await html5QrCode.start(
                     { facingMode: "environment" }, 
@@ -95,7 +96,7 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
                  <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">Pindai QR Code</h3>
                  <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
                     <div id="reader" className="w-full h-full"></div>
-                    <div className="absolute inset-0 border-2 border-white/30 pointer-events-none"></div>
+                    {/* Removed white border div to clean up UI */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-400 rounded-xl pointer-events-none animate-pulse"></div>
                  </div>
                  <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
