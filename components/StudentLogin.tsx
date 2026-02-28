@@ -96,8 +96,18 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
                  <h3 className="text-center font-black text-slate-800 dark:text-white mb-4 text-lg">Pindai QR Code</h3>
                  <div className="relative rounded-2xl overflow-hidden bg-black aspect-square shadow-inner">
                     <div id="reader" className="w-full h-full"></div>
-                    {/* Removed white border div to clean up UI */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-400 rounded-xl pointer-events-none animate-pulse"></div>
+                    {/* Scanning Line Animation */}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                        <div className="w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                        <style>{`
+                            @keyframes scan {
+                                0% { transform: translateY(0); opacity: 0; }
+                                10% { opacity: 1; }
+                                90% { opacity: 1; }
+                                100% { transform: translateY(100%); opacity: 0; }
+                            }
+                        `}</style>
+                    </div>
                  </div>
                  <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4 font-medium">
                     Arahkan kamera ke QR Code ujian.<br/>
@@ -342,7 +352,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             </div>
         )}
 
-        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col h-full sm:h-auto justify-center py-10 my-auto">
+        <div className="w-full max-w-[420px] px-4 relative z-10 flex flex-col sm:h-auto justify-center py-10 my-auto">
             <button 
                 onClick={onBack} 
                 className="group self-start flex items-center gap-2 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mb-4 text-[10px] font-bold uppercase tracking-widest transition-all pl-2 py-2"
