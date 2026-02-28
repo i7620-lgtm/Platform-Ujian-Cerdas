@@ -43,6 +43,137 @@ export interface StudentAnalysis {
     recommendation: string;
 }
 
+export interface QuestionTypeStat {
+    type: QuestionType;
+    typeName: string;
+    totalQuestions: number;
+    totalAttempt: number;
+    correct: number;
+    percentage: number;
+}
+
+export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Result[]): QuestionTypeStat[] => {
+    const resultArray = Array.isArray(results) ? results : [results];
+    const typeMap: Record<string, { totalQuestions: number; totalAttempt: number; correct: number }> = {};
+    const normalize = (str: string) => (str || '').trim().toLowerCase();
+
+    // Initialize map with all types present in exam
+    exam.questions.forEach(q => {
+        if (q.questionType === 'INFO') return;
+        if (!typeMap[q.questionType]) {
+            typeMap[q.questionType] = { totalQuestions: 0, totalAttempt: 0, correct: 0 };
+        }
+        typeMap[q.questionType].totalQuestions++;
+    });
+
+    const checkAnswer = (q: Question, ans: string) => {
+        if (!ans) return false;
+        const normAns = normalize(String(ans));
+        const normKey = normalize(String(q.correctAnswer || ''));
+
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            return normAns === normKey;
+        } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const sSet = new Set(parseList(normAns).map(normalize));
+            const cSet = new Set(parseList(normKey).map(normalize));
+            return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        } else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+            } catch(e) { return false; }
+        } else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+            } catch(e) { return false; }
+        }
+        return false;
+    };
+
+    // Calculate stats
+    resultArray.forEach(result => {
+        exam.questions.forEach(q => {
+             if (q.questionType === 'INFO') return;
+             if (!typeMap[q.questionType]) return; // Should be initialized, but safety check
+
+             typeMap[q.questionType].totalAttempt++;
+             if (checkAnswer(q, result.answers[q.id])) {
+                 typeMap[q.questionType].correct++;
+             }
+        });
+    });
+
+    const getTypeName = (type: QuestionType) => {
+        switch(type) {
+            case 'MULTIPLE_CHOICE': return 'Pilihan Ganda';
+            case 'COMPLEX_MULTIPLE_CHOICE': return 'Pilihan Ganda Kompleks';
+            case 'TRUE_FALSE': return 'Benar / Salah';
+            case 'MATCHING': return 'Menjodohkan';
+            case 'FILL_IN_THE_BLANK': return 'Isian Singkat';
+            case 'ESSAY': return 'Uraian / Esai';
+            default: return type;
+        }
+    };
+
+    return Object.entries(typeMap).map(([type, data]) => ({
+        type: type as QuestionType,
+        typeName: getTypeName(type as QuestionType),
+        totalQuestions: data.totalQuestions,
+        totalAttempt: data.totalAttempt,
+        correct: data.correct,
+        percentage: data.totalAttempt > 0 ? Math.round((data.correct / data.totalAttempt) * 100) : 0
+    })).sort((a, b) => b.percentage - a.percentage);
+};
+
+export interface ClassAnalysis {
+    className: string;
+    studentCount: number;
+    averageScore: number;
+    highestScore: number;
+    lowestScore: number;
+    passCount: number;
+    passRate: number;
+    questionTypeStats: QuestionTypeStat[];
+}
+
+export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAnalysis[] => {
+    const classMap: Record<string, Result[]> = {};
+    
+    // Group by class
+    results.forEach(r => {
+        const c = r.student.class || 'Tanpa Kelas';
+        if (!classMap[c]) classMap[c] = [];
+        classMap[c].push(r);
+    });
+
+    return Object.entries(classMap).map(([className, classResults]) => {
+        const studentCount = classResults.length;
+        const scores = classResults.map(r => r.score);
+        const averageScore = studentCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / studentCount) : 0;
+        const highestScore = studentCount > 0 ? Math.max(...scores) : 0;
+        const lowestScore = studentCount > 0 ? Math.min(...scores) : 0;
+        
+        const kkm = exam.config.kkm || 75;
+        const passCount = scores.filter(s => s >= kkm).length; 
+        const passRate = studentCount > 0 ? Math.round((passCount / studentCount) * 100) : 0;
+        
+        // Analyze question type performance for this class specifically
+        const questionTypeStats = analyzeQuestionTypePerformance(exam, classResults);
+
+        return {
+            className,
+            studentCount,
+            averageScore,
+            highestScore,
+            lowestScore,
+            passCount,
+            passRate,
+            questionTypeStats
+        };
+    }).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+};
+
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
 export const parseList = (str: string | undefined | null): string[] => {
     if (!str) return [];

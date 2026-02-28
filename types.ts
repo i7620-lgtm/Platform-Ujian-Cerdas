@@ -49,6 +49,7 @@ export interface ExamConfig {
   examType: string;
   description: string;
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
+  kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
 }
 
 export interface Exam {

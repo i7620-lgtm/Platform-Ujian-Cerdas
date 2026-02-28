@@ -5,7 +5,7 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { StudentResultPage } from '../StudentResultPage';
-import { calculateAggregateStats, parseList } from './examUtils';
+import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; onAllowContinuation: (studentId: string, examCode: string) => void; onUpdateExam?: (exam: Exam) => void; isReadOnly?: boolean; }
@@ -829,6 +829,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
     // --- NEW: CATEGORY & LEVEL ANALYSIS ---
     const { categoryStats, levelStats } = useMemo(() => calculateAggregateStats(displayExam, results), [displayExam, results]);
+    const questionTypeStats = useMemo(() => analyzeQuestionTypePerformance(displayExam, results), [displayExam, results]);
 
     const questionStats = useMemo(() => {
         return displayExam.questions.filter(q => q.questionType !== 'INFO').map(q => {
@@ -946,14 +947,14 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                 </div>
 
                                 {/* NEW: Category & Level Statistics */}
-                                {(categoryStats.length > 0 || levelStats.length > 0) && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {(categoryStats.length > 0 || levelStats.length > 0 || questionTypeStats.length > 0) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                             <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <ListBulletIcon className="w-4 h-4"/> Penguasaan Materi (Kategori)
                                             </h3>
                                             <div className="space-y-3">
-                                                {categoryStats.map(stat => (
+                                                {categoryStats.length > 0 ? categoryStats.map(stat => (
                                                     <div key={stat.name}>
                                                         <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                                                             <span>{stat.name}</span>
@@ -963,7 +964,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                             <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
                                             </div>
                                         </div>
 
@@ -972,7 +973,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                 <ChartBarIcon className="w-4 h-4"/> Tingkat Kesulitan (Level)
                                             </h3>
                                             <div className="space-y-3">
-                                                {levelStats.map(stat => (
+                                                {levelStats.length > 0 ? levelStats.map(stat => (
                                                     <div key={stat.name}>
                                                         <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                                                             <span>{stat.name}</span>
@@ -982,7 +983,26 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                             <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                            <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <TableCellsIcon className="w-4 h-4"/> Jenis Soal
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {questionTypeStats.length > 0 ? questionTypeStats.map(stat => (
+                                                    <div key={stat.type}>
+                                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                            <span>{stat.typeName}</span>
+                                                            <span className={stat.percentage < 50 ? 'text-rose-500' : stat.percentage < 80 ? 'text-amber-500' : 'text-emerald-600'}>{stat.percentage}%</span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full transition-all duration-1000 ${stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{width: `${stat.percentage}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                )) : <p className="text-xs text-slate-400 italic">Tidak ada data.</p>}
                                             </div>
                                         </div>
                                     </div>

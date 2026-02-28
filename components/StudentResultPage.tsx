@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { Result, Exam, Question } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance, parseList } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance } from './teacher/examUtils';
 
 interface StudentResultPageProps {
   result: Result;
@@ -121,6 +121,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
     // NEW: Analytical Data for Diagnostic Card
     const analysisData = useMemo(() => analyzeStudentPerformance(exam, result), [exam, result]);
+    const questionTypeStats = useMemo(() => analyzeQuestionTypePerformance(exam, result), [exam, result]);
 
     if (result.status === 'force_closed') {
         return (
@@ -250,6 +251,34 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                     </div>
                                 ) : (
                                     <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>
+                                )}
+                            </div>
+
+                            {/* NEW: QUESTION TYPE ANALYSIS CARD */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
+                                <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <ChartBarIcon className="w-4 h-4"/> Analisis Jenis Soal
+                                </h3>
+                                
+                                {questionTypeStats.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {questionTypeStats.map((stat) => {
+                                            const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
+                                            return (
+                                                <div key={stat.type}>
+                                                    <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                        <span>{stat.typeName}</span>
+                                                        <span>{stat.percentage}% ({stat.correct}/{stat.totalAttempt})</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                        <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 italic">Tidak ada data jenis soal.</p>
                                 )}
                             </div>
 

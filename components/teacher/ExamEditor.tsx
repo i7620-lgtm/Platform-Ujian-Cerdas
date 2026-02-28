@@ -2,14 +2,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
-    TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, SpeakerWaveIcon, StopIcon, PlayIcon,
+    TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, SpeakerWaveIcon,
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
 import { compressImage, parseList } from './examUtils';
-import { AudioPlayer } from '../AudioPlayer';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -97,6 +96,7 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
     const [val1, setVal1] = useState(''); const [val2, setVal2] = useState(''); const [val3, setVal3] = useState(''); 
     const [rows, setRows] = useState(2); const [cols, setCols] = useState(2);
     const [matData, setMatData] = useState<string[][]>([]);
+    
     useEffect(() => {
         if (isOpen) {
             const safeRows = Math.max(1, Math.min(10, Math.floor(rows || 1)));
@@ -104,7 +104,31 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
             setMatData(Array.from({ length: safeRows }, () => Array(safeCols).fill('')));
             setVal1(''); setVal2(''); setVal3('');
         }
-    }, [isOpen, rows, cols]);
+    }, [isOpen]); // Removed rows/cols from deps to prevent sync loop
+
+    const handleRowsChange = (val: number) => {
+        const newRows = Math.max(1, Math.min(10, Math.floor(val || 1)));
+        setRows(newRows);
+        setMatData(prev => {
+            const newData = Array.from({ length: newRows }, (_, r) => {
+                return Array.from({ length: cols }, (_, c) => (prev[r] && prev[r][c]) || '');
+            });
+            return newData;
+        });
+    };
+
+    const handleColsChange = (val: number) => {
+        const newCols = Math.max(1, Math.min(10, Math.floor(val || 1)));
+        setCols(newCols);
+        setMatData(prev => {
+            return prev.map(row => {
+                const newRow = Array(newCols).fill('');
+                row.forEach((v, i) => { if (i < newCols) newRow[i] = v; });
+                return newRow;
+            });
+        });
+    };
+
     const updateMatrix = (r: number, c: number, v: string) => { const d = matData.map(row => [...row]); if(d[r]) { d[r][c] = v; setMatData(d); }};
     const insertStructure = (type: 'FRAC' | 'ROOT' | 'LIMIT' | 'INT' | 'SUM' | 'MATRIX' | 'SYMBOL', symbolVal?: string) => {
         let latex = '';
@@ -129,7 +153,7 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
                 <div className="p-5 overflow-y-auto">
                     {tab === 'BASIC' && (<div className="space-y-6"><div className="bg-gray-50 dark:bg-slate-700/30 p-3 rounded-lg border border-gray-100 dark:border-slate-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-3 text-center">Pecahan</p><div className="flex flex-col gap-2"><div className="flex items-center justify-center gap-3"><input placeholder="Int" className="w-12 h-10 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val3} onChange={e => setVal3(e.target.value)} /><div className="flex flex-col items-center gap-1"><input placeholder="Atas" className="w-16 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val1} onChange={e => setVal1(e.target.value)} /><div className="w-20 h-0.5 bg-gray-800 dark:bg-slate-400 rounded-full"></div><input placeholder="Bawah" className="w-16 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val2} onChange={e => setVal2(e.target.value)} /></div></div><button onClick={() => insertStructure('FRAC')} className="mt-2 w-full text-xs bg-indigo-600 text-white font-bold py-1.5 rounded">Sisipkan</button></div></div><div className="bg-gray-50 dark:bg-slate-700/30 p-3 rounded-lg border border-gray-100 dark:border-slate-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">Akar</p><div className="flex items-end gap-1 justify-center"><input placeholder="n" className="w-8 text-center text-xs p-1 border dark:border-slate-600 rounded mb-4 bg-white dark:bg-slate-800 dark:text-slate-200" value={val1} onChange={e => setVal1(e.target.value)} /><span className="text-3xl text-gray-400 font-light">√</span><input placeholder="Nilai" className="w-24 text-sm p-1 border dark:border-slate-600 rounded mb-1 bg-white dark:bg-slate-800 dark:text-slate-200" value={val2} onChange={e => setVal2(e.target.value)} /><button onClick={() => insertStructure('ROOT')} className="mb-1 text-xs bg-white dark:bg-slate-800 border dark:border-slate-600 font-bold px-3 py-1.5 rounded dark:text-slate-200">OK</button></div></div></div>)}
                     {tab === 'CALCULUS' && (<div className="space-y-4"><div className="border dark:border-slate-700 p-3 rounded bg-white dark:bg-slate-800 dark:text-slate-200"><p className="text-[10px] font-bold mb-2">Limit</p><div className="flex items-center gap-3 text-sm"><div className="flex flex-col items-center"><span className="font-serif italic text-lg leading-none">lim</span><div className="flex items-center gap-1 text-[10px] mt-1"><input placeholder="x" className="w-8 p-0.5 border dark:border-slate-600 rounded text-center bg-white dark:bg-slate-900" value={val1} onChange={e => setVal1(e.target.value)} /><span>→</span><input placeholder="∞" className="w-8 p-0.5 border dark:border-slate-600 rounded text-center bg-white dark:bg-slate-900" value={val2} onChange={e => setVal2(e.target.value)} /></div></div><input placeholder="f(x)" className="w-24 p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-900 self-center" value={val3} onChange={e => setVal3(e.target.value)} /><button onClick={() => insertStructure('LIMIT')} className="ml-auto text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded font-bold">Add</button></div></div><div className="border dark:border-slate-700 p-3 rounded bg-white dark:bg-slate-800 dark:text-slate-200"><p className="text-[10px] font-bold mb-2">Integral / Sigma</p><div className="flex items-center gap-2"><div className="flex flex-col items-center"><input placeholder="b" className="w-10 text-center text-xs border dark:border-slate-600 rounded mb-1 bg-white dark:bg-slate-900" value={val2} onChange={e => setVal2(e.target.value)} /><span className="text-2xl text-gray-400">∫/∑</span><input placeholder="a" className="w-10 text-center text-xs border dark:border-slate-600 rounded mt-1 bg-white dark:bg-slate-900" value={val1} onChange={e => setVal1(e.target.value)} /></div><input placeholder="Fungsi" className="flex-1 p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-900" value={val3} onChange={e => setVal3(e.target.value)} /></div><div className="flex gap-2 mt-2"><button onClick={() => insertStructure('INT')} className="flex-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 py-1 rounded">Integral</button><button onClick={() => insertStructure('SUM')} className="flex-1 text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 py-1 rounded">Sigma</button></div></div></div>)}
-                    {tab === 'MATRIX' && (<div><div className="flex gap-4 justify-center mb-4 dark:text-slate-200"><label className="text-[10px] font-bold">Baris <input type="number" min="1" max="5" value={rows} onChange={e => setRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label><label className="text-[10px] font-bold">Kolom <input type="number" min="1" max="5" value={cols} onChange={e => setCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label></div><div className="grid gap-1 justify-center bg-gray-100 dark:bg-slate-700/50 p-2 rounded" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>{matData.map((rArr, r) => rArr.map((val, c) => (<input key={`${r}-${c}`} value={val} onChange={e => updateMatrix(r, c, e.target.value)} className="w-10 h-8 text-center border dark:border-slate-600 rounded text-xs focus:bg-indigo-50 dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-900 dark:text-slate-200" placeholder="0" />)))}</div><button onClick={() => insertStructure('MATRIX')} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-indigo-700">Sisipkan Matriks</button></div>)}
+                    {tab === 'MATRIX' && (<div><div className="flex gap-4 justify-center mb-4 dark:text-slate-200"><label className="text-[10px] font-bold">Baris <input type="number" min="1" max="5" value={rows} onChange={e => handleRowsChange(parseInt(e.target.value))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label><label className="text-[10px] font-bold">Kolom <input type="number" min="1" max="5" value={cols} onChange={e => handleColsChange(parseInt(e.target.value))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label></div><div className="grid gap-1 justify-center bg-gray-100 dark:bg-slate-700/50 p-2 rounded" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>{matData.map((rArr, r) => rArr.map((val, c) => (<input key={`${r}-${c}`} value={val} onChange={e => updateMatrix(r, c, e.target.value)} className="w-10 h-8 text-center border dark:border-slate-600 rounded text-xs focus:bg-indigo-50 dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-900 dark:text-slate-200" placeholder="0" />)))}</div><button onClick={() => insertStructure('MATRIX')} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-indigo-700">Sisipkan Matriks</button></div>)}
                     {tab === 'SYMBOLS' && (<div className="grid grid-cols-5 gap-2">{symbols.map((s, i) => (<button key={i} onClick={() => insertStructure('SYMBOL', s.v)} className="aspect-square bg-gray-50 dark:bg-slate-700/50 border dark:border-slate-600 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 transition-colors text-sm font-serif dark:text-slate-200">{s.l}</button>))}</div>)}
                 </div>
             </div>
@@ -238,7 +262,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         if (hasManualGrading && config.showResultToStudent) {
             setConfig(prev => ({ ...prev, showResultToStudent: false }));
         }
-    }, [hasManualGrading]);
+    }, [hasManualGrading, config.showResultToStudent]);
 
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
@@ -592,6 +616,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Kelas</label><div onClick={() => setIsClassModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
 
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jenis Evaluasi</label><div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
+
+                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">KKM (Opsional)</label><input type="number" name="kkm" value={config.kkm || ''} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" placeholder="Contoh: 75" /></div>
 
                         <div className="md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Target Kelas (Opsional)</label>
