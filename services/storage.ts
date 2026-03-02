@@ -381,17 +381,45 @@ class StorageService {
 
       const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, school, role')
+          .select('full_name, school, role, regency')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
-      if (error || !profile) return null;
+      if (error) return null;
+
+      if (!profile) {
+          // Create default profile for new OAuth users
+          const meta = session.user.user_metadata || {};
+          const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                  id: session.user.id,
+                  full_name: meta.full_name || meta.name || 'Pengguna',
+                  school: '-',
+                  regency: '-',
+                  role: 'guru'
+              })
+              .select()
+              .single();
+          
+          if (insertError || !newProfile) return null;
+
+          return {
+              id: session.user.id,
+              fullName: newProfile.full_name,
+              accountType: newProfile.role as AccountType,
+              school: newProfile.school,
+              regency: newProfile.regency,
+              email: session.user.email
+          };
+      }
 
       return {
           id: session.user.id,
           fullName: profile.full_name,
           accountType: profile.role as AccountType,
           school: profile.school,
+          regency: profile.regency,
           email: session.user.email
       };
   }
@@ -405,15 +433,15 @@ class StorageService {
       return profile;
   }
 
-  async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const auth = supabase.auth as any;
-      const { data: authData, error: authError } = await auth.signUp({ 
+  async signUpWithEmail(email: string, password: string, fullName: string, school: string, regency: string): Promise<TeacherProfile> {
+      const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
           options: {
               data: {
                   full_name: fullName,
                   school: school,
+                  regency: regency,
                   role: 'guru'
               }
           }
@@ -428,13 +456,13 @@ class StorageService {
           fullName: fullName,
           accountType: 'guru',
           school: school,
+          regency: regency,
           email: email
       };
   }
 
   async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
-      const auth = supabase.auth as any;
-      const { error } = await auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
       // Tunggu sebentar untuk trigger
@@ -442,29 +470,27 @@ class StorageService {
 
       let profile = await this.getCurrentUser();
       
-      if (!profile) {
-          const { data: { user } } = await auth.getUser();
-          if (user) {
-              const meta = user.user_metadata || {};
-              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
-              await supabase.from('profiles').insert({
-                  id: user.id,
-                  full_name: meta.full_name || 'Pengguna',
-                  school: meta.school || '-',
-                  role: meta.role || 'guru'
-              }).select().single();
-              
-              profile = await this.getCurrentUser();
-          }
-      }
-
       if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
       return profile;
   }
 
   async signOut() {
-      const auth = supabase.auth as any;
-      await auth.signOut();
+      await supabase.auth.signOut();
+  }
+
+  async updateTeacherProfile(id: string, updates: Partial<TeacherProfile>): Promise<void> {
+      const dbUpdates: Record<string, string | undefined> = {};
+      if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+      if (updates.school !== undefined) dbUpdates.school = updates.school;
+      if (updates.regency !== undefined) dbUpdates.regency = updates.regency;
+      if (updates.accountType !== undefined) dbUpdates.role = updates.accountType;
+
+      const { error } = await supabase
+          .from('profiles')
+          .update(dbUpdates)
+          .eq('id', id);
+
+      if (error) throw error;
   }
 
   // --- USER MANAGEMENT (SUPER ADMIN) ---
@@ -780,6 +806,30 @@ class StorageService {
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summary = this.calculateExamStatistics(fatExam, examResults);
       
+      // FETCH AUTHOR REGION (Default if not manually edited)
+      if (exam.authorId) {
+          const { data: profile } = await supabase
+              .from('profiles')
+              .select('regency')
+              .eq('id', exam.authorId)
+              .maybeSingle();
+          if (profile?.regency) {
+              summary.region = profile.regency;
+          }
+      }
+
+      // PRESERVE MANUAL EDITS: Fetch existing summary first
+      const { data: existing } = await supabase
+          .from('exam_summaries')
+          .select('region, exam_type')
+          .eq('exam_code', exam.code)
+          .maybeSingle();
+
+      if (existing) {
+          if (existing.region) summary.region = existing.region;
+          if (existing.exam_type) summary.exam_type = existing.exam_type;
+      }
+
       // 5. Insert Summary into SQL (Transaction Step 2)
       // If this fails, we abort.
       const { error: summaryError } = await supabase.from('exam_summaries').insert(summary);
@@ -820,9 +870,45 @@ class StorageService {
   }
 
   async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
+      // PRESERVE MANUAL EDITS: Fetch existing summary first
+      const { data: existing } = await supabase
+          .from('exam_summaries')
+          .select('region, exam_type')
+          .eq('exam_code', exam.code)
+          .maybeSingle();
+
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
       const summary = this.calculateExamStatistics(exam, results);
+
+      // FETCH AUTHOR REGION (Default if not manually edited)
+      if (exam.authorId) {
+          const { data: profile } = await supabase
+              .from('profiles')
+              .select('regency')
+              .eq('id', exam.authorId)
+              .maybeSingle();
+          if (profile?.regency) {
+              summary.region = profile.regency;
+          }
+      }
+
+      // Restore manual edits if available
+      if (existing) {
+          if (existing.region) summary.region = existing.region;
+          if (existing.exam_type) summary.exam_type = existing.exam_type;
+      }
       
+      // Hapus data lama jika ada (berdasarkan kode ujian) untuk menghindari duplikasi
+      // Ini memenuhi permintaan: "aplikasi dapat mengganti data lama menjadi data baru"
+      const { error: deleteError } = await supabase
+          .from('exam_summaries')
+          .delete()
+          .eq('exam_code', exam.code);
+
+      if (deleteError) {
+          console.warn("Gagal menghapus data lama (mungkin tidak ada):", deleteError);
+      }
+
       // Simpan ke tabel exam_summaries
       const { error } = await supabase.from('exam_summaries').insert(summary);
       
@@ -874,6 +960,7 @@ class StorageService {
           school_name: exam.authorSchool || 'Unknown School',
           exam_subject: exam.config.subject,
           exam_code: exam.code,
+          exam_type: exam.config.examType, // Added exam_type
           exam_date: exam.config.date,
           total_participants: total,
           average_score: parseFloat(avg.toFixed(2)),
@@ -923,6 +1010,14 @@ class StorageService {
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) return [];
       return data as ExamSummary[];
+  }
+
+  async deleteAnalyticsData(id: string): Promise<void> {
+      // SECURITY: Verify Admin Access
+      await this._verifyRole(['super_admin']);
+
+      const { error } = await supabase.from('exam_summaries').delete().eq('id', id);
+      if (error) throw error;
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
@@ -1525,6 +1620,26 @@ class StorageService {
       };
 
       return { exam, role: collaborator.role };
+  }
+
+  async updateAnalyticsData(examCode: string, updates: Partial<ExamSummary>): Promise<void> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
+      // Try updating by exam_code which is the semantic key
+      const { data, error } = await supabase
+          .from('exam_summaries')
+          .update(updates)
+          .eq('exam_code', examCode)
+          .select();
+
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+          // Fallback: Try by ID if exam_code update returned nothing (though unlikely if exam_code is correct)
+          // This handles cases where maybe exam_code is mutated? (Should not happen)
+           throw new Error("Gagal memperbarui data. Data tidak ditemukan atau akun Super Admin Anda tidak memiliki izin RLS (Row Level Security) untuk mengedit data milik pengguna lain. Silakan hubungi teknisi untuk menambahkan kebijakan RLS.");
+      }
   }
 }
 

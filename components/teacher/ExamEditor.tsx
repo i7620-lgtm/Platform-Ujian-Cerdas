@@ -9,6 +9,7 @@ import {
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
 import { compressImage, parseList } from './examUtils';
+import { EXAM_TYPES } from './constants';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -31,8 +32,6 @@ const SUBJECTS = [
 ];
 
 const CLASSES = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6", "Kelas 7", "Kelas 8", "Kelas 9", "Kelas 10", "Kelas 11", "Kelas 12", "Mahasiswa", "Umum"];
-
-const EXAM_TYPES = ["Kuis", "Lainnya", "Latihan", "Olimpiade", "PAS", "PTS", "TKA", "Ulangan Harian"];
 
 // --- HELPER FUNCTIONS ---
 const execCmd = (command: string, value: string | undefined = undefined) => {

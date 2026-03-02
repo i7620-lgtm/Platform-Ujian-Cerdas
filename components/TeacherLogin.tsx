@@ -21,6 +21,7 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [school, setSchool] = useState('');
+  const [regency, setRegency] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
@@ -32,8 +33,8 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     setError(''); 
     
     if (isRegistering) {
-        if (!fullName || !school) {
-            setError("Nama Lengkap dan Sekolah wajib diisi.");
+        if (!fullName || !school || !regency) {
+            setError("Nama Lengkap, Sekolah, dan Kabupaten/Kota wajib diisi.");
             return;
         }
         if (password !== confirmPassword) {
@@ -51,13 +52,14 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
     try {
         let profile: TeacherProfile;
         if (isRegistering) {
-            profile = await storageService.signUpWithEmail(email, password, fullName, school);
+            profile = await storageService.signUpWithEmail(email, password, fullName, school, regency);
         } else {
             profile = await storageService.signInWithEmail(email, password);
         }
         onLoginSuccess(profile);
-    } catch (e: any) { 
-        setError(e.message || 'Terjadi kesalahan sistem.'); 
+    } catch (e: unknown) { 
+        const error = e as Error;
+        setError(error.message || 'Terjadi kesalahan sistem.'); 
     } finally { 
         setIsLoading(false); 
     }
@@ -131,6 +133,17 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                                     onChange={(e) => setSchool(e.target.value)} 
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-200 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl outline-none mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600" 
                                     placeholder="Contoh: SMA Negeri 1 Jakarta"
+                                    required 
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Kabupaten/Kota</label>
+                                <input 
+                                    type="text" 
+                                    value={regency} 
+                                    onChange={(e) => setRegency(e.target.value)} 
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-200 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl outline-none mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600" 
+                                    placeholder="Contoh: Jakarta Selatan"
                                     required 
                                 />
                             </div>
@@ -244,8 +257,9 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLoginSuccess, onBa
                                     }
                                 });
                                 if (error) throw error;
-                            } catch (e: any) {
-                                setError(e.message);
+                            } catch (e: unknown) {
+                                const error = e as Error;
+                                setError(error.message);
                                 setIsLoading(false);
                             }
                         }}

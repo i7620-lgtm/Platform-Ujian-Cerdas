@@ -5,9 +5,11 @@ import { storageService } from '../../../services/storage';
 import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
-    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon 
+    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon 
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
+import * as XLSX from 'xlsx';
+import { EXAM_TYPES } from '../constants';
 
 interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
@@ -19,6 +21,100 @@ type ArchiveData = {
 };
 
 type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
+
+const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () => void, onSave: (updated: Partial<Exam>) => void }) => {
+    const [formData, setFormData] = useState({
+        authorSchool: exam.authorSchool || '',
+        authorName: exam.authorName || '',
+        subject: exam.config.subject || '',
+        classLevel: exam.config.classLevel || '',
+        examType: exam.config.examType || '',
+        date: exam.config.date || '',
+        manualParticipantCount: exam.config.manualParticipantCount || ''
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = () => {
+        onSave({
+            authorSchool: formData.authorSchool,
+            authorName: formData.authorName,
+            config: {
+                ...exam.config,
+                subject: formData.subject,
+                classLevel: formData.classLevel,
+                examType: formData.examType,
+                date: formData.date,
+                manualParticipantCount: formData.manualParticipantCount ? Number(formData.manualParticipantCount) : undefined
+            }
+        });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 dark:border-slate-700">
+                <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <PencilIcon className="w-5 h-5 text-indigo-600"/> Edit Metadata Arsip
+                    </h3>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                        <XMarkIcon className="w-5 h-5 text-slate-500"/>
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Sekolah</label>
+                            <input name="authorSchool" value={formData.authorSchool} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Guru</label>
+                            <input name="authorName" value={formData.authorName} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mata Pelajaran</label>
+                            <input name="subject" value={formData.subject} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tingkat Kelas</label>
+                            <input name="classLevel" value={formData.classLevel} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Evaluasi</label>
+                            <select name="examType" value={formData.examType} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                                <option value="">Pilih...</option>
+                                {EXAM_TYPES.map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal Ujian</label>
+                            <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Partisipan (Manual)</label>
+                            <input type="number" name="manualParticipantCount" value={formData.manualParticipantCount} onChange={handleChange} placeholder="Otomatis (dari hasil)" className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                    </div>
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800 flex gap-3 items-start">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"/>
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                            Perubahan ini hanya berlaku pada sesi ini. Untuk menyimpan permanen, silakan "Download JSON" atau "Simpan ke Cloud" setelah mengedit.
+                        </p>
+                    </div>
+                </div>
+                <div className="p-6 border-t dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
+                    <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-bold transition-colors">Batal</button>
+                    <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all">Simpan Perubahan</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
@@ -34,6 +130,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
     const [isRegisteringStats, setIsRegisteringStats] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [showEditMetadata, setShowEditMetadata] = useState(false);
 
     useEffect(() => {
         const loadCloudList = async () => {
@@ -141,8 +238,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
     };
 
-    const handleUploadToCloud = async () => {
-        if (!archiveData) return;
+    const handleUploadToCloud = async (dataToUpload?: ArchiveData) => {
+        const currentData = dataToUpload || archiveData;
+        if (!currentData) return;
         
         if (!confirm("Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?")) return;
 
@@ -175,7 +273,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             };
 
             // Deep clone to avoid mutating state directly during process
-            const optimizedExam = JSON.parse(JSON.stringify(archiveData.exam)) as Exam;
+            const optimizedExam = JSON.parse(JSON.stringify(currentData.exam)) as Exam;
             
             // Loop through questions and optimize images
             for (let i = 0; i < optimizedExam.questions.length; i++) {
@@ -189,7 +287,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             }
 
             setLoadingMessage('Mengunggah ke Cloud...');
-            const finalPayload = { ...archiveData, exam: optimizedExam };
+            const finalPayload = { ...currentData, exam: optimizedExam };
             const jsonString = JSON.stringify(finalPayload, null, 2);
             await storageService.uploadArchive(optimizedExam.code, jsonString, {
                 school: optimizedExam.authorSchool,
@@ -198,7 +296,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 examType: optimizedExam.config.examType,
                 targetClasses: optimizedExam.config.targetClasses,
                 date: optimizedExam.config.date,
-                participantCount: archiveData.results.length
+                participantCount: currentData.results.length
             });
             
             // Refresh list
@@ -236,6 +334,199 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         setArchiveData(null); setError(''); setFixMessage(''); setSourceType(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         storageService.getArchivedList().then(setCloudArchives).catch(()=>{});
+    };
+
+    const handleDownloadExcel = () => {
+        if (!archiveData) return;
+        const { exam, results } = archiveData;
+
+        // 1. Detail Ujian Sheet
+        const detailData = [
+            ["DETAIL UJIAN"],
+            ["Kode Ujian", exam.code],
+            ["Mata Pelajaran", exam.config.subject],
+            ["Tingkat Kelas", exam.config.classLevel],
+            ["Tipe Ujian", exam.config.examType],
+            ["Tanggal", exam.config.date],
+            ["Durasi", `${exam.config.timeLimit} Menit`],
+            ["Pembuat", exam.authorName],
+            ["Sekolah", exam.authorSchool],
+            ["Status", exam.status],
+            [""],
+            ["DAFTAR SOAL"],
+            ["No", "Tipe", "Pertanyaan", "Opsi Jawaban", "Kunci Jawaban", "Bobot", "Kategori", "Level"]
+        ];
+
+        exam.questions.forEach((q, idx) => {
+            if (q.questionType === 'INFO') return;
+            
+            let optionsStr = "-";
+            if (q.options) {
+                optionsStr = q.options.map((o, i) => `${String.fromCharCode(65+i)}. ${o.replace(/<[^>]*>/g, '')}`).join("\n");
+            } else if (q.trueFalseRows) {
+                optionsStr = q.trueFalseRows.map(r => `${r.text.replace(/<[^>]*>/g, '')} (${r.answer ? 'Benar' : 'Salah'})`).join("\n");
+            } else if (q.matchingPairs) {
+                optionsStr = q.matchingPairs.map(p => `${p.left} -> ${p.right}`).join("\n");
+            }
+
+            let answerStr = "-";
+            if (q.correctAnswer) {
+                if (Array.isArray(q.correctAnswer)) {
+                    answerStr = q.correctAnswer.join(", ");
+                } else {
+                    answerStr = String(q.correctAnswer).replace(/<[^>]*>/g, '');
+                }
+            }
+
+            detailData.push([
+                String(idx + 1),
+                q.questionType,
+                q.questionText.replace(/<[^>]*>/g, ''),
+                optionsStr,
+                answerStr,
+                String(q.scoreWeight || 1),
+                q.category || "-",
+                q.level || "-"
+            ]);
+        });
+
+        // 2. Rekap Siswa Sheet
+        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Selesai", "Durasi (Detik)"];
+        
+        // Add question columns
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        scorableQuestions.forEach((_, i) => rekapHeader.push(`Q${i+1}`));
+
+        const rekapData = [rekapHeader];
+        
+        // Sort results same as UI
+        const sorted = [...results].sort((a, b) => {
+            const classA = a.student.class || '';
+            const classB = b.student.class || '';
+            const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+            if (c !== 0) return c;
+            const getAbs = (id: string) => {
+                const parts = id.split('-');
+                return parseInt(parts[parts.length-1]) || 0;
+            }
+            return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+        });
+
+        sorted.forEach((r, idx) => {
+            const stats = getCalculatedStats(r, exam);
+            const row = [
+                String(idx + 1),
+                r.student.fullName,
+                r.student.studentId,
+                r.student.class,
+                String(stats.score),
+                String(stats.correct),
+                String(stats.wrong),
+                String(stats.empty),
+                r.status || "-",
+                r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : "-",
+                r.completionTime ? String(r.completionTime) : "-"
+            ];
+
+            // Add answers
+            scorableQuestions.forEach(q => {
+                const ans = r.answers[q.id];
+                let ansStr = "-";
+                if (ans) {
+                    ansStr = String(ans).replace(/<[^>]*>/g, '');
+                }
+                row.push(ansStr);
+            });
+
+            rekapData.push(row);
+        });
+
+        // 3. Analisis Soal Sheet
+        const analisisSoalHeader = ["No", "Pertanyaan", "Tipe", "Tingkat Kesulitan (%)", "Jml Benar", "Jml Salah/Kosong", "Distribusi Jawaban"];
+        const analisisSoalData = [analisisSoalHeader];
+
+        scorableQuestions.forEach((q, idx) => {
+            let correctCount = 0;
+            const answerCounts: Record<string, number> = {};
+            
+            results.forEach(r => {
+                const ans = r.answers[q.id];
+                const status = checkAnswerStatus(q, r.answers);
+                if (status === 'CORRECT') correctCount++;
+                if (ans) {
+                    const val = String(ans).replace(/<[^>]*>/g, '');
+                    answerCounts[val] = (answerCounts[val] || 0) + 1;
+                }
+            });
+
+            const total = results.length;
+            const correctRate = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+            
+            let distStr = "";
+            if (q.questionType === 'MULTIPLE_CHOICE' && q.options) {
+                distStr = q.options.map(opt => {
+                    const cleanOpt = opt.replace(/<[^>]*>/g, '');
+                    const count = answerCounts[cleanOpt] || 0;
+                    return `${cleanOpt}: ${count}`;
+                }).join(", ");
+            } else {
+                distStr = JSON.stringify(answerCounts);
+            }
+
+            analisisSoalData.push([
+                String(idx + 1),
+                q.questionText.replace(/<[^>]*>/g, ''),
+                q.questionType,
+                String(correctRate),
+                String(correctCount),
+                String(total - correctCount),
+                distStr
+            ]);
+        });
+
+        // 4. Analisis Kelas Sheet
+        const analisisKelasHeader = ["Kelas", "Jumlah Siswa", "Rata-rata Nilai", "Nilai Tertinggi", "Nilai Terendah", "Lulus (>=75)", "Tidak Lulus (<75)"];
+        const analisisKelasData = [analisisKelasHeader];
+
+        const classes = Array.from(new Set(results.map(r => r.student.class))).sort();
+        classes.forEach(cls => {
+            const classResults = results.filter(r => r.student.class === cls);
+            const count = classResults.length;
+            const scores = classResults.map(r => getCalculatedStats(r, exam).score);
+            const avg = count > 0 ? Math.round(scores.reduce((a,b) => a+b, 0) / count) : 0;
+            const max = count > 0 ? Math.max(...scores) : 0;
+            const min = count > 0 ? Math.min(...scores) : 0;
+            const pass = scores.filter(s => s >= 75).length;
+            const fail = count - pass;
+
+            analisisKelasData.push([
+                cls,
+                String(count),
+                String(avg),
+                String(max),
+                String(min),
+                String(pass),
+                String(fail)
+            ]);
+        });
+
+        // Create Workbook
+        const wb = XLSX.utils.book_new();
+        
+        const wsDetail = XLSX.utils.aoa_to_sheet(detailData);
+        XLSX.utils.book_append_sheet(wb, wsDetail, "Detail Ujian");
+
+        const wsRekap = XLSX.utils.aoa_to_sheet(rekapData);
+        XLSX.utils.book_append_sheet(wb, wsRekap, "Rekap Siswa");
+
+        const wsAnalisisSoal = XLSX.utils.aoa_to_sheet(analisisSoalData);
+        XLSX.utils.book_append_sheet(wb, wsAnalisisSoal, "Analisis Soal");
+
+        const wsAnalisisKelas = XLSX.utils.aoa_to_sheet(analisisKelasData);
+        XLSX.utils.book_append_sheet(wb, wsAnalisisKelas, "Analisis Kelas");
+
+        // Download
+        XLSX.writeFile(wb, `Data_Mentah_${exam.config.subject}_${exam.code}.xlsx`);
     };
 
     const handlePrint = () => {
@@ -617,10 +908,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     }
     
     const { exam, results } = archiveData;
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
+    const totalStudents = exam.config.manualParticipantCount || results.length;
+    const realStudentCount = results.length;
+    const averageScore = realStudentCount > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
+    const highestScore = realStudentCount > 0 ? Math.max(...results.map(r => r.score)) : 0;
+    const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
@@ -661,34 +953,40 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
             {/* INTERACTIVE HEADER (HIDDEN ON PRINT) */}
             <div className="p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm print:hidden">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{exam.config.subject}</span></h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                Pratinjau Arsip: <span className="text-indigo-600 dark:text-indigo-400">{exam.config.subject}</span>
+                                <button onClick={() => setShowEditMetadata(true)} className="p-1 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit Info">
+                                    <PencilIcon className="w-5 h-5"/>
+                                </button>
+                            </h2>
                             {sourceType === 'LOCAL' && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase border border-gray-200">Local File</span>}
                             {sourceType === 'CLOUD' && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase border border-blue-100">Cloud Storage</span>}
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}</p>
                     </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button onClick={resetView} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
+                    <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto xl:justify-end">
+                        <button onClick={resetView} className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
                         
                         {sourceType === 'LOCAL' && (
                             <>
-                                <button onClick={handleRegisterStats} disabled={isRegisteringStats} className="flex-1 md:flex-none px-4 py-2 bg-amber-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-amber-600 transition-all shadow-md shadow-amber-100 dark:shadow-amber-900/30 flex items-center justify-center gap-2">
+                                <button onClick={handleRegisterStats} disabled={isRegisteringStats} className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-amber-600 transition-all shadow-md shadow-amber-100 dark:shadow-amber-900/30 flex items-center justify-center gap-2">
                                     {isRegisteringStats ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <ChartBarIcon className="w-4 h-4"/>}
                                     <span>Catat Statistik</span>
                                 </button>
 
-                                <button onClick={handleUploadToCloud} disabled={isLoadingCloud} className="flex-1 md:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
+                                <button onClick={() => handleUploadToCloud()} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
                                     {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
                                     <span>Simpan ke Cloud</span>
                                 </button>
                             </>
                         )}
 
-                        <button onClick={handlePrint} className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
-                        <button onClick={() => onReuseExam(exam)} className="flex-1 md:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
+                        <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
+                        <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
+                        <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-4">
@@ -1501,6 +1799,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
             </div>
+
+            {showEditMetadata && archiveData && (
+                <EditMetadataModal 
+                    exam={archiveData.exam} 
+                    onClose={() => setShowEditMetadata(false)} 
+                    onSave={(updated) => {
+                        const updatedData = {
+                            ...archiveData,
+                            exam: { ...archiveData.exam, ...updated }
+                        };
+                        setArchiveData(updatedData);
+                        setShowEditMetadata(false);
+                        handleUploadToCloud(updatedData);
+                    }} 
+                />
+            )}
         </div>
     );
 };

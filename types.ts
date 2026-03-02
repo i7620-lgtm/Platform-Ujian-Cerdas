@@ -48,6 +48,7 @@ export interface ExamConfig {
   targetClasses?: string[]; 
   examType: string;
   description: string;
+  manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
 }
@@ -104,6 +105,7 @@ export interface TeacherProfile {
     fullName: string;
     accountType: AccountType;
     school: string;
+    regency?: string; // Added for Kabupaten/Kota
     avatarUrl?: string;
     email?: string; // Added for user management display
 }
@@ -118,6 +120,7 @@ export interface ExamSummary {
     school_name: string;
     exam_subject: string;
     exam_code: string;
+    exam_type?: string; // Added for Analisis Daerah
     exam_date: string;
     total_participants: number;
     average_score: number;
