@@ -1614,7 +1614,7 @@ class StorageService {
       if (!data || data.length === 0) {
           // Fallback: Try by ID if exam_code update returned nothing (though unlikely if exam_code is correct)
           // This handles cases where maybe exam_code is mutated? (Should not happen)
-           throw new Error("Gagal memperbarui data. Data tidak ditemukan atau izin ditolak.");
+           throw new Error("Gagal memperbarui data. Data tidak ditemukan atau akun Super Admin Anda tidak memiliki izin RLS (Row Level Security) untuk mengedit data milik pengguna lain. Silakan hubungi teknisi untuk menambahkan kebijakan RLS.");
       }
   }
 }
