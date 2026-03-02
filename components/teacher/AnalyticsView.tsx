@@ -90,8 +90,8 @@ const AnalyticsView: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left whitespace-nowrap">
                     <thead className="bg-slate-50 dark:bg-slate-700">
                         <tr>
                             <th className="px-6 py-4 w-10">
