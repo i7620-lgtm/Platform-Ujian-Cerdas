@@ -1,6 +1,6 @@
  
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChartBarIcon, ArrowPathIcon } from '../Icons';
+import { ChartBarIcon, ArrowPathIcon, TrashIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import type { ExamSummary } from '../../types';
 
@@ -43,6 +43,23 @@ const AnalyticsView: React.FC = () => {
         else setSelectedIds(new Set(summaries.map(s => s.id)));
     };
 
+    const handleDelete = async (id: string) => {
+        if (!confirm("Apakah Anda yakin ingin menghapus data statistik ini? Tindakan ini tidak dapat dibatalkan.")) return;
+        
+        try {
+            await storageService.deleteAnalyticsData(id);
+            setSummaries(prev => prev.filter(s => s.id !== id));
+            // Also remove from selection if selected
+            if (selectedIds.has(id)) {
+                const newSet = new Set(selectedIds);
+                newSet.delete(id);
+                setSelectedIds(newSet);
+            }
+        } catch (error: any) {
+            alert("Gagal menghapus data: " + error.message);
+        }
+    };
+
     const handleGenerateAI = async () => {
         const selectedData = summaries.filter(s => selectedIds.has(s.id));
         if (selectedData.length === 0) return;
@@ -82,20 +99,38 @@ const AnalyticsView: React.FC = () => {
                             </th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Mapel</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kode Soal</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Jenis Evaluasi</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Tanggal</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                        {isLoading ? <tr><td colSpan={6} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
+                        {isLoading ? <tr><td colSpan={9} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
                             <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                 <td className="px-6 py-4"><input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} className="rounded text-indigo-600 focus:ring-indigo-500"/></td>
                                 <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{s.school_name}</td>
                                 <td className="px-6 py-4 text-sm">{s.exam_subject}</td>
+                                <td className="px-6 py-4 text-sm font-mono text-slate-500">{s.exam_code}</td>
+                                <td className="px-6 py-4 text-sm">
+                                    <span className="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-xs font-medium">
+                                        {s.exam_type || '-'}
+                                    </span>
+                                </td>
                                 <td className="px-6 py-4 text-center font-bold">{s.average_score}</td>
                                 <td className="px-6 py-4 text-center text-sm">{s.total_participants}</td>
                                 <td className="px-6 py-4 text-center text-xs text-slate-500">{new Date(s.exam_date).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <button 
+                                        onClick={() => handleDelete(s.id)}
+                                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                        title="Hapus Data"
+                                    >
+                                        <TrashIcon className="w-4 h-4"/>
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
