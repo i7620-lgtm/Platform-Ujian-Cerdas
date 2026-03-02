@@ -29,7 +29,8 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
         subject: exam.config.subject || '',
         classLevel: exam.config.classLevel || '',
         examType: exam.config.examType || '',
-        date: exam.config.date || ''
+        date: exam.config.date || '',
+        manualParticipantCount: exam.config.manualParticipantCount || ''
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -45,7 +46,8 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
                 subject: formData.subject,
                 classLevel: formData.classLevel,
                 examType: formData.examType,
-                date: formData.date
+                date: formData.date,
+                manualParticipantCount: formData.manualParticipantCount ? Number(formData.manualParticipantCount) : undefined
             }
         });
         onClose();
@@ -92,6 +94,10 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal Ujian</label>
                             <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Partisipan (Manual)</label>
+                            <input type="number" name="manualParticipantCount" value={formData.manualParticipantCount} onChange={handleChange} placeholder="Otomatis (dari hasil)" className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"/>
                         </div>
                     </div>
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800 flex gap-3 items-start">
@@ -901,10 +907,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     }
     
     const { exam, results } = archiveData;
-    const totalStudents = results.length;
-    const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...results.map(r => r.score)) : 0;
+    const totalStudents = exam.config.manualParticipantCount || results.length;
+    const realStudentCount = results.length;
+    const averageScore = realStudentCount > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
+    const highestScore = realStudentCount > 0 ? Math.max(...results.map(r => r.score)) : 0;
+    const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
