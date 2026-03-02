@@ -1792,6 +1792,20 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
             </div>
+
+            {showEditMetadata && archiveData && (
+                <EditMetadataModal 
+                    exam={archiveData.exam} 
+                    onClose={() => setShowEditMetadata(false)} 
+                    onSave={(updated) => {
+                        setArchiveData({
+                            ...archiveData,
+                            exam: { ...archiveData.exam, ...updated }
+                        });
+                        setShowEditMetadata(false);
+                    }} 
+                />
+            )}
         </div>
     );
 };
