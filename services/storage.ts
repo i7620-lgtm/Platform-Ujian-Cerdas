@@ -381,17 +381,45 @@ class StorageService {
 
       const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, school, role')
+          .select('full_name, school, role, regency')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
-      if (error || !profile) return null;
+      if (error) return null;
+
+      if (!profile) {
+          // Create default profile for new OAuth users
+          const meta = session.user.user_metadata || {};
+          const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                  id: session.user.id,
+                  full_name: meta.full_name || meta.name || 'Pengguna',
+                  school: '-',
+                  regency: '-',
+                  role: 'guru'
+              })
+              .select()
+              .single();
+          
+          if (insertError || !newProfile) return null;
+
+          return {
+              id: session.user.id,
+              fullName: newProfile.full_name,
+              accountType: newProfile.role as AccountType,
+              school: newProfile.school,
+              regency: newProfile.regency,
+              email: session.user.email
+          };
+      }
 
       return {
           id: session.user.id,
           fullName: profile.full_name,
           accountType: profile.role as AccountType,
           school: profile.school,
+          regency: profile.regency,
           email: session.user.email
       };
   }
@@ -405,15 +433,15 @@ class StorageService {
       return profile;
   }
 
-  async signUpWithEmail(email: string, password: string, fullName: string, school: string): Promise<TeacherProfile> {
-      const auth = supabase.auth as any;
-      const { data: authData, error: authError } = await auth.signUp({ 
+  async signUpWithEmail(email: string, password: string, fullName: string, school: string, regency: string): Promise<TeacherProfile> {
+      const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
           options: {
               data: {
                   full_name: fullName,
                   school: school,
+                  regency: regency,
                   role: 'guru'
               }
           }
@@ -428,13 +456,13 @@ class StorageService {
           fullName: fullName,
           accountType: 'guru',
           school: school,
+          regency: regency,
           email: email
       };
   }
 
   async signInWithEmail(email: string, password: string): Promise<TeacherProfile> {
-      const auth = supabase.auth as any;
-      const { error } = await auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error('Email atau password salah.');
       
       // Tunggu sebentar untuk trigger
@@ -442,29 +470,27 @@ class StorageService {
 
       let profile = await this.getCurrentUser();
       
-      if (!profile) {
-          const { data: { user } } = await auth.getUser();
-          if (user) {
-              const meta = user.user_metadata || {};
-              // Coba insert manual (policy RLS 'Users can insert their own profile' harus aktif)
-              await supabase.from('profiles').insert({
-                  id: user.id,
-                  full_name: meta.full_name || 'Pengguna',
-                  school: meta.school || '-',
-                  role: meta.role || 'guru'
-              }).select().single();
-              
-              profile = await this.getCurrentUser();
-          }
-      }
-
       if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
       return profile;
   }
 
   async signOut() {
-      const auth = supabase.auth as any;
-      await auth.signOut();
+      await supabase.auth.signOut();
+  }
+
+  async updateTeacherProfile(id: string, updates: Partial<TeacherProfile>): Promise<void> {
+      const dbUpdates: Record<string, string | undefined> = {};
+      if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+      if (updates.school !== undefined) dbUpdates.school = updates.school;
+      if (updates.regency !== undefined) dbUpdates.regency = updates.regency;
+      if (updates.accountType !== undefined) dbUpdates.role = updates.accountType;
+
+      const { error } = await supabase
+          .from('profiles')
+          .update(dbUpdates)
+          .eq('id', id);
+
+      if (error) throw error;
   }
 
   // --- USER MANAGEMENT (SUPER ADMIN) ---
