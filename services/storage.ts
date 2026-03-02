@@ -806,6 +806,18 @@ class StorageService {
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summary = this.calculateExamStatistics(fatExam, examResults);
       
+      // FETCH AUTHOR REGION (Default if not manually edited)
+      if (exam.authorId) {
+          const { data: profile } = await supabase
+              .from('profiles')
+              .select('regency')
+              .eq('id', exam.authorId)
+              .maybeSingle();
+          if (profile?.regency) {
+              summary.region = profile.regency;
+          }
+      }
+
       // PRESERVE MANUAL EDITS: Fetch existing summary first
       const { data: existing } = await supabase
           .from('exam_summaries')
@@ -867,6 +879,18 @@ class StorageService {
 
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
       const summary = this.calculateExamStatistics(exam, results);
+
+      // FETCH AUTHOR REGION (Default if not manually edited)
+      if (exam.authorId) {
+          const { data: profile } = await supabase
+              .from('profiles')
+              .select('regency')
+              .eq('id', exam.authorId)
+              .maybeSingle();
+          if (profile?.regency) {
+              summary.region = profile.regency;
+          }
+      }
 
       // Restore manual edits if available
       if (existing) {
