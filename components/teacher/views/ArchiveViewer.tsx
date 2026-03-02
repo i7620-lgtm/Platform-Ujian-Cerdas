@@ -8,6 +8,7 @@ import {
     CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon 
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
+import * as XLSX from 'xlsx';
 
 interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
@@ -236,6 +237,199 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         setArchiveData(null); setError(''); setFixMessage(''); setSourceType(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         storageService.getArchivedList().then(setCloudArchives).catch(()=>{});
+    };
+
+    const handleDownloadExcel = () => {
+        if (!archiveData) return;
+        const { exam, results } = archiveData;
+
+        // 1. Detail Ujian Sheet
+        const detailData = [
+            ["DETAIL UJIAN"],
+            ["Kode Ujian", exam.code],
+            ["Mata Pelajaran", exam.config.subject],
+            ["Tingkat Kelas", exam.config.classLevel],
+            ["Tipe Ujian", exam.config.examType],
+            ["Tanggal", exam.config.date],
+            ["Durasi", `${exam.config.timeLimit} Menit`],
+            ["Pembuat", exam.authorName],
+            ["Sekolah", exam.authorSchool],
+            ["Status", exam.status],
+            [""],
+            ["DAFTAR SOAL"],
+            ["No", "Tipe", "Pertanyaan", "Opsi Jawaban", "Kunci Jawaban", "Bobot", "Kategori", "Level"]
+        ];
+
+        exam.questions.forEach((q, idx) => {
+            if (q.questionType === 'INFO') return;
+            
+            let optionsStr = "-";
+            if (q.options) {
+                optionsStr = q.options.map((o, i) => `${String.fromCharCode(65+i)}. ${o.replace(/<[^>]*>/g, '')}`).join("\n");
+            } else if (q.trueFalseRows) {
+                optionsStr = q.trueFalseRows.map(r => `${r.text.replace(/<[^>]*>/g, '')} (${r.answer ? 'Benar' : 'Salah'})`).join("\n");
+            } else if (q.matchingPairs) {
+                optionsStr = q.matchingPairs.map(p => `${p.left} -> ${p.right}`).join("\n");
+            }
+
+            let answerStr = "-";
+            if (q.correctAnswer) {
+                if (Array.isArray(q.correctAnswer)) {
+                    answerStr = q.correctAnswer.join(", ");
+                } else {
+                    answerStr = String(q.correctAnswer).replace(/<[^>]*>/g, '');
+                }
+            }
+
+            detailData.push([
+                String(idx + 1),
+                q.questionType,
+                q.questionText.replace(/<[^>]*>/g, ''),
+                optionsStr,
+                answerStr,
+                String(q.scoreWeight || 1),
+                q.category || "-",
+                q.level || "-"
+            ]);
+        });
+
+        // 2. Rekap Siswa Sheet
+        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Selesai", "Durasi (Detik)"];
+        
+        // Add question columns
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        scorableQuestions.forEach((_, i) => rekapHeader.push(`Q${i+1}`));
+
+        const rekapData = [rekapHeader];
+        
+        // Sort results same as UI
+        const sorted = [...results].sort((a, b) => {
+            const classA = a.student.class || '';
+            const classB = b.student.class || '';
+            const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+            if (c !== 0) return c;
+            const getAbs = (id: string) => {
+                const parts = id.split('-');
+                return parseInt(parts[parts.length-1]) || 0;
+            }
+            return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+        });
+
+        sorted.forEach((r, idx) => {
+            const stats = getCalculatedStats(r, exam);
+            const row = [
+                String(idx + 1),
+                r.student.fullName,
+                r.student.studentId,
+                r.student.class,
+                String(stats.score),
+                String(stats.correct),
+                String(stats.wrong),
+                String(stats.empty),
+                r.status || "-",
+                r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : "-",
+                r.completionTime ? String(r.completionTime) : "-"
+            ];
+
+            // Add answers
+            scorableQuestions.forEach(q => {
+                const ans = r.answers[q.id];
+                let ansStr = "-";
+                if (ans) {
+                    ansStr = String(ans).replace(/<[^>]*>/g, '');
+                }
+                row.push(ansStr);
+            });
+
+            rekapData.push(row);
+        });
+
+        // 3. Analisis Soal Sheet
+        const analisisSoalHeader = ["No", "Pertanyaan", "Tipe", "Tingkat Kesulitan (%)", "Jml Benar", "Jml Salah/Kosong", "Distribusi Jawaban"];
+        const analisisSoalData = [analisisSoalHeader];
+
+        scorableQuestions.forEach((q, idx) => {
+            let correctCount = 0;
+            const answerCounts: Record<string, number> = {};
+            
+            results.forEach(r => {
+                const ans = r.answers[q.id];
+                const status = checkAnswerStatus(q, r.answers);
+                if (status === 'CORRECT') correctCount++;
+                if (ans) {
+                    const val = String(ans).replace(/<[^>]*>/g, '');
+                    answerCounts[val] = (answerCounts[val] || 0) + 1;
+                }
+            });
+
+            const total = results.length;
+            const correctRate = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+            
+            let distStr = "";
+            if (q.questionType === 'MULTIPLE_CHOICE' && q.options) {
+                distStr = q.options.map(opt => {
+                    const cleanOpt = opt.replace(/<[^>]*>/g, '');
+                    const count = answerCounts[cleanOpt] || 0;
+                    return `${cleanOpt}: ${count}`;
+                }).join(", ");
+            } else {
+                distStr = JSON.stringify(answerCounts);
+            }
+
+            analisisSoalData.push([
+                String(idx + 1),
+                q.questionText.replace(/<[^>]*>/g, ''),
+                q.questionType,
+                String(correctRate),
+                String(correctCount),
+                String(total - correctCount),
+                distStr
+            ]);
+        });
+
+        // 4. Analisis Kelas Sheet
+        const analisisKelasHeader = ["Kelas", "Jumlah Siswa", "Rata-rata Nilai", "Nilai Tertinggi", "Nilai Terendah", "Lulus (>=75)", "Tidak Lulus (<75)"];
+        const analisisKelasData = [analisisKelasHeader];
+
+        const classes = Array.from(new Set(results.map(r => r.student.class))).sort();
+        classes.forEach(cls => {
+            const classResults = results.filter(r => r.student.class === cls);
+            const count = classResults.length;
+            const scores = classResults.map(r => getCalculatedStats(r, exam).score);
+            const avg = count > 0 ? Math.round(scores.reduce((a,b) => a+b, 0) / count) : 0;
+            const max = count > 0 ? Math.max(...scores) : 0;
+            const min = count > 0 ? Math.min(...scores) : 0;
+            const pass = scores.filter(s => s >= 75).length;
+            const fail = count - pass;
+
+            analisisKelasData.push([
+                cls,
+                String(count),
+                String(avg),
+                String(max),
+                String(min),
+                String(pass),
+                String(fail)
+            ]);
+        });
+
+        // Create Workbook
+        const wb = XLSX.utils.book_new();
+        
+        const wsDetail = XLSX.utils.aoa_to_sheet(detailData);
+        XLSX.utils.book_append_sheet(wb, wsDetail, "Detail Ujian");
+
+        const wsRekap = XLSX.utils.aoa_to_sheet(rekapData);
+        XLSX.utils.book_append_sheet(wb, wsRekap, "Rekap Siswa");
+
+        const wsAnalisisSoal = XLSX.utils.aoa_to_sheet(analisisSoalData);
+        XLSX.utils.book_append_sheet(wb, wsAnalisisSoal, "Analisis Soal");
+
+        const wsAnalisisKelas = XLSX.utils.aoa_to_sheet(analisisKelasData);
+        XLSX.utils.book_append_sheet(wb, wsAnalisisKelas, "Analisis Kelas");
+
+        // Download
+        XLSX.writeFile(wb, `Data_Mentah_${exam.config.subject}_${exam.code}.xlsx`);
     };
 
     const handlePrint = () => {
@@ -688,6 +882,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         )}
 
                         <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
+                        <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
                         <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>
                 </div>
