@@ -9,6 +9,7 @@ import {
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
 import * as XLSX from 'xlsx';
+import { EXAM_TYPES } from '../constants';
 
 interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
@@ -83,11 +84,9 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Evaluasi</label>
                             <select name="examType" value={formData.examType} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                                 <option value="">Pilih...</option>
-                                <option value="UH">Ulangan Harian</option>
-                                <option value="PTS">PTS</option>
-                                <option value="PAS">PAS</option>
-                                <option value="US">Ujian Sekolah</option>
-                                <option value="TO">Try Out</option>
+                                {EXAM_TYPES.map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                ))}
                             </select>
                         </div>
                         <div>
