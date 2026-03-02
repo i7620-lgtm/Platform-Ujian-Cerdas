@@ -80,7 +80,7 @@ const AnalyticsView: React.FC = () => {
         if (!editingSummary) return;
         
         try {
-            await storageService.updateAnalyticsData(editingSummary.id, editForm);
+            await storageService.updateAnalyticsData(editingSummary.exam_code, editForm);
             setSummaries(prev => prev.map(s => s.id === editingSummary.id ? { ...s, ...editForm } : s));
             setEditingSummary(null);
         } catch (error: any) {
