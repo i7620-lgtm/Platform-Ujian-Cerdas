@@ -1,6 +1,6 @@
  
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChartBarIcon, ArrowPathIcon, TrashIcon } from '../Icons';
+import { ChartBarIcon, ArrowPathIcon, TrashIcon, PencilIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import type { ExamSummary } from '../../types';
 
@@ -19,6 +19,9 @@ const AnalyticsView: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [aiResult, setAiResult] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
+
+    const [editingSummary, setEditingSummary] = useState<ExamSummary | null>(null);
+    const [editForm, setEditForm] = useState<Partial<ExamSummary>>({});
 
     const fetchData = useCallback(async (region: string, subject: string) => {
         setIsLoading(true);
@@ -57,6 +60,29 @@ const AnalyticsView: React.FC = () => {
             }
         } catch (error: any) {
             alert("Gagal menghapus data: " + error.message);
+        }
+    };
+
+    const handleEdit = (summary: ExamSummary) => {
+        setEditingSummary(summary);
+        setEditForm({
+            school_name: summary.school_name,
+            exam_subject: summary.exam_subject,
+            exam_type: summary.exam_type,
+            total_participants: summary.total_participants,
+            average_score: summary.average_score
+        });
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingSummary) return;
+        
+        try {
+            await storageService.updateAnalyticsData(editingSummary.id, editForm);
+            setSummaries(prev => prev.map(s => s.id === editingSummary.id ? { ...s, ...editForm } : s));
+            setEditingSummary(null);
+        } catch (error: any) {
+            alert("Gagal menyimpan perubahan: " + error.message);
         }
     };
 
@@ -123,13 +149,22 @@ const AnalyticsView: React.FC = () => {
                                 <td className="px-6 py-4 text-center text-sm">{s.total_participants}</td>
                                 <td className="px-6 py-4 text-center text-xs text-slate-500">{new Date(s.exam_date).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 text-center">
-                                    <button 
-                                        onClick={() => handleDelete(s.id)}
-                                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                                        title="Hapus Data"
-                                    >
-                                        <TrashIcon className="w-4 h-4"/>
-                                    </button>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button 
+                                            onClick={() => handleEdit(s)}
+                                            className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                            title="Edit Data"
+                                        >
+                                            <PencilIcon className="w-4 h-4"/>
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(s.id)}
+                                            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                            title="Hapus Data"
+                                        >
+                                            <TrashIcon className="w-4 h-4"/>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -159,6 +194,72 @@ const AnalyticsView: React.FC = () => {
                         <div className="p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 flex-1">
                             {/* Prose max-w-none ensures tables and charts take full width */}
                             <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-indigo-600" dangerouslySetInnerHTML={{ __html: aiResult.replace(/\n/g, '<br/>') }} /> 
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {editingSummary && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 animate-scale-in border border-slate-200 dark:border-slate-700">
+                        <h3 className="text-lg font-bold mb-4 text-slate-800 dark:text-white">Edit Data Statistik</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Nama Sekolah</label>
+                                <input 
+                                    className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={editForm.school_name || ''}
+                                    onChange={e => setEditForm({...editForm, school_name: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Mata Pelajaran</label>
+                                <input 
+                                    className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={editForm.exam_subject || ''}
+                                    onChange={e => setEditForm({...editForm, exam_subject: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Jenis Evaluasi</label>
+                                <select 
+                                    className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={editForm.exam_type || ''}
+                                    onChange={e => setEditForm({...editForm, exam_type: e.target.value})}
+                                >
+                                    <option value="">Pilih Jenis</option>
+                                    <option value="FORMATIF">Formatif</option>
+                                    <option value="SUMATIF">Sumatif</option>
+                                    <option value="UTS">UTS</option>
+                                    <option value="UAS">UAS</option>
+                                    <option value="TRYOUT">Try Out</option>
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Partisipan</label>
+                                    <input 
+                                        type="number"
+                                        className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                        value={editForm.total_participants || 0}
+                                        onChange={e => setEditForm({...editForm, total_participants: Number(e.target.value)})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Rerata Nilai</label>
+                                    <input 
+                                        type="number"
+                                        step="0.01"
+                                        className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                        value={editForm.average_score || 0}
+                                        onChange={e => setEditForm({...editForm, average_score: Number(e.target.value)})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button onClick={() => setEditingSummary(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-bold">Batal</button>
+                            <button onClick={handleSaveEdit} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none">Simpan Perubahan</button>
                         </div>
                     </div>
                 </div>
