@@ -806,6 +806,18 @@ class StorageService {
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summary = this.calculateExamStatistics(fatExam, examResults);
       
+      // PRESERVE MANUAL EDITS: Fetch existing summary first
+      const { data: existing } = await supabase
+          .from('exam_summaries')
+          .select('region, exam_type')
+          .eq('exam_code', exam.code)
+          .maybeSingle();
+
+      if (existing) {
+          if (existing.region) summary.region = existing.region;
+          if (existing.exam_type) summary.exam_type = existing.exam_type;
+      }
+
       // 5. Insert Summary into SQL (Transaction Step 2)
       // If this fails, we abort.
       const { error: summaryError } = await supabase.from('exam_summaries').insert(summary);
@@ -846,8 +858,21 @@ class StorageService {
   }
 
   async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
+      // PRESERVE MANUAL EDITS: Fetch existing summary first
+      const { data: existing } = await supabase
+          .from('exam_summaries')
+          .select('region, exam_type')
+          .eq('exam_code', exam.code)
+          .maybeSingle();
+
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
       const summary = this.calculateExamStatistics(exam, results);
+
+      // Restore manual edits if available
+      if (existing) {
+          if (existing.region) summary.region = existing.region;
+          if (existing.exam_type) summary.exam_type = existing.exam_type;
+      }
       
       // Hapus data lama jika ada (berdasarkan kode ujian) untuk menghindari duplikasi
       // Ini memenuhi permintaan: "aplikasi dapat mengganti data lama menjadi data baru"
@@ -1577,12 +1602,16 @@ class StorageService {
       // SECURITY: Verify Super Admin
       await this._verifyRole(['super_admin']);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
           .from('exam_summaries')
           .update(updates)
-          .eq('id', id);
+          .eq('id', id)
+          .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+          throw new Error("Gagal memperbarui data. ID tidak ditemukan atau izin ditolak.");
+      }
   }
 }
 
