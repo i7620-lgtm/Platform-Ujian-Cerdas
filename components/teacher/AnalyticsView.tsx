@@ -1,4 +1,4 @@
- 
+  
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChartBarIcon, ArrowPathIcon, TrashIcon, PencilIcon } from '../Icons';
 import { storageService } from '../../services/storage';
