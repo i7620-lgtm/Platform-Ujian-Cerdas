@@ -48,6 +48,7 @@ export interface ExamConfig {
   targetClasses?: string[]; 
   examType: string;
   description: string;
+  manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
 }
