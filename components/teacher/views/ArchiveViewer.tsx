@@ -238,8 +238,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
     };
 
-    const handleUploadToCloud = async () => {
-        if (!archiveData) return;
+    const handleUploadToCloud = async (dataToUpload?: ArchiveData) => {
+        const currentData = dataToUpload || archiveData;
+        if (!currentData) return;
         
         if (!confirm("Arsip ini akan diunggah ke Cloud Storage. Sistem akan mengoptimalkan ukuran gambar secara otomatis (Resize + WebP) agar hemat kuota.\n\nLanjutkan?")) return;
 
@@ -272,7 +273,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             };
 
             // Deep clone to avoid mutating state directly during process
-            const optimizedExam = JSON.parse(JSON.stringify(archiveData.exam)) as Exam;
+            const optimizedExam = JSON.parse(JSON.stringify(currentData.exam)) as Exam;
             
             // Loop through questions and optimize images
             for (let i = 0; i < optimizedExam.questions.length; i++) {
@@ -286,7 +287,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             }
 
             setLoadingMessage('Mengunggah ke Cloud...');
-            const finalPayload = { ...archiveData, exam: optimizedExam };
+            const finalPayload = { ...currentData, exam: optimizedExam };
             const jsonString = JSON.stringify(finalPayload, null, 2);
             await storageService.uploadArchive(optimizedExam.code, jsonString, {
                 school: optimizedExam.authorSchool,
@@ -295,7 +296,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 examType: optimizedExam.config.examType,
                 targetClasses: optimizedExam.config.targetClasses,
                 date: optimizedExam.config.date,
-                participantCount: archiveData.results.length
+                participantCount: currentData.results.length
             });
             
             // Refresh list
@@ -976,7 +977,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     <span>Catat Statistik</span>
                                 </button>
 
-                                <button onClick={handleUploadToCloud} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
+                                <button onClick={() => handleUploadToCloud()} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
                                     {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
                                     <span>Simpan ke Cloud</span>
                                 </button>
@@ -1804,11 +1805,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     exam={archiveData.exam} 
                     onClose={() => setShowEditMetadata(false)} 
                     onSave={(updated) => {
-                        setArchiveData({
+                        const updatedData = {
                             ...archiveData,
                             exam: { ...archiveData.exam, ...updated }
-                        });
+                        };
+                        setArchiveData(updatedData);
                         setShowEditMetadata(false);
+                        handleUploadToCloud(updatedData);
                     }} 
                 />
             )}
