@@ -104,6 +104,7 @@ export interface TeacherProfile {
     fullName: string;
     accountType: AccountType;
     school: string;
+    regency?: string; // Added for Kabupaten/Kota
     avatarUrl?: string;
     email?: string; // Added for user management display
 }
