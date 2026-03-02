@@ -1,8 +1,9 @@
-  
+ 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChartBarIcon, ArrowPathIcon, TrashIcon, PencilIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import type { ExamSummary } from '../../types';
+import { EXAM_TYPES } from './constants';
 
 // Simple Icon for AI Button
 const SparklesIcon = ({ className }: { className?: string }) => (
@@ -228,11 +229,9 @@ const AnalyticsView: React.FC = () => {
                                     onChange={e => setEditForm({...editForm, exam_type: e.target.value})}
                                 >
                                     <option value="">Pilih Jenis</option>
-                                    <option value="FORMATIF">Formatif</option>
-                                    <option value="SUMATIF">Sumatif</option>
-                                    <option value="UTS">UTS</option>
-                                    <option value="UAS">UAS</option>
-                                    <option value="TRYOUT">Try Out</option>
+                                    {EXAM_TYPES.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
