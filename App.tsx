@@ -5,9 +5,10 @@ import { StudentResultPage } from './components/StudentResultPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
-import { LogoIcon, NoWifiIcon, WifiIcon, UserIcon, ArrowLeftIcon, SignalIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
+import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
 import { InvitationModal } from './components/InvitationModal';
+import { ProfileCompletionModal } from './components/teacher/ProfileCompletionModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [studentResult, setStudentResult] = useState<Result | null>(null);
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
+  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
   const [exams, setExams] = useState<Record<string, Exam>>({});
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -59,12 +61,20 @@ const App: React.FC = () => {
 
   const toggleTheme = () => setDarkMode(!darkMode);
 
+  const isProfileComplete = (profile: TeacherProfile) => {
+    return !!(profile.fullName && profile.school && profile.regency && 
+           profile.fullName !== 'Pengguna' && profile.school !== '-' && profile.regency !== '-');
+  };
+
   useEffect(() => {
     const checkSession = async () => {
         try {
             const profile = await storageService.getCurrentUser();
             if (profile) {
                 setTeacherProfile(profile);
+                if (!isProfileComplete(profile)) {
+                    setShowProfileCompletion(true);
+                }
                 setView('TEACHER_DASHBOARD');
             }
         } catch (e) {
@@ -145,11 +155,12 @@ const App: React.FC = () => {
       setCurrentExam(exam);
       setCurrentStudent(studentWithId);
       setView('STUDENT_EXAM');
-    } catch (err: any) {
-        if (err.message === 'EXAM_IS_DRAFT') {
+    } catch (err: unknown) {
+        const error = err as Error;
+        if (error.message === 'EXAM_IS_DRAFT') {
             alert("Ujian ini masih berupa draf.");
         } else {
-            console.error(err);
+            console.error(error);
             alert("Gagal memuat ujian. Periksa koneksi internet Anda.");
         }
     } finally { setIsSyncing(false); }
@@ -292,7 +303,7 @@ const App: React.FC = () => {
     } finally { setIsSyncing(false); }
   }, [teacherProfile]);
 
-  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string, grading?: any) => {
+  const handleExamSubmit = async (answers: Record<string, string>, timeLeft: number, status: ResultStatus = 'completed', activityLog: string[] = [], location?: string, grading?: unknown) => {
     if (!currentExam || !currentStudent) return;
     
     if (currentStudent.class === 'PREVIEW') {
@@ -311,7 +322,7 @@ const App: React.FC = () => {
         activityLog, 
         location, 
         timestamp: Date.now(),
-        ...(grading || {})
+        ...(grading as any || {})
     });
     
     if (status === 'completed' || status === 'force_closed') {
@@ -485,7 +496,13 @@ const App: React.FC = () => {
 
         {view === 'TEACHER_LOGIN' && (
             <TeacherLogin 
-                onLoginSuccess={(p) => { setTeacherProfile(p); setView('TEACHER_DASHBOARD'); }} 
+                onLoginSuccess={(p) => { 
+                    setTeacherProfile(p); 
+                    if (!isProfileComplete(p)) {
+                        setShowProfileCompletion(true);
+                    }
+                    setView('TEACHER_DASHBOARD'); 
+                }} 
                 onBack={() => setView('SELECTOR')}
                 onViewTerms={() => { setPreviousView('TEACHER_LOGIN'); setView('TERMS'); }}
                 onViewPrivacy={() => { setPreviousView('TEACHER_LOGIN'); setView('PRIVACY'); }}
@@ -588,6 +605,17 @@ const App: React.FC = () => {
             isOpen={isInviteOpen} 
             onClose={() => setIsInviteOpen(false)} 
         />
+
+        {/* Profile Completion Modal */}
+        {showProfileCompletion && teacherProfile && (
+            <ProfileCompletionModal 
+                profile={teacherProfile}
+                onComplete={(updated) => {
+                    setTeacherProfile(updated);
+                    setShowProfileCompletion(false);
+                }}
+            />
+        )}
 
         {/* Legal Pages */}
         {view === 'TERMS' && (
