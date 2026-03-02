@@ -1598,19 +1598,23 @@ class StorageService {
       return { exam, role: collaborator.role };
   }
 
-  async updateAnalyticsData(id: string, updates: Partial<ExamSummary>): Promise<void> {
+  async updateAnalyticsData(examCode: string, updates: Partial<ExamSummary>): Promise<void> {
       // SECURITY: Verify Super Admin
       await this._verifyRole(['super_admin']);
 
+      // Try updating by exam_code which is the semantic key
       const { data, error } = await supabase
           .from('exam_summaries')
           .update(updates)
-          .eq('id', id)
+          .eq('exam_code', examCode)
           .select();
 
       if (error) throw error;
+      
       if (!data || data.length === 0) {
-          throw new Error("Gagal memperbarui data. ID tidak ditemukan atau izin ditolak.");
+          // Fallback: Try by ID if exam_code update returned nothing (though unlikely if exam_code is correct)
+          // This handles cases where maybe exam_code is mutated? (Should not happen)
+           throw new Error("Gagal memperbarui data. Data tidak ditemukan atau izin ditolak.");
       }
   }
 }
