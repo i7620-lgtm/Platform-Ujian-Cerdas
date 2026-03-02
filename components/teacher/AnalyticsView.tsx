@@ -68,6 +68,7 @@ const AnalyticsView: React.FC = () => {
         setEditingSummary(summary);
         setEditForm({
             school_name: summary.school_name,
+            region: summary.region,
             exam_subject: summary.exam_subject,
             exam_type: summary.exam_type,
             total_participants: summary.total_participants,
@@ -125,6 +126,7 @@ const AnalyticsView: React.FC = () => {
                                 <input type="checkbox" checked={summaries.length > 0 && selectedIds.size === summaries.length} onChange={toggleSelectAll} className="rounded text-indigo-600 focus:ring-indigo-500"/>
                             </th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Daerah</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Mapel</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kode Soal</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Jenis Evaluasi</th>
@@ -139,6 +141,7 @@ const AnalyticsView: React.FC = () => {
                             <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                 <td className="px-6 py-4"><input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} className="rounded text-indigo-600 focus:ring-indigo-500"/></td>
                                 <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{s.school_name}</td>
+                                <td className="px-6 py-4 text-sm">{s.region || '-'}</td>
                                 <td className="px-6 py-4 text-sm">{s.exam_subject}</td>
                                 <td className="px-6 py-4 text-sm font-mono text-slate-500">{s.exam_code}</td>
                                 <td className="px-6 py-4 text-sm">
@@ -211,6 +214,14 @@ const AnalyticsView: React.FC = () => {
                                     className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                     value={editForm.school_name || ''}
                                     onChange={e => setEditForm({...editForm, school_name: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Daerah</label>
+                                <input 
+                                    className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={editForm.region || ''}
+                                    onChange={e => setEditForm({...editForm, region: e.target.value})}
                                 />
                             </div>
                             <div>
