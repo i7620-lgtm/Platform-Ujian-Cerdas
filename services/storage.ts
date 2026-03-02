@@ -1572,6 +1572,18 @@ class StorageService {
 
       return { exam, role: collaborator.role };
   }
+
+  async updateAnalyticsData(id: string, updates: Partial<ExamSummary>): Promise<void> {
+      // SECURITY: Verify Super Admin
+      await this._verifyRole(['super_admin']);
+
+      const { error } = await supabase
+          .from('exam_summaries')
+          .update(updates)
+          .eq('id', id);
+
+      if (error) throw error;
+  }
 }
 
 export const storageService = new StorageService();
