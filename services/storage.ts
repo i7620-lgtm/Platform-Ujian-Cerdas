@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
@@ -849,6 +849,17 @@ class StorageService {
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
       const summary = this.calculateExamStatistics(exam, results);
       
+      // Hapus data lama jika ada (berdasarkan kode ujian) untuk menghindari duplikasi
+      // Ini memenuhi permintaan: "aplikasi dapat mengganti data lama menjadi data baru"
+      const { error: deleteError } = await supabase
+          .from('exam_summaries')
+          .delete()
+          .eq('exam_code', exam.code);
+
+      if (deleteError) {
+          console.warn("Gagal menghapus data lama (mungkin tidak ada):", deleteError);
+      }
+
       // Simpan ke tabel exam_summaries
       const { error } = await supabase.from('exam_summaries').insert(summary);
       
@@ -900,6 +911,7 @@ class StorageService {
           school_name: exam.authorSchool || 'Unknown School',
           exam_subject: exam.config.subject,
           exam_code: exam.code,
+          exam_type: exam.config.examType, // Added exam_type
           exam_date: exam.config.date,
           total_participants: total,
           average_score: parseFloat(avg.toFixed(2)),
@@ -949,6 +961,14 @@ class StorageService {
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) return [];
       return data as ExamSummary[];
+  }
+
+  async deleteAnalyticsData(id: string): Promise<void> {
+      // SECURITY: Verify Admin Access
+      await this._verifyRole(['super_admin']);
+
+      const { error } = await supabase.from('exam_summaries').delete().eq('id', id);
+      if (error) throw error;
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
