@@ -28,7 +28,7 @@
   }
   
   .math-visual {
-    display: inline-block;
+    display: inline;
     vertical-align: middle;
   }
 
@@ -88,6 +88,8 @@
   .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; } 
   .dark .wysiwyg-content blockquote { border-color: #475569; color: #94a3b8; } 
   .dark .wysiwyg-content { color: #f1f5f9; }
+  /* Force darker text in light mode for better contrast and to fix "gray" appearance */
+  .wysiwyg-content { color: #0f172a; } /* Slate 900 (almost black) */
 
   /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
   .wysiwyg-content img, 
