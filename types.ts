@@ -15,6 +15,7 @@ export interface Question {
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
   level?: string;    // e.g., "1", "HOTS", "LOTS"
   scoreWeight?: number; // Bobot Nilai (Default: 1)
+  kisiKisi?: string; // NEW: Kisi-kisi materi per soal
 
   matchingPairs?: {
     left: string;
@@ -51,7 +52,6 @@ export interface ExamConfig {
   manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
-  kisiKisi?: string; // NEW: Kisi-kisi materi ujian
 }
 
 export interface Exam {
