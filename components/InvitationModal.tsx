@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon } from './Icons';
+import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from './Icons';
 import type { Exam } from '../types';
 
 interface InvitationModalProps {
@@ -10,9 +10,52 @@ interface InvitationModalProps {
     exam?: Exam | null;
 }
 
+const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; content: string; subject: string }> = ({ isOpen, onClose, content, subject }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[85vh]">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white">Kisi-Kisi Materi</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{subject}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                        <XMarkIcon className="w-5 h-5"/>
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-900">
+                    <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-slate-300">
+                        {content || "Tidak ada kisi-kisi materi yang tersedia untuk ujian ini."}
+                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
+                    <button onClick={() => window.print()} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm">
+                        <PrinterIcon className="w-4 h-4"/> Cetak
+                    </button>
+                    <button onClick={onClose} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+            <style>{`
+                @media print {
+                    body * { visibility: hidden; }
+                    .fixed.z-\\[160\\] * { visibility: visible; }
+                    .fixed.z-\\[160\\] { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 0; display: block; }
+                    .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; height: auto; max-height: none; border-radius: 0; }
+                    .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible; }
+                    .fixed.z-\\[160\\] button { display: none; }
+                }
+            `}</style>
+        </div>
+    );
+};
+
 export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClose, teacherName, schoolName, exam }) => {
     const [timeLeft, setTimeLeft] = useState<{ d: number, h: number, m: number, s: number } | null>(null);
     const [isStarted, setIsStarted] = useState(false);
+    const [showKisiKisi, setShowKisiKisi] = useState(false);
 
     const currentUrl = window.location.origin;
     const joinUrl = exam ? `${currentUrl}/?join=${exam.code}` : currentUrl;
@@ -135,7 +178,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             });
             
             return `${datePart} pukul ${timePart} waktu setempat`;
-        } catch (e) {
+        } catch {
             return `${dateStr} ${exam.config.startTime}`;
         }
     };
@@ -300,17 +343,33 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                 </span>
                             </div>
 
-                            <button 
-                                onClick={handlePrint}
-                                className="group w-full py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98] active:translate-y-0"
-                            >
-                                <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
-                                <span className="tracking-wide">Cetak Kartu Undangan</span>
-                            </button>
+                            <div className="flex flex-col gap-2 sm:gap-3">
+                                <button 
+                                    onClick={() => setShowKisiKisi(true)}
+                                    className="group w-full py-2.5 sm:py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98]"
+                                >
+                                    <BookOpenIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <span className="tracking-wide">Baca Kisi-Kisi</span>
+                                </button>
+
+                                <button 
+                                    onClick={handlePrint}
+                                    className="group w-full py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98] active:translate-y-0"
+                                >
+                                    <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <span className="tracking-wide">Cetak Kartu Undangan</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <KisiKisiModal 
+                isOpen={showKisiKisi} 
+                onClose={() => setShowKisiKisi(false)} 
+                content={exam?.config.kisiKisi || ''} 
+                subject={exam?.config.subject || ''} 
+            />
         </div>
     );
 };
