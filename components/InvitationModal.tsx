@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from './Icons';
-import type { Exam } from '../types';
+import type { Exam, Question } from '../types';
 
 interface InvitationModalProps {
     isOpen: boolean;
@@ -10,11 +10,25 @@ interface InvitationModalProps {
     exam?: Exam | null;
 }
 
-const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; content: string; subject: string }> = ({ isOpen, onClose, content, subject }) => {
+const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions: Question[]; subject: string }> = ({ isOpen, onClose, questions, subject }) => {
     if (!isOpen) return null;
+
+    const formatType = (type: string) => {
+        switch(type) {
+            case 'MULTIPLE_CHOICE': return 'Pilihan Ganda';
+            case 'COMPLEX_MULTIPLE_CHOICE': return 'PG Kompleks';
+            case 'TRUE_FALSE': return 'Benar/Salah';
+            case 'MATCHING': return 'Menjodohkan';
+            case 'ESSAY': return 'Uraian';
+            case 'FILL_IN_THE_BLANK': return 'Isian Singkat';
+            case 'INFO': return 'Informasi';
+            default: return type;
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[85vh]">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                     <div>
                         <h3 className="font-bold text-lg text-slate-800 dark:text-white">Kisi-Kisi Materi</h3>
@@ -25,8 +39,36 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; content: s
                     </button>
                 </div>
                 <div className="p-6 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-900">
-                    <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-slate-300">
-                        {content || "Tidak ada kisi-kisi materi yang tersedia untuk ujian ini."}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                    <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-12 text-center">No</th>
+                                    <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-32">Tipe Soal</th>
+                                    <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-24">Level</th>
+                                    <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-32">Materi</th>
+                                    <th className="p-3 font-bold text-slate-600 dark:text-slate-300">Indikator Soal (Kisi-Kisi)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {questions.filter(q => q.questionType !== 'INFO').map((q, i) => (
+                                    <tr key={q.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="p-3 text-center text-slate-500 dark:text-slate-400 font-mono">{i + 1}</td>
+                                        <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{formatType(q.questionType)}</td>
+                                        <td className="p-3 text-slate-600 dark:text-slate-400">{q.level || '-'}</td>
+                                        <td className="p-3 text-slate-600 dark:text-slate-400">{q.category || '-'}</td>
+                                        <td className="p-3 text-slate-800 dark:text-slate-200 leading-relaxed">
+                                            {q.kisiKisi || <span className="text-slate-400 italic">Tidak ada indikator</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {questions.filter(q => q.questionType !== 'INFO').length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-slate-400 italic">Belum ada soal yang dibuat.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
@@ -46,6 +88,9 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; content: s
                     .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; height: auto; max-height: none; border-radius: 0; }
                     .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible; }
                     .fixed.z-\\[160\\] button { display: none; }
+                    .fixed.z-\\[160\\] table { width: 100%; border-collapse: collapse; }
+                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { border: 1px solid #ddd; padding: 8px; color: black; }
+                    .fixed.z-\\[160\\] th { background-color: #f0f0f0; font-weight: bold; }
                 }
             `}</style>
         </div>
@@ -367,7 +412,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             <KisiKisiModal 
                 isOpen={showKisiKisi} 
                 onClose={() => setShowKisiKisi(false)} 
-                content={exam?.config.kisiKisi || ''} 
+                questions={exam?.questions || []} 
                 subject={exam?.config.subject || ''} 
             />
         </div>
