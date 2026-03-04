@@ -325,6 +325,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
     const handleLevelChange = (id: string, level: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, level } : q));
+    const handleKisiKisiChange = (id: string, kisiKisi: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, kisiKisi } : q));
     
     const handleTypeChange = (qId: string, newType: QuestionType) => {
         setQuestions(prev => prev.map(q => {
@@ -380,7 +381,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
     const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
     const createNewQuestion = (type: QuestionType): Question => {
-        const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '' };
+        const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '' };
         switch (type) {
             case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
         }
@@ -495,6 +496,16 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                             placeholder="Default: 1"
                                                         />
                                                     </div>
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kisi-Kisi Materi</label>
+                                                    <textarea 
+                                                        value={q.kisiKisi || ''} 
+                                                        onChange={(e) => handleKisiKisiChange(q.id, e.target.value)}
+                                                        className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[60px] resize-y"
+                                                        placeholder="Contoh: Peserta didik dapat menentukan hasil operasi hitung campuran bilangan cacah"
+                                                    />
                                                 </div>
 
                                                 <WysiwygEditor 
@@ -673,8 +684,6 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         </div>
 
                          <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Instruksi Pengerjaan</label><textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner text-slate-800 dark:text-slate-200" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." /></div>
-
-                         <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Kisi-Kisi Materi (Opsional)</label><textarea name="kisiKisi" value={config.kisiKisi || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner text-slate-800 dark:text-slate-200" placeholder="Tuliskan kisi-kisi atau cakupan materi yang akan diujikan..." /></div>
                     </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 pt-8 border-t border-gray-100 dark:border-slate-700">
