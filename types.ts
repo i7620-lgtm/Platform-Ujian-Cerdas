@@ -1,4 +1,4 @@
-
+ 
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -15,6 +15,7 @@ export interface Question {
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
   level?: string;    // e.g., "1", "HOTS", "LOTS"
   scoreWeight?: number; // Bobot Nilai (Default: 1)
+  kisiKisi?: string; // NEW: Kisi-kisi materi per soal
 
   matchingPairs?: {
     left: string;
