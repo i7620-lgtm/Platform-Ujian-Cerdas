@@ -51,6 +51,7 @@ export interface ExamConfig {
   manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
+  kisiKisi?: string; // NEW: Kisi-kisi materi ujian
 }
 
 export interface Exam {
