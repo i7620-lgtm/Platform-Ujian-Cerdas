@@ -171,11 +171,31 @@ const WysiwygEditor: React.FC<{
     minHeight?: string; 
     showTabs?: boolean;
 }> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px", showTabs = true }) => {
-    const editorRef = useRef<HTMLDivElement>(null); const fileInputRef = useRef<HTMLInputElement>(null); const audioInputRef = useRef<HTMLInputElement>(null); const savedRange = useRef<Range | null>(null);
+    const editorRef = useRef<HTMLDivElement>(null); 
+    const fileInputRef = useRef<HTMLInputElement>(null); 
+    const audioInputRef = useRef<HTMLInputElement>(null); 
+    const savedRange = useRef<Range | null>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
-    const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>(showTabs ? 'FORMAT' : 'INSERT'); const [activeCmds, setActiveCmds] = useState<string[]>([]); const [isInsideTable, setIsInsideTable] = useState(false); const [showMath, setShowMath] = useState(false); const [showTable, setShowTable] = useState(false);
+    const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>(showTabs ? 'FORMAT' : 'INSERT'); 
+    const [activeCmds, setActiveCmds] = useState<string[]>([]); 
+    const [isInsideTable, setIsInsideTable] = useState(false); 
+    const [showMath, setShowMath] = useState(false); 
+    const [showTable, setShowTable] = useState(false);
     
-    useEffect(() => { if (editorRef.current && value !== editorRef.current.innerHTML) { if (!editorRef.current.innerText.trim() && !value) { editorRef.current.innerHTML = ""; } else if (document.activeElement !== editorRef.current) { editorRef.current.innerHTML = value; } } }, [value]);
+    // Local state to handle immediate updates without re-rendering parent
+    const [localValue, setLocalValue] = useState(value);
+
+    // Sync local state with prop value only when prop changes significantly (e.g. initial load or external reset)
+    // We avoid syncing on every render to prevent cursor jumping if parent updates are slow
+    useEffect(() => {
+        if (editorRef.current && value !== localValue) {
+             // Only update if the content is truly different to avoid loop
+             if (editorRef.current.innerHTML !== value) {
+                editorRef.current.innerHTML = value;
+                setLocalValue(value);
+             }
+        }
+    }, [value]);
     
     // Cleanup debounce on unmount
     useEffect(() => {
@@ -187,12 +207,14 @@ const WysiwygEditor: React.FC<{
     const handleInput = () => { 
         if (editorRef.current) { 
             const html = editorRef.current.innerHTML;
+            setLocalValue(html); // Update local state immediately
+
             // Debounce onChange to prevent heavy re-renders of parent
             if (debounceRef.current) clearTimeout(debounceRef.current);
             debounceRef.current = setTimeout(() => {
                 // Sanitize HTML before sending to parent to remove theme-specific styles
                 onChange(sanitizeHtml(html));
-            }, 500);
+            }, 1000); // Increased debounce time to 1s as requested for performance
             
             saveSelection(); 
             checkActiveFormats(); 
@@ -204,7 +226,10 @@ const WysiwygEditor: React.FC<{
         if (debounceRef.current) {
             clearTimeout(debounceRef.current);
             debounceRef.current = null;
-            if (editorRef.current) onChange(editorRef.current.innerHTML);
+            if (editorRef.current) {
+                const html = editorRef.current.innerHTML;
+                onChange(sanitizeHtml(html));
+            }
         }
         saveSelection();
     };
