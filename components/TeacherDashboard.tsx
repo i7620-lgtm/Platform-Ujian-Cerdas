@@ -18,7 +18,7 @@ import {
     BookOpenIcon,
     UserIcon
 } from './Icons';
-import { generateExamCode } from './teacher/examUtils';
+import { generateExamCode, sanitizeHtml } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
@@ -114,11 +114,31 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const handleSaveExam = (status: 'PUBLISHED' | 'DRAFT') => {
         if (status === 'PUBLISHED' && questions.length === 0) { alert("Tidak ada soal."); return; }
+        
+        // Sanitize all questions before saving to ensure no theme-specific styles are stored
+        const sanitizedQuestions = questions.map(q => ({
+            ...q,
+            questionText: sanitizeHtml(q.questionText),
+            options: q.options ? q.options.map(opt => sanitizeHtml(opt)) : undefined,
+            correctAnswer: q.correctAnswer ? sanitizeHtml(q.correctAnswer) : undefined,
+            trueFalseRows: q.trueFalseRows ? q.trueFalseRows.map(row => ({
+                ...row,
+                text: sanitizeHtml(row.text)
+            })) : undefined,
+            matchingPairs: q.matchingPairs ? q.matchingPairs.map(pair => ({
+                ...pair,
+                left: sanitizeHtml(pair.left),
+                right: sanitizeHtml(pair.right)
+            })) : undefined
+        }));
+
         const code = editingExam ? editingExam.code : generateExamCode();
         const now = new Date();
         const readableDate = now.toLocaleString('id-ID').replace(/\//g, '-');
         const examData: Exam = {
-            code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, questions, config,
+            code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, 
+            questions: sanitizedQuestions, 
+            config,
             createdAt: editingExam?.createdAt || String(readableDate), status
         };
         
