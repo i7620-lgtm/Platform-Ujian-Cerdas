@@ -242,7 +242,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     };
 
     const openEditModal = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setIsEditModalOpen(true); };
-    const continueDraft = (exam: Exam) => { setEditingExam(exam); setQuestions(exam.questions); setConfig(exam.config); setManualMode(true); setView('UPLOAD'); };
+    const continueDraft = (exam: Exam) => { 
+        // Yield to main thread to allow UI feedback (INP fix)
+        setTimeout(() => {
+            setEditingExam(exam); 
+            setQuestions(exam.questions); 
+            setConfig(exam.config); 
+            setManualMode(true); 
+            setView('UPLOAD'); 
+        }, 0);
+    };
     const handleExamUpdate = (updatedExam: Exam) => { updateExam(updatedExam); };
 
     const allExams: Exam[] = Object.values(exams);
