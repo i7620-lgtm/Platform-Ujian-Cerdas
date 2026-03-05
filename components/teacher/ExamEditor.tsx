@@ -185,15 +185,25 @@ const WysiwygEditor: React.FC<{
     // Local state to handle immediate updates without re-rendering parent
     const [localValue, setLocalValue] = useState(value);
 
-    // Sync local state with prop value only when prop changes significantly (e.g. initial load or external reset)
-    // We avoid syncing on every render to prevent cursor jumping if parent updates are slow
+    // Sync local state with prop value
     useEffect(() => {
-        if (editorRef.current && value !== localValue) {
-             // Only update if the content is truly different to avoid loop
-             if (editorRef.current.innerHTML !== value) {
-                editorRef.current.innerHTML = value;
-                setLocalValue(value);
-             }
+        if (editorRef.current) {
+            const isFocused = document.activeElement === editorRef.current;
+            const currentHtml = editorRef.current.innerHTML;
+            
+            // We update the DOM if:
+            // 1. The value from props is different from what's in the DOM
+            // AND
+            // 2. (We are NOT focused OR the current DOM is empty/default)
+            // This ensures initial load works (DOM is empty) and external updates work (not focused)
+            // while preventing cursor jumps when typing (focused).
+            
+            if (value !== currentHtml) {
+                if (!isFocused || !currentHtml || currentHtml === '<p><br></p>') {
+                    editorRef.current.innerHTML = value;
+                    setLocalValue(value);
+                }
+            }
         }
     }, [value]);
     
