@@ -8,7 +8,7 @@ import {
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
-import { compressImage, parseList } from './examUtils';
+import { compressImage, parseList, sanitizeHtml } from './examUtils';
 import { EXAM_TYPES } from './constants';
 
 // --- TIPE DATA & KONSTANTA ---
@@ -190,7 +190,8 @@ const WysiwygEditor: React.FC<{
             // Debounce onChange to prevent heavy re-renders of parent
             if (debounceRef.current) clearTimeout(debounceRef.current);
             debounceRef.current = setTimeout(() => {
-                onChange(html);
+                // Sanitize HTML before sending to parent to remove theme-specific styles
+                onChange(sanitizeHtml(html));
             }, 500);
             
             saveSelection(); 
@@ -250,12 +251,8 @@ const WysiwygEditor: React.FC<{
         
         let content = text;
         if (html) {
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            doc.body.querySelectorAll('*').forEach(node => {
-                node.removeAttribute('style');
-                node.removeAttribute('class');
-            });
-            content = doc.body.innerHTML;
+            // Use the shared sanitizeHtml function for consistent cleaning
+            content = sanitizeHtml(html);
         }
         document.execCommand('insertHTML', false, content);
         handleInput();
