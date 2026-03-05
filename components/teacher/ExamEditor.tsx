@@ -128,12 +128,26 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
             case 'INT': latex = `\\int_{${val1 || 'a'}}^{${val2 || 'b'}} ${val3 || 'x'} \\,dx`; break;
             case 'SUM': latex = `\\sum_{${val1 || 'i=1'}}^{${val2 || 'n'}} ${val3 || 'x_i'}`; break;
             case 'MATRIX': latex = `\\begin{pmatrix} ${matData.map(row => row.map(c => c || '0').join(' & ')).join(' \\\\ ')} \\end{pmatrix}`; break;
-            case 'SYMBOL': latex = symbolVal || ''; break;
+            case 'SYMBOL': 
+                if (symbolVal && !symbolVal.includes('\\')) {
+                    // Insert as plain text for simple symbols
+                    document.execCommand('insertText', false, symbolVal);
+                    return;
+                }
+                latex = symbolVal || ''; 
+                break;
         }
         onInsert(latex); if (type !== 'SYMBOL') onClose(); 
     };
     if (!isOpen) return null;
-    const symbols = [{ l: '×', v: '\\times' }, { l: '÷', v: '\\div' }, { l: '≠', v: '\\neq' }, { l: '±', v: '\\pm' }, { l: '≤', v: '\\le' }, { l: '≥', v: '\\ge' }, { l: '≈', v: '\\approx' }, { l: '∞', v: '\\infty' }, { l: 'α', v: '\\alpha' }, { l: 'β', v: '\\beta' }, { l: 'θ', v: '\\theta' }, { l: 'π', v: '\\pi' }, { l: 'Δ', v: '\\Delta' }, { l: 'Ω', v: '\\Omega' }, { l: '∑', v: '\\Sigma' }, { l: '∫', v: '\\int' }, { l: '∠', v: '\\angle' }, { l: '°', v: '^{\\circ}' }, { l: '∈', v: '\\in' }, { l: '→', v: '\\rightarrow' }, { l: 'Turus 5', v: '\\cancel{||||}' }];
+    const symbols = [
+        { l: '×', v: '×' }, { l: '÷', v: '÷' }, { l: '≠', v: '≠' }, { l: '±', v: '±' }, 
+        { l: '≤', v: '≤' }, { l: '≥', v: '≥' }, { l: '≈', v: '≈' }, { l: '∞', v: '∞' }, 
+        { l: 'α', v: '\\alpha' }, { l: 'β', v: '\\beta' }, { l: 'θ', v: '\\theta' }, { l: 'π', v: '\\pi' }, 
+        { l: 'Δ', v: '\\Delta' }, { l: 'Ω', v: '\\Omega' }, { l: '∑', v: '\\Sigma' }, { l: '∫', v: '\\int' }, 
+        { l: '∠', v: '∠' }, { l: '°', v: '°' }, { l: '∈', v: '∈' }, { l: '→', v: '→' }, 
+        { l: 'Turus 5', v: '卌' }
+    ];
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
@@ -223,7 +237,7 @@ const WysiwygEditor: React.FC<{
     const insertMath = (latex: string) => { 
         if ((window as any).katex) { 
             const html = (window as any).katex.renderToString(latex, { throwOnError: false, displayMode: false }); 
-            const wrapper = `<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 100%; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`; 
+            const wrapper = `<span class="math-visual" style="display: inline; vertical-align: baseline;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>`; 
             runCmd('insertHTML', wrapper); 
             handleInput(); 
         } 
