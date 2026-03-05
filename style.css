@@ -28,8 +28,14 @@
   }
   
   .math-visual {
-    display: inline;
+    display: inline-block;
     vertical-align: middle;
+  }
+  
+  /* Force inline display for math inside the visual wrapper to prevent line breaks */
+  .math-visual .katex-display {
+      display: inline-block !important;
+      margin: 0 !important;
   }
 
   /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
