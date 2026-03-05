@@ -957,3 +957,50 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 export const generateExamCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
+
+export const sanitizeHtml = (html: string): string => {
+    if (!html) return '';
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    const isMath = (el: Element) => 
+        el.classList.contains('math-visual') || 
+        el.closest('.math-visual') ||
+        el.classList.contains('katex') ||
+        el.closest('.katex');
+
+    doc.body.querySelectorAll('*').forEach(el => {
+        if (!isMath(el)) {
+            if (el instanceof HTMLElement) {
+                // Remove color and background-color styles
+                el.style.color = '';
+                el.style.backgroundColor = '';
+                
+                // Remove theme-specific classes (Tailwind)
+                const classes = Array.from(el.classList);
+                classes.forEach(cls => {
+                    if (cls.startsWith('dark:') || 
+                        cls.includes('slate-') || 
+                        cls.includes('gray-') || 
+                        cls.includes('zinc-') || 
+                        cls.includes('neutral-') || 
+                        cls.includes('stone-') ||
+                        cls.includes('text-white') ||
+                        cls.includes('text-black') ||
+                        cls.includes('bg-white') ||
+                        cls.includes('bg-black')
+                    ) {
+                        el.classList.remove(cls);
+                    }
+                });
+
+                if (el.getAttribute('style') === '') el.removeAttribute('style');
+                if (el.getAttribute('class') === '') el.removeAttribute('class');
+            }
+            // Remove legacy attributes
+            el.removeAttribute('color');
+            el.removeAttribute('bgcolor');
+        }
+    });
+    return doc.body.innerHTML;
+};
