@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Question, QuestionType, ExamConfig } from '../../types';
 import { 
@@ -8,7 +8,7 @@ import {
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
 } from '../Icons';
-import { compressImage, parseList } from './examUtils';
+import { compressImage, parseList, sanitizeHtml } from './examUtils';
 import { EXAM_TYPES } from './constants';
 
 // --- TIPE DATA & KONSTANTA ---
@@ -48,7 +48,6 @@ const SelectionModal: React.FC<{
     searchPlaceholder?: string;
 }> = ({ isOpen, title, options, selectedValue, onClose, onSelect, searchPlaceholder = "Cari..." }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    useEffect(() => { if (isOpen) setSearchTerm(''); }, [isOpen]);
     const filteredOptions = useMemo(() => options.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())), [searchTerm, options]);
     if (!isOpen) return null;
     return (
@@ -94,16 +93,7 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
     const [tab, setTab] = useState<'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS'>('BASIC');
     const [val1, setVal1] = useState(''); const [val2, setVal2] = useState(''); const [val3, setVal3] = useState(''); 
     const [rows, setRows] = useState(2); const [cols, setCols] = useState(2);
-    const [matData, setMatData] = useState<string[][]>([]);
-    
-    useEffect(() => {
-        if (isOpen) {
-            const safeRows = Math.max(1, Math.min(10, Math.floor(rows || 1)));
-            const safeCols = Math.max(1, Math.min(10, Math.floor(cols || 1)));
-            setMatData(Array.from({ length: safeRows }, () => Array(safeCols).fill('')));
-            setVal1(''); setVal2(''); setVal3('');
-        }
-    }, [isOpen]); // Removed rows/cols from deps to prevent sync loop
+    const [matData, setMatData] = useState<string[][]>(() => Array.from({ length: 2 }, () => Array(2).fill('')));
 
     const handleRowsChange = (val: number) => {
         const newRows = Math.max(1, Math.min(10, Math.floor(val || 1)));
@@ -138,12 +128,26 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
             case 'INT': latex = `\\int_{${val1 || 'a'}}^{${val2 || 'b'}} ${val3 || 'x'} \\,dx`; break;
             case 'SUM': latex = `\\sum_{${val1 || 'i=1'}}^{${val2 || 'n'}} ${val3 || 'x_i'}`; break;
             case 'MATRIX': latex = `\\begin{pmatrix} ${matData.map(row => row.map(c => c || '0').join(' & ')).join(' \\\\ ')} \\end{pmatrix}`; break;
-            case 'SYMBOL': latex = symbolVal || ''; break;
+            case 'SYMBOL': 
+                if (symbolVal && !symbolVal.includes('\\')) {
+                    // Insert as plain text for simple symbols
+                    document.execCommand('insertText', false, symbolVal);
+                    return;
+                }
+                latex = symbolVal || ''; 
+                break;
         }
         onInsert(latex); if (type !== 'SYMBOL') onClose(); 
     };
     if (!isOpen) return null;
-    const symbols = [{ l: '×', v: '\\times' }, { l: '÷', v: '\\div' }, { l: '≠', v: '\\neq' }, { l: '±', v: '\\pm' }, { l: '≤', v: '\\le' }, { l: '≥', v: '\\ge' }, { l: '≈', v: '\\approx' }, { l: '∞', v: '\\infty' }, { l: 'α', v: '\\alpha' }, { l: 'β', v: '\\beta' }, { l: 'θ', v: '\\theta' }, { l: 'π', v: '\\pi' }, { l: 'Δ', v: '\\Delta' }, { l: 'Ω', v: '\\Omega' }, { l: '∑', v: '\\Sigma' }, { l: '∫', v: '\\int' }, { l: '∠', v: '\\angle' }, { l: '°', v: '^{\\circ}' }, { l: '∈', v: '\\in' }, { l: '→', v: '\\rightarrow' }];
+    const symbols = [
+        { l: '×', v: '×' }, { l: '÷', v: '÷' }, { l: '≠', v: '≠' }, { l: '±', v: '±' }, 
+        { l: '≤', v: '≤' }, { l: '≥', v: '≥' }, { l: '≈', v: '≈' }, { l: '∞', v: '∞' }, 
+        { l: 'α', v: '\\alpha' }, { l: 'β', v: '\\beta' }, { l: 'θ', v: '\\theta' }, { l: 'π', v: '\\pi' }, 
+        { l: 'Δ', v: '\\Delta' }, { l: 'Ω', v: '\\Omega' }, { l: '∑', v: '\\Sigma' }, { l: '∫', v: '\\int' }, 
+        { l: '∠', v: '∠' }, { l: '°', v: '°' }, { l: '∈', v: '∈' }, { l: '→', v: '→' }, 
+        { l: 'Turus 5', v: '卌' }
+    ];
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
@@ -167,11 +171,41 @@ const WysiwygEditor: React.FC<{
     minHeight?: string; 
     showTabs?: boolean;
 }> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px", showTabs = true }) => {
-    const editorRef = useRef<HTMLDivElement>(null); const fileInputRef = useRef<HTMLInputElement>(null); const audioInputRef = useRef<HTMLInputElement>(null); const savedRange = useRef<Range | null>(null);
+    const editorRef = useRef<HTMLDivElement>(null); 
+    const fileInputRef = useRef<HTMLInputElement>(null); 
+    const audioInputRef = useRef<HTMLInputElement>(null); 
+    const savedRange = useRef<Range | null>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
-    const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>(showTabs ? 'FORMAT' : 'INSERT'); const [activeCmds, setActiveCmds] = useState<string[]>([]); const [isInsideTable, setIsInsideTable] = useState(false); const [showMath, setShowMath] = useState(false); const [showTable, setShowTable] = useState(false);
+    const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>(showTabs ? 'FORMAT' : 'INSERT'); 
+    const [activeCmds, setActiveCmds] = useState<string[]>([]); 
+    const [isInsideTable, setIsInsideTable] = useState(false); 
+    const [showMath, setShowMath] = useState(false); 
+    const [showTable, setShowTable] = useState(false);
     
-    useEffect(() => { if (editorRef.current && value !== editorRef.current.innerHTML) { if (!editorRef.current.innerText.trim() && !value) { editorRef.current.innerHTML = ""; } else if (document.activeElement !== editorRef.current) { editorRef.current.innerHTML = value; } } }, [value]);
+    // Local state to handle immediate updates without re-rendering parent
+    const [localValue, setLocalValue] = useState(value);
+
+    // Sync local state with prop value
+    useEffect(() => {
+        if (editorRef.current) {
+            const isFocused = document.activeElement === editorRef.current;
+            const currentHtml = editorRef.current.innerHTML;
+            
+            // We update the DOM if:
+            // 1. The value from props is different from what's in the DOM
+            // AND
+            // 2. (We are NOT focused OR the current DOM is empty/default)
+            // This ensures initial load works (DOM is empty) and external updates work (not focused)
+            // while preventing cursor jumps when typing (focused).
+            
+            if (value !== currentHtml) {
+                if (!isFocused || !currentHtml || currentHtml === '<p><br></p>') {
+                    editorRef.current.innerHTML = value;
+                    setLocalValue(value);
+                }
+            }
+        }
+    }, [value]);
     
     // Cleanup debounce on unmount
     useEffect(() => {
@@ -183,11 +217,14 @@ const WysiwygEditor: React.FC<{
     const handleInput = () => { 
         if (editorRef.current) { 
             const html = editorRef.current.innerHTML;
+            setLocalValue(html); // Update local state immediately
+
             // Debounce onChange to prevent heavy re-renders of parent
             if (debounceRef.current) clearTimeout(debounceRef.current);
             debounceRef.current = setTimeout(() => {
-                onChange(html);
-            }, 500);
+                // Sanitize HTML before sending to parent to remove theme-specific styles
+                onChange(sanitizeHtml(html));
+            }, 1000); // Increased debounce time to 1s as requested for performance
             
             saveSelection(); 
             checkActiveFormats(); 
@@ -199,7 +236,10 @@ const WysiwygEditor: React.FC<{
         if (debounceRef.current) {
             clearTimeout(debounceRef.current);
             debounceRef.current = null;
-            if (editorRef.current) onChange(editorRef.current.innerHTML);
+            if (editorRef.current) {
+                const html = editorRef.current.innerHTML;
+                onChange(sanitizeHtml(html));
+            }
         }
         saveSelection();
     };
@@ -230,7 +270,29 @@ const WysiwygEditor: React.FC<{
     };
     const insertTable = (rows: number, cols: number) => { let html = '<table class="border-collapse border border-slate-300 dark:border-slate-600 my-2 w-full text-sm"><thead><tr>'; for(let c=0; c<cols; c++) html += `<th class="border border-slate-300 dark:border-slate-600 p-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100">H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td class="border border-slate-300 dark:border-slate-600 p-2 text-slate-800 dark:text-slate-200">Data</td>`; html += '</tr>'; } html += '</tbody></table><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
     const deleteCurrentTable = () => { const selection = window.getSelection(); if (selection && selection.rangeCount > 0) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE') { node.parentNode?.removeChild(node); handleInput(); setIsInsideTable(false); return; } node = node.parentNode; } } };
-    const insertMath = (latex: string) => { if ((window as any).katex) { const html = (window as any).katex.renderToString(latex, { throwOnError: false }); const wrapper = `&nbsp;<span class="math-visual inline-block px-0.5 rounded select-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-slate-700 align-middle" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span><span style="font-size: 100%; font-family: inherit; font-weight: normal; font-style: normal; color: inherit;">&nbsp;</span>`; runCmd('insertHTML', wrapper); handleInput(); } };
+    const insertMath = (latex: string) => { 
+        if ((window as any).katex) { 
+            const html = (window as any).katex.renderToString(latex, { throwOnError: false, displayMode: false }); 
+            const wrapper = `<span class="math-visual" style="display: inline; vertical-align: baseline;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>`; 
+            runCmd('insertHTML', wrapper); 
+            handleInput(); 
+        } 
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        const html = e.clipboardData.getData('text/html');
+        
+        let content = text;
+        if (html) {
+            // Use the shared sanitizeHtml function for consistent cleaning
+            content = sanitizeHtml(html);
+        }
+        document.execCommand('insertHTML', false, content);
+        handleInput();
+    };
+
     const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (ev) => { const rawDataUrl = ev.target?.result as string; try { const dataUrl = await compressImage(rawDataUrl, 0.7); const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />&nbsp;`; runCmd('insertHTML', imgTag); handleInput(); } catch (error) { console.error("Image compression failed", error); } }; reader.readAsDataURL(file); } e.target.value = ''; };
     const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -250,7 +312,7 @@ const WysiwygEditor: React.FC<{
     
     // NOTE: Styles are now handled globally in style.css to ensure consistency between Editor and Preview/Draft View.
     const Btn: React.FC<{ cmd?: string; label?: string; icon?: React.FC<any>; active?: boolean; onClick?: () => void }> = ({ cmd, label, icon: Icon, active, onClick }) => (<button type="button" onMouseDown={(e) => { e.preventDefault(); onClick ? onClick() : runCmd(cmd!); }} className={`min-w-[28px] h-7 px-1.5 rounded flex items-center justify-center transition-all ${active ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shadow-inner' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400'}`} title={label}>{Icon ? <Icon className="w-4 h-4"/> : <span className="text-xs font-bold font-serif">{label}</span>}</button>);
-    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end">{showTabs && (<div className="flex gap-1">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (<button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-1.5 text-[10px] font-bold tracking-wider rounded-t-lg transition-colors ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-800 dark:text-slate-200 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={checkActiveFormats} data-placeholder={placeholder} spellCheck={false} /></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /></div>);
+    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end">{showTabs && (<div className="flex gap-1">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: any) => (<button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-1.5 text-[10px] font-bold tracking-wider rounded-t-lg transition-colors ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div><Btn cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={checkActiveFormats} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} /></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal key={showMath ? 'open' : 'closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /></div>);
 };
 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
@@ -801,9 +863,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             </div>
 
             {renderTypeSelectionModal()}
-            <SelectionModal isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
-            <SelectionModal isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
-            <SelectionModal isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
+            <SelectionModal key={isSubjectModalOpen ? 'open' : 'closed'} isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
+            <SelectionModal key={isClassModalOpen ? 'open' : 'closed'} isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
+            <SelectionModal key={isExamTypeModalOpen ? 'open' : 'closed'} isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
         </div>
     );
 };

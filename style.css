@@ -28,8 +28,8 @@
   }
   
   .math-visual {
-    display: inline-block;
-    vertical-align: middle;
+    display: inline;
+    vertical-align: baseline;
   }
 
   /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
@@ -88,6 +88,8 @@
   .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; } 
   .dark .wysiwyg-content blockquote { border-color: #475569; color: #94a3b8; } 
   .dark .wysiwyg-content { color: #f1f5f9; }
+  /* Force darker text in light mode for better contrast and to fix "gray" appearance */
+  .wysiwyg-content { color: #0f172a; } /* Slate 900 (almost black) */
 
   /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
   .wysiwyg-content img, 
@@ -120,6 +122,25 @@
   .dark .prose *[style*="color: rgb(0, 0, 0)"], 
   .dark .prose *[style*="color: #000000"],
   .dark .prose *[style*="color:rgb(0,0,0)"] {
+      color: inherit !important;
+  }
+
+  /* --- Aggressive Light Mode Text Visibility Fixes --- */
+  /* Prevent dark mode artifacts (black background, white text) from breaking light mode */
+  
+  /* 1. Force transparent background */
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre):not(mark),
+  .prose :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre):not(mark) {
+      background-color: transparent !important;
+  }
+
+  /* 2. Reset white text to inherit (black/slate) */
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: white"],
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: #ffffff"],
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: rgb(255, 255, 255)"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: white"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: #ffffff"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: rgb(255, 255, 255)"] {
       color: inherit !important;
   }
 
