@@ -84,11 +84,12 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                 @media print {
                     body * { visibility: hidden; }
                     .fixed.z-\\[160\\] * { visibility: visible; }
-                    .fixed.z-\\[160\\] { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 0; display: block; }
-                    .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; height: auto; max-height: none; border-radius: 0; }
-                    .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible; }
+                    .fixed.z-\\[160\\] { position: static !important; width: 100%; height: auto !important; background: white; z-index: 9999; padding: 0; display: block !important; overflow: visible !important; }
+                    .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; width: 100%; height: auto !important; max-height: none !important; border-radius: 0; overflow: visible !important; display: block !important; }
+                    .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible !important; height: auto !important; max-height: none !important; }
                     .fixed.z-\\[160\\] button { display: none; }
-                    .fixed.z-\\[160\\] table { width: 100%; border-collapse: collapse; }
+                    .fixed.z-\\[160\\] table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+                    .fixed.z-\\[160\\] tr { page-break-inside: avoid; page-break-after: auto; }
                     .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { border: 1px solid #ddd; padding: 8px; color: black; }
                     .fixed.z-\\[160\\] th { background-color: #f0f0f0; font-weight: bold; }
                 }
@@ -272,6 +273,14 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                             </div>
                         </div>
 
+                        {/* Access Code Section (Moved Here) */}
+                        <div className="mt-4 sm:mt-6 flex flex-col items-center gap-1 w-full px-4 no-print">
+                             <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode Akses</span>
+                             <span className="font-mono text-xl sm:text-2xl font-black text-slate-800 dark:text-white bg-white dark:bg-slate-900 px-4 py-1.5 rounded-xl tracking-[0.2em] border-2 border-slate-100 dark:border-slate-700 select-all shadow-sm w-full text-center">
+                                {exam?.code || '------'}
+                             </span>
+                        </div>
+
                         {/* Link & Button Section (Visible on Screen, Hidden on Print) */}
                         <div className="mt-3 sm:mt-6 w-full max-w-[240px] space-y-2 sm:space-y-3 no-print">
                             <div className="relative group/link">
@@ -379,15 +388,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                             )}
                         </div>
 
-                        {/* Footer: Access Code & Print Button */}
+                        {/* Footer: Print Button Only */}
                         <div className="mt-auto pt-2 sm:pt-4 border-t border-slate-50 dark:border-slate-800">
-                            <div className="flex items-center justify-between mb-2 sm:mb-4">
-                                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode Akses</span>
-                                <span className="font-mono text-base sm:text-lg font-black text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg tracking-widest border border-slate-200 dark:border-slate-700 select-all">
-                                    {exam?.code || '------'}
-                                </span>
-                            </div>
-
                             <div className="flex flex-row gap-2 sm:gap-3">
                                 <button 
                                     onClick={() => setShowKisiKisi(true)}
