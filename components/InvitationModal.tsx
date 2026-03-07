@@ -83,11 +83,17 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
             <style>{`
                 @media print {
                     @page { size: portrait; margin: 1cm; }
-                    body { overflow: visible !important; height: auto !important; }
+                    html, body { 
+                        height: auto !important; 
+                        overflow: visible !important; 
+                        background: white !important;
+                    }
                     body * { visibility: hidden; }
                     .fixed.z-\\[160\\] * { visibility: visible; }
                     .fixed.z-\\[160\\] { 
-                        position: static !important; 
+                        position: absolute !important; 
+                        left: 0 !important;
+                        top: 0 !important;
                         width: 100% !important; 
                         height: auto !important; 
                         background: white !important; 
