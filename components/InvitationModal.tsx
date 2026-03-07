@@ -82,16 +82,54 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
             </div>
             <style>{`
                 @media print {
+                    @page { size: portrait; margin: 1cm; }
+                    body { overflow: visible !important; height: auto !important; }
                     body * { visibility: hidden; }
                     .fixed.z-\\[160\\] * { visibility: visible; }
-                    .fixed.z-\\[160\\] { position: static !important; width: 100%; height: auto !important; background: white; z-index: 9999; padding: 0; display: block !important; overflow: visible !important; }
-                    .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; width: 100%; height: auto !important; max-height: none !important; border-radius: 0; overflow: visible !important; display: block !important; }
-                    .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible !important; height: auto !important; max-height: none !important; }
-                    .fixed.z-\\[160\\] button { display: none; }
-                    .fixed.z-\\[160\\] table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
-                    .fixed.z-\\[160\\] tr { page-break-inside: avoid; page-break-after: auto; }
-                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { border: 1px solid #ddd; padding: 8px; color: black; }
-                    .fixed.z-\\[160\\] th { background-color: #f0f0f0; font-weight: bold; }
+                    .fixed.z-\\[160\\] { 
+                        position: static !important; 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        background: white !important; 
+                        z-index: 9999; 
+                        padding: 0 !important; 
+                        display: block !important; 
+                        overflow: visible !important; 
+                    }
+                    .fixed.z-\\[160\\] .bg-white { 
+                        box-shadow: none !important; 
+                        border: none !important; 
+                        max-width: 100% !important; 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        max-height: none !important; 
+                        border-radius: 0 !important; 
+                        overflow: visible !important; 
+                        display: block !important; 
+                    }
+                    .fixed.z-\\[160\\] .overflow-y-auto { 
+                        overflow: visible !important; 
+                        height: auto !important; 
+                        max-height: none !important; 
+                    }
+                    .fixed.z-\\[160\\] button { display: none !important; }
+                    .fixed.z-\\[160\\] table { 
+                        width: 100% !important; 
+                        border-collapse: collapse !important; 
+                    }
+                    .fixed.z-\\[160\\] thead { display: table-header-group; }
+                    .fixed.z-\\[160\\] tr { page-break-inside: avoid; }
+                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { 
+                        border: 1px solid #ddd !important; 
+                        padding: 8px !important; 
+                        color: black !important; 
+                    }
+                    .fixed.z-\\[160\\] th { 
+                        background-color: #f0f0f0 !important; 
+                        font-weight: bold !important; 
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                    }
                 }
             `}</style>
         </div>
