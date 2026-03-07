@@ -16,19 +16,25 @@ interface CollaboratorViewProps {
 export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, onExit, isDarkMode, toggleTheme }) => {
     const [questions, setQuestions] = useState<Question[]>(exam.questions);
     const [config, setConfig] = useState<ExamConfig>(exam.config);
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
-        setIsSaving(true);
         try {
-            const updatedExam = { ...exam, questions, config };
-            await storageService.saveExam(updatedExam);
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('collab_token');
+
+            if (token) {
+                // Use specialized collaborator save
+                await storageService.saveCollaboratorExam({ ...exam, questions, config }, token);
+            } else {
+                // Fallback to standard save (unlikely to work for collaborators but keeps existing logic)
+                const updatedExam = { ...exam, questions, config };
+                await storageService.saveExam(updatedExam);
+            }
             alert('Perubahan berhasil disimpan!');
-        } catch (e) {
-            alert('Gagal menyimpan perubahan.');
+        } catch (e: unknown) {
             console.error(e);
-        } finally {
-            setIsSaving(false);
+            const errorMessage = e instanceof Error ? e.message : 'Gagal menyimpan perubahan.';
+            alert(errorMessage);
         }
     };
 
