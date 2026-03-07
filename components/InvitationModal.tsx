@@ -83,26 +83,42 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
             <style>{`
                 @media print {
                     @page { size: portrait; margin: 1cm; }
+                    
+                    /* Reset Root and Body */
                     html, body { 
                         height: auto !important; 
                         overflow: visible !important; 
                         background: white !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
+
+                    /* Hide everything by default */
                     body * { visibility: hidden; }
-                    .fixed.z-\\[160\\] * { visibility: visible; }
+
+                    /* Show Modal and its children */
+                    .fixed.z-\\[160\\], .fixed.z-\\[160\\] * { 
+                        visibility: visible !important; 
+                    }
+
+                    /* Position the Modal Wrapper */
                     .fixed.z-\\[160\\] { 
                         position: absolute !important; 
                         left: 0 !important;
                         top: 0 !important;
                         width: 100% !important; 
                         height: auto !important; 
+                        min-height: 100% !important;
                         background: white !important; 
                         z-index: 9999; 
                         padding: 0 !important; 
                         display: block !important; 
                         overflow: visible !important; 
                     }
-                    .fixed.z-\\[160\\] .bg-white { 
+
+                    /* Reset the Inner Modal Card */
+                    .fixed.z-\\[160\\] > div { 
                         box-shadow: none !important; 
                         border: none !important; 
                         max-width: 100% !important; 
@@ -112,24 +128,52 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                         border-radius: 0 !important; 
                         overflow: visible !important; 
                         display: block !important; 
+                        position: static !important;
                     }
+
+                    /* Reset Scrollable Content Area */
                     .fixed.z-\\[160\\] .overflow-y-auto { 
                         overflow: visible !important; 
                         height: auto !important; 
                         max-height: none !important; 
+                        display: block !important;
                     }
-                    .fixed.z-\\[160\\] button { display: none !important; }
+
+                    /* Reset Table Container */
+                    .fixed.z-\\[160\\] .overflow-x-auto {
+                        overflow: visible !important;
+                        display: block !important;
+                    }
+
+                    /* Hide Buttons and Header Controls */
+                    .fixed.z-\\[160\\] button,
+                    .fixed.z-\\[160\\] .border-b.flex.justify-between { 
+                        display: none !important; 
+                    }
+
+                    /* Explicitly hide the Invitation Card container to prevent overlap */
+                    .print-container {
+                        display: none !important;
+                    }
+
+                    /* Table Styling for Print */
                     .fixed.z-\\[160\\] table { 
                         width: 100% !important; 
                         border-collapse: collapse !important; 
+                        table-layout: fixed !important; /* Ensure columns don't overflow */
                     }
+                    
                     .fixed.z-\\[160\\] thead { display: table-header-group; }
                     .fixed.z-\\[160\\] tr { page-break-inside: avoid; }
+                    
                     .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { 
-                        border: 1px solid #ddd !important; 
+                        border: 1px solid #000 !important; /* Darker border for print */
                         padding: 8px !important; 
                         color: black !important; 
+                        font-size: 10pt !important; /* Readable print font size */
+                        word-wrap: break-word !important;
                     }
+                    
                     .fixed.z-\\[160\\] th { 
                         background-color: #f0f0f0 !important; 
                         font-weight: bold !important; 
