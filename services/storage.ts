@@ -734,10 +734,14 @@ class StorageService {
         }
     }
 
-    const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: finalAuthorId, school: exam.authorSchool,
-        config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
-    });
+    // FIX: Use update instead of upsert to avoid RLS issues with author_id for collaborators
+    // We don't need to send author_id as it's already set during creation/check
+    const { error } = await supabase.from('exams').update({
+        school: exam.authorSchool,
+        config: exam.config, 
+        questions: processedQuestions, 
+        status: exam.status || 'PUBLISHED'
+    }).eq('code', exam.code);
     if (error) throw error;
   }
 
