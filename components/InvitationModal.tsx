@@ -388,20 +388,20 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                 </span>
                             </div>
 
-                            <div className="flex flex-col gap-2 sm:gap-3">
+                            <div className="flex flex-row gap-2 sm:gap-3">
                                 <button 
                                     onClick={() => setShowKisiKisi(true)}
-                                    className="group w-full py-2.5 sm:py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98]"
+                                    className="group flex-1 py-2.5 sm:py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] sm:text-sm rounded-xl sm:rounded-2xl border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 no-print flex items-center justify-center gap-1.5 sm:gap-3 active:scale-[0.98]"
                                 >
-                                    <BookOpenIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <BookOpenIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
                                     <span className="tracking-wide">Baca Kisi-Kisi</span>
                                 </button>
 
                                 <button 
                                     onClick={handlePrint}
-                                    className="group w-full py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98] active:translate-y-0"
+                                    className="group flex-1 py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-[10px] sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-1.5 sm:gap-3 active:scale-[0.98] active:translate-y-0"
                                 >
-                                    <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <PrinterIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
                                     <span className="tracking-wide">Cetak Kartu Undangan</span>
                                 </button>
                             </div>
