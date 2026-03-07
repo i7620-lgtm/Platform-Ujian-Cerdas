@@ -746,12 +746,28 @@ class StorageService {
     if (error) throw error;
 
     // If no rows were updated, it implies RLS blocked the update or the exam wasn't found.
-    // We attempt a fallback upsert (without author_id) which might bypass specific UPDATE RLS policies 
-    // if the user has INSERT permissions (common in some RLS setups for "shared" resources).
+    // We attempt a fallback upsert using the EXISTING author_id.
+    // This is crucial because some RLS policies require the author_id to be present and match the existing one
+    // to allow an "upsert" (even if it's effectively an update).
     if (!data || data.length === 0) {
-        console.warn("Update returned 0 rows. Attempting fallback upsert...");
+        console.warn("Update returned 0 rows. Attempting fallback upsert with existing author_id...");
+        
+        // 1. Fetch existing exam to get author_id
+        const { data: existingExam, error: fetchError } = await supabase
+            .from('exams')
+            .select('author_id')
+            .eq('code', exam.code)
+            .single();
+
+        if (fetchError || !existingExam) {
+             console.error("Failed to fetch existing exam for fallback:", fetchError);
+             throw new Error("Gagal menyimpan perubahan. Ujian tidak ditemukan atau Anda tidak memiliki akses.");
+        }
+
+        // 2. Perform upsert with the correct author_id
         const { error: upsertError } = await supabase.from('exams').upsert({
             code: exam.code,
+            author_id: existingExam.author_id, // Include the original author_id
             school: exam.authorSchool,
             config: exam.config,
             questions: processedQuestions,
