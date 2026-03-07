@@ -127,12 +127,13 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                 @media print {
                     @page { 
                         size: portrait; 
-                        margin: 2cm; 
+                        margin: 1.5cm; 
                     }
                     
                     /* Reset everything */
                     html, body { 
                         height: auto !important; 
+                        min-height: 100% !important;
                         overflow: visible !important; 
                         background: white !important;
                         margin: 0 !important;
@@ -157,16 +158,24 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                     .kisi-kisi-modal-root {
                         visibility: visible !important;
                         position: absolute !important;
-                        top: 0;
-                        left: 0;
+                        top: 0 !important;
+                        left: 0 !important;
                         width: 100% !important;
                         height: auto !important;
+                        min-height: 100% !important;
                         overflow: visible !important;
                         background: white !important;
                         z-index: 9999 !important;
                         display: block !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        
+                        /* Critical resets for multi-page */
+                        bottom: auto !important;
+                        right: auto !important;
+                        transform: none !important;
+                        animation: none !important;
+                        opacity: 1 !important;
                     }
 
                     /* Show only the print document */
@@ -187,7 +196,7 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                     }
 
                     /* Ensure tables break correctly */
-                    table { page-break-inside: auto; }
+                    table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
                     tr { page-break-inside: avoid; page-break-after: auto; }
                     thead { display: table-header-group; }
                     tfoot { display: table-footer-group; }
