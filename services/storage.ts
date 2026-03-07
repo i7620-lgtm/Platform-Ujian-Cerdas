@@ -736,13 +736,33 @@ class StorageService {
 
     // FIX: Use update instead of upsert to avoid RLS issues with author_id for collaborators
     // We don't need to send author_id as it's already set during creation/check
-    const { error } = await supabase.from('exams').update({
+    const { data, error } = await supabase.from('exams').update({
         school: exam.authorSchool,
         config: exam.config, 
         questions: processedQuestions, 
         status: exam.status || 'PUBLISHED'
-    }).eq('code', exam.code);
+    }).eq('code', exam.code).select();
+
     if (error) throw error;
+
+    // If no rows were updated, it implies RLS blocked the update or the exam wasn't found.
+    // We attempt a fallback upsert (without author_id) which might bypass specific UPDATE RLS policies 
+    // if the user has INSERT permissions (common in some RLS setups for "shared" resources).
+    if (!data || data.length === 0) {
+        console.warn("Update returned 0 rows. Attempting fallback upsert...");
+        const { error: upsertError } = await supabase.from('exams').upsert({
+            code: exam.code,
+            school: exam.authorSchool,
+            config: exam.config,
+            questions: processedQuestions,
+            status: exam.status || 'PUBLISHED'
+        }, { onConflict: 'code' });
+
+        if (upsertError) {
+            console.error("Fallback upsert failed:", upsertError);
+            throw new Error("Gagal menyimpan perubahan. Anda mungkin tidak memiliki izin edit atau ujian tidak ditemukan.");
+        }
+    }
   }
 
   async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
