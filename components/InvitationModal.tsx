@@ -82,15 +82,60 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
             </div>
             <style>{`
                 @media print {
+                    @page { size: portrait; margin: 1cm; }
+                    html, body { 
+                        height: auto !important; 
+                        overflow: visible !important; 
+                        background: white !important;
+                    }
                     body * { visibility: hidden; }
                     .fixed.z-\\[160\\] * { visibility: visible; }
-                    .fixed.z-\\[160\\] { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 0; display: block; }
-                    .fixed.z-\\[160\\] .bg-white { box-shadow: none; border: none; max-width: 100%; height: auto; max-height: none; border-radius: 0; }
-                    .fixed.z-\\[160\\] .overflow-y-auto { overflow: visible; }
-                    .fixed.z-\\[160\\] button { display: none; }
-                    .fixed.z-\\[160\\] table { width: 100%; border-collapse: collapse; }
-                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { border: 1px solid #ddd; padding: 8px; color: black; }
-                    .fixed.z-\\[160\\] th { background-color: #f0f0f0; font-weight: bold; }
+                    .fixed.z-\\[160\\] { 
+                        position: absolute !important; 
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important; 
+                        height: auto !important; 
+                        background: white !important; 
+                        z-index: 9999; 
+                        padding: 0 !important; 
+                        display: block !important; 
+                        overflow: visible !important; 
+                    }
+                    .fixed.z-\\[160\\] .bg-white { 
+                        box-shadow: none !important; 
+                        border: none !important; 
+                        max-width: 100% !important; 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        max-height: none !important; 
+                        border-radius: 0 !important; 
+                        overflow: visible !important; 
+                        display: block !important; 
+                    }
+                    .fixed.z-\\[160\\] .overflow-y-auto { 
+                        overflow: visible !important; 
+                        height: auto !important; 
+                        max-height: none !important; 
+                    }
+                    .fixed.z-\\[160\\] button { display: none !important; }
+                    .fixed.z-\\[160\\] table { 
+                        width: 100% !important; 
+                        border-collapse: collapse !important; 
+                    }
+                    .fixed.z-\\[160\\] thead { display: table-header-group; }
+                    .fixed.z-\\[160\\] tr { page-break-inside: avoid; }
+                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { 
+                        border: 1px solid #ddd !important; 
+                        padding: 8px !important; 
+                        color: black !important; 
+                    }
+                    .fixed.z-\\[160\\] th { 
+                        background-color: #f0f0f0 !important; 
+                        font-weight: bold !important; 
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                    }
                 }
             `}</style>
         </div>
@@ -272,6 +317,14 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                             </div>
                         </div>
 
+                        {/* Access Code Section (Moved Here) */}
+                        <div className="mt-4 sm:mt-6 flex flex-col items-center gap-1 w-full px-4 no-print">
+                             <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode Akses</span>
+                             <span className="font-mono text-xl sm:text-2xl font-black text-slate-800 dark:text-white bg-white dark:bg-slate-900 px-4 py-1.5 rounded-xl tracking-[0.2em] border-2 border-slate-100 dark:border-slate-700 select-all shadow-sm w-full text-center">
+                                {exam?.code || '------'}
+                             </span>
+                        </div>
+
                         {/* Link & Button Section (Visible on Screen, Hidden on Print) */}
                         <div className="mt-3 sm:mt-6 w-full max-w-[240px] space-y-2 sm:space-y-3 no-print">
                             <div className="relative group/link">
@@ -379,29 +432,22 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                             )}
                         </div>
 
-                        {/* Footer: Access Code & Print Button */}
+                        {/* Footer: Print Button Only */}
                         <div className="mt-auto pt-2 sm:pt-4 border-t border-slate-50 dark:border-slate-800">
-                            <div className="flex items-center justify-between mb-2 sm:mb-4">
-                                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode Akses</span>
-                                <span className="font-mono text-base sm:text-lg font-black text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg tracking-widest border border-slate-200 dark:border-slate-700 select-all">
-                                    {exam?.code || '------'}
-                                </span>
-                            </div>
-
-                            <div className="flex flex-col gap-2 sm:gap-3">
+                            <div className="flex flex-row gap-2 sm:gap-3">
                                 <button 
                                     onClick={() => setShowKisiKisi(true)}
-                                    className="group w-full py-2.5 sm:py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98]"
+                                    className="group flex-1 py-2.5 sm:py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] sm:text-sm rounded-xl sm:rounded-2xl border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 no-print flex items-center justify-center gap-1.5 sm:gap-3 active:scale-[0.98]"
                                 >
-                                    <BookOpenIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <BookOpenIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
                                     <span className="tracking-wide">Baca Kisi-Kisi</span>
                                 </button>
 
                                 <button 
                                     onClick={handlePrint}
-                                    className="group w-full py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-2 sm:gap-3 active:scale-[0.98] active:translate-y-0"
+                                    className="group flex-1 py-2.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-[10px] sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 no-print flex items-center justify-center gap-1.5 sm:gap-3 active:scale-[0.98] active:translate-y-0"
                                 >
-                                    <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
+                                    <PrinterIcon className="w-3.5 h-3.5 sm:w-5 sm:h-5 opacity-90 group-hover:scale-110 transition-transform" />
                                     <span className="tracking-wide">Cetak Kartu Undangan</span>
                                 </button>
                             </div>

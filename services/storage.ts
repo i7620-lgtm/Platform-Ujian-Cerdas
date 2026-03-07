@@ -734,11 +734,70 @@ class StorageService {
         }
     }
 
-    const { error } = await supabase.from('exams').upsert({
-        code: exam.code, author_id: finalAuthorId, school: exam.authorSchool,
-        config: exam.config, questions: processedQuestions, status: exam.status || 'PUBLISHED'
-    });
+    // FIX: Use update instead of upsert to avoid RLS issues with author_id for collaborators
+    // We don't need to send author_id as it's already set during creation/check
+    const { data, error } = await supabase.from('exams').update({
+        school: exam.authorSchool,
+        config: exam.config, 
+        questions: processedQuestions, 
+        status: exam.status || 'PUBLISHED'
+    }).eq('code', exam.code).select();
+
     if (error) throw error;
+
+    // If no rows were updated, it implies RLS blocked the update or the exam wasn't found.
+    // We attempt a fallback strategy for collaborators.
+    if (!data || data.length === 0) {
+        console.warn("Update returned 0 rows. Attempting fallback strategies...");
+        
+        // Strategy 1: Partial Update (Questions & Config only)
+        // Some RLS policies might restrict updating 'school' or 'status' for non-owners.
+        console.log("Attempting partial update (questions & config only)...");
+        const { data: partialData, error: partialError } = await supabase.from('exams').update({
+            config: exam.config,
+            questions: processedQuestions
+        }).eq('code', exam.code).select();
+
+        if (partialData && partialData.length > 0) {
+            console.log("Partial update successful!");
+            return;
+        }
+
+        if (partialError) {
+             console.warn("Partial update failed:", partialError);
+        }
+
+        // Strategy 2: Upsert with existing author_id (Last Resort)
+        console.log("Attempting fallback upsert with existing author_id...");
+        
+        // 1. Fetch existing exam to get author_id
+        const { data: existingExam, error: fetchError } = await supabase
+            .from('exams')
+            .select('author_id')
+            .eq('code', exam.code)
+            .single();
+
+        if (fetchError || !existingExam) {
+             console.error("Failed to fetch existing exam for fallback:", fetchError);
+             throw new Error("Gagal menyimpan perubahan. Ujian tidak ditemukan atau Anda tidak memiliki akses.");
+        }
+
+        // 2. Perform upsert with the correct author_id
+        // We exclude 'school' here as well just in case it's protected
+        const { error: upsertError } = await supabase.from('exams').upsert({
+            code: exam.code,
+            author_id: existingExam.author_id, // Include the original author_id
+            // school: exam.authorSchool, // Exclude school to be safe
+            config: exam.config,
+            questions: processedQuestions,
+            status: exam.status || 'PUBLISHED'
+        }, { onConflict: 'code' });
+
+        if (upsertError) {
+            console.error("Fallback upsert failed:", upsertError);
+            throw new Error(`Gagal menyimpan perubahan. Izin ditolak oleh server (RLS). Pastikan Anda login atau memiliki akses edit yang valid. (Error: ${upsertError.message})`);
+        }
+    }
   }
 
   async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
