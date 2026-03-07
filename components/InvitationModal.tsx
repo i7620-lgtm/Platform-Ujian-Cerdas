@@ -10,7 +10,7 @@ interface InvitationModalProps {
     exam?: Exam | null;
 }
 
-const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions: Question[]; subject: string }> = ({ isOpen, onClose, questions, subject }) => {
+const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions: Question[]; subject: string; schoolName?: string; teacherName?: string }> = ({ isOpen, onClose, questions, subject, schoolName, teacherName }) => {
     if (!isOpen) return null;
 
     const formatType = (type: string) => {
@@ -28,7 +28,8 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
 
     return (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+            {/* Screen UI - Hidden on Print */}
+            <div className="screen-only-ui bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                     <div>
                         <h3 className="font-bold text-lg text-slate-800 dark:text-white">Kisi-Kisi Materi</h3>
@@ -80,106 +81,101 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                     </button>
                 </div>
             </div>
+
+            {/* Print Document - Visible ONLY on Print */}
+            <div className="print-only-document hidden">
+                <div className="text-center mb-6 border-b-2 border-black pb-4">
+                    <h2 className="text-xl font-bold uppercase tracking-wide mb-1">{schoolName || 'Sekolah'}</h2>
+                    <p className="text-sm mb-4">{teacherName ? `Guru Pengampu: ${teacherName}` : ''}</p>
+                    <h1 className="text-2xl font-bold uppercase underline">KISI-KISI SOAL</h1>
+                    <p className="text-lg font-bold mt-2">{subject}</p>
+                </div>
+
+                <table className="w-full border-collapse border border-black text-sm">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="border border-black p-2 w-12 text-center">No</th>
+                            <th className="border border-black p-2 w-1/4">Kompetensi / Materi</th>
+                            <th className="border border-black p-2">Indikator Soal</th>
+                            <th className="border border-black p-2 w-24 text-center">Level</th>
+                            <th className="border border-black p-2 w-32 text-center">Bentuk Soal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {questions.filter(q => q.questionType !== 'INFO').map((q, i) => (
+                            <tr key={q.id}>
+                                <td className="border border-black p-2 text-center">{i + 1}</td>
+                                <td className="border border-black p-2">{q.category || '-'}</td>
+                                <td className="border border-black p-2">{q.kisiKisi || '-'}</td>
+                                <td className="border border-black p-2 text-center">{q.level || '-'}</td>
+                                <td className="border border-black p-2 text-center">{formatType(q.questionType)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                
+                <div className="mt-8 flex justify-end">
+                    <div className="text-center w-64">
+                        <p className="mb-16">Mengetahui,</p>
+                        <p className="font-bold underline">{teacherName || 'Guru Mata Pelajaran'}</p>
+                        <p>NIP. ..............................</p>
+                    </div>
+                </div>
+            </div>
+
             <style>{`
                 @media print {
-                    @page { size: portrait; margin: 1cm; }
+                    @page { 
+                        size: portrait; 
+                        margin: 2cm; 
+                    }
                     
-                    /* Reset Root and Body */
+                    /* Reset everything */
                     html, body { 
                         height: auto !important; 
                         overflow: visible !important; 
                         background: white !important;
-                        width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        width: 100% !important;
                     }
 
-                    /* Hide everything by default */
-                    body * { visibility: hidden; }
-
-                    /* Show Modal and its children */
-                    .fixed.z-\\[160\\], .fixed.z-\\[160\\] * { 
-                        visibility: visible !important; 
+                    /* Hide all screen UI */
+                    body * { 
+                        visibility: hidden; 
                     }
-
-                    /* Position the Modal Wrapper */
-                    .fixed.z-\\[160\\] { 
-                        position: absolute !important; 
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important; 
-                        height: auto !important; 
-                        min-height: 100% !important;
-                        background: white !important; 
-                        z-index: 9999; 
-                        padding: 0 !important; 
-                        display: block !important; 
-                        overflow: visible !important; 
-                    }
-
-                    /* Reset the Inner Modal Card */
-                    .fixed.z-\\[160\\] > div { 
-                        box-shadow: none !important; 
-                        border: none !important; 
-                        max-width: 100% !important; 
-                        width: 100% !important; 
-                        height: auto !important; 
-                        max-height: none !important; 
-                        border-radius: 0 !important; 
-                        overflow: visible !important; 
-                        display: block !important; 
-                        position: static !important;
-                    }
-
-                    /* Reset Scrollable Content Area */
-                    .fixed.z-\\[160\\] .overflow-y-auto { 
-                        overflow: visible !important; 
-                        height: auto !important; 
-                        max-height: none !important; 
-                        display: block !important;
-                    }
-
-                    /* Reset Table Container */
-                    .fixed.z-\\[160\\] .overflow-x-auto {
-                        overflow: visible !important;
-                        display: block !important;
-                    }
-
-                    /* Hide Buttons and Header Controls */
-                    .fixed.z-\\[160\\] button,
-                    .fixed.z-\\[160\\] .border-b.flex.justify-between { 
+                    
+                    .screen-only-ui, 
+                    .print-container, 
+                    #invitation-card,
+                    .fixed.z-\\[150\\] { 
                         display: none !important; 
                     }
 
-                    /* Explicitly hide the Invitation Card container to prevent overlap */
-                    .print-container {
-                        display: none !important;
+                    /* Show only the print document */
+                    .print-only-document, 
+                    .print-only-document * { 
+                        visibility: visible !important; 
                     }
 
-                    /* Table Styling for Print */
-                    .fixed.z-\\[160\\] table { 
-                        width: 100% !important; 
-                        border-collapse: collapse !important; 
-                        table-layout: fixed !important; /* Ensure columns don't overflow */
+                    .print-only-document {
+                        display: block !important;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        background: white;
+                        color: black;
+                        font-family: "Times New Roman", Times, serif;
+                        padding: 0;
+                        margin: 0;
                     }
-                    
-                    .fixed.z-\\[160\\] thead { display: table-header-group; }
-                    .fixed.z-\\[160\\] tr { page-break-inside: avoid; }
-                    
-                    .fixed.z-\\[160\\] th, .fixed.z-\\[160\\] td { 
-                        border: 1px solid #000 !important; /* Darker border for print */
-                        padding: 8px !important; 
-                        color: black !important; 
-                        font-size: 10pt !important; /* Readable print font size */
-                        word-wrap: break-word !important;
-                    }
-                    
-                    .fixed.z-\\[160\\] th { 
-                        background-color: #f0f0f0 !important; 
-                        font-weight: bold !important; 
-                        -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact; 
-                    }
+
+                    /* Ensure table breaks correctly */
+                    table { page-break-inside: auto; }
+                    tr { page-break-inside: avoid; page-break-after: auto; }
+                    thead { display: table-header-group; }
+                    tfoot { display: table-footer-group; }
                 }
             `}</style>
         </div>
@@ -504,6 +500,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 onClose={() => setShowKisiKisi(false)} 
                 questions={exam?.questions || []} 
                 subject={exam?.config.subject || ''} 
+                schoolName={schoolName}
+                teacherName={teacherName}
             />
         </div>
     );
