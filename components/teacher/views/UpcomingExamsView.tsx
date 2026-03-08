@@ -1,4 +1,4 @@
- 
+
 import React, { useState } from 'react';
 import type { Exam } from '../../../types';
 import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon, DocumentDuplicateIcon } from '../../Icons';
@@ -53,7 +53,11 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                         )}
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-3 font-medium">
-                                        <span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {exam.config.startTime} Waktu Setempat</span>
+                                        <span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {
+                                            (exam.config.date.includes('T') && exam.config.date.length > 10) 
+                                            ? new Date(exam.config.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' ' + (new Date(exam.config.date).toLocaleTimeString('id-ID', { timeZoneName: 'short' }).split(' ').pop() || '')
+                                            : exam.config.startTime + ' Waktu Setempat'
+                                        }</span>
                                         <span className="text-gray-300 dark:text-slate-600">•</span>
                                         <span>{exam.config.timeLimit} Menit</span>
                                     </div>
