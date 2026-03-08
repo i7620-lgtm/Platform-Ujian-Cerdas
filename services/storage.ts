@@ -1218,15 +1218,17 @@ class StorageService {
           }));
 
           const prompt = `
-            You are a Senior Education Data Consultant creating an Executive Dashboard.
+            You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
             
             INPUT DATA (JSON):
             ${JSON.stringify(simpleData)}
 
             TASK:
-            Generate a visual-heavy HTML/Markdown report.
+            Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.
+            The report must be visually engaging, using HTML/Tailwind CSS for charts and tables.
+            
             DO NOT output raw JSON.
-            DO NOT wrap HTML in code blocks (no \`\`\`html). Embed raw HTML directly into the response so it renders immediately.
+            DO NOT wrap HTML in code blocks (no \`\`\`html). Embed raw HTML directly into the response.
             
             STRUCTURE & VISUAL RULES:
 
@@ -1235,28 +1237,29 @@ class StorageService {
                - Use Tailwind classes: \`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm\`.
                - Use text colors like \`text-emerald-600\` for good stats and \`text-rose-600\` for bad stats.
 
-            2. DISTRIBUTION ANALYSIS (Generative Bar Charts):
-               - List top 5 and bottom 5 schools.
-               - Instead of just text, render a Horizontal Bar Chart using HTML <div>.
+            2. COMPETENCY MASTERY CHART (Visual Bar Chart):
+               - Create a visual representation of school performance distribution.
+               - Use HTML <div> elements to create horizontal bars.
                - Template: 
-                 <div class="mb-2">
+                 <div class="mb-3">
                    <div class="flex justify-between text-xs font-bold mb-1"><span>{SchoolName}</span><span>{Score}</span></div>
-                   <div class="w-full bg-slate-100 rounded-full h-2.5 dark:bg-slate-700">
+                   <div class="w-full bg-slate-100 rounded-full h-2.5 dark:bg-slate-700 overflow-hidden">
                      <div class="bg-indigo-600 h-2.5 rounded-full" style="width: {Score}%"></div>
                    </div>
                  </div>
 
-            3. ITEM DIAGNOSIS (Heatmap Table):
-               - Identify common difficult questions.
-               - Render a small HTML table where the "Difficulty" cell background color depends on value (Red < 40, Yellow < 70, Green > 70).
-               - Use classes: \`w-full text-sm border-collapse\`, \`p-2 border\`.
+            3. DEEP DIVE ANALYSIS (Qualitative & Competency-Based):
+               - **Identify Systemic Weaknesses:** Analyze questions/topics that failed across most schools. What specific competency (e.g., Numeracy, Logic, Recall) is likely missing?
+               - **Analyze Disparities:** Compare high-performing vs low-performing schools. Is the gap wide? What does this suggest about resource distribution or teacher quality?
+               - **Avoid Assumptions:** Do NOT guess teaching methods (e.g., "PBL", "Inquiry"). Focus strictly on *what* was tested and *how* students performed.
 
-            4. RECOMMENDATIONS (Quadrant Matrix):
-               - Present a 2x2 Matrix using a Markdown Table.
-               - Columns: "Quick Wins (High Impact, Low Effort)" vs "Long Term Projects".
-               - Use emojis for bullet points.
+            4. STRATEGIC RECOMMENDATIONS (Actionable Table):
+               - Create an HTML Table with columns: "Fokus Masalah", "Kompetensi Target", "Rekomendasi Program Dinas/MGMP".
+               - Suggest concrete actions like "Workshop Bedah SKL untuk Materi X" or "Penguatan Literasi Numerasi Dasar".
 
-            Output must be in Bahasa Indonesia. Keep it professional, insightful, and visually modern.
+            TONE:
+            - Professional, analytical, yet accessible to education policymakers.
+            - Use Indonesian language (Bahasa Indonesia).
           `;
 
           const response = await ai.models.generateContent({
