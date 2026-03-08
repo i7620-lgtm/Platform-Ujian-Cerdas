@@ -17,7 +17,7 @@ import { CollaboratorView } from './components/CollaboratorView';
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE';
- 
+
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
   const [previousView, setPreviousView] = useState<View>('SELECTOR');
@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' } | null>(null);
+  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer', token: string } | null>(null);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -178,7 +178,7 @@ const App: React.FC = () => {
         storageService.getExamByCollaboratorToken(collabCode, collabToken)
             .then(data => {
                 if (data) {
-                    setCollaboratorData(data);
+                    setCollaboratorData({ ...data, token: collabToken });
                     setView('COLLABORATOR_MODE');
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
@@ -594,7 +594,7 @@ const App: React.FC = () => {
             <CollaboratorView 
                 exam={collaboratorData.exam}
                 role={collaboratorData.role}
-                token={new URLSearchParams(window.location.search).get('collab_token') || ''}
+                token={collaboratorData.token}
                 onExit={resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
@@ -632,7 +632,7 @@ const App: React.FC = () => {
             <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
     </div>
-  ); 
+  );
 };
  
 export default App;
