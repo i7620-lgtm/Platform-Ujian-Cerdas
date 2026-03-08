@@ -632,7 +632,7 @@ const App: React.FC = () => {
             <TutorialPage onBack={() => setView('SELECTOR')} />
         )}
     </div>
-  );
+  ); 
 };
  
 export default App;
