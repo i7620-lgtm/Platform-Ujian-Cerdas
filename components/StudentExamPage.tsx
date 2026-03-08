@@ -232,8 +232,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     const deadline = useMemo(() => {
         if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
-        const dateStr = activeExam.config.date.includes('T') ? activeExam.config.date.split('T')[0] : activeExam.config.date;
-        const start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        
+        let start: Date;
+        // Check if date is ISO string (new format) or YYYY-MM-DD (legacy)
+        if (activeExam.config.date.includes('T') && activeExam.config.date.length > 10) {
+             start = new Date(activeExam.config.date);
+        } else {
+             const dateStr = activeExam.config.date;
+             start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        }
+        
         return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
     }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
 
