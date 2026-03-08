@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer' } | null>(null);
+  const [collaboratorData, setCollaboratorData] = useState<{ exam: Exam, role: 'editor' | 'viewer', token: string } | null>(null);
 
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
@@ -178,7 +178,7 @@ const App: React.FC = () => {
         storageService.getExamByCollaboratorToken(collabCode, collabToken)
             .then(data => {
                 if (data) {
-                    setCollaboratorData(data);
+                    setCollaboratorData({ ...data, token: collabToken });
                     setView('COLLABORATOR_MODE');
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
@@ -594,6 +594,7 @@ const App: React.FC = () => {
             <CollaboratorView 
                 exam={collaboratorData.exam}
                 role={collaboratorData.role}
+                token={collaboratorData.token}
                 onExit={resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
