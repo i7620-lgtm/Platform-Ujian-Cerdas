@@ -594,6 +594,7 @@ const App: React.FC = () => {
             <CollaboratorView 
                 exam={collaboratorData.exam}
                 role={collaboratorData.role}
+                token={new URLSearchParams(window.location.search).get('collab_token') || ''}
                 onExit={resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
