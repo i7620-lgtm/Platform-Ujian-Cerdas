@@ -17,7 +17,7 @@ import { CollaboratorView } from './components/CollaboratorView';
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE';
-
+ 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
   const [previousView, setPreviousView] = useState<View>('SELECTOR');
