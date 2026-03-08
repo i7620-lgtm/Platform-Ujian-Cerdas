@@ -224,8 +224,16 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         if (!exam || !isOpen) return;
 
         const tick = () => {
-            const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-            const targetDate = new Date(`${dateStr}T${exam.config.startTime}`).getTime();
+            let targetDate: number;
+            
+            // Check if date is ISO string (new format) or YYYY-MM-DD (legacy)
+            if (exam.config.date.includes('T') && exam.config.date.length > 10) {
+                targetDate = new Date(exam.config.date).getTime();
+            } else {
+                const dateStr = exam.config.date;
+                targetDate = new Date(`${dateStr}T${exam.config.startTime}`).getTime();
+            }
+            
             const now = new Date().getTime();
             const diff = targetDate - now;
 
@@ -319,10 +327,19 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
     const getFormattedStartDate = () => {
         if (!exam) return '';
-        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+        
         try {
-            const date = new Date(`${dateStr}T${exam.config.startTime}`);
-            if (isNaN(date.getTime())) return `${dateStr} ${exam.config.startTime}`;
+            let date: Date;
+            if (exam.config.date.includes('T') && exam.config.date.length > 10) {
+                // ISO String (UTC)
+                date = new Date(exam.config.date);
+            } else {
+                // Legacy
+                const dateStr = exam.config.date;
+                date = new Date(`${dateStr}T${exam.config.startTime}`);
+            }
+
+            if (isNaN(date.getTime())) return `${exam.config.date} ${exam.config.startTime}`;
             
             const datePart = date.toLocaleDateString('id-ID', { 
                 weekday: 'long', 
@@ -336,9 +353,33 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 hour12: false
             });
             
-            return `${datePart} pukul ${timePart} waktu setempat`;
+            // Get Timezone Name (e.g., WIB, WITA, WIT)
+            // Fallback to offset if name not available
+            let timeZoneName = '';
+            try {
+                // Try to get timezone abbreviation
+                const match = date.toLocaleTimeString('id-ID', { timeZoneName: 'short' }).split(' ');
+                if (match && match.length > 0) {
+                    const lastPart = match[match.length - 1];
+                    // Check if it looks like a timezone (WIB, WITA, WIT, GMT+7, etc)
+                    if (lastPart.length >= 3) {
+                        timeZoneName = lastPart;
+                    }
+                }
+            } catch (e) {}
+
+            // Manual mapping for Indonesian timezones if browser returns generic GMT
+            if (!timeZoneName || timeZoneName.includes('GMT')) {
+                const offset = -date.getTimezoneOffset() / 60;
+                if (offset === 7) timeZoneName = 'WIB';
+                else if (offset === 8) timeZoneName = 'WITA';
+                else if (offset === 9) timeZoneName = 'WIT';
+                else timeZoneName = `GMT${offset >= 0 ? '+' : ''}${offset}`;
+            }
+            
+            return `${datePart} pukul ${timePart} ${timeZoneName}`;
         } catch {
-            return `${dateStr} ${exam.config.startTime}`;
+            return `${exam.config.date} ${exam.config.startTime}`;
         }
     };
 
