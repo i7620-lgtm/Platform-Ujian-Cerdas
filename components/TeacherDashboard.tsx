@@ -443,7 +443,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <h2 className="font-black text-slate-800 dark:text-white">Edit Detail Ujian</h2>
                             <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 transition-colors"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
-                        <div className="p-4 md:p-8 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-900/50">
+                        <div className="p-4 md:p-8 overflow-y-auto overflow-x-hidden flex-1 bg-slate-50/30 dark:bg-slate-900/50">
                             <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} />
                         </div>
                     </div>
