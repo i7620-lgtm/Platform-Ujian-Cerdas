@@ -8,27 +8,23 @@ import { LogoIcon, MoonIcon, SunIcon, LogoutIcon } from './Icons';
 interface CollaboratorViewProps {
     exam: Exam;
     role: 'editor' | 'viewer';
+    token: string;
     onExit: () => void;
     isDarkMode: boolean;
     toggleTheme: () => void;
 }
 
-export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, onExit, isDarkMode, toggleTheme }) => {
+export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, token, onExit, isDarkMode, toggleTheme }) => {
     const [questions, setQuestions] = useState<Question[]>(exam.questions);
     const [config, setConfig] = useState<ExamConfig>(exam.config);
 
     const handleSave = async () => {
         try {
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get('collab_token');
-
             if (token) {
                 // Use specialized collaborator save
                 await storageService.saveCollaboratorExam({ ...exam, questions, config }, token);
             } else {
-                // Fallback to standard save (unlikely to work for collaborators but keeps existing logic)
-                const updatedExam = { ...exam, questions, config };
-                await storageService.saveExam(updatedExam);
+                 throw new Error("Token kolaborator hilang. Silakan refresh halaman.");
             }
             alert('Perubahan berhasil disimpan!');
         } catch (e: unknown) {
