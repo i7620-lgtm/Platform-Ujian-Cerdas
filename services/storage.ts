@@ -302,39 +302,21 @@ class StorageService {
             }
         }
 
-        // 4. Attempt Update (Strategy 1: Partial Update)
-        const { data: updateData, error: updateError } = await supabase
-            .from('exams')
-            .update({
-                config: newConfig,
-                questions: processedQuestions
-            })
-            .eq('code', exam.code)
-            .select();
+        // 4. Attempt Update via RPC (Bypass RLS securely)
+        const { error: rpcError } = await supabase.rpc('save_collaborator_exam', {
+            p_exam_code: exam.code,
+            p_token: token,
+            p_new_config: newConfig,
+            p_new_questions: processedQuestions
+        });
 
-        if (!updateError && updateData && updateData.length > 0) {
-            console.log("Collaborator save success (Partial Update)");
+        if (!rpcError) {
+            console.log("Collaborator save success (RPC)");
             return;
         }
 
-        console.warn("Collaborator partial update failed (0 rows or error). Attempting upsert...", updateError);
-
-        // 5. Attempt Upsert (Strategy 2: Upsert with existing author_id)
-        const { error: upsertError } = await supabase.from('exams').upsert({
-            code: exam.code,
-            author_id: existingExam.author_id,
-            school: existingExam.school, 
-            status: existingExam.status, 
-            config: newConfig,
-            questions: processedQuestions,
-        }, { onConflict: 'code' });
-
-        if (upsertError) {
-            console.error("Collaborator upsert failed", upsertError);
-            throw new Error(`Gagal menyimpan. Izin ditolak (RLS). Error: ${upsertError.message}`);
-        }
-        
-        console.log("Collaborator save success (Upsert)");
+        console.warn("Collaborator RPC failed. Make sure the SQL function is created in Supabase.", rpcError);
+        throw new Error(`Gagal menyimpan. Pastikan fungsi SQL 'save_collaborator_exam' telah dibuat di Supabase. Error: ${rpcError.message}`);
     }
 
   async updateExamAnswerKey(examCode: string, questionId: string, newCorrectAnswer: string): Promise<void> {
