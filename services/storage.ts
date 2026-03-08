@@ -196,6 +196,129 @@ class StorageService {
         }
     }
 
+    /**
+     * Specialized method for saving exams by collaborators.
+     * Includes token verification and specific fallback strategies.
+     */
+    async saveCollaboratorExam(exam: Exam, token: string): Promise<void> {
+        console.log("Saving exam as collaborator...", { code: exam.code, token });
+        const BUCKET_NAME = 'soal';
+        const examCode = exam.code;
+
+        // 1. Fetch existing exam to verify token and get author_id
+        const { data: existingExam, error: fetchError } = await supabase
+            .from('exams')
+            .select('*')
+            .eq('code', exam.code)
+            .single();
+
+        if (fetchError || !existingExam) {
+            console.error("Collaborator save failed: Exam not found", fetchError);
+            throw new Error("Ujian tidak ditemukan.");
+        }
+
+        // 2. Verify Token
+        const config = existingExam.config as ExamConfig;
+        const collaborators = config.collaborators || [];
+        const collaborator = collaborators.find(c => c.token === token);
+
+        if (!collaborator || collaborator.role !== 'editor') {
+            throw new Error("Akses ditolak. Token kolaborator tidak valid atau Anda hanya memiliki akses 'viewer'.");
+        }
+
+        // 3. Prepare Data
+        const newConfig = { 
+            ...exam.config, 
+            collaborators: config.collaborators // Keep existing collaborators from DB
+        };
+
+        // Helper to process HTML content (images/audio)
+        const processHtmlString = async (html: string, contextId: string): Promise<string> => {
+            if (!html || (!html.includes('data:image') && !html.includes('data:audio'))) return html;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            const images = doc.getElementsByTagName('img');
+            for (let i = 0; i < images.length; i++) {
+                const img = images[i];
+                const src = img.getAttribute('src');
+                if (src && src.startsWith('data:image')) {
+                    try {
+                        const blob = base64ToBlob(src);
+                        const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                        const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
+                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                        if (data) {
+                            const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                            img.setAttribute('src', publicUrlData.publicUrl);
+                            img.setAttribute('data-bucket-path', filename); 
+                        }
+                    } catch (e) { console.error("Gagal upload gambar", e); }
+                }
+            }
+            // Audio processing if needed inside HTML...
+            return doc.body.innerHTML;
+        };
+
+        let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
+        
+        for (const q of processedQuestions) {
+            // Process HTML content
+            q.questionText = await processHtmlString(q.questionText, q.id);
+            if (q.options) {
+                for (let i = 0; i < q.options.length; i++) {
+                    q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
+                }
+            }
+
+            // Handle Explicit Image Upload (imageUrl)
+            if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
+                try {
+                    const blob = base64ToBlob(q.imageUrl);
+                    const mime = q.imageUrl.substring(5, q.imageUrl.indexOf(';'));
+                    const ext = mime.split('/')[1] || 'png';
+                    const filename = `${exam.code}/${q.id}_img_${Date.now()}.${ext}`;
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                    if (data) {
+                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                        q.imageUrl = publicUrlData.publicUrl;
+                    }
+                } catch (e) { console.error("Upload image failed", e); }
+            }
+
+            // Handle Explicit Audio Upload (audioUrl)
+            if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
+                 try {
+                    const blob = base64ToBlob(q.audioUrl);
+                    const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
+                    const ext = mime.split('/')[1] || 'mp3';
+                    const filename = `${exam.code}/${q.id}_audio_${Date.now()}.${ext}`;
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
+                    if (data) {
+                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
+                        q.audioUrl = publicUrlData.publicUrl;
+                    }
+                } catch (e) { console.error("Upload audio failed", e); }
+            }
+        }
+
+        // 4. Attempt Update via RPC (Bypass RLS securely)
+        const { error: rpcError } = await supabase.rpc('save_collaborator_exam', {
+            p_exam_code: exam.code,
+            p_token: token,
+            p_new_config: newConfig,
+            p_new_questions: processedQuestions
+        });
+
+        if (!rpcError) {
+            console.log("Collaborator save success (RPC)");
+            return;
+        }
+
+        console.warn("Collaborator RPC failed. Make sure the SQL function is created in Supabase.", rpcError);
+        throw new Error(`Gagal menyimpan. Pastikan fungsi SQL 'save_collaborator_exam' telah dibuat di Supabase. Error: ${rpcError.message}`);
+    }
+
   async updateExamAnswerKey(examCode: string, questionId: string, newCorrectAnswer: string): Promise<void> {
       // 1. Fetch Exam
       const { data: examData, error: examError } = await supabase
