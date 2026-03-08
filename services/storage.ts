@@ -1224,36 +1224,32 @@ class StorageService {
 
         TASK:
         Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.
-        The report must be visually engaging, using HTML/Tailwind CSS for charts and tables.
         
-        DO NOT output raw JSON.
-        DO NOT wrap HTML in code blocks (no \`\`\`html). Embed raw HTML directly into the response.
+        OUTPUT FORMAT:
+        - Use standard Markdown (MD) for all formatting.
+        - DO NOT use HTML tags (no <div>, <table>, etc.).
+        - Use Markdown tables for structured data.
+        - Use ASCII charts or simple text-based visualizations if needed (e.g., [||||||||||] 80%).
         
-        STRUCTURE & VISUAL RULES:
+        STRUCTURE:
 
-        1. EXECUTIVE SUMMARY (Scorecard Style):
-           - Create a flexbox container with 3 cards: "Rata-rata Wilayah", "Sekolah Tertinggi", "Perlu Intervensi".
-           - Use Tailwind classes: \`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm\`.
-           - Use text colors like \`text-emerald-600\` for good stats and \`text-rose-600\` for bad stats.
+        1. EXECUTIVE SUMMARY:
+           - Provide a high-level overview of regional performance.
+           - Highlight top 3 key findings (positive & negative).
 
-        2. COMPETENCY MASTERY CHART (Visual Bar Chart):
-           - Create a visual representation of school performance distribution.
-           - Use HTML <div> elements to create horizontal bars.
-           - Template: 
-             <div class="mb-3">
-               <div class="flex justify-between text-xs font-bold mb-1"><span>{SchoolName}</span><span>{Score}</span></div>
-               <div class="w-full bg-slate-100 rounded-full h-2.5 dark:bg-slate-700 overflow-hidden">
-                 <div class="bg-indigo-600 h-2.5 rounded-full" style="width: {Score}%"></div>
-               </div>
-             </div>
+        2. COMPETENCY MASTERY (Text-Based Chart):
+           - List schools and their scores using a text-based bar chart format.
+           - Example:
+             School A: [==========] 100%
+             School B: [=====     ] 50%
 
         3. DEEP DIVE ANALYSIS (Qualitative & Competency-Based):
            - **Identify Systemic Weaknesses:** Analyze questions/topics that failed across most schools. What specific competency (e.g., Numeracy, Logic, Recall) is likely missing?
            - **Analyze Disparities:** Compare high-performing vs low-performing schools. Is the gap wide? What does this suggest about resource distribution or teacher quality?
            - **Avoid Assumptions:** Do NOT guess teaching methods (e.g., "PBL", "Inquiry"). Focus strictly on *what* was tested and *how* students performed.
 
-        4. STRATEGIC RECOMMENDATIONS (Actionable Table):
-           - Create an HTML Table with columns: "Fokus Masalah", "Kompetensi Target", "Rekomendasi Program Dinas/MGMP".
+        4. STRATEGIC RECOMMENDATIONS (Markdown Table):
+           - Create a Markdown Table with columns: "Fokus Masalah", "Kompetensi Target", "Rekomendasi Program Dinas/MGMP".
            - Suggest concrete actions like "Workshop Bedah SKL untuk Materi X" or "Penguatan Literasi Numerasi Dasar".
 
         TONE:
