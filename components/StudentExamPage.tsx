@@ -127,7 +127,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
 
         const pollInterval = setInterval(async () => {
-            if (!navigator.onLine) return;
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
             try {
                 const { data } = await supabase.from('exams').select('config').eq('code', exam.code).single();
                 if (data && data.config) {
