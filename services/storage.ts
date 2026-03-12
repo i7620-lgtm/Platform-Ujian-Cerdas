@@ -183,10 +183,12 @@ class StorageService {
     private isProcessingQueue = false;
 
     constructor() {
-        const savedQueue = localStorage.getItem('exam_sync_queue');
-        if (savedQueue) {
-            try { this.syncQueue = JSON.parse(savedQueue); } catch(e) {}
-        }
+        try {
+            const savedQueue = localStorage.getItem('exam_sync_queue');
+            if (savedQueue) {
+                this.syncQueue = JSON.parse(savedQueue);
+            }
+        } catch(e) {}
         
         if (typeof window !== 'undefined') {
             window.addEventListener('online', () => this.processQueue());
@@ -492,7 +494,7 @@ class StorageService {
           const tx = db.transaction(STORE_PROGRESS, 'readwrite');
           tx.objectStore(STORE_PROGRESS).delete(key);
       } catch(e) {
-          localStorage.removeItem(key);
+          try { localStorage.removeItem(key); } catch(err) {}
       }
   }
   
@@ -1416,7 +1418,7 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    if (!navigator.onLine) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
@@ -1498,15 +1500,15 @@ class StorageService {
       this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
       this.syncQueue.push({ ...payload, queuedAt: Date.now() });
       this.saveQueue();
-      if(navigator.onLine) this.processQueue(); 
+      if(typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue(); 
   }
 
   private saveQueue() {
-      localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue));
+      try { localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue)); } catch(e) {}
   }
 
   async processQueue() {
-      if (this.isProcessingQueue || this.syncQueue.length === 0 || !navigator.onLine) return;
+      if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
       const remainingQueue: any[] = [];
@@ -1736,7 +1738,12 @@ class StorageService {
       if (error || !data) throw new Error("Exam not found");
 
       const config = data.config as ExamConfig;
-      const token = crypto.randomUUID();
+      const token = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+          ? crypto.randomUUID() 
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
       const newCollaborator = {
           token,
           label,
