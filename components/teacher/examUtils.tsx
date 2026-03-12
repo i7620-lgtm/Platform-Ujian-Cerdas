@@ -976,6 +976,11 @@ export const sanitizeHtml = (html: string): string => {
                 el.style.color = '';
                 el.style.backgroundColor = '';
                 
+                // Remove font-size, font-family, and line-height to allow app to control text size
+                el.style.fontSize = '';
+                el.style.fontFamily = '';
+                el.style.lineHeight = '';
+                
                 // Remove theme-specific classes (Tailwind)
                 const classes = Array.from(el.classList);
                 classes.forEach(cls => {
