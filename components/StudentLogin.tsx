@@ -130,9 +130,9 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
-  const [fullName, setFullName] = useState(() => localStorage.getItem('saved_student_fullname') || '');
-  const [studentClass, setStudentClass] = useState(() => localStorage.getItem('saved_student_class') || '');
-  const [absentNumber, setAbsentNumber] = useState(() => localStorage.getItem('saved_student_absent') || '');
+  const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch(e) { return ''; } });
+  const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch(e) { return ''; } });
+  const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch(e) { return ''; } });
   
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -169,10 +169,12 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     if (initialCode) {
         setTimeout(() => nameInputRef.current?.focus(), 100);
     } else {
-        // Cek localStorage langsung untuk menghindari dependency cycle
-        const savedName = localStorage.getItem('saved_student_fullname');
-        const savedClass = localStorage.getItem('saved_student_class');
-        const savedAbsent = localStorage.getItem('saved_student_absent');
+        let savedName, savedClass, savedAbsent;
+        try {
+            savedName = localStorage.getItem('saved_student_fullname');
+            savedClass = localStorage.getItem('saved_student_class');
+            savedAbsent = localStorage.getItem('saved_student_absent');
+        } catch(e) {}
         
         if (savedName && savedClass && savedAbsent && examCodeInputRef.current) {
             examCodeInputRef.current.focus();
@@ -216,9 +218,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     setError('');
 
     // Save preference (original text for display)
-    localStorage.setItem('saved_student_fullname', fullName.trim());
-    localStorage.setItem('saved_student_class', studentClass.trim());
-    localStorage.setItem('saved_student_absent', absentNumber.trim());
+    try {
+        localStorage.setItem('saved_student_fullname', fullName.trim());
+        localStorage.setItem('saved_student_class', studentClass.trim());
+        localStorage.setItem('saved_student_absent', absentNumber.trim());
+    } catch(e) {}
     
     // Parse class name (remove limit if present) for ID and Data
     const { name: cleanClassName } = parseClassConfig(studentClass);

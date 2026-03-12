@@ -268,13 +268,50 @@ const WysiwygEditor: React.FC<{
         // checkActiveFormats calls saveSelection internally
         checkActiveFormats(); 
     };
-    const insertTable = (rows: number, cols: number) => { let html = '<table class="border-collapse border border-slate-300 dark:border-slate-600 my-2 w-full text-sm"><thead><tr>'; for(let c=0; c<cols; c++) html += `<th class="border border-slate-300 dark:border-slate-600 p-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100">H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td class="border border-slate-300 dark:border-slate-600 p-2 text-slate-800 dark:text-slate-200">Data</td>`; html += '</tr>'; } html += '</tbody></table><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
+    const insertTable = (rows: number, cols: number) => { let html = '<div class="overflow-x-auto custom-scrollbar"><table class="border-collapse border border-slate-300 dark:border-slate-600 my-2 w-full text-sm min-w-[500px]"><thead><tr>'; for(let c=0; c<cols; c++) html += `<th class="border border-slate-300 dark:border-slate-600 p-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100">H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td class="border border-slate-300 dark:border-slate-600 p-2 text-slate-800 dark:text-slate-200">Data</td>`; html += '</tr>'; } html += '</tbody></table></div><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
     const deleteCurrentTable = () => { const selection = window.getSelection(); if (selection && selection.rangeCount > 0) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE') { node.parentNode?.removeChild(node); handleInput(); setIsInsideTable(false); return; } node = node.parentNode; } } };
     const insertMath = (latex: string) => { 
         if ((window as any).katex) { 
             const html = (window as any).katex.renderToString(latex, { throwOnError: false, displayMode: false }); 
-            const wrapper = `<span class="math-visual" style="display: inline; vertical-align: baseline;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>`; 
-            runCmd('insertHTML', wrapper); 
+            
+            if (document.activeElement !== editorRef.current) {
+                restoreSelection();
+            }
+            if (editorRef.current) editorRef.current.focus();
+
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && editorRef.current && editorRef.current.contains(sel.anchorNode)) {
+                const range = sel.getRangeAt(0);
+                range.deleteContents();
+                
+                const span = document.createElement('span');
+                span.className = 'math-visual';
+                span.style.display = 'inline-block';
+                span.style.verticalAlign = 'middle';
+                span.contentEditable = 'false';
+                span.setAttribute('data-latex', latex);
+                span.innerHTML = html;
+
+                const zws1 = document.createTextNode('\u200B');
+                const zws2 = document.createTextNode('\u200B');
+                
+                const frag = document.createDocumentFragment();
+                frag.appendChild(zws1);
+                frag.appendChild(span);
+                frag.appendChild(zws2);
+                
+                range.insertNode(frag);
+                
+                range.setStartAfter(zws2);
+                range.setEndAfter(zws2);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                
+                checkActiveFormats();
+            } else {
+                const wrapper = `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>&#8203;`; 
+                runCmd('insertHTML', wrapper); 
+            }
             handleInput(); 
         } 
     };

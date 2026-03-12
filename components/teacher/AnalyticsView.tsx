@@ -88,14 +88,21 @@ const AnalyticsView: React.FC = () => {
         }
     };
 
-    const handleGenerateAI = async () => {
+    const [promptResult, setPromptResult] = useState<string | null>(null);
+
+    const handleGeneratePrompt = () => {
         const selectedData = summaries.filter(s => selectedIds.has(s.id));
         if (selectedData.length === 0) return;
         
-        setIsAiLoading(true);
-        const report = await storageService.generateAIAnalysis(selectedData);
-        setAiResult(report);
-        setIsAiLoading(false);
+        const prompt = storageService.generateAnalysisPrompt(selectedData);
+        setPromptResult(prompt);
+    };
+
+    const handleCopyPrompt = () => {
+        if (promptResult) {
+            navigator.clipboard.writeText(promptResult);
+            alert("Prompt berhasil disalin! Silakan tempel di ChatGPT atau Gemini.");
+        }
     };
 
     return (
@@ -178,14 +185,44 @@ const AnalyticsView: React.FC = () => {
 
             <div className="sticky bottom-6 flex justify-center">
                 <button 
-                    onClick={handleGenerateAI} 
-                    disabled={selectedIds.size === 0 || isAiLoading}
+                    onClick={handleGeneratePrompt} 
+                    disabled={selectedIds.size === 0}
                     className={`px-8 py-4 rounded-2xl font-bold shadow-xl flex items-center gap-3 transition-all transform active:scale-95 ${selectedIds.size > 0 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
-                    {isAiLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <SparklesIcon className="w-5 h-5"/>}
-                    <span>{isAiLoading ? 'Sedang Menganalisis...' : `Analisis ${selectedIds.size} Sekolah dengan AI`}</span>
+                    <SparklesIcon className="w-5 h-5"/>
+                    <span>{`Buat Prompt Analisis (${selectedIds.size} Sekolah)`}</span>
                 </button>
             </div>
+
+            {promptResult && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
+                        <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-900 rounded-t-2xl">
+                            <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-300 flex items-center gap-2"><SparklesIcon className="w-5 h-5"/> Prompt Analisis AI Siap Salin</h3>
+                            <button onClick={() => setPromptResult(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">Tutup</button>
+                        </div>
+                        <div className="p-6 flex-1 overflow-hidden flex flex-col gap-4">
+                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
+                                <strong>Tips:</strong> Salin prompt di bawah ini dan tempelkan ke ChatGPT, Claude, atau Gemini untuk mendapatkan analisis mendalam beserta grafik visual.
+                            </div>
+                            <textarea 
+                                className="w-full flex-1 p-4 font-mono text-xs bg-slate-50 dark:bg-slate-900 border rounded-xl resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                                readOnly
+                                value={promptResult}
+                            />
+                        </div>
+                        <div className="p-6 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl flex justify-end gap-3">
+                            <button onClick={() => setPromptResult(null)} className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl">Tutup</button>
+                            <button onClick={handleCopyPrompt} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                                </svg>
+                                Salin Prompt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {aiResult && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">

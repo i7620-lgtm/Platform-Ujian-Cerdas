@@ -183,10 +183,12 @@ class StorageService {
     private isProcessingQueue = false;
 
     constructor() {
-        const savedQueue = localStorage.getItem('exam_sync_queue');
-        if (savedQueue) {
-            try { this.syncQueue = JSON.parse(savedQueue); } catch(e) {}
-        }
+        try {
+            const savedQueue = localStorage.getItem('exam_sync_queue');
+            if (savedQueue) {
+                this.syncQueue = JSON.parse(savedQueue);
+            }
+        } catch(e) {}
         
         if (typeof window !== 'undefined') {
             window.addEventListener('online', () => this.processQueue());
@@ -492,7 +494,7 @@ class StorageService {
           const tx = db.transaction(STORE_PROGRESS, 'readwrite');
           tx.objectStore(STORE_PROGRESS).delete(key);
       } catch(e) {
-          localStorage.removeItem(key);
+          try { localStorage.removeItem(key); } catch(err) {}
       }
   }
   
@@ -1202,65 +1204,70 @@ class StorageService {
       if (error) throw error;
   }
 
+  // --- PROMPT GENERATOR (NO AI CALL) ---
+  generateAnalysisPrompt(summaries: ExamSummary[]): string {
+      // Pre-process data to save tokens
+      const simpleData = summaries.map(s => ({
+          school: s.school_name,
+          avg: s.average_score,
+          participants: s.total_participants,
+          weakness_count: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length,
+          top_difficulty_questions: s.question_stats
+              .filter((qs: any) => qs.correct_rate < 40)
+              .map((qs: any) => `Q${qs.id.split('-')[1] || qs.id}: ${qs.correct_rate}%`)
+              .slice(0, 3)
+      }));
+
+      return `
+        You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
+        
+        INPUT DATA (JSON):
+        ${JSON.stringify(simpleData, null, 2)}
+
+        TASK:
+        Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.
+        
+        OUTPUT FORMAT:
+        - Use standard Markdown (MD) for all formatting.
+        - DO NOT use HTML tags (no <div>, <table>, etc.).
+        - Use Markdown tables for structured data.
+        - Use ASCII charts or simple text-based visualizations if needed (e.g., [||||||||||] 80%).
+        
+        STRUCTURE:
+
+        1. EXECUTIVE SUMMARY:
+           - Provide a high-level overview of regional performance.
+           - Highlight top 3 key findings (positive & negative).
+
+        2. COMPETENCY MASTERY (Text-Based Chart):
+           - List schools and their scores using a text-based bar chart format.
+           - Example:
+             School A: [==========] 100%
+             School B: [=====     ] 50%
+
+        3. DEEP DIVE ANALYSIS (Qualitative & Competency-Based):
+           - **Identify Systemic Weaknesses:** Analyze questions/topics that failed across most schools. What specific competency (e.g., Numeracy, Logic, Recall) is likely missing?
+           - **Analyze Disparities:** Compare high-performing vs low-performing schools. Is the gap wide? What does this suggest about resource distribution or teacher quality?
+           - **Avoid Assumptions:** Do NOT guess teaching methods (e.g., "PBL", "Inquiry"). Focus strictly on *what* was tested and *how* students performed.
+
+        4. STRATEGIC RECOMMENDATIONS (Markdown Table):
+           - Create a Markdown Table with columns: "Fokus Masalah", "Kompetensi Target", "Rekomendasi Program Dinas/MGMP".
+           - Suggest concrete actions like "Workshop Bedah SKL untuk Materi X" or "Penguatan Literasi Numerasi Dasar".
+
+        TONE:
+        - Professional, analytical, yet accessible to education policymakers.
+        - Use Indonesian language (Bahasa Indonesia).
+      `;
+  }
+
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
   async generateAIAnalysis(summaries: ExamSummary[]): Promise<string> {
       try {
-          // Pre-process data to save tokens
-          const simpleData = summaries.map(s => ({
-              school: s.school_name,
-              avg: s.average_score,
-              participants: s.total_participants,
-              weakness_count: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length,
-              top_difficulty_questions: s.question_stats
-                  .filter((qs: any) => qs.correct_rate < 40)
-                  .map((qs: any) => `Q${qs.id.split('-')[1] || qs.id}: ${qs.correct_rate}%`)
-                  .slice(0, 3)
-          }));
-
-          const prompt = `
-            You are a Senior Education Data Consultant creating an Executive Dashboard.
-            
-            INPUT DATA (JSON):
-            ${JSON.stringify(simpleData)}
-
-            TASK:
-            Generate a visual-heavy HTML/Markdown report.
-            DO NOT output raw JSON.
-            DO NOT wrap HTML in code blocks (no \`\`\`html). Embed raw HTML directly into the response so it renders immediately.
-            
-            STRUCTURE & VISUAL RULES:
-
-            1. EXECUTIVE SUMMARY (Scorecard Style):
-               - Create a flexbox container with 3 cards: "Rata-rata Wilayah", "Sekolah Tertinggi", "Perlu Intervensi".
-               - Use Tailwind classes: \`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm\`.
-               - Use text colors like \`text-emerald-600\` for good stats and \`text-rose-600\` for bad stats.
-
-            2. DISTRIBUTION ANALYSIS (Generative Bar Charts):
-               - List top 5 and bottom 5 schools.
-               - Instead of just text, render a Horizontal Bar Chart using HTML <div>.
-               - Template: 
-                 <div class="mb-2">
-                   <div class="flex justify-between text-xs font-bold mb-1"><span>{SchoolName}</span><span>{Score}</span></div>
-                   <div class="w-full bg-slate-100 rounded-full h-2.5 dark:bg-slate-700">
-                     <div class="bg-indigo-600 h-2.5 rounded-full" style="width: {Score}%"></div>
-                   </div>
-                 </div>
-
-            3. ITEM DIAGNOSIS (Heatmap Table):
-               - Identify common difficult questions.
-               - Render a small HTML table where the "Difficulty" cell background color depends on value (Red < 40, Yellow < 70, Green > 70).
-               - Use classes: \`w-full text-sm border-collapse\`, \`p-2 border\`.
-
-            4. RECOMMENDATIONS (Quadrant Matrix):
-               - Present a 2x2 Matrix using a Markdown Table.
-               - Columns: "Quick Wins (High Impact, Low Effort)" vs "Long Term Projects".
-               - Use emojis for bullet points.
-
-            Output must be in Bahasa Indonesia. Keep it professional, insightful, and visually modern.
-          `;
-
+          const prompt = this.generateAnalysisPrompt(summaries);
+          
+          // Use the new SDK method
           const response = await ai.models.generateContent({
-              model: 'gemini-3-flash-preview', // Switch to Flash Model for higher rate limits
+              model: 'gemini-3-flash-preview', 
               contents: prompt
           });
 
@@ -1411,7 +1418,7 @@ class StorageService {
   }
 
   async submitExamResult(resultPayload: any): Promise<any> {
-    if (!navigator.onLine) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
@@ -1493,15 +1500,15 @@ class StorageService {
       this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
       this.syncQueue.push({ ...payload, queuedAt: Date.now() });
       this.saveQueue();
-      if(navigator.onLine) this.processQueue(); 
+      if(typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue(); 
   }
 
   private saveQueue() {
-      localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue));
+      try { localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue)); } catch(e) {}
   }
 
   async processQueue() {
-      if (this.isProcessingQueue || this.syncQueue.length === 0 || !navigator.onLine) return;
+      if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
       const remainingQueue: any[] = [];
@@ -1731,7 +1738,12 @@ class StorageService {
       if (error || !data) throw new Error("Exam not found");
 
       const config = data.config as ExamConfig;
-      const token = crypto.randomUUID();
+      const token = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+          ? crypto.randomUUID() 
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
       const newCollaborator = {
           token,
           label,
