@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     
+    <!-- Polyfill for older browsers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js-bundle/3.37.0/minified.js"></script>
+    
     <!-- PWA / Mobile Capability -->
     <link rel="manifest" href="/manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
@@ -44,7 +47,7 @@
       (function() {
         try {
           const localTheme = localStorage.getItem('theme');
-          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const supportDarkMode = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
           if (localTheme === 'dark' || (!localTheme && supportDarkMode)) {
             document.documentElement.classList.add('dark');
             document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
