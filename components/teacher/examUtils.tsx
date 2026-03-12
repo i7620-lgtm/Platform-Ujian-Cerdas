@@ -1014,7 +1014,7 @@ export const htmlToMarkdown = (html: string): string => {
     // 1. Math (Inline)
     // From: <span class="math-visual" ... data-latex="\frac{1}{2}">...</span>
     // To: $\frac{1}{2}$
-    const mathRegex = /<span[^>]*class="math-visual"[^>]*data-latex="([^"]*)"[^>]*>.*?<\/span>/g;
+    const mathRegex = /(?:&#8203;|\u200B)?<span[^>]*class="math-visual"[^>]*data-latex="([^"]*)"[^>]*>.*?<\/span>(?:&#8203;|\u200B)?/g;
     markdown = markdown.replace(mathRegex, (match, latex) => {
         return `$${latex.replace(/&quot;/g, '"')}$`;
     });
@@ -1117,7 +1117,7 @@ export const markdownToHtml = (markdown: string): string => {
                 rendered = (window as any).katex.renderToString(latex, { throwOnError: false, displayMode: false });
             } catch (e) {}
         }
-        return `<span class="math-visual" style="display: inline; vertical-align: baseline;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${rendered}</span>`;
+        return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${rendered}</span>&#8203;`;
     });
 
     // 2. Images
