@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [exams, setExams] = useState<Record<string, Exam>>({});
   const [results, setResults] = useState<Result[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [prefillCode, setPrefillCode] = useState<string>('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -40,8 +40,12 @@ const App: React.FC = () => {
   // Theme State Management
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-        const local = localStorage.getItem('theme');
-        return local === 'dark' || (!local && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        try {
+            const local = localStorage.getItem('theme');
+            return local === 'dark' || (!local && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        } catch (e) {
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
     }
     return false;
   });
@@ -51,11 +55,11 @@ const App: React.FC = () => {
     if (darkMode) {
         document.documentElement.classList.add('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
-        localStorage.setItem('theme', 'dark');
+        try { localStorage.setItem('theme', 'dark'); } catch(e) {}
     } else {
         document.documentElement.classList.remove('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#ffffff');
-        localStorage.setItem('theme', 'light');
+        try { localStorage.setItem('theme', 'light'); } catch(e) {}
     }
   }, [darkMode]);
 
