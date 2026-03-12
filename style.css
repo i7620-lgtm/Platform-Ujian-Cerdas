@@ -28,8 +28,8 @@
   }
   
   .math-visual {
-    display: inline;
-    vertical-align: baseline;
+    display: inline-block;
+    vertical-align: middle;
   }
 
   /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
