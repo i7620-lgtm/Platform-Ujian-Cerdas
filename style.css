@@ -146,45 +146,49 @@
 
   /* --- Text Normalization (Smarter Approach) --- */
   
-  /* 1. Reset Font Size & Line Height for generic containers */
-  /* Exclude elements with 'katex' or 'math' classes to protect equations */
-  .prose:not(.prose-sm) :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]), 
-  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
-      font-size: 1rem !important;
-      line-height: 1.75 !important;
-  }
-
-  /* Only reset spans/fonts that have NO class (likely copy-paste junk) */
-  /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
-  .prose:not(.prose-sm) :is(span, font):not([class]), 
-  .wysiwyg-content :is(span, font):not([class]) {
-      font-size: 1rem !important;
-      line-height: 1.75 !important;
-  }
-
-  /* 2. Small Prose (Result/Archive View) - Force 14px */
-  .prose.prose-sm :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
-      font-size: 0.875rem !important;
-      line-height: 1.5 !important;
-  }
-  .prose.prose-sm :is(span, font):not([class]) {
-      font-size: 0.875rem !important;
-      line-height: 1.5 !important;
-  }
-
-  /* 3. Options - Force 14px */
+  /* 1. Reset Font Size & Line Height for generic containers to inherit from parent */
+  .prose :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]), 
+  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]),
   .option-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
-      font-size: 0.875rem !important;
-      line-height: 1.5 !important;
-  }
-  .option-content :is(span, font):not([class]) {
-      font-size: 0.875rem !important;
-      line-height: 1.5 !important;
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
   }
 
-  /* 4. Fix specific "font-size" inline styles from Word/GDocs */
-  /* We remove the aggressive inline style reset as it breaks KaTeX. 
-     Instead, we rely on the tag-based resets above for unclassed elements. */
+  /* 2. Only reset spans/fonts that have NO class (likely copy-paste junk) */
+  /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
+  .prose :is(span, font):not([class]), 
+  .wysiwyg-content :is(span, font):not([class]),
+  .option-content :is(span, font):not([class]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+  
+  /* 3. Also reset elements with inline font-size styles, but ONLY if they are not math related */
+  /* We use a specific selector to avoid breaking math */
+  .prose :is(span, font)[style*="font-size"]:not([class]),
+  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]),
+  .option-content :is(span, font)[style*="font-size"]:not([class]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+
+  /* 4. Aggressive fallback for modern browsers: target ANY element with inline font-size, line-height, or font-family that is NOT inside a math block */
+  .prose *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .prose *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .prose *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre),
+  .wysiwyg-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .wysiwyg-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .wysiwyg-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre),
+  .option-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .option-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
+  .option-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
 
   /* Exceptions for Superscript/Subscript */
   
