@@ -670,62 +670,35 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">2</div>
                                 <div className="w-full">
                                     <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Memantau Status Siswa</h4>
-                                    <p className="mb-3">Di layar utama Live Monitoring, Anda akan melihat daftar siswa yang sedang mengerjakan ujian. Perhatikan indikator warna pada setiap siswa:</p>
+                                    <p className="mb-3">Di layar utama Live Monitoring, Anda akan melihat daftar siswa yang sedang mengerjakan ujian. Status siswa ditandai dengan label berikut:</p>
                                     
-                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row gap-4 justify-center items-center">
-                                        {/* Example Student Card */}
-                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-[200px]">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Online</span>
-                                                </div>
-                                            </div>
-                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate">Budi Santoso</p>
-                                            <p className="text-xs text-slate-500">Kelas 10A</p>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-[200px]">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></div>
-                                                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Peringatan</span>
-                                                </div>
-                                            </div>
-                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate">Siti Aminah</p>
-                                            <p className="text-xs text-slate-500">Keluar tab (2x)</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 mb-4">
                                         <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                            <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                                            <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900 shadow-sm">
+                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Online
+                                            </span>
                                             <div>
-                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Online & Aktif</p>
-                                                <p className="text-[10px] text-slate-500">Siswa sedang membuka tab ujian.</p>
+                                                <p className="text-[10px] text-slate-500">Siswa sedang mengerjakan.</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                            <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></div>
+                                            <span className="px-2.5 py-1 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-rose-100 dark:border-rose-900">
+                                                <LockClosedIcon className="w-3 h-3"/> Locked
+                                            </span>
                                             <div>
-                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Peringatan (Keluar Tab)</p>
-                                                <p className="text-[10px] text-slate-500">Siswa membuka tab/aplikasi lain.</p>
+                                                <p className="text-[10px] text-slate-500">Ujian terblokir otomatis.</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                                            <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border border-slate-200 dark:border-slate-600">
+                                                <CheckCircleIcon className="w-3 h-3"/> Selesai
+                                            </span>
                                             <div>
-                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Offline / Terputus</p>
-                                                <p className="text-[10px] text-slate-500">Koneksi internet siswa terputus.</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                            <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                                            <div>
-                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Selesai</p>
-                                                <p className="text-[10px] text-slate-500">Siswa telah mengumpulkan ujian.</p>
+                                                <p className="text-[10px] text-slate-500">Ujian telah dikumpulkan.</p>
                                             </div>
                                         </div>
                                     </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">Anda juga dapat melihat <strong>Progres</strong> (jumlah soal yang dijawab) dan waktu terakhir <strong>Aktif</strong>.</p>
                                 </div>
                             </div>
 
@@ -733,27 +706,30 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             <div className="flex gap-4">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
                                 <div className="w-full">
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Blokir & Lanjutkan)</h4>
-                                    <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis. Layar siswa akan terkunci.</p>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Membuka Blokir)</h4>
+                                    <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis dan statusnya menjadi <strong>Locked</strong>.</p>
                                     
-                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex justify-center items-center">
-                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-rose-200 dark:border-rose-900/50 w-full max-w-[250px] relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-                                                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Terblokir</span>
-                                                </div>
+                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row items-center gap-4 justify-center">
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+                                            <div>
+                                                <p className="font-bold text-sm text-slate-800 dark:text-white">Andi Wijaya</p>
+                                                <span className="px-2 py-0.5 mt-1 inline-block bg-rose-50 text-rose-600 rounded text-[9px] font-black uppercase border border-rose-100">Locked</span>
                                             </div>
-                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate mb-3">Andi Wijaya</p>
-                                            <button className="w-full py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-200 dark:border-emerald-800">
-                                                <CheckCircleIcon className="w-3 h-3"/> Izinkan Lanjut
+                                            <button className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                                                Buat Token
                                             </button>
+                                        </div>
+                                        <div className="hidden sm:block text-slate-400">
+                                            <ArrowPathIcon className="w-5 h-5 animate-spin-slow" />
+                                        </div>
+                                        <div className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 shadow-inner text-center">
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Token Akses</p>
+                                            <span className="text-xl font-mono font-black tracking-widest text-slate-800 dark:text-white">A1B2C</span>
                                         </div>
                                     </div>
 
-                                    <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl p-4 mb-3">
-                                        <p className="text-xs text-rose-800 dark:text-rose-300 font-medium">Untuk membuka blokir, klik tombol <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded font-bold text-[10px] uppercase"><CheckCircleIcon className="w-3 h-3"/> Izinkan Lanjut</span> pada kartu siswa yang bersangkutan. Siswa kemudian dapat melanjutkan ujiannya.</p>
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 mb-3">
+                                        <p className="text-xs text-indigo-800 dark:text-indigo-300 font-medium">Untuk membuka blokir, klik tombol <strong>Buat Token</strong> di kolom Aksi pada baris siswa tersebut. Berikan token yang muncul kepada siswa agar mereka dapat melanjutkan ujian.</p>
                                     </div>
                                 </div>
                             </div>
