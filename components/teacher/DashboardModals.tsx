@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -20,6 +20,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [addTimeValue, setAddTimeValue] = useState<number | ''>('');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
+    const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
     const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, class: string, absentNumber: string } | null>(null);
 
@@ -242,6 +243,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {!isReadOnly && (
+                                    <button onClick={() => setIsGuideModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-2 shadow-sm border border-blue-100 dark:border-blue-800">
+                                        <BookOpenIcon className="w-4 h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
+                                    </button>
+                                )}
                                 {!isReadOnly && (
                                     <button onClick={() => setIsJoinQrModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800">
                                         <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
@@ -633,6 +639,140 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             <DocumentDuplicateIcon className="w-4 h-4" />
                             Salin Link Ujian
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* MODAL PANDUAN LIVE MONITORING */}
+            {isGuideModalOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-in-up border border-white dark:border-slate-700 relative">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-blue-50 dark:bg-slate-900 sticky top-0 z-10">
+                            <h3 className="font-bold text-lg text-blue-900 dark:text-blue-300 flex items-center gap-2">
+                                <BookOpenIcon className="w-5 h-5"/> Panduan Live Monitoring
+                            </h3>
+                            <button onClick={() => setIsGuideModalOpen(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
+                                <XMarkIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-8 text-slate-700 dark:text-slate-300 text-sm">
+                            {/* Step 1 */}
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">1</div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Akses Siswa</h4>
+                                    <p className="mb-3">Untuk memulai ujian, siswa harus masuk menggunakan <strong>Kode Ujian</strong> atau memindai <strong>QR Code</strong>. Klik tombol <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded font-bold text-xs"><QrCodeIcon className="w-3 h-3"/> Akses Siswa</span> di pojok kanan atas untuk menampilkan QR Code dan Kode Ujian di layar proyektor kelas.</p>
+                                </div>
+                            </div>
+
+                            {/* Step 2 */}
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">2</div>
+                                <div className="w-full">
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Memantau Status Siswa</h4>
+                                    <p className="mb-3">Di layar utama Live Monitoring, Anda akan melihat daftar siswa yang sedang mengerjakan ujian. Perhatikan indikator warna pada setiap siswa:</p>
+                                    
+                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                                        {/* Example Student Card */}
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-[200px]">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Online</span>
+                                                </div>
+                                            </div>
+                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate">Budi Santoso</p>
+                                            <p className="text-xs text-slate-500">Kelas 10A</p>
+                                        </div>
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-[200px]">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></div>
+                                                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Peringatan</span>
+                                                </div>
+                                            </div>
+                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate">Siti Aminah</p>
+                                            <p className="text-xs text-slate-500">Keluar tab (2x)</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                            <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                                            <div>
+                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Online & Aktif</p>
+                                                <p className="text-[10px] text-slate-500">Siswa sedang membuka tab ujian.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                            <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></div>
+                                            <div>
+                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Peringatan (Keluar Tab)</p>
+                                                <p className="text-[10px] text-slate-500">Siswa membuka tab/aplikasi lain.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                                            <div>
+                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Offline / Terputus</p>
+                                                <p className="text-[10px] text-slate-500">Koneksi internet siswa terputus.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                            <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
+                                            <div>
+                                                <p className="font-bold text-xs text-slate-900 dark:text-white">Selesai</p>
+                                                <p className="text-[10px] text-slate-500">Siswa telah mengumpulkan ujian.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
+                                <div className="w-full">
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Blokir & Lanjutkan)</h4>
+                                    <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis. Layar siswa akan terkunci.</p>
+                                    
+                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex justify-center items-center">
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-rose-200 dark:border-rose-900/50 w-full max-w-[250px] relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+                                                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Terblokir</span>
+                                                </div>
+                                            </div>
+                                            <p className="font-bold text-sm text-slate-800 dark:text-white truncate mb-3">Andi Wijaya</p>
+                                            <button className="w-full py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-200 dark:border-emerald-800">
+                                                <CheckCircleIcon className="w-3 h-3"/> Izinkan Lanjut
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl p-4 mb-3">
+                                        <p className="text-xs text-rose-800 dark:text-rose-300 font-medium">Untuk membuka blokir, klik tombol <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded font-bold text-[10px] uppercase"><CheckCircleIcon className="w-3 h-3"/> Izinkan Lanjut</span> pada kartu siswa yang bersangkutan. Siswa kemudian dapat melanjutkan ujiannya.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Step 4 */}
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">4</div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Membagikan Link Pantauan (Opsional)</h4>
+                                    <p className="mb-3">Jika Anda ingin orang tua atau pengawas lain ikut memantau jalannya ujian secara *real-time* (tanpa bisa mengubah pengaturan), klik tombol <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded font-bold text-xs"><ShareIcon className="w-3 h-3"/> Stream</span>. Bagikan link atau QR Code yang muncul kepada mereka.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center">
+                            <button onClick={() => setIsGuideModalOpen(false)} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-200 dark:shadow-none">
+                                Mengerti
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
