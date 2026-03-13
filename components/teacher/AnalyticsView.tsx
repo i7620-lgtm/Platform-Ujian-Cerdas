@@ -98,10 +98,37 @@ const AnalyticsView: React.FC = () => {
         setPromptResult(prompt);
     };
 
-    const handleCopyPrompt = () => {
-        if (promptResult) {
-            navigator.clipboard.writeText(promptResult);
-            alert("Prompt berhasil disalin! Silakan tempel di ChatGPT atau Gemini.");
+    const handleCopyPrompt = async () => {
+        if (!promptResult) return;
+        
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(promptResult);
+                alert("Prompt berhasil disalin! Silakan tempel di ChatGPT atau Gemini.");
+            } else {
+                // Fallback for older browsers or non-HTTPS
+                const textArea = document.createElement("textarea");
+                textArea.value = promptResult;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    alert("Prompt berhasil disalin! Silakan tempel di ChatGPT atau Gemini.");
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                    alert("Gagal menyalin otomatis. Silakan salin teks secara manual.");
+                }
+                
+                document.body.removeChild(textArea);
+            }
+        } catch (err) {
+            console.error('Failed to copy!', err);
+            alert("Gagal menyalin otomatis. Silakan salin teks secara manual.");
         }
     };
 
@@ -125,8 +152,8 @@ const AnalyticsView: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-left whitespace-nowrap">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left whitespace-nowrap min-w-[1000px]">
                     <thead className="bg-slate-50 dark:bg-slate-700">
                         <tr>
                             <th className="px-6 py-4 w-10">
@@ -196,7 +223,7 @@ const AnalyticsView: React.FC = () => {
 
             {promptResult && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-full h-[80vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
                         <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-900 rounded-t-2xl">
                             <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-300 flex items-center gap-2"><SparklesIcon className="w-5 h-5"/> Prompt Analisis AI Siap Salin</h3>
                             <button onClick={() => setPromptResult(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">Tutup</button>
@@ -226,7 +253,7 @@ const AnalyticsView: React.FC = () => {
 
             {aiResult && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-full h-[90vh] flex flex-col border border-white dark:border-slate-700 animate-slide-in-up">
                         <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-900 rounded-t-2xl">
                             <h3 className="font-bold text-lg text-indigo-900 dark:text-indigo-300 flex items-center gap-2"><SparklesIcon className="w-5 h-5"/> Laporan Analisis AI</h3>
                             <button onClick={() => setAiResult(null)} className="p-2 bg-white dark:bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">Tutup</button>
