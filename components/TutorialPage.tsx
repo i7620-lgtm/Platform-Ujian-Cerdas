@@ -70,7 +70,7 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300">
-            <div className="max-w-4xl mx-auto p-6 md:p-12 animate-fade-in">
+            <div className="w-full max-w-full mx-auto p-6 md:p-12 animate-fade-in">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                     <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-all text-xs uppercase tracking-widest">
