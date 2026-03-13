@@ -11,6 +11,7 @@ import {
     CloudArrowUpIcon,
     MoonIcon,
     SunIcon,
+    QuestionMarkCircleIcon,
     TableCellsIcon,
     QrCodeIcon,
     FileTextIcon,
@@ -21,7 +22,7 @@ import {
 import { generateExamCode, sanitizeHtml } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
-import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
+import { OngoingExamModal, FinishedExamModal, MainGuideModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage';
 import { InvitationModal } from './InvitationModal';
 
@@ -87,6 +88,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [isMainGuideModalOpen, setIsMainGuideModalOpen] = useState(false);
 
     // Logic for Organizer Name in Invitations
     const organizerName = teacherProfile.accountType === 'super_admin' ? 'Developer' :
@@ -474,6 +476,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
                         <div className="flex items-center gap-4">
                             <button 
+                                onClick={() => setIsMainGuideModalOpen(true)}
+                                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-2 text-xs font-bold"
+                                title="Cara Penggunaan"
+                            >
+                                <QuestionMarkCircleIcon className="w-5 h-5" />
+                                <span className="hidden sm:inline">Panduan</span>
+                            </button>
+                            <button 
                                 onClick={toggleTheme} 
                                 className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
                                 title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
@@ -599,6 +609,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 teacherName={organizerName}
                 schoolName={teacherProfile.school}
             />
+
+            {/* Main Guide Modal */}
+            {isMainGuideModalOpen && (
+                <MainGuideModal onClose={() => setIsMainGuideModalOpen(false)} />
+            )}
         </div>
     );
 };
