@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
-    CheckCircleIcon, 
+    CheckCircleIcon,  
     ChartBarIcon, 
     LogoutIcon, 
     ClockIcon, 
@@ -11,6 +11,7 @@ import {
     CloudArrowUpIcon,
     MoonIcon,
     SunIcon,
+    QuestionMarkCircleIcon,
     TableCellsIcon,
     QrCodeIcon,
     FileTextIcon,
@@ -21,7 +22,7 @@ import {
 import { generateExamCode, sanitizeHtml } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
-import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
+import { OngoingExamModal, FinishedExamModal, MainGuideModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage';
 import { InvitationModal } from './InvitationModal';
 
@@ -87,6 +88,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [isMainGuideModalOpen, setIsMainGuideModalOpen] = useState(false);
 
     // Logic for Organizer Name in Invitations
     const organizerName = teacherProfile.accountType === 'super_admin' ? 'Developer' :
@@ -454,7 +456,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             )}
 
             <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40 transition-colors duration-300">
-                <div className="max-w-7xl mx-auto px-4 md:px-6">
+                <div className="w-full max-w-full mx-auto px-4 md:px-6">
                     <div className="py-3 md:py-5 flex justify-between items-center">
                         <div>
                             <div className="flex items-center gap-3">
@@ -473,6 +475,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setIsMainGuideModalOpen(true)}
+                                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-2 text-xs font-bold"
+                                title="Cara Penggunaan"
+                            >
+                                <QuestionMarkCircleIcon className="w-5 h-5" />
+                                <span className="hidden sm:inline">Panduan</span>
+                            </button>
                             <button 
                                 onClick={toggleTheme} 
                                 className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
@@ -526,7 +536,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
             </header>
             
-            <main className="max-w-7xl mx-auto p-4 md:p-10">
+            <main className="w-full max-w-full mx-auto p-4 md:p-10">
                 {view === 'UPLOAD' && (
                     <>
                         <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
@@ -580,7 +590,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             
             {isEditModalOpen && editingExam && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col border border-white dark:border-slate-700">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col border border-white dark:border-slate-700">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 rounded-t-3xl">
                             <h2 className="font-black text-slate-800 dark:text-white">Edit Detail Ujian</h2>
                             <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 transition-colors"><XMarkIcon className="w-6 h-6"/></button>
@@ -599,6 +609,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 teacherName={organizerName}
                 schoolName={teacherProfile.school}
             />
+
+            {/* Main Guide Modal */}
+            {isMainGuideModalOpen && (
+                <MainGuideModal onClose={() => setIsMainGuideModalOpen(false)} />
+            )}
         </div>
     );
 };

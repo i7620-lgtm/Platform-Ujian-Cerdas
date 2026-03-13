@@ -380,7 +380,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 className={`fixed top-0 inset-x-0 z-[60] border-b shadow-sm transition-all duration-300 h-16 flex items-center ${isNavOpen ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200/60 dark:border-slate-800/60'}`}
             >
                  <div className="absolute top-0 left-0 h-[2px] bg-indigo-600 dark:bg-indigo-500 transition-all duration-700 ease-out z-10" style={{width: `${progress}%`}}></div>
-                 <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 flex items-center justify-between">
+                 <div className="w-full max-w-full mx-auto px-4 sm:px-6 flex items-center justify-between">
                      <div 
                         className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
                         onClick={() => setIsNavOpen(!isNavOpen)}
@@ -426,7 +426,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             </header>
 
             <div className={`fixed top-16 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-50 border-b border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-300 ease-in-out origin-top ${isNavOpen ? 'translate-y-0 opacity-100 visible' : '-translate-y-full opacity-0 invisible'}`}>
-                <div className="max-w-4xl mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
+                <div className="w-full max-w-full mx-auto p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
                     <div className="flex flex-wrap gap-2 justify-center">
                         {activeExam.questions.map((q, idx) => {
                             if (q.questionType === 'INFO') return null;
@@ -462,7 +462,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 </div>
             </div>
 
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 space-y-8">
+            <main className="w-full max-w-full mx-auto px-4 sm:px-6 pt-24 space-y-8">
                 {activeExam.questions.map((q, idx) => {
                     const num = activeExam.questions.slice(0, idx).filter(i => i.questionType !== 'INFO').length + 1;
                     const answered = isAnswered(q, answers);

@@ -194,7 +194,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 </div>
             )}
 
-            <div className={`w-full ${expandedReview ? 'max-w-3xl' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
+            <div className={`w-full ${expandedReview ? 'max-w-full' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
                 <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
                     
                     {/* Background decoration */}
