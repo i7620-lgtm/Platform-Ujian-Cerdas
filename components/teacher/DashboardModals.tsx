@@ -698,7 +698,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400">Anda juga dapat melihat <strong>Progres</strong> (jumlah soal yang dijawab) dan waktu terakhir <strong>Aktif</strong>.</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">Pada mode <strong>Realtime</strong>, Anda juga dapat melihat <strong>Progres</strong> (jumlah soal yang dijawab) dan waktu terakhir <strong>Aktif</strong>.</p>
                                 </div>
                             </div>
 
