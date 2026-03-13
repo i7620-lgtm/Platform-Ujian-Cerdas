@@ -51,7 +51,7 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, 
     return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 flex flex-col transition-colors duration-300">
             <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                <div className="w-full max-w-full mx-auto px-6 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
                             <LogoIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
@@ -75,7 +75,7 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, 
                 </div>
             </header>
             
-            <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
+            <main className="flex-1 p-6 w-full max-w-full mx-auto">
                 <ExamEditor 
                     questions={questions} 
                     setQuestions={setQuestions} 
