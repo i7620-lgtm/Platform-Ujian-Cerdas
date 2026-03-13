@@ -9,7 +9,7 @@ interface LegalPageProps {
 export const TermsPage: React.FC<LegalPageProps> = ({ onBack }) => {
     return (
         <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 p-6 md:p-12 transition-colors duration-300">
-            <div className="max-w-3xl mx-auto animate-fade-in">
+            <div className="w-full max-w-full mx-auto animate-fade-in">
                 <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 mb-8 font-bold transition-all text-xs uppercase tracking-widest">
                     <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                     Kembali
@@ -55,7 +55,7 @@ export const TermsPage: React.FC<LegalPageProps> = ({ onBack }) => {
 export const PrivacyPage: React.FC<LegalPageProps> = ({ onBack }) => {
     return (
         <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-200 p-6 md:p-12 transition-colors duration-300">
-            <div className="max-w-3xl mx-auto animate-fade-in">
+            <div className="w-full max-w-full mx-auto animate-fade-in">
                 <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 mb-8 font-bold transition-all text-xs uppercase tracking-widest">
                     <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                     Kembali
