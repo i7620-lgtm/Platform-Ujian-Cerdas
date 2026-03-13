@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, FileTextIcon, PlayIcon, QuestionMarkCircleIcon, CloudArrowUpIcon } from '../Icons';
+import { XMarkIcon, WifiIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, ChevronUpIcon, EyeIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, FileTextIcon, PlayIcon, QuestionMarkCircleIcon, CloudArrowUpIcon, EnvelopeIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -1398,23 +1398,24 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                         <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-2">Langkah-langkah:</h4>
                                         <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
                                             <li>Pilih tab <strong>Buat Ujian</strong> di menu atas.</li>
+                                            <li>Pilih metode pembuatan: <strong>Buat Manual</strong>, <strong>Unggah PDF Soal</strong>, atau <strong>Tempel Teks Soal</strong>.</li>
                                             <li>Isi <strong>Pengaturan Ujian</strong> seperti Judul, Mata Pelajaran, Kelas, Waktu, dan Tanggal.</li>
                                             <li>Atur opsi keamanan seperti <strong>Deteksi Kecurangan</strong> atau <strong>Acak Soal/Jawaban</strong>.</li>
-                                            <li>Tambahkan soal dengan mengetik langsung atau menggunakan format khusus (jika tersedia).</li>
-                                            <li>Klik tombol <strong>Simpan sebagai Draf</strong> untuk menyimpan sementara, atau <strong>Terbitkan Ujian</strong> agar ujian siap diakses siswa.</li>
+                                            <li>Tambahkan atau edit soal sesuai kebutuhan.</li>
+                                            <li>Klik tombol <strong>Simpan Draf</strong> untuk menyimpan sementara, atau <strong>Publikasikan Sekarang</strong> agar ujian siap diakses siswa.</li>
                                         </ol>
                                     </div>
                                     
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan</h4>
                                         <div className="flex flex-wrap gap-4 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-sm">
-                                                <CloudArrowUpIcon className="w-5 h-5" />
-                                                Terbitkan Ujian
+                                            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-sm">
+                                                <CheckCircleIcon className="w-5 h-5" />
+                                                Publikasikan Sekarang
                                             </div>
-                                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold shadow-sm border border-slate-200 dark:border-slate-700">
-                                                <DocumentArrowUpIcon className="w-5 h-5" />
-                                                Simpan sebagai Draf
+                                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold shadow-sm border-2 border-slate-100 dark:border-slate-700">
+                                                <PencilIcon className="w-5 h-5" />
+                                                Simpan Draf
                                             </div>
                                         </div>
                                     </div>
@@ -1444,8 +1445,8 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                         <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
                                             <li>Pilih tab <strong>Draf</strong> di menu atas.</li>
                                             <li>Anda akan melihat daftar ujian yang berstatus draf.</li>
+                                            <li>Klik tombol <strong>Preview</strong> (ikon mata) untuk melihat tampilan soal.</li>
                                             <li>Klik tombol <strong>Edit</strong> (ikon pensil) untuk melanjutkan pembuatan soal atau mengubah pengaturan.</li>
-                                            <li>Setelah selesai mengedit, Anda dapat menerbitkannya agar masuk ke daftar Terjadwal atau Berlangsung.</li>
                                             <li>Gunakan tombol <strong>Hapus</strong> (ikon tempat sampah) jika ingin membatalkan pembuatan ujian tersebut.</li>
                                         </ol>
                                     </div>
@@ -1453,11 +1454,14 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Aksi</h4>
                                         <div className="flex gap-2 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-800 flex items-center gap-1 text-xs font-bold">
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-gray-700 dark:text-white rounded-lg border border-gray-200 dark:border-slate-600 flex items-center gap-1 text-xs font-bold">
                                                 <PencilIcon className="w-4 h-4" /> Edit
                                             </div>
-                                            <div className="p-2 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-100 dark:border-rose-800 flex items-center gap-1 text-xs font-bold">
-                                                <TrashIcon className="w-4 h-4" /> Hapus
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg border border-gray-200 dark:border-slate-600 flex items-center gap-1 text-xs font-bold">
+                                                <EyeIcon className="w-4 h-4" /> Preview
+                                            </div>
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-gray-400 rounded-full border border-gray-100 dark:border-slate-600 flex items-center gap-1 text-xs font-bold">
+                                                <TrashIcon className="w-4 h-4" />
                                             </div>
                                         </div>
                                     </div>
@@ -1477,33 +1481,28 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                         <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-2">Langkah-langkah:</h4>
                                         <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
                                             <li>Pilih tab <strong>Berlangsung</strong> di menu atas.</li>
-                                            <li>Klik tombol <strong>Live Monitor</strong> pada ujian yang ingin dipantau.</li>
+                                            <li>Klik pada kartu ujian untuk membuka <strong>Live Monitor</strong>.</li>
                                             <li>Di dalam Live Monitor, Anda dapat melihat status siswa: <strong>Online</strong> (hijau), <strong>Terkunci</strong> (merah), atau <strong>Selesai</strong> (abu-abu).</li>
                                             <li>Jika siswa terkunci karena kecurangan, klik <strong>Buat Token</strong> di kolom Aksi dan berikan token tersebut ke siswa agar bisa melanjutkan.</li>
-                                            <li>Anda juga dapat membagikan link ujian atau kode QR melalui tombol <strong>Bagikan</strong>.</li>
-                                            <li>Klik <strong>Akhiri Ujian</strong> jika waktu sudah habis atau semua siswa telah selesai.</li>
+                                            <li>Anda juga dapat membagikan link ujian melalui tombol <strong>QR Code Gabung Siswa</strong> atau <strong>Bagikan Link Pantauan</strong>.</li>
+                                            <li>Ujian akan otomatis selesai saat waktu habis.</li>
                                         </ol>
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Status Siswa</h4>
-                                        <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span></span>
-                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Siswa A</span>
-                                                </div>
-                                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">Online</span>
+                                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Aksi</h4>
+                                        <div className="flex flex-wrap gap-2 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-slate-400 rounded-lg border border-slate-100 dark:border-slate-600 flex items-center justify-center">
+                                                <QrCodeIcon className="w-4 h-4" />
                                             </div>
-                                            <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                                                <div className="flex items-center gap-2">
-                                                    <LockClosedIcon className="w-4 h-4 text-rose-500" />
-                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Siswa B</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-md">Terkunci</span>
-                                                    <button className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-200">Buat Token</button>
-                                                </div>
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-slate-400 rounded-lg border border-slate-100 dark:border-slate-600 flex items-center justify-center">
+                                                <UserIcon className="w-4 h-4" />
+                                            </div>
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-slate-400 rounded-lg border border-slate-100 dark:border-slate-600 flex items-center justify-center">
+                                                <ShareIcon className="w-4 h-4" />
+                                            </div>
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-slate-400 rounded-lg border border-slate-100 dark:border-slate-600 flex items-center justify-center">
+                                                <DocumentDuplicateIcon className="w-4 h-4" />
                                             </div>
                                         </div>
                                     </div>
@@ -1533,20 +1532,23 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                         <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
                                             <li>Pilih tab <strong>Terjadwal</strong> di menu atas.</li>
                                             <li>Ujian di sini akan otomatis pindah ke tab <strong>Berlangsung</strong> saat waktu mulainya tiba.</li>
-                                            <li>Anda dapat membagikan kode ujian, link, atau QR code kepada siswa sebelum ujian dimulai.</li>
+                                            <li>Gunakan tombol <strong>Preview</strong> untuk melihat tampilan soal.</li>
+                                            <li>Gunakan tombol <strong>Undangan</strong> untuk membagikan kode ujian, link, atau QR code kepada siswa sebelum ujian dimulai.</li>
                                             <li>Klik <strong>Edit</strong> jika ada perubahan jadwal atau soal sebelum ujian dimulai.</li>
-                                            <li>Gunakan tombol <strong>Mulai Sekarang</strong> jika Anda ingin memulai ujian lebih awal dari jadwal yang ditentukan.</li>
                                         </ol>
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Aksi</h4>
                                         <div className="flex flex-wrap gap-2 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-800 flex items-center gap-1 text-xs font-bold">
-                                                <PlayIcon className="w-4 h-4" /> Mulai Sekarang
+                                            <div className="p-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-800 flex items-center gap-1 text-xs font-bold">
+                                                <EyeIcon className="w-4 h-4" /> Preview
                                             </div>
                                             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-800 flex items-center gap-1 text-xs font-bold">
-                                                <ShareIcon className="w-4 h-4" /> Bagikan
+                                                <EnvelopeIcon className="w-4 h-4" /> Undangan
+                                            </div>
+                                            <div className="p-2 bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg border border-gray-100 dark:border-slate-600 flex items-center gap-1 text-xs font-bold">
+                                                <PencilIcon className="w-4 h-4" /> Edit
                                             </div>
                                         </div>
                                     </div>
@@ -1570,18 +1572,21 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                             <li>Anda akan melihat statistik nilai rata-rata, tertinggi, dan terendah.</li>
                                             <li>Di bagian bawah, terdapat daftar nilai seluruh siswa beserta detail jawaban mereka.</li>
                                             <li>Anda dapat mengunduh rekap nilai dalam format Excel dengan menekan tombol <strong>Export Excel</strong>.</li>
-                                            <li>Klik <strong>Arsipkan</strong> untuk memindahkan ujian ini ke daftar arsip agar dashboard lebih rapi.</li>
+                                            <li>Klik <strong>Finalisasi & Arsip</strong> untuk memindahkan ujian ini ke daftar arsip agar dashboard lebih rapi dan tersimpan di Cloud.</li>
                                         </ol>
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Aksi</h4>
                                         <div className="flex flex-wrap gap-2 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="p-2 bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm">
-                                                <ChartBarIcon className="w-4 h-4" /> Lihat Hasil
+                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-800 flex items-center gap-1 text-xs font-bold">
+                                                <CloudArrowUpIcon className="w-4 h-4" /> Finalisasi & Arsip
                                             </div>
-                                            <div className="p-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-800 flex items-center gap-1 text-xs font-bold">
-                                                <BookOpenIcon className="w-4 h-4" /> Arsipkan
+                                            <div className="p-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg border border-gray-200 dark:border-slate-600 flex items-center gap-1 text-xs font-bold">
+                                                <DocumentDuplicateIcon className="w-4 h-4" /> Reuse
+                                            </div>
+                                            <div className="p-2 bg-slate-900 dark:bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm">
+                                                <ChartBarIcon className="w-4 h-4" /> Lihat Hasil
                                             </div>
                                         </div>
                                     </div>
@@ -1600,21 +1605,22 @@ export const MainGuideModal: React.FC<MainGuideModalProps> = ({ onClose }) => {
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                                         <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-2">Langkah-langkah:</h4>
                                         <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
-                                            <li>Klik tombol <strong>Buka Arsip</strong> di pojok kanan atas area daftar ujian.</li>
-                                            <li>Anda akan melihat daftar ujian yang telah diarsipkan.</li>
-                                            <li>Anda tetap bisa melihat hasil dan analisis dari ujian yang diarsipkan.</li>
-                                            <li>Jika diperlukan, Anda dapat mengembalikan ujian ke daftar utama dengan menekan tombol <strong>Buka Arsip</strong> (Unarchive) pada ujian tersebut.</li>
+                                            <li>Pilih tab <strong>Buka Arsip</strong> di menu atas.</li>
+                                            <li>Pilih arsip dari perangkat Anda (file JSON) atau unduh dari Cloud.</li>
+                                            <li>Anda dapat melihat hasil, statistik, dan analisis dari ujian yang diarsipkan.</li>
+                                            <li>Gunakan tombol <strong>Edit Metadata</strong> untuk mengubah detail arsip.</li>
+                                            <li>Anda dapat menggunakan kembali soal dari arsip dengan menekan tombol <strong>Gunakan Kembali Soal</strong>.</li>
                                         </ol>
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Contoh Tampilan Aksi</h4>
                                         <div className="flex flex-wrap gap-2 items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-800 flex items-center gap-1 text-xs font-bold">
-                                                <ArrowPathIcon className="w-4 h-4" /> Buka Arsip
+                                            <div className="p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1 text-xs font-bold">
+                                                <PencilIcon className="w-4 h-4" /> Edit Metadata
                                             </div>
-                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-800 flex items-center gap-1 text-xs font-bold">
-                                                <ChartBarIcon className="w-4 h-4" /> Lihat Hasil
+                                            <div className="p-2 bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm">
+                                                <DocumentDuplicateIcon className="w-4 h-4" /> Gunakan Kembali Soal
                                             </div>
                                         </div>
                                     </div>
