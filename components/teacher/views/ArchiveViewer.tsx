@@ -391,7 +391,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         });
 
         // 2. Rekap Siswa Sheet
-        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Selesai", "Durasi (Detik)"];
+        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Mulai", "Waktu Selesai", "Durasi (Detik)"];
         
         // Add question columns
         const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
@@ -414,6 +414,47 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
         sorted.forEach((r, idx) => {
             const stats = getCalculatedStats(r, exam);
+            
+            // Logic for Start/End Time
+            let startTimeStr = "-";
+            let endTimeStr = "-";
+            
+            // Construct Scheduled Times
+            const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+            const scheduledStart = new Date(`${dateStr}T${exam.config.startTime}`);
+            const scheduledEnd = new Date(scheduledStart.getTime() + exam.config.timeLimit * 60000);
+
+            if (r.status === 'force_closed') {
+                // Lupa Absen / Force Closed -> Use Scheduled Times
+                startTimeStr = scheduledStart.toLocaleString('id-ID');
+                endTimeStr = scheduledEnd.toLocaleString('id-ID');
+            } else {
+                // Normal -> Use Actual Times with Clamping
+                if (r.timestamp) {
+                    let finalEndTime = r.timestamp;
+                    // Clamp End Time (Max = Scheduled End + 10 mins grace)
+                    const maxEndTime = scheduledEnd.getTime() + 10 * 60000;
+                    if (finalEndTime > maxEndTime) finalEndTime = scheduledEnd.getTime();
+
+                    const endTime = new Date(finalEndTime);
+                    endTimeStr = endTime.toLocaleString('id-ID');
+                    
+                    // Infer Start Time from Duration
+                    if (r.completionTime) {
+                        let finalStartTime = finalEndTime - (r.completionTime * 1000);
+                        // Clamp Start Time (Min = Scheduled Start - 30 mins early allowed)
+                        const minStartTime = scheduledStart.getTime() - 30 * 60000;
+                        if (finalStartTime < minStartTime) finalStartTime = scheduledStart.getTime();
+
+                        const startTime = new Date(finalStartTime);
+                        startTimeStr = startTime.toLocaleString('id-ID');
+                    } else {
+                        // Fallback if no duration: Use Scheduled Start
+                        startTimeStr = scheduledStart.toLocaleString('id-ID');
+                    }
+                }
+            }
+
             const row = [
                 String(idx + 1),
                 r.student.fullName,
@@ -424,7 +465,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 String(stats.wrong),
                 String(stats.empty),
                 r.status || "-",
-                r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID') : "-",
+                startTimeStr,
+                endTimeStr,
                 r.completionTime ? String(r.completionTime) : "-"
             ];
 
@@ -793,7 +835,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     if (!archiveData) {
         return (
-            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+            <div className="w-full max-w-full mx-auto space-y-8 animate-fade-in">
                 {isLoadingCloud && (
                     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex flex-col items-center">
@@ -915,7 +957,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="w-full max-w-full mx-auto space-y-6">
             <style>{`
                 @media print {
                     @page { margin: 1cm; size: portrait; }
@@ -1020,7 +1062,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer === opt ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer === opt && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
+                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
                                             {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 text-sm"><div className="flex-1 font-medium dark:text-slate-200">{p.left}</div><div className="text-slate-300 dark:text-slate-500">→</div><div className="flex-1 font-bold dark:text-slate-200">{p.right}</div></div>)}</div>}
                                             {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && <div className="mt-4 pt-3 border-t dark:border-slate-700"><p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Kunci Jawaban</p><div className="mt-1 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm prose prose-sm max-w-none dark:text-slate-200" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div></div>}
                                         </div>
@@ -1052,8 +1094,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </div>
                             </div>
                         )}
-                         <table className="w-full text-left">
-                            <thead className="bg-slate-50/50 dark:bg-slate-700/50">
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-left min-w-[800px]">
+                                <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                                 <tr>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Siswa</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kelas</th>
@@ -1128,6 +1171,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 )})}
                             </tbody>
                          </table>
+                        </div>
                     </div>
                 )}
                 {activeTab === 'ANALYSIS' && (
@@ -1194,8 +1238,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 Ringkasan performa dan ketuntasan belajar siswa dikelompokkan berdasarkan kelas.
                             </p>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-left min-w-[800px]">
                                 <thead className="bg-slate-50 dark:bg-slate-700">
                                     <tr>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
@@ -1491,92 +1535,96 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     {/* B. REKAPITULASI HASIL KELAS */}
                                     <div className="mb-4">
                                         <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">B. Rekapitulasi Hasil Kelas {className}</h4>
-                                        <table className="w-full border-collapse border border-slate-300 text-[9px]">
-                                            <thead>
-                                                <tr className="bg-slate-100">
-                                                    <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                                    <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
-                                                    <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
-                                                    <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {classResults.map((r, index) => {
-                                                    const { score } = getCalculatedStats(r, exam);
-                                                    return (
-                                                        <tr key={r.student.studentId} className="avoid-break">
-                                                            <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                                            <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                            <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
-                                                            <td className="border border-slate-300 p-1">
-                                                                <div className="flex flex-wrap gap-0.5">
-                                                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                                        const status = checkAnswerStatus(q, r.answers);
-                                                                        let bgClass = 'print-bg-gray'; 
-                                                                        if (status === 'CORRECT') bgClass = 'print-bg-green';
-                                                                        else if (status === 'WRONG') bgClass = 'print-bg-red';
-                                                                        
-                                                                        return (
-                                                                            <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
-                                                                                {idx + 1}
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                        <div className="overflow-x-auto custom-scrollbar">
+                                            <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
+                                                <thead>
+                                                    <tr className="bg-slate-100">
+                                                        <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                        <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
+                                                        <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
+                                                        <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {classResults.map((r, index) => {
+                                                        const { score } = getCalculatedStats(r, exam);
+                                                        return (
+                                                            <tr key={r.student.studentId} className="avoid-break">
+                                                                <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                                <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                                <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
+                                                                <td className="border border-slate-300 p-1">
+                                                                    <div className="flex flex-wrap gap-0.5">
+                                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                            const status = checkAnswerStatus(q, r.answers);
+                                                                            let bgClass = 'print-bg-gray'; 
+                                                                            if (status === 'CORRECT') bgClass = 'print-bg-green';
+                                                                            else if (status === 'WRONG') bgClass = 'print-bg-red';
+                                                                            
+                                                                            return (
+                                                                                <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
+                                                                                    {idx + 1}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
 
                                     {/* C. ANALISIS INDIVIDU KELAS */}
                                     <div className="mb-4">
                                         <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">C. Analisis Individu Kelas {className}</h4>
-                                        <table className="w-full border-collapse border border-slate-300 text-[9px]">
-                                            <thead>
-                                                <tr className="bg-slate-100">
-                                                    <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                                    <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
-                                                    <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
-                                                    <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {classResults.map((r, index) => {
-                                                    const analysis = analyzeStudentPerformance(exam, r);
-                                                    return (
-                                                        <tr key={r.student.studentId} className="avoid-break">
-                                                            <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                                            <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                            <td className="border border-slate-300 p-1">
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {analysis.stats.map(stat => {
-                                                                        let textClass = 'text-emerald-700';
-                                                                        if (stat.percentage < 50) textClass = 'text-rose-700';
-                                                                        else if (stat.percentage < 80) textClass = 'text-amber-700';
+                                        <div className="overflow-x-auto custom-scrollbar">
+                                            <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
+                                                <thead>
+                                                    <tr className="bg-slate-100">
+                                                        <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                        <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
+                                                        <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
+                                                        <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {classResults.map((r, index) => {
+                                                        const analysis = analyzeStudentPerformance(exam, r);
+                                                        return (
+                                                            <tr key={r.student.studentId} className="avoid-break">
+                                                                <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                                <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                                <td className="border border-slate-300 p-1">
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {analysis.stats.map(stat => {
+                                                                            let textClass = 'text-emerald-700';
+                                                                            if (stat.percentage < 50) textClass = 'text-rose-700';
+                                                                            else if (stat.percentage < 80) textClass = 'text-amber-700';
 
-                                                                        return (
-                                                                            <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                                                                <span className="font-semibold">{stat.name}:</span>
-                                                                                <span className={`font-bold ${textClass}`}>
-                                                                                    {stat.percentage}%
+                                                                            return (
+                                                                                <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                                                    <span className="font-semibold">{stat.name}:</span>
+                                                                                    <span className={`font-bold ${textClass}`}>
+                                                                                        {stat.percentage}%
+                                                                                    </span>
                                                                                 </span>
-                                                                            </span>
-                                                                        );
-                                                                    })}
-                                                                    {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
-                                                                </div>
-                                                            </td>
-                                                            <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
-                                                                "{analysis.recommendation}"
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                                                            );
+                                                                        })}
+                                                                        {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
+                                                                    "{analysis.recommendation}"
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="page-break"></div>
@@ -1753,8 +1801,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             ))}
                                             
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                                    <table className="w-full text-xs">
+                                                <div className="border border-slate-200 rounded-lg overflow-x-auto custom-scrollbar">
+                                                    <table className="w-full text-xs min-w-[500px]">
                                                         <thead className="bg-slate-50">
                                                             <tr>
                                                                 <th className="p-2 font-bold text-slate-600 text-left border-b border-slate-200">Pernyataan</th>
