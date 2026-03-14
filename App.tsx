@@ -153,7 +153,7 @@ const App: React.FC = () => {
           timestamp: Date.now()
         });
         // Capture the new ID
-        studentWithId = { ...student, resultId: newRes.id };
+        studentWithId = { ...student, resultId: newRes.id as number };
       }
       
       setCurrentExam(exam);
@@ -330,7 +330,7 @@ const App: React.FC = () => {
     });
     
     if (status === 'completed' || status === 'force_closed') {
-        setStudentResult(res);
+        setStudentResult(res as unknown as Result);
         setView('STUDENT_RESULT');
         setIsSyncing(false);
     }
@@ -579,7 +579,6 @@ const App: React.FC = () => {
             <OngoingExamModal 
                 exam={currentExam}
                 onClose={resetToHome}
-                onAllowContinuation={()=>{}}
                 isReadOnly={true}
             />
         )}
