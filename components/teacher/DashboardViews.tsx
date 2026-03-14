@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 // This file serves as a barrel file to export all view components
 // from their respective files in the 'views' directory.
 
