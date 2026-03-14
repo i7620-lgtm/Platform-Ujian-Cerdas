@@ -43,7 +43,7 @@ const App: React.FC = () => {
         try {
             const local = localStorage.getItem('theme');
             return local === 'dark' || (!local && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        } catch (e) {
+        } catch {
             return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
     }
@@ -55,11 +55,11 @@ const App: React.FC = () => {
     if (darkMode) {
         document.documentElement.classList.add('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
-        try { localStorage.setItem('theme', 'dark'); } catch(e) {}
+        try { localStorage.setItem('theme', 'dark'); } catch { /* ignore */ }
     } else {
         document.documentElement.classList.remove('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#ffffff');
-        try { localStorage.setItem('theme', 'light'); } catch(e) {}
+        try { localStorage.setItem('theme', 'light'); } catch { /* ignore */ }
     }
   }, [darkMode]);
 
@@ -326,7 +326,7 @@ const App: React.FC = () => {
         activityLog, 
         location, 
         timestamp: Date.now(),
-        ...(grading as any || {})
+        ...(grading as Record<string, unknown> || {})
     });
     
     if (status === 'completed' || status === 'force_closed') {
