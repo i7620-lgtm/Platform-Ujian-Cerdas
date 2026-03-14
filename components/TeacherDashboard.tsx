@@ -1,19 +1,15 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
-    CheckCircleIcon,  
+    CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
-    ClockIcon, 
     CalendarDaysIcon,
     XMarkIcon,
     PencilIcon,
-    CloudArrowUpIcon,
     MoonIcon,
     SunIcon,
     QuestionMarkCircleIcon,
-    TableCellsIcon,
-    QrCodeIcon,
     FileTextIcon,
     PlayIcon,
     BookOpenIcon,
@@ -22,7 +18,8 @@ import {
 import { generateExamCode, sanitizeHtml } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
-import { OngoingExamModal, FinishedExamModal, MainGuideModal } from './teacher/DashboardModals';
+import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
+import { TutorialPage } from './TutorialPage';
 import { storageService } from '../services/storage';
 import { InvitationModal } from './InvitationModal';
 
@@ -103,6 +100,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             onRefreshResults();
         }
     }, [view, onRefreshExams, onRefreshResults]);
+
+    if (isMainGuideModalOpen) {
+        return <TutorialPage onBack={() => setIsMainGuideModalOpen(false)} />;
+    }
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
     
@@ -328,9 +329,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 alert("Berhasil! Ujian telah diarsipkan dan statistik tersimpan.");
             }
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            alert("Gagal memproses arsip: " + e.message);
+            alert("Gagal memproses arsip: " + (e instanceof Error ? e.message : String(e)));
         } finally {
             setIsLoadingArchive(false);
         }
@@ -611,9 +612,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             />
 
             {/* Main Guide Modal */}
-            {isMainGuideModalOpen && (
-                <MainGuideModal onClose={() => setIsMainGuideModalOpen(false)} />
-            )}
+
         </div>
     );
 };
