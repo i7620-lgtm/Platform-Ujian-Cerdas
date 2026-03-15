@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface Question {
@@ -128,6 +128,6 @@ export interface ExamSummary {
     highest_score: number;
     lowest_score: number;
     passing_rate: number;
-    question_stats: any; // JSONB Statistical Snapshot
+    question_stats: Record<string, unknown>; // JSONB Statistical Snapshot
     region?: string;
 }
