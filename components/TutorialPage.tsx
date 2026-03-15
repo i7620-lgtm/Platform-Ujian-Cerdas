@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeftIcon, AcademicCapIcon, PresentationChartLineIcon, CloudArrowUpIcon, ShareIcon, ClockIcon, CheckCircleIcon, SparklesIcon, QrCodeIcon, ChartBarIcon, LightBulbIcon, EnvelopeIcon, ShieldCheckIcon } from './Icons';
+import { ArrowLeftIcon, AcademicCapIcon, PresentationChartLineIcon, CloudArrowUpIcon, ShareIcon, CheckCircleIcon, SparklesIcon, QrCodeIcon, ChartBarIcon, LightBulbIcon, EnvelopeIcon, ShieldCheckIcon } from './Icons';
 
 interface TutorialPageProps {
     onBack: () => void;
