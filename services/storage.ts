@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
@@ -179,7 +179,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
 };
 
 class StorageService {
-    private syncQueue: Record<string, unknown>[] = [];
+    private syncQueue: Result[] = [];
     private isProcessingQueue = false;
 
     constructor() {
@@ -1149,7 +1149,7 @@ class StorageService {
           highest_score: max,
           lowest_score: min,
           passing_rate: parseFloat(passingRate.toFixed(2)),
-          question_stats: questionStats as unknown as Record<string, unknown>,
+          question_stats: questionStats,
           region: '' // Region usually comes from profile, handled in UI or DB default
       };
   }
@@ -1397,7 +1397,7 @@ class StorageService {
         }
 
         return {
-            id: row.id as string, // Primary Key
+            id: row.id as number, // Primary Key
             student: { 
                 studentId: row.student_id as string, 
                 fullName: row.student_name as string, 
@@ -1409,7 +1409,7 @@ class StorageService {
             score: row.score as number, 
             correctAnswers: row.correct_answers as number,
             totalQuestions: row.total_questions as number, 
-            status: row.status as 'in_progress' | 'submitted', 
+            status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
             timestamp: new Date(row.updated_at as string).getTime(), 
             location: row.location as { lat: number; lng: number } | undefined
@@ -1417,7 +1417,7 @@ class StorageService {
     });
   }
 
-  async submitExamResult(resultPayload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async submitExamResult(resultPayload: Result): Promise<Result> {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
@@ -1441,8 +1441,6 @@ class StorageService {
                     total_questions: resultPayload.totalQuestions || 0,
                     location: resultPayload.location,
                     updated_at: new Date().toISOString()
-                    // NOTE: We intentionally DO NOT update student_id, student_name, class_name here.
-                    // This allows teacher edits to persist even if the student client has old data.
                 })
                 .eq('id', resultPayload.student.resultId)
                 .select()
@@ -1497,9 +1495,9 @@ class StorageService {
     }
   }
 
-  private addToQueue(payload: Record<string, unknown>) {
-      this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && (item.student as Record<string, string>).studentId === (payload.student as Record<string, string>).studentId));
-      this.syncQueue.push({ ...payload, queuedAt: Date.now() });
+  private addToQueue(payload: Result) {
+      this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
+      this.syncQueue.push({ ...payload, timestamp: Date.now() });
       this.saveQueue();
       if(typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue(); 
   }
@@ -1512,11 +1510,11 @@ class StorageService {
       if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
-      const remainingQueue: Record<string, unknown>[] = [];
+      const remainingQueue: Result[] = [];
       
       for (const payload of queueCopy) {
           try {
-             const student = payload.student as Record<string, string>;
+             const student = payload.student;
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
                 class_name: student.class, answers: payload.answers || {}, status: payload.status,
@@ -1678,7 +1676,7 @@ class StorageService {
           return [];
       }
       
-      return data.map((f: Record<string, unknown>) => {
+      return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
           let metadata = null;
           if (typeof f.name === 'string' && f.name.includes('_meta_')) {
               try {
@@ -1709,7 +1707,7 @@ class StorageService {
               return {
               name: f.name as string,
               created_at: f.created_at as string,
-              size: f.metadata?.size || 0,
+              size: (f.metadata as {size?: number})?.size || 0,
               metadata
           };
       });
