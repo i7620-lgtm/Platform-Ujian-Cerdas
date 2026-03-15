@@ -13,7 +13,7 @@ interface CollaboratorViewProps {
     isDarkMode: boolean;
     toggleTheme: () => void;
 }
-
+ 
 export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, token, onExit, isDarkMode, toggleTheme }) => {
     const [questions, setQuestions] = useState<Question[]>(exam.questions);
     const [config, setConfig] = useState<ExamConfig>(exam.config);
