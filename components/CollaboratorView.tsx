@@ -40,7 +40,6 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, 
                 <OngoingExamModal 
                     exam={exam}
                     onClose={onExit}
-                    onAllowContinuation={() => {}}
                     isReadOnly={false}
                     teacherProfile={{ fullName: 'Collaborator', school: exam.authorSchool || '-', id: 'collab', accountType: 'collaborator' }}
                 />
