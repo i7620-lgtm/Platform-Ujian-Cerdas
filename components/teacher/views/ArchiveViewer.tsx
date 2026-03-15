@@ -116,6 +116,60 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
     );
 };
 
+const normalize = (str: string) => str.trim().toLowerCase();
+
+const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+    const ans = studentAnswers[q.id];
+    if (!ans) return 'EMPTY';
+
+    const studentAns = normalize(String(ans));
+    const correctAns = normalize(String(q.correctAnswer || ''));
+
+    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+        return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+    } 
+    else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+        const sSet = new Set(parseList(studentAns).map(normalize));
+        const cSet = new Set(parseList(correctAns).map(normalize));
+        if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+        return 'WRONG';
+    }
+    else if (q.questionType === 'TRUE_FALSE') {
+         try {
+            const ansObj = JSON.parse(ans);
+            const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+            return allCorrect ? 'CORRECT' : 'WRONG';
+        } catch { return 'WRONG'; }
+    }
+    else if (q.questionType === 'MATCHING') {
+        try {
+            const ansObj = JSON.parse(ans);
+            const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+            return allCorrect ? 'CORRECT' : 'WRONG';
+        } catch { return 'WRONG'; }
+    }
+
+    return 'WRONG'; 
+};
+
+const getCalculatedStats = (r: Result, exam: Exam) => {
+    let correct = 0;
+    let empty = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+    
+    scorableQuestions.forEach(q => {
+        const status = checkAnswerStatus(q, r.answers);
+        if (status === 'CORRECT') correct++;
+        else if (status === 'EMPTY') empty++;
+    });
+
+    const total = scorableQuestions.length;
+    const wrong = total - correct - empty;
+    const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+    
+    return { correct, wrong, empty, score };
+};
+
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
@@ -137,7 +191,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             try {
                 const list = await storageService.getArchivedList();
                 setCloudArchives(list);
-            } catch (e) {
+            } catch {
                 console.warn("Cloud archives list unavailable");
             }
         };
@@ -185,7 +239,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         setError('File JSON tidak valid atau bukan format arsip lengkap.');
                     }
                 }
-            } catch (e) {
+            } catch {
                 setError('Gagal membaca file. Pastikan file berformat JSON yang benar.');
             }
         };
@@ -198,7 +252,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         setLoadingMessage('Mengunduh dari Cloud...');
         setError('');
         try {
-            const data = await storageService.downloadArchive(filename);
+            const data = await storageService.downloadArchive(filename) as ArchiveData | null;
             if (data && data.exam && data.exam.questions) {
                 setArchiveData(data);
                 setActiveTab('DETAIL');
@@ -207,7 +261,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             } else {
                 setError("Data arsip cloud rusak.");
             }
-        } catch (e) {
+        } catch {
             setError("Gagal mengunduh arsip dari cloud.");
         } finally {
             setIsLoadingCloud(false);
@@ -322,9 +376,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             await storageService.registerLegacyArchive(archiveData.exam, archiveData.results);
             alert("Berhasil! Statistik ujian telah dicatat dan kini tersedia di menu Analisis Daerah.");
-        } catch (e: any) {
+        } catch (e) {
             console.error(e);
-            alert(e.message || "Gagal mencatat statistik.");
+            alert(e instanceof Error ? e.message : "Gagal mencatat statistik.");
         } finally {
             setIsRegisteringStats(false);
         }
@@ -584,61 +638,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }, 100);
     };
 
-    const normalize = (str: string) => str.trim().toLowerCase();
-
-    const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
-        const ans = studentAnswers[q.id];
-        if (!ans) return 'EMPTY';
-
-        const studentAns = normalize(String(ans));
-        const correctAns = normalize(String(q.correctAnswer || ''));
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            // FIX: Use parseList to handle JSON arrays correctly and independent of order
-            const sSet = new Set(parseList(studentAns).map(normalize));
-            const cSet = new Set(parseList(correctAns).map(normalize));
-            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
-            return 'WRONG';
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-             try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-
-        return 'WRONG'; 
-    };
-
-    const getCalculatedStats = (r: Result, exam: Exam) => {
-        let correct = 0;
-        let empty = 0;
-        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-        
-        scorableQuestions.forEach(q => {
-            const status = checkAnswerStatus(q, r.answers);
-            if (status === 'CORRECT') correct++;
-            else if (status === 'EMPTY') empty++;
-        });
-
-        const total = scorableQuestions.length;
-        const wrong = total - correct - empty;
-        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
-        
-        return { correct, wrong, empty, score };
-    };
-
     useEffect(() => {
         if (!archiveData) return;
         
@@ -705,7 +704,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
-    }, [archiveData?.exam.code]);
+    }, [archiveData]);
 
     // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
     const sortedResults = useMemo(() => {
@@ -1421,8 +1420,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
                         const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
                         const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                        const kkm = exam.config.kkm || 75;
-                        const passedCount = classScores.filter(s => s >= kkm).length; 
+                        // const kkm = exam.config.kkm || 75;
+                        // const passedCount = classScores.filter(s => s >= kkm).length; 
 
                         return (
                             <div key={className}>
@@ -1739,7 +1738,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     const normKey = normalize(originalQ?.correctAnswer || '');
                                                                     isCorrect = normAns === normKey;
                                                                 }
-                                                            } catch(e) {}
+                                                            } catch { /* ignore */ }
 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
