@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
-import { ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, EyeIcon, LockClosedIcon, SunIcon, MoonIcon, SignalIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
+import { ClockIcon, CheckCircleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, LockClosedIcon, SunIcon, MoonIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { parseList } from './teacher/examUtils';
@@ -11,19 +11,19 @@ interface StudentExamPageProps {
   exam: Exam;
   student: Student;
   initialData?: Result | null;
-  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string, grading?: any) => void;
+  onSubmit: (answers: Record<string, string>, timeLeft: number, status?: ResultStatus, logs?: string[], location?: string, grading?: Record<string, unknown>) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
 }
 
-const normalize = (str: any) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correctCount = 0;
     const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
     
-    scorableQuestions.forEach((q: any) => {
+    scorableQuestions.forEach((q: Question) => {
         const studentAnswer = answers[q.id];
         if (!studentAnswer) return;
 
@@ -40,20 +40,20 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
         else if (q.questionType === 'TRUE_FALSE') {
             try {
                 const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.trueFalseRows?.every((row: any, idx: number) => {
+                const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
                     return ansObj[idx] === row.answer;
                 });
                 if (allCorrect) correctCount++;
-            } catch (e) {}
+            } catch { /* ignore */ }
         }
         else if (q.questionType === 'MATCHING') {
             try {
                 const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.matchingPairs?.every((pair: any, idx: number) => {
+                const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
                     return ansObj[idx] === pair.right;
                 });
                 if (allCorrect) correctCount++;
-            } catch (e) {}
+            } catch { /* ignore */ }
         }
     });
 
@@ -72,12 +72,30 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isNavOpen, setIsNavOpen] = useState(false);
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const [showConfigIntro, setShowConfigIntro] = useState(true);
+    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
     const [activeExam, setActiveExam] = useState<Exam>(exam);
-    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
 
     // State untuk Custom Dropdown Menjodohkan
     const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
+    const [matchingOptionsMap, setMatchingOptionsMap] = useState<Record<string, string[]>>({});
+
+    useEffect(() => {
+        const map: Record<string, string[]> = {};
+        activeExam?.questions.forEach(q => {
+            if (q.questionType === 'MATCHING' && q.matchingPairs) {
+                const opts = q.matchingPairs.map(p => p.right);
+                for (let i = opts.length - 1; i > 0; i--) { 
+                    const j = Math.floor(Math.random() * (i + 1)); 
+                    [opts[i], opts[j]] = [opts[j], opts[i]]; 
+                }
+                map[q.id] = opts;
+            }
+        });
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setMatchingOptionsMap(map);
+    }, [activeExam]);
 
     const answersRef = useRef<Record<string, string>>({});
     const logRef = useRef<string[]>(initialData?.activityLog || []);
@@ -85,10 +103,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const timeLeftRef = useRef(0);
     const lastBroadcastTimeRef = useRef<number>(0);
     
-    const violationsRef = useRef(0);
-    const blurTimestampRef = useRef<number | null>(null);
-    const [cheatingWarning, setCheatingWarning] = useState<string>('');
-
     // Monitoring Status
     const isMonitoring = activeExam.config.detectBehavior;
     const monitoringLabel = activeExam.config.continueWithPermission ? 'Diawasi & Terkunci' : 'Diawasi Sistem';
@@ -105,7 +119,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [openDropdownId]);
 
     useEffect(() => {
-        let channel: any = null;
+        let channel: ReturnType<typeof supabase.channel> | null = null;
         if (!exam.config.disableRealtime) {
             channel = supabase.channel(`exam-config-${exam.code}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` }, (payload) => {
@@ -143,7 +157,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         return { ...prev, config: data.config };
                     });
                 }
-            } catch (e) {}
+            } catch { /* ignore */ }
         }, 15000);
 
         return () => { if (channel) supabase.removeChannel(channel); clearInterval(pollInterval); };
@@ -151,8 +165,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => {
         const loadState = async () => {
-            try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch (e) {}
-            const localData = await storageService.getLocalProgress(STORAGE_KEY);
+            try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
+            const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
             if (localData) {
                 setAnswers(localData.answers || {});
                 answersRef.current = localData.answers || {};
@@ -165,7 +179,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
         };
         loadState();
-    }, [STORAGE_KEY, initialData, exam]);
+    }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
@@ -173,12 +187,12 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const v = ansMap[q.id];
         if (!v) return false;
         if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch(e) { return false; }
+            try { return Object.keys(JSON.parse(v)).length > 0; } catch { return false; }
         }
         return v.trim() !== "";
     };
 
-    const handleSubmit = async (auto = false, status: ResultStatus = 'completed') => {
+    const handleSubmit = useCallback(async (auto = false, status: ResultStatus = 'completed') => {
         if (!auto) {
             const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
             const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
@@ -195,7 +209,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const grading = calculateGrade(activeExam, answersRef.current);
         await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
         if (status === 'completed' || status === 'force_closed') { storageService.clearLocalProgress(STORAGE_KEY); }
-    };
+    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
 
     useEffect(() => {
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
@@ -212,17 +226,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
             
             if (type === 'hard') {
-                violationsRef.current += 1;
                 // FIX: Jika mode 'Kunci Akses' tidak aktif, jangan pernah kunci ujian (hapus 3 strikes rule).
                 // Hanya tampilkan peringatan visual bahwa aktivitas tercatat.
-                setCheatingWarning(`PELANGGARAN TERDETEKSI! Aktivitas dicatat.`); 
-                setTimeout(() => setCheatingWarning(''), 5000); 
             }
         };
         const handleVisibilityChange = () => { if (document.hidden && !isSubmittingRef.current) handleViolation('hard', 'Meninggalkan halaman'); };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => { document.removeEventListener('visibilitychange', handleVisibilityChange); };
-    }, [activeExam, student, handleSubmit]);
+    }, [activeExam, student, handleSubmit, STORAGE_KEY]);
 
     useEffect(() => {
         if (activeExam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
@@ -230,8 +241,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, [activeExam.config.trackLocation, student.class]);
 
-    const deadline = useMemo(() => {
-        if (student.class === 'PREVIEW') return Date.now() + (activeExam.config.timeLimit * 60 * 1000);
+    const [deadline, setDeadline] = useState<number>(0);
+
+    useEffect(() => {
+        if (student.class === 'PREVIEW') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setDeadline(Date.now() + (activeExam.config.timeLimit * 60 * 1000));
+            return;
+        }
         
         let start: Date;
         // Check if date is ISO string (new format) or YYYY-MM-DD (legacy)
@@ -242,7 +259,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
              start = new Date(`${dateStr}T${activeExam.config.startTime}`);
         }
         
-        return start.getTime() + (activeExam.config.timeLimit * 60 * 1000);
+        setDeadline(start.getTime() + (activeExam.config.timeLimit * 60 * 1000));
     }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
 
     const [timeLeft, setTimeLeft] = useState(0);
@@ -259,13 +276,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => clearInterval(timer);
     }, [deadline, handleSubmit, student.class]);
 
-    const broadcastProgress = useMemo(() => () => {
+    const broadcastProgress = useCallback(() => {
         const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
         storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
-    }, [activeExam]);
+    }, [activeExam, student.studentId]);
 
-    const handleAnswerChange = (qId: string, val: string) => {
+    const handleAnswerChange = useCallback((qId: string, val: string) => {
         setAnswers(prev => {
             const next = { ...prev, [qId]: val };
             answersRef.current = next;
@@ -278,7 +295,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             const now = Date.now();
             if (now - lastBroadcastTimeRef.current > 2000) { broadcastProgress(); lastBroadcastTimeRef.current = now; } 
         }
-    };
+    }, [STORAGE_KEY, activeExam.config.disableRealtime, broadcastProgress, student.class]);
 
     const scrollToQuestion = (id: string) => {
         setIsNavOpen(false);
@@ -557,11 +574,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             {q.questionType === 'MATCHING' && q.matchingPairs && (
                                                 <div className="space-y-3">
                                                     {(() => {
-                                                        const rightOptions = useMemo(() => {
-                                                            const opts = q.matchingPairs!.map(p => p.right);
-                                                            for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
-                                                            return opts;
-                                                        }, [q.id]);
+                                                        const rightOptions = matchingOptionsMap[q.id] || [];
                                                         return q.matchingPairs.map((pair, i) => {
                                                             const currentAnsObj = answers[q.id] ? JSON.parse(answers[q.id]) : {};
                                                             const selectedValue = currentAnsObj[i] || '';
