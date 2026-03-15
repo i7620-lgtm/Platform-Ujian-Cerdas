@@ -170,6 +170,16 @@ const getCalculatedStats = (r: Result, exam: Exam) => {
     return { correct, wrong, empty, score };
 };
 
+interface ArchiveMetadata {
+    school?: string;
+    subject?: string;
+    classLevel?: string;
+    examType?: string;
+    targetClasses?: string[];
+    date?: string | number;
+    participantCount?: number;
+}
+
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
@@ -178,7 +188,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
     const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: any}[]>([]);
+    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
@@ -190,7 +200,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         const loadCloudList = async () => {
             try {
                 const list = await storageService.getArchivedList();
-                setCloudArchives(list);
+                setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             } catch {
                 console.warn("Cloud archives list unavailable");
             }
@@ -278,7 +288,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             await storageService.deleteArchive(filename);
             const list = await storageService.getArchivedList();
-            setCloudArchives(list);
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             // If the deleted file is currently open, close it
             if (archiveData && sourceType === 'CLOUD' && archiveData.exam.code === filename.split('_')[0]) {
@@ -355,7 +365,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             
             // Refresh list
             const list = await storageService.getArchivedList();
-            setCloudArchives(list);
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             setSourceType('CLOUD'); // Switch mode to cloud
             setArchiveData(finalPayload); // Update view with optimized data
@@ -864,41 +874,44 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         >
                                             <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
                                             
-                                            {file.metadata ? (
+                                            {file.metadata ? (() => {
+                                                const meta = file.metadata as ArchiveMetadata;
+                                                return (
                                                 <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
                                                     {userRole === 'super_admin' && (
                                                         <div className="grid grid-cols-3 gap-1">
                                                             <span className="font-bold text-slate-400">Sekolah</span>
-                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.school || '-'}</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.school || '-'}</span>
                                                         </div>
                                                     )}
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Mapel/Kelas</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.subject} ({file.metadata.classLevel})</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.subject} ({meta.classLevel})</span>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Evaluasi</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.examType}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.examType}</span>
                                                     </div>
-                                                    {file.metadata.targetClasses && file.metadata.targetClasses.length > 0 && (
+                                                    {meta.targetClasses && meta.targetClasses.length > 0 && (
                                                         <div className="grid grid-cols-3 gap-1">
                                                             <span className="font-bold text-slate-400">Target</span>
-                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.targetClasses.join(', ')}</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.targetClasses.join(', ')}</span>
                                                         </div>
                                                     )}
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Tanggal</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.metadata.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.date ? new Date(meta.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Partisipan</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.participantCount ? `${file.metadata.participantCount} Siswa` : '-'}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.participantCount ? `${meta.participantCount} Siswa` : '-'}</span>
                                                     </div>
                                                     <div className="text-[9px] text-right text-slate-300 mt-1">
                                                         {(file.size / 1024).toFixed(1)} KB
                                                     </div>
                                                 </div>
-                                            ) : (
+                                                );
+                                            })() : (
                                                 <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-200 dark:border-slate-600">Arsip Lama</span>
