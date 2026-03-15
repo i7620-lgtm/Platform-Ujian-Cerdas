@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
 import { storageService } from '../../services/storage';
@@ -61,7 +61,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     const idx = prev.findIndex(r => r.student.studentId === studentId); 
                     if (idx >= 0 && prev[idx].status === 'in_progress') { 
                         const updated = [...prev]; 
-                        updated[idx] = { ...updated[idx], answers: Array(answeredCount).fill('placeholder') as Record<string, string>, timestamp: timestamp }; 
+                        updated[idx] = { ...updated[idx], answers: Object.fromEntries(Array(answeredCount).fill('placeholder').map((_, i) => [i.toString(), 'placeholder'])), timestamp: timestamp }; 
                         return updated; 
                     } 
                     return prev; 
@@ -769,6 +769,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
     const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+    const [fixMessage, setFixMessage] = useState<string | null>(null);
 
     const ungradedCount = useMemo(() => {
         const essayQuestions = displayExam.questions.filter(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK');
