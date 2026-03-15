@@ -167,15 +167,15 @@ function _transliterateWord(word: string): string {
 export function transliterate(text: string): string {
   if (!text) return '';
 
-  const parts = text.split(/([\s\n\.,\-\:\?!]+)/);
+  const parts = text.split(/([\s\n.,\-:?!]+)/);
   let result = '';
 
   for (let i = 0; i < parts.length; i++) {
-    let part = parts[i];
+    const part = parts[i];
 
-    if (/^[\s\n\.,\-\:\?!]+$/.test(part)) {
+    if (/^[\s\n.,\-:?!]+$/.test(part)) {
       let punctResult = '';
-      for (let char of part) {
+      for (const char of part) {
         punctResult += BALINESE_NUMBERS_PUNCTUATION[char] || char;
       }
       result += punctResult;
@@ -197,7 +197,7 @@ export function transliterate(text: string): string {
 
     if (/^[0-9]+$/.test(lowerPart)) {
       let numResult = '';
-      for (let char of lowerPart) {
+      for (const char of lowerPart) {
         numResult += BALINESE_NUMBERS_PUNCTUATION[char] || char;
       }
       result += numResult;
