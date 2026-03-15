@@ -576,8 +576,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     exam={selectedOngoingExam} 
                     teacherProfile={teacherProfile}
                     onClose={() => setSelectedOngoingExam(null)} 
-                    onAllowContinuation={onAllowContinuation} 
-                    onUpdateExam={handleExamUpdate} 
                 />
             )}
             
