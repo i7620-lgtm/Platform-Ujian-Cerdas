@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, DocumentArrowUpIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
+import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
@@ -769,7 +769,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const [activeTab, setActiveTab] = useState<'ANALYSIS' | 'STUDENTS'>('ANALYSIS');
     const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-    const [fixMessage, setFixMessage] = useState<string | null>(null);
+
 
     const ungradedCount = useMemo(() => {
         const essayQuestions = displayExam.questions.filter(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK');
@@ -848,19 +848,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         }
     };
 
-    const handleDownloadCorrected = () => {
-        const fixedArchive = { exam: exam, results: results };
-        const jsonString = JSON.stringify(fixedArchive, null, 2);
-        const blob = new Blob([jsonString], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `REKAP_NILAI_TERBARU_${exam.code}_${Date.now()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
+
 
     const normalize = useCallback((str: string) => str.trim().toLowerCase(), []);
 
@@ -1036,17 +1024,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     </div>
                 )}
 
-                {fixMessage && (
-                    <div className="bg-amber-50 dark:bg-amber-900/30 px-6 py-3 border-b border-amber-100 dark:border-amber-800 flex items-center justify-between gap-4 animate-slide-in-up">
-                        <div className="flex items-center gap-3 text-amber-800 dark:text-amber-200">
-                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
-                            <p className="text-xs font-bold">{fixMessage}</p>
-                        </div>
-                        <button onClick={handleDownloadCorrected} className="px-3 py-1.5 bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 text-[10px] font-bold uppercase rounded-lg shadow-sm transition-colors flex items-center gap-2">
-                             <DocumentArrowUpIcon className="w-3 h-3"/> Unduh Data Perbaikan
-                        </button>
-                    </div>
-                )}
+
 
                 <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50">
                     {isLoading ? (
