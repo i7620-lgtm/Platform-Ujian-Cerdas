@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
-import {  
+import { 
     CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
@@ -35,7 +35,6 @@ interface TeacherDashboardProps {
     exams: Record<string, Exam>;
     results: Result[];
     onLogout: () => void;
-    onAllowContinuation: (studentId: string, examCode: string) => void;
     onRefreshExams: () => Promise<void>;
     onRefreshResults: () => Promise<void>;
     isDarkMode: boolean;
@@ -45,7 +44,7 @@ interface TeacherDashboardProps {
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER' | 'ANALYTICS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
+    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     const [isLoadingArchive, setIsLoadingArchive] = useState(false);
@@ -388,7 +387,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setView('UPLOAD'); 
         }, 0);
     };
-    const handleExamUpdate = (updatedExam: Exam) => { updateExam(updatedExam); };
+
 
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
