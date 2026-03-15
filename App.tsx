@@ -12,7 +12,7 @@ import { ProfileCompletionModal } from './components/teacher/ProfileCompletionMo
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
- 
+
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
@@ -149,6 +149,9 @@ const App: React.FC = () => {
           student,
           examCode,
           answers: {},
+          score: 0,
+          totalQuestions: exam.questions.length,
+          correctAnswers: 0,
           status: 'in_progress',
           timestamp: Date.now()
         });
@@ -322,11 +325,13 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
+        score: (grading as {score?: number})?.score || 0,
+        totalQuestions: (grading as {totalQuestions?: number})?.totalQuestions || currentExam.questions.length,
+        correctAnswers: (grading as {correctAnswers?: number})?.correctAnswers || 0,
         status, 
         activityLog, 
         location, 
-        timestamp: Date.now(),
-        ...(grading as Record<string, unknown> || {})
+        timestamp: Date.now()
     });
     
     if (status === 'completed' || status === 'force_closed') {
@@ -548,7 +553,7 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
                     onRefreshResults={refreshResults}
-                    onAllowContinuation={async (sid, ec) => { await storageService.unlockStudentExam(ec, sid); refreshResults(); }}
+
                 />
             </Suspense>
         )}
