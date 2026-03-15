@@ -72,7 +72,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [isNavOpen, setIsNavOpen] = useState(false);
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const [showConfigIntro, setShowConfigIntro] = useState(true);
-    const [timeExtensionNotif, setTimeExtensionNotif] = useState<string | null>(null);
+
 
     const [activeExam, setActiveExam] = useState<Exam>(exam);
 
@@ -126,13 +126,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         const newConfig = payload.new.config;
                         if (newConfig) {
                             setActiveExam(prev => {
-                                const oldLimit = prev.config.timeLimit;
-                                const newLimit = newConfig.timeLimit;
-                                if (newLimit > oldLimit) {
-                                    const diff = newLimit - oldLimit;
-                                    setTimeExtensionNotif(`Waktu diperpanjang +${diff} menit!`);
-                                    setTimeout(() => setTimeExtensionNotif(null), 5000);
-                                }
                                 return { ...prev, config: newConfig };
                             });
                         }
@@ -147,11 +140,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 if (data && data.config) {
                     setActiveExam(prev => {
                         if (prev.config.timeLimit !== data.config.timeLimit) {
-                            const diff = data.config.timeLimit - prev.config.timeLimit;
-                            if (diff > 0) {
-                                setTimeExtensionNotif(`Sinkronisasi: Waktu +${diff} menit!`);
-                                setTimeout(() => setTimeExtensionNotif(null), 5000);
-                            }
                             return { ...prev, config: data.config };
                         }
                         return { ...prev, config: data.config };
