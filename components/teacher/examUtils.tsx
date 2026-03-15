@@ -968,6 +968,10 @@ export const sanitizeHtml = (html: string): string => {
         el.closest('.math-visual') ||
         el.classList.contains('katex') ||
         el.closest('.katex');
+        
+    const isAksaraBali = (el: Element) =>
+        el.classList.contains('aksara-bali') ||
+        (el instanceof HTMLElement && el.style.fontFamily.includes('Noto Sans Balinese'));
 
     doc.body.querySelectorAll('*').forEach(el => {
         if (!isMath(el)) {
@@ -978,7 +982,9 @@ export const sanitizeHtml = (html: string): string => {
                 
                 // Remove font-size, font-family, and line-height to allow app to control text size
                 el.style.fontSize = '';
-                el.style.fontFamily = '';
+                if (!isAksaraBali(el)) {
+                    el.style.fontFamily = '';
+                }
                 el.style.lineHeight = '';
                 
                 // Remove theme-specific classes (Tailwind)
