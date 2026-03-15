@@ -40,8 +40,8 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                     </button>
                 </div>
                 <div className="p-6 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-900">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left border-collapse">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <table className="w-full text-sm text-left border-collapse min-w-[600px]">
                             <thead>
                                 <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                                     <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-12 text-center">No</th>
@@ -366,7 +366,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                         timeZoneName = lastPart;
                     }
                 }
-            } catch (e) {}
+            } catch { /* ignore */ }
 
             // Manual mapping for Indonesian timezones if browser returns generic GMT
             if (!timeZoneName || timeZoneName.includes('GMT')) {
