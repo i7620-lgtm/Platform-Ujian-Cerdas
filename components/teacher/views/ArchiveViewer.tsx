@@ -116,6 +116,70 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
     );
 };
 
+const normalize = (str: string) => str.trim().toLowerCase();
+
+const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+    const ans = studentAnswers[q.id];
+    if (!ans) return 'EMPTY';
+
+    const studentAns = normalize(String(ans));
+    const correctAns = normalize(String(q.correctAnswer || ''));
+
+    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+        return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+    } 
+    else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+        const sSet = new Set(parseList(studentAns).map(normalize));
+        const cSet = new Set(parseList(correctAns).map(normalize));
+        if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+        return 'WRONG';
+    }
+    else if (q.questionType === 'TRUE_FALSE') {
+         try {
+            const ansObj = JSON.parse(ans);
+            const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+            return allCorrect ? 'CORRECT' : 'WRONG';
+        } catch { return 'WRONG'; }
+    }
+    else if (q.questionType === 'MATCHING') {
+        try {
+            const ansObj = JSON.parse(ans);
+            const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+            return allCorrect ? 'CORRECT' : 'WRONG';
+        } catch { return 'WRONG'; }
+    }
+
+    return 'WRONG'; 
+};
+
+const getCalculatedStats = (r: Result, exam: Exam) => {
+    let correct = 0;
+    let empty = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+    
+    scorableQuestions.forEach(q => {
+        const status = checkAnswerStatus(q, r.answers);
+        if (status === 'CORRECT') correct++;
+        else if (status === 'EMPTY') empty++;
+    });
+
+    const total = scorableQuestions.length;
+    const wrong = total - correct - empty;
+    const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+    
+    return { correct, wrong, empty, score };
+};
+
+interface ArchiveMetadata {
+    school?: string;
+    subject?: string;
+    classLevel?: string;
+    examType?: string;
+    targetClasses?: string[];
+    date?: string | number;
+    participantCount?: number;
+}
+
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
@@ -124,7 +188,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
     const [selectedClass, setSelectedClass] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: any}[]>([]);
+    const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('Mengunduh dari Cloud...');
     const [sourceType, setSourceType] = useState<'LOCAL' | 'CLOUD' | null>(null);
@@ -136,8 +200,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         const loadCloudList = async () => {
             try {
                 const list = await storageService.getArchivedList();
-                setCloudArchives(list);
-            } catch (e) {
+                setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
+            } catch {
                 console.warn("Cloud archives list unavailable");
             }
         };
@@ -185,7 +249,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         setError('File JSON tidak valid atau bukan format arsip lengkap.');
                     }
                 }
-            } catch (e) {
+            } catch {
                 setError('Gagal membaca file. Pastikan file berformat JSON yang benar.');
             }
         };
@@ -198,7 +262,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         setLoadingMessage('Mengunduh dari Cloud...');
         setError('');
         try {
-            const data = await storageService.downloadArchive(filename);
+            const data = await storageService.downloadArchive(filename) as ArchiveData | null;
             if (data && data.exam && data.exam.questions) {
                 setArchiveData(data);
                 setActiveTab('DETAIL');
@@ -207,7 +271,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             } else {
                 setError("Data arsip cloud rusak.");
             }
-        } catch (e) {
+        } catch {
             setError("Gagal mengunduh arsip dari cloud.");
         } finally {
             setIsLoadingCloud(false);
@@ -224,7 +288,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             await storageService.deleteArchive(filename);
             const list = await storageService.getArchivedList();
-            setCloudArchives(list);
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             // If the deleted file is currently open, close it
             if (archiveData && sourceType === 'CLOUD' && archiveData.exam.code === filename.split('_')[0]) {
@@ -301,7 +365,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             
             // Refresh list
             const list = await storageService.getArchivedList();
-            setCloudArchives(list);
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             setSourceType('CLOUD'); // Switch mode to cloud
             setArchiveData(finalPayload); // Update view with optimized data
@@ -322,9 +386,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             await storageService.registerLegacyArchive(archiveData.exam, archiveData.results);
             alert("Berhasil! Statistik ujian telah dicatat dan kini tersedia di menu Analisis Daerah.");
-        } catch (e: any) {
+        } catch (e) {
             console.error(e);
-            alert(e.message || "Gagal mencatat statistik.");
+            alert(e instanceof Error ? e.message : "Gagal mencatat statistik.");
         } finally {
             setIsRegisteringStats(false);
         }
@@ -584,61 +648,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }, 100);
     };
 
-    const normalize = (str: string) => str.trim().toLowerCase();
-
-    const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
-        const ans = studentAnswers[q.id];
-        if (!ans) return 'EMPTY';
-
-        const studentAns = normalize(String(ans));
-        const correctAns = normalize(String(q.correctAnswer || ''));
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-            return studentAns === correctAns ? 'CORRECT' : 'WRONG';
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            // FIX: Use parseList to handle JSON arrays correctly and independent of order
-            const sSet = new Set(parseList(studentAns).map(normalize));
-            const cSet = new Set(parseList(correctAns).map(normalize));
-            if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
-            return 'WRONG';
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-             try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(ans);
-                const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
-                return allCorrect ? 'CORRECT' : 'WRONG';
-            } catch(e) { return 'WRONG'; }
-        }
-
-        return 'WRONG'; 
-    };
-
-    const getCalculatedStats = (r: Result, exam: Exam) => {
-        let correct = 0;
-        let empty = 0;
-        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-        
-        scorableQuestions.forEach(q => {
-            const status = checkAnswerStatus(q, r.answers);
-            if (status === 'CORRECT') correct++;
-            else if (status === 'EMPTY') empty++;
-        });
-
-        const total = scorableQuestions.length;
-        const wrong = total - correct - empty;
-        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
-        
-        return { correct, wrong, empty, score };
-    };
-
     useEffect(() => {
         if (!archiveData) return;
         
@@ -705,7 +714,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
-    }, [archiveData?.exam.code]);
+    }, [archiveData]);
 
     // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
     const sortedResults = useMemo(() => {
@@ -865,41 +874,44 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         >
                                             <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
                                             
-                                            {file.metadata ? (
+                                            {file.metadata ? (() => {
+                                                const meta = file.metadata as ArchiveMetadata;
+                                                return (
                                                 <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
                                                     {userRole === 'super_admin' && (
                                                         <div className="grid grid-cols-3 gap-1">
                                                             <span className="font-bold text-slate-400">Sekolah</span>
-                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.school || '-'}</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.school || '-'}</span>
                                                         </div>
                                                     )}
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Mapel/Kelas</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.subject} ({file.metadata.classLevel})</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.subject} ({meta.classLevel})</span>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Evaluasi</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.examType}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.examType}</span>
                                                     </div>
-                                                    {file.metadata.targetClasses && file.metadata.targetClasses.length > 0 && (
+                                                    {meta.targetClasses && meta.targetClasses.length > 0 && (
                                                         <div className="grid grid-cols-3 gap-1">
                                                             <span className="font-bold text-slate-400">Target</span>
-                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.targetClasses.join(', ')}</span>
+                                                            <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.targetClasses.join(', ')}</span>
                                                         </div>
                                                     )}
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Tanggal</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {new Date(file.metadata.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.date ? new Date(meta.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-1">
                                                         <span className="font-bold text-slate-400">Partisipan</span>
-                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {file.metadata.participantCount ? `${file.metadata.participantCount} Siswa` : '-'}</span>
+                                                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">: {meta.participantCount ? `${meta.participantCount} Siswa` : '-'}</span>
                                                     </div>
                                                     <div className="text-[9px] text-right text-slate-300 mt-1">
                                                         {(file.size / 1024).toFixed(1)} KB
                                                     </div>
                                                 </div>
-                                            ) : (
+                                                );
+                                            })() : (
                                                 <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border border-slate-200 dark:border-slate-600">Arsip Lama</span>
@@ -1421,8 +1433,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
                         const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
                         const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                        const kkm = exam.config.kkm || 75;
-                        const passedCount = classScores.filter(s => s >= kkm).length; 
+                        // const kkm = exam.config.kkm || 75;
+                        // const passedCount = classScores.filter(s => s >= kkm).length; 
 
                         return (
                             <div key={className}>
@@ -1739,7 +1751,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     const normKey = normalize(originalQ?.correctAnswer || '');
                                                                     isCorrect = normAns === normKey;
                                                                 }
-                                                            } catch(e) {}
+                                                            } catch { /* ignore */ }
 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>

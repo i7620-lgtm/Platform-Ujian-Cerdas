@@ -25,7 +25,7 @@ const parseClassConfig = (classString: string) => {
 };
 
 const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
-    const scannerRef = useRef<any>(null);
+    const scannerRef = useRef<unknown>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -33,7 +33,7 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
         const initScanner = async () => {
             try {
                 // Load from CDN to avoid build-time resolution issues with the package
-                if (!(window as any).Html5Qrcode) {
+                if (!(window as unknown as Record<string, unknown>).Html5Qrcode) {
                     await new Promise((resolve, reject) => {
                         const script = document.createElement("script");
                         script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
@@ -47,7 +47,11 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
                 if (!isMounted) return;
 
                 // Access global variable
-                const Html5Qrcode = (window as any).Html5Qrcode;
+                const Html5Qrcode = (window as unknown as Record<string, unknown>).Html5Qrcode as new (id: string, verbose: boolean) => {
+                    start: (config: unknown, options: unknown, onSuccess: (text: string) => void, onError: (error: unknown) => void) => Promise<void>;
+                    stop: () => Promise<void>;
+                    clear: () => void;
+                };
                 if (!Html5Qrcode) throw new Error("Html5Qrcode not found");
 
                 const html5QrCode = new Html5Qrcode("reader", false);
@@ -62,7 +66,7 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
                     (decodedText: string) => {
                         if (isMounted) onScanSuccess(decodedText);
                     },
-                    (errorMessage: any) => {
+                    () => {
                         // ignore parse errors
                     }
                 );
@@ -83,12 +87,13 @@ const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose:
             clearTimeout(timer);
             if (scannerRef.current) {
                 // Use catch to ignore errors during stop if it wasn't fully started
-                scannerRef.current.stop().then(() => {
-                    try { scannerRef.current?.clear(); } catch(e) {}
-                }).catch((e: any) => console.log("Stop failed", e));
+                const scanner = scannerRef.current as { stop: () => Promise<void>, clear: () => void };
+                scanner.stop().then(() => {
+                    try { scanner.clear(); } catch { /* ignore */ }
+                }).catch((e: unknown) => console.log("Stop failed", e));
             }
         };
-    }, []);
+    }, [onClose, onScanSuccess]);
 
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
@@ -130,9 +135,9 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
-  const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch(e) { return ''; } });
-  const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch(e) { return ''; } });
-  const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch(e) { return ''; } });
+  const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch { return ''; } });
+  const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch { return ''; } });
+  const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch { return ''; } });
   
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -174,7 +179,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             savedName = localStorage.getItem('saved_student_fullname');
             savedClass = localStorage.getItem('saved_student_class');
             savedAbsent = localStorage.getItem('saved_student_absent');
-        } catch(e) {}
+        } catch { /* ignore */ }
         
         if (savedName && savedClass && savedAbsent && examCodeInputRef.current) {
             examCodeInputRef.current.focus();
@@ -210,7 +215,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     return;
                 }
             }
-        } catch (err) {
+        } catch {
             // Ignore error here to allow offline/fallback behavior in onLoginSuccess logic
         }
     }
@@ -222,7 +227,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         localStorage.setItem('saved_student_fullname', fullName.trim());
         localStorage.setItem('saved_student_class', studentClass.trim());
         localStorage.setItem('saved_student_absent', absentNumber.trim());
-    } catch(e) {}
+    } catch { /* ignore */ }
     
     // Parse class name (remove limit if present) for ID and Data
     const { name: cleanClassName } = parseClassConfig(studentClass);
@@ -310,7 +315,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
           } else {
              alert("Token salah.");
           }
-      } catch(e) {
+      } catch {
           alert("Gagal verifikasi token.");
       }
   };
@@ -553,7 +558,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                         const url = new URL(text);
                         const joinCode = url.searchParams.get('join');
                         if (joinCode) code = joinCode;
-                    } catch (e) {}
+                    } catch { /* ignore */ }
                     setExamCode(code);
                     setIsQrScannerOpen(false);
                 }} 

@@ -96,7 +96,7 @@ export interface Result {
     status?: ResultStatus;
     isSynced?: boolean; 
     timestamp?: number;
-    location?: string; 
+    location?: { lat: number; lng: number } | string;
 }
 
 export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru' | 'collaborator';
@@ -128,6 +128,6 @@ export interface ExamSummary {
     highest_score: number;
     lowest_score: number;
     passing_rate: number;
-    question_stats: any; // JSONB Statistical Snapshot
+    question_stats: Record<string, unknown>[]; // JSONB Statistical Snapshot
     region?: string;
 }

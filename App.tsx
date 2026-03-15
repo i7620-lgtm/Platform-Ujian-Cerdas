@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, Suspense } from 'react'; 
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
@@ -43,7 +43,7 @@ const App: React.FC = () => {
         try {
             const local = localStorage.getItem('theme');
             return local === 'dark' || (!local && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        } catch (e) {
+        } catch {
             return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
     }
@@ -55,11 +55,11 @@ const App: React.FC = () => {
     if (darkMode) {
         document.documentElement.classList.add('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
-        try { localStorage.setItem('theme', 'dark'); } catch(e) {}
+        try { localStorage.setItem('theme', 'dark'); } catch { /* ignore */ }
     } else {
         document.documentElement.classList.remove('dark');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#ffffff');
-        try { localStorage.setItem('theme', 'light'); } catch(e) {}
+        try { localStorage.setItem('theme', 'light'); } catch { /* ignore */ }
     }
   }, [darkMode]);
 
@@ -149,11 +149,14 @@ const App: React.FC = () => {
           student,
           examCode,
           answers: {},
+          score: 0,
+          totalQuestions: exam.questions.length,
+          correctAnswers: 0,
           status: 'in_progress',
           timestamp: Date.now()
         });
         // Capture the new ID
-        studentWithId = { ...student, resultId: newRes.id };
+        studentWithId = { ...student, resultId: newRes.id as number };
       }
       
       setCurrentExam(exam);
@@ -322,15 +325,17 @@ const App: React.FC = () => {
         student: currentStudent,
         examCode: currentExam.code,
         answers,
+        score: (grading as {score?: number})?.score || 0,
+        totalQuestions: (grading as {totalQuestions?: number})?.totalQuestions || currentExam.questions.length,
+        correctAnswers: (grading as {correctAnswers?: number})?.correctAnswers || 0,
         status, 
         activityLog, 
         location, 
-        timestamp: Date.now(),
-        ...(grading as any || {})
+        timestamp: Date.now()
     });
     
     if (status === 'completed' || status === 'force_closed') {
-        setStudentResult(res);
+        setStudentResult(res as unknown as Result);
         setView('STUDENT_RESULT');
         setIsSyncing(false);
     }
@@ -548,7 +553,7 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onRefreshExams={refreshExams}
                     onRefreshResults={refreshResults}
-                    onAllowContinuation={async (sid, ec) => { await storageService.unlockStudentExam(ec, sid); refreshResults(); }}
+
                 />
             </Suspense>
         )}
@@ -579,7 +584,6 @@ const App: React.FC = () => {
             <OngoingExamModal 
                 exam={currentExam}
                 onClose={resetToHome}
-                onAllowContinuation={()=>{}}
                 isReadOnly={true}
             />
         )}

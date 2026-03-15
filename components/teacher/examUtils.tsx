@@ -81,12 +81,12 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
             try {
                 const ansObj = JSON.parse(ans);
                 return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-            } catch(e) { return false; }
+            } catch { return false; }
         } else if (q.questionType === 'MATCHING') {
             try {
                 const ansObj = JSON.parse(ans);
                 return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-            } catch(e) { return false; }
+            } catch { return false; }
         }
         return false;
     };
@@ -180,7 +180,7 @@ export const parseList = (str: string | undefined | null): string[] => {
     try {
         const parsed = JSON.parse(str);
         if (Array.isArray(parsed)) return parsed.map(String);
-    } catch(e) {}
+    } catch { /* ignore */ }
     // Fallback: handle legacy comma-separated
     return str.split(',').map(s => s.trim()).filter(s => s !== '');
 };
@@ -207,12 +207,12 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
             try {
                 const ansObj = JSON.parse(ans);
                 return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-            } catch(e) { return false; }
+            } catch { return false; }
         } else if (q.questionType === 'MATCHING') {
             try {
                 const ansObj = JSON.parse(ans);
                 return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-            } catch(e) { return false; }
+            } catch { return false; }
         }
         return false;
     };
@@ -238,7 +238,7 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     });
 
     // 3. Process to Array
-    const processMap = (map: any) => Object.entries(map).map(([name, data]: any) => ({
+    const processMap = (map: Record<string, { total: number; correct: number }>) => Object.entries(map).map(([name, data]) => ({
         name,
         percentage: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0,
         totalAttempt: data.total,
@@ -285,12 +285,12 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
                 try {
                     const ansObj = JSON.parse(studentAns);
                     isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-                } catch(e) {}
+                } catch { /* ignore */ }
             } else if (q.questionType === 'MATCHING') {
                 try {
                     const ansObj = JSON.parse(studentAns);
                     isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-                } catch(e) {}
+                } catch { /* ignore */ }
             }
         }
 
@@ -548,7 +548,7 @@ export const refineImageContent = (dataUrl: string): Promise<string> => {
 export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> => {
     // Increased scale for preview
     return new Promise((resolve, reject) => {
-        const pdfjsLib = (window as any).pdfjsLib;
+        const pdfjsLib = (window as unknown as { pdfjsLib: { getDocument: (opts: unknown) => { promise: Promise<unknown> } } }).pdfjsLib;
         if (!pdfjsLib) return reject(new Error("Pustaka PDF belum siap."));
 
         const reader = new FileReader();
@@ -559,7 +559,7 @@ export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> =
                 const doc = await pdfjsLib.getDocument({ 
                     data: e.target.result as ArrayBuffer,
                     verbosity: 0 
-                }).promise;
+                }).promise as { numPages: number, getPage: (i: number) => Promise<{ getViewport: (opts: { scale: number }) => { height: number, width: number }, render: (opts: { canvasContext: CanvasRenderingContext2D, viewport: { height: number, width: number } }) => { promise: Promise<void> } }> };
                 
                 const images: string[] = [];
                 // Only render first few pages for preview to save memory
@@ -581,14 +581,14 @@ export const convertPdfToImages = (file: File, scale = 2.0): Promise<string[]> =
                     images.push(canvas.toDataURL('image/webp', 0.7));
                 }
                 resolve(images);
-            } catch (err) { reject(new Error('Gagal mengonversi PDF.')); }
+            } catch { reject(new Error('Gagal mengonversi PDF.')); }
         };
         reader.readAsArrayBuffer(file);
     });
 };
 
 export const extractTextFromPdf = async (file: File): Promise<string> => {
-    const pdfjsLib = (window as any).pdfjsLib;
+    const pdfjsLib = (window as unknown as { pdfjsLib: { getDocument: (opts: unknown) => { promise: Promise<{ numPages: number, getPage: (i: number) => Promise<{ getTextContent: () => Promise<{ items: { str: string }[] }> }> }> } } }).pdfjsLib;
     if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
     
     // Set verbosity to 0
@@ -601,7 +601,7 @@ export const extractTextFromPdf = async (file: File): Promise<string> => {
     for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        const pageText = textContent.items.map((item) => item.str).join(' ');
         fullText += pageText + "\n\n";
     }
     return fullText;
@@ -610,7 +610,7 @@ export const extractTextFromPdf = async (file: File): Promise<string> => {
 // --- GEOMETRIC PDF PARSER ENGINE ---
 
 export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
-    const pdfjsLib = (window as any).pdfjsLib;
+    const pdfjsLib = (window as unknown as { pdfjsLib: { getDocument: (opts: unknown) => { promise: Promise<{ numPages: number, getPage: (i: number) => Promise<{ getViewport: (opts: unknown) => { width: number, height: number }, render: (opts: unknown) => { promise: Promise<void> }, getTextContent: () => Promise<{ items: { str: string, height?: number, width?: number, transform: number[] }[] }> }> }> } } }).pdfjsLib;
     if (!pdfjsLib) throw new Error("Pustaka PDF belum siap.");
 
     // Set verbosity to 0
@@ -645,7 +645,7 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
 
         const textContent = await page.getTextContent();
         
-        const items = textContent.items.map((item: any) => {
+        const items = textContent.items.map((item) => {
             const h = (item.height || 10) * SCALE;
             const w = (item.width || 0) * SCALE;
             const pdfY = item.transform[5] * SCALE;
@@ -658,14 +658,14 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                 height: h,
                 width: w
             };
-        }).sort((a: any, b: any) => {
+        }).sort((a, b) => {
             const yDiff = a.top - b.top;
             if (Math.abs(yDiff) < 5) return a.x - b.x; 
             return yDiff; 
         });
 
         let currentLine: VisualLine | null = null;
-        items.forEach((item: any) => {
+        items.forEach((item) => {
             if (item.top > viewport.height * 0.94) return; // Footer
             if (item.top < viewport.height * 0.04) return; // Header
 
@@ -692,8 +692,8 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
 
     // --- STEP 2: DETECT ANCHORS ---
     const anchors: Anchor[] = [];
-    const qRegex = /^\s*(\d+)[\.\)]/;
-    const optRegex = /^\s*([a-eA-E])[\.\)]/;
+    const qRegex = /^\s*(\d+)[.)]/;
+    const optRegex = /^\s*([a-eA-E])[.)]/;
 
     allLines.forEach(line => {
         const text = line.text.trim();
@@ -884,8 +884,8 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
     let currentOptions: string[] = [];
     let currentAnswerKey: string | undefined = undefined;
 
-    const questionStartPattern = /^\s*(?:soal|no\.?|nomor)?\s*(\d+)[\.\)\-\s]\s*(.*)/i;
-    const optionStartPattern = /^\s*(?:[\(\[])?\s*([a-eA-E])\s*(?:[\)\]\.])\s+(.*)/;
+    const questionStartPattern = /^\s*(?:soal|no\.?|nomor)?\s*(\d+)[.)-\s]\s*(.*)/i;
+    const optionStartPattern = /^\s*(?:[([])?\s*([a-eA-E])\s*(?:[)\].])\s+(.*)/;
     const answerKeyPattern = /^\s*(?:kunci|jawaban)(?:\s+jawaban)?\s*(?::)?\s*([a-e])\b/i;
 
     const finalizeCurrentQuestion = () => {
@@ -968,6 +968,10 @@ export const sanitizeHtml = (html: string): string => {
         el.closest('.math-visual') ||
         el.classList.contains('katex') ||
         el.closest('.katex');
+        
+    const isAksaraBali = (el: Element) =>
+        el.classList.contains('aksara-bali') ||
+        (el instanceof HTMLElement && el.style.fontFamily.includes('Noto Sans Balinese'));
 
     doc.body.querySelectorAll('*').forEach(el => {
         if (!isMath(el)) {
@@ -978,7 +982,9 @@ export const sanitizeHtml = (html: string): string => {
                 
                 // Remove font-size, font-family, and line-height to allow app to control text size
                 el.style.fontSize = '';
-                el.style.fontFamily = '';
+                if (!isAksaraBali(el)) {
+                    el.style.fontFamily = '';
+                }
                 el.style.lineHeight = '';
                 
                 // Remove theme-specific classes (Tailwind)
@@ -1069,29 +1075,6 @@ export const htmlToMarkdown = (html: string): string => {
     // or use a dedicated library if requested. 
     // However, the user asked for markdown. Let's try a basic DOM parser approach for robustness.
     
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(markdown, 'text/html');
-    
-    // Helper to process nodes recursively
-    const processNode = (node: Node): string => {
-        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
-        if (node.nodeType !== Node.ELEMENT_NODE) return '';
-        
-        const el = node as HTMLElement;
-        let content = '';
-        el.childNodes.forEach(c => content += processNode(c));
-
-        switch (el.tagName.toLowerCase()) {
-            case 'p': return content + '\n\n';
-            case 'br': return '\n';
-            case 'div': return content + '\n';
-            case 'h1': return '# ' + content + '\n';
-            case 'h2': return '## ' + content + '\n';
-            case 'h3': return '### ' + content + '\n';
-            default: return content; // Fallback for unknown tags (like span not handled above)
-        }
-    };
-
     // We already handled special tags (math, img, audio) via regex above, 
     // so 'markdown' string currently has mixed HTML and Markdown.
     // To be safe and simple for this iteration without breaking the existing regex replacements:
@@ -1117,10 +1100,10 @@ export const markdownToHtml = (markdown: string): string => {
     const mathRegex = /\$([^$]+)\$/g;
     html = html.replace(mathRegex, (match, latex) => {
         let rendered = latex;
-        if ((window as any).katex) {
+        if ((window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex) {
             try {
-                rendered = (window as any).katex.renderToString(latex, { throwOnError: false, displayMode: false });
-            } catch (e) {}
+                rendered = (window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex.renderToString(latex, { throwOnError: false, displayMode: false });
+            } catch { /* ignore */ }
         }
         return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${rendered}</span>&#8203;`;
     });

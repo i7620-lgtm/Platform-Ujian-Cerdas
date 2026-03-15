@@ -147,9 +147,9 @@
   /* --- Text Normalization (Smarter Approach) --- */
   
   /* 1. Reset Font Size & Line Height for generic containers to inherit from parent */
-  .prose :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]), 
-  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]),
-  .option-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]) {
+  .prose :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]), 
+  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
@@ -157,9 +157,9 @@
 
   /* 2. Only reset spans/fonts that have NO class (likely copy-paste junk) */
   /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
-  .prose :is(span, font):not([class]), 
-  .wysiwyg-content :is(span, font):not([class]),
-  .option-content :is(span, font):not([class]) {
+  .prose :is(span, font):not([class]):not([style*="Noto Sans Balinese"]), 
+  .wysiwyg-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
@@ -167,29 +167,34 @@
   
   /* 3. Also reset elements with inline font-size styles, but ONLY if they are not math related */
   /* We use a specific selector to avoid breaking math */
-  .prose :is(span, font)[style*="font-size"]:not([class]),
-  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]),
-  .option-content :is(span, font)[style*="font-size"]:not([class]) {
+  .prose :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
   }
 
-  /* 4. Aggressive fallback for modern browsers: target ANY element with inline font-size, line-height, or font-family that is NOT inside a math block */
-  .prose *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .prose *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .prose *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre),
-  .wysiwyg-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .wysiwyg-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .wysiwyg-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre),
-  .option-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .option-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub),
-  .option-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre) {
+  /* 4. Aggressive fallback for modern browsers: target ANY element with inline font-size, line-height, or font-family that is NOT inside a math block or aksara bali */
+  .prose *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .prose *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .prose *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]) {
       font-size: inherit !important;
       line-height: inherit !important;
       font-family: inherit !important;
   }
 
+  /* 5. Ensure Aksara Bali elements always use the correct font */
+  .aksara-bali, [style*="Noto Sans Balinese"] {
+      font-family: 'Noto Sans Balinese', sans-serif !important;
+  }
+  
   /* Exceptions for Superscript/Subscript */
   
   /* Viewer (Prose) - Pretty styling that doesn't affect line height */

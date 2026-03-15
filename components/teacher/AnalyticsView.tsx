@@ -19,7 +19,6 @@ const AnalyticsView: React.FC = () => {
     const [filterSubject, setFilterSubject] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [aiResult, setAiResult] = useState<string | null>(null);
-    const [isAiLoading, setIsAiLoading] = useState(false);
 
     const [editingSummary, setEditingSummary] = useState<ExamSummary | null>(null);
     const [editForm, setEditForm] = useState<Partial<ExamSummary>>({});
@@ -32,6 +31,7 @@ const AnalyticsView: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData('', '');
     }, [fetchData]);
 
@@ -59,8 +59,8 @@ const AnalyticsView: React.FC = () => {
                 newSet.delete(id);
                 setSelectedIds(newSet);
             }
-        } catch (error: any) {
-            alert("Gagal menghapus data: " + error.message);
+        } catch (error: unknown) {
+            alert("Gagal menghapus data: " + (error instanceof Error ? error.message : String(error)));
         }
     };
 
@@ -83,8 +83,8 @@ const AnalyticsView: React.FC = () => {
             await storageService.updateAnalyticsData(editingSummary.exam_code, editForm);
             setSummaries(prev => prev.map(s => s.id === editingSummary.id ? { ...s, ...editForm } : s));
             setEditingSummary(null);
-        } catch (error: any) {
-            alert("Gagal menyimpan perubahan: " + error.message);
+        } catch (error: unknown) {
+            alert("Gagal menyimpan perubahan: " + (error instanceof Error ? error.message : String(error)));
         }
     };
 
@@ -146,6 +146,12 @@ const AnalyticsView: React.FC = () => {
                         placeholder="Filter Wilayah/Sekolah..." 
                         value={filterRegion} 
                         onChange={e => setFilterRegion(e.target.value)}
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                    />
+                    <input 
+                        placeholder="Filter Mapel..." 
+                        value={filterSubject} 
+                        onChange={e => setFilterSubject(e.target.value)}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <button onClick={() => fetchData(filterRegion, filterSubject)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>

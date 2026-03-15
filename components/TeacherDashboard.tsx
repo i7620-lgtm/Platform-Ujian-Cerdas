@@ -1,19 +1,15 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
-    CheckCircleIcon,  
+    CheckCircleIcon, 
     ChartBarIcon, 
     LogoutIcon, 
-    ClockIcon, 
     CalendarDaysIcon,
     XMarkIcon,
     PencilIcon,
-    CloudArrowUpIcon,
     MoonIcon,
     SunIcon,
     QuestionMarkCircleIcon,
-    TableCellsIcon,
-    QrCodeIcon,
     FileTextIcon,
     PlayIcon,
     BookOpenIcon,
@@ -22,7 +18,8 @@ import {
 import { generateExamCode, sanitizeHtml } from './teacher/examUtils';
 import { ExamEditor } from './teacher/ExamEditor';
 import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, DraftsView, ArchiveViewer } from './teacher/DashboardViews';
-import { OngoingExamModal, FinishedExamModal, MainGuideModal } from './teacher/DashboardModals';
+import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
+import { TutorialPage } from './TutorialPage';
 import { storageService } from '../services/storage';
 import { InvitationModal } from './InvitationModal';
 
@@ -38,7 +35,6 @@ interface TeacherDashboardProps {
     exams: Record<string, Exam>;
     results: Result[];
     onLogout: () => void;
-    onAllowContinuation: (studentId: string, examCode: string) => void;
     onRefreshExams: () => Promise<void>;
     onRefreshResults: () => Promise<void>;
     isDarkMode: boolean;
@@ -48,7 +44,7 @@ interface TeacherDashboardProps {
 type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER' | 'ANALYTICS';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ 
-    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onAllowContinuation, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
+    teacherProfile, addExam, updateExam, deleteExam, exams, results, onLogout, onRefreshExams, onRefreshResults, isDarkMode, toggleTheme
 }) => {
     const [view, setView] = useState<TeacherView>('UPLOAD');
     const [isLoadingArchive, setIsLoadingArchive] = useState(false);
@@ -103,6 +99,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             onRefreshResults();
         }
     }, [view, onRefreshExams, onRefreshResults]);
+
+    if (isMainGuideModalOpen) {
+        return <TutorialPage onBack={() => setIsMainGuideModalOpen(false)} />;
+    }
 
     const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
     
@@ -328,9 +328,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 alert("Berhasil! Ujian telah diarsipkan dan statistik tersimpan.");
             }
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            alert("Gagal memproses arsip: " + e.message);
+            alert("Gagal memproses arsip: " + (e instanceof Error ? e.message : String(e)));
         } finally {
             setIsLoadingArchive(false);
         }
@@ -387,7 +387,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setView('UPLOAD'); 
         }, 0);
     };
-    const handleExamUpdate = (updatedExam: Exam) => { updateExam(updatedExam); };
+
 
     const allExams: Exam[] = Object.values(exams);
     const publishedExams = allExams.filter(e => e.status !== 'DRAFT');
@@ -575,8 +575,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     exam={selectedOngoingExam} 
                     teacherProfile={teacherProfile}
                     onClose={() => setSelectedOngoingExam(null)} 
-                    onAllowContinuation={onAllowContinuation} 
-                    onUpdateExam={handleExamUpdate} 
                 />
             )}
             
@@ -611,9 +609,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             />
 
             {/* Main Guide Modal */}
-            {isMainGuideModalOpen && (
-                <MainGuideModal onClose={() => setIsMainGuideModalOpen(false)} />
-            )}
+
         </div>
     );
 };

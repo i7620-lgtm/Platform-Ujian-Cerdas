@@ -30,7 +30,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
             const label = role === 'viewer' ? 'Pengawas (Shared)' : 'Editor (Shared)';
             await storageService.addCollaborator(exam.code, label, role);
             onUpdate();
-        } catch (e) {
+        } catch {
             alert('Gagal membuat link.');
         } finally {
             setIsLoading(false);
@@ -45,7 +45,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
             const label = role === 'viewer' ? 'Pengawas (Shared)' : 'Editor (Shared)';
             await storageService.addCollaborator(exam.code, label, role);
             onUpdate();
-        } catch (e) {
+        } catch {
             alert('Gagal mereset link.');
         } finally {
             setIsLoading(false);
@@ -58,7 +58,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
         try {
             await storageService.removeCollaborator(exam.code, token);
             onUpdate();
-        } catch (e) {
+        } catch {
             alert('Gagal menghapus link.');
         } finally {
             setIsLoading(false);

@@ -1,6 +1,6 @@
-
+ 
 import { supabase } from '../lib/supabase';
-import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig } from '../types';
+import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
@@ -33,7 +33,7 @@ const urlToBase64 = async (url: string): Promise<string | null> => {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
-    } catch (error) {
+    } catch {
         // Attempt 2: Image Object with CrossOrigin (Works if server supports it but fetch failed for some reason)
         return new Promise((resolve) => {
             const img = new Image();
@@ -47,7 +47,7 @@ const urlToBase64 = async (url: string): Promise<string | null> => {
                 try {
                     ctx.drawImage(img, 0, 0);
                     resolve(canvas.toDataURL('image/png'));
-                } catch (e) {
+                } catch {
                     // Canvas tainted - cannot export
                     console.warn("Canvas tainted, cannot convert to base64:", url);
                     resolve(null);
@@ -118,7 +118,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     try {
         const stored = localStorage.getItem(STORAGE_KEY_ORDER);
         if (stored) orderMap = JSON.parse(stored);
-    } catch(e) {}
+    } catch { /* ignore */ }
 
     if (!orderMap) {
         let questionsToProcess = [...exam.questions];
@@ -144,7 +144,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
         });
 
         orderMap = { qOrder, optOrders };
-        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch(e) {}
+        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch { /* ignore */ }
     }
 
     const questionMap = new Map(exam.questions.map(q => [q.id, q]));
@@ -179,7 +179,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
 };
 
 class StorageService {
-    private syncQueue: any[] = [];
+    private syncQueue: Result[] = [];
     private isProcessingQueue = false;
 
     constructor() {
@@ -188,7 +188,7 @@ class StorageService {
             if (savedQueue) {
                 this.syncQueue = JSON.parse(savedQueue);
             }
-        } catch(e) {}
+        } catch { /* ignore */ }
         
         if (typeof window !== 'undefined') {
             window.addEventListener('online', () => this.processQueue());
@@ -262,7 +262,7 @@ class StorageService {
             return doc.body.innerHTML;
         };
 
-        let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
+        const processedQuestions = JSON.parse(JSON.stringify(exam.questions));
         
         for (const q of processedQuestions) {
             // Process HTML content
@@ -339,15 +339,15 @@ class StorageService {
       if (questions[qIndex].questionType === 'TRUE_FALSE') {
           try {
               questions[qIndex].trueFalseRows = JSON.parse(newCorrectAnswer);
-          } catch (e) {
-              console.error("Failed to parse TRUE_FALSE rows", e);
+          } catch {
+              console.error("Failed to parse TRUE_FALSE rows");
               throw new Error("Invalid data format for TRUE_FALSE");
           }
       } else if (questions[qIndex].questionType === 'MATCHING') {
           try {
               questions[qIndex].matchingPairs = JSON.parse(newCorrectAnswer);
-          } catch (e) {
-              console.error("Failed to parse MATCHING pairs", e);
+          } catch {
+              console.error("Failed to parse MATCHING pairs");
               throw new Error("Invalid data format for MATCHING");
           }
       } else {
@@ -371,7 +371,7 @@ class StorageService {
       if (resultsError) throw resultsError;
 
       // 5. Recalculate Scores
-      const updates = results.map((r: any) => {
+      const updates = results.map((r: Result) => {
           const answers = r.answers;
           let correctCount = 0;
           let emptyCount = 0;
@@ -407,7 +407,7 @@ class StorageService {
                       try {
                           const parsed = JSON.parse(str);
                           if (Array.isArray(parsed)) return parsed.map(String);
-                      } catch(e) {}
+                      } catch { /* ignore */ }
                       return str.split(',').map(s => s.trim()).filter(s => s !== '');
                   };
                   const sSet = new Set(parseList(studentAns).map(normalize));
@@ -418,13 +418,13 @@ class StorageService {
                    try {
                       const ansObj = JSON.parse(ans);
                       isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-                  } catch(e) { isCorrect = false; }
+                  } catch { isCorrect = false; }
               }
               else if (q.questionType === 'MATCHING') {
                   try {
                       const ansObj = JSON.parse(ans);
                       isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-                  } catch(e) { isCorrect = false; }
+                  } catch { isCorrect = false; }
               }
 
               if (isCorrect) correctCount++;
@@ -453,7 +453,7 @@ class StorageService {
 
   // --- INDEXED DB METHODS (LOCAL PROGRESS) ---
   
-  async saveLocalProgress(key: string, data: any): Promise<void> {
+  async saveLocalProgress(key: string, data: unknown): Promise<void> {
       try {
           const db = await initDB();
           return new Promise((resolve, reject) => {
@@ -463,13 +463,13 @@ class StorageService {
               tx.oncomplete = () => resolve();
               tx.onerror = () => reject(tx.error);
           });
-      } catch(e) { 
+      } catch { 
           // Fallback to LocalStorage if IDB fails
-          try { localStorage.setItem(key, JSON.stringify(data)); } catch(err) {}
+          try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* ignore */ }
       }
   }
 
-  async getLocalProgress(key: string): Promise<any | null> {
+  async getLocalProgress(key: string): Promise<unknown | null> {
       try {
           const db = await initDB();
           return new Promise((resolve, reject) => {
@@ -479,12 +479,12 @@ class StorageService {
               req.onsuccess = () => resolve(req.result ? req.result.data : null);
               req.onerror = () => reject(req.error);
           });
-      } catch(e) { 
+      } catch { 
           // Fallback to LocalStorage
           try { 
               const item = localStorage.getItem(key);
               return item ? JSON.parse(item) : null;
-          } catch(err) { return null; }
+          } catch { return null; }
       }
   }
 
@@ -493,14 +493,14 @@ class StorageService {
           const db = await initDB();
           const tx = db.transaction(STORE_PROGRESS, 'readwrite');
           tx.objectStore(STORE_PROGRESS).delete(key);
-      } catch(e) {
-          try { localStorage.removeItem(key); } catch(err) {}
+      } catch {
+          try { localStorage.removeItem(key); } catch { /* ignore */ }
       }
   }
   
   // --- AUTH METHODS ---
   async getCurrentUser(): Promise<TeacherProfile | null> {
-      const auth = supabase.auth as any;
+      const auth = supabase.auth;
       const { data: { session } } = await auth.getSession();
       if (!session?.user) return null;
 
@@ -593,7 +593,7 @@ class StorageService {
       // Tunggu sebentar untuk trigger
       await new Promise(r => setTimeout(r, 500));
 
-      let profile = await this.getCurrentUser();
+      const profile = await this.getCurrentUser();
       
       if (!profile) throw new Error('Gagal memuat profil pengguna. Silakan hubungi admin.');
       return profile;
@@ -627,11 +627,11 @@ class StorageService {
       const { data: profiles, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
       
-      return profiles.map((p: any) => ({
-          id: p.id,
-          fullName: p.full_name,
+      return profiles.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          fullName: p.full_name as string,
           accountType: p.role as AccountType,
-          school: p.school,
+          school: p.school as string,
           email: '-' 
       }));
   }
@@ -684,15 +684,15 @@ class StorageService {
 
     const examMap: Record<string, Exam> = {};
     if (data) {
-        data.forEach((row: any) => {
-            examMap[row.code] = {
-                code: row.code,
-                authorId: row.author_id,
-                authorSchool: row.school,
-                config: row.config,
-                questions: row.questions,
-                status: row.status,
-                createdAt: row.created_at
+        data.forEach((row: Record<string, unknown>) => {
+            examMap[row.code as string] = {
+                code: row.code as string,
+                authorId: row.author_id as string,
+                authorSchool: row.school as string,
+                config: row.config as ExamConfig,
+                questions: row.questions as Question[],
+                status: row.status as 'DRAFT' | 'PUBLISHED',
+                createdAt: row.created_at as string
             };
         });
     }
@@ -701,7 +701,6 @@ class StorageService {
 
   async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
       let data = null;
-      let errorDetails = null;
 
       // ATTEMPT 1: Full data fetch (with author profile)
       // This is expected to FAIL for anonymous students if RLS on 'profiles' restricts access.
@@ -715,7 +714,7 @@ class StorageService {
           if (!fullError && fullData) {
               data = fullData;
           }
-      } catch (e) {
+      } catch {
           // Ignore failures here, we proceed to fallback
           console.warn("Attempt 1 (Full Fetch) failed, retrying with fallback...");
       }
@@ -732,7 +731,6 @@ class StorageService {
           
           if (simpleError) {
               console.error("Attempt 2 (Fallback) failed:", simpleError);
-              errorDetails = simpleError;
           } else {
               data = simpleData;
           }
@@ -763,7 +761,7 @@ class StorageService {
   }
 
   async saveExam(exam: Exam): Promise<void> {
-    let processedQuestions = JSON.parse(JSON.stringify(exam.questions));
+    const processedQuestions = JSON.parse(JSON.stringify(exam.questions));
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
@@ -1038,7 +1036,7 @@ class StorageService {
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
           await this.deleteExam(exam.code);
-      } catch (cloudError: any) {
+      } catch (cloudError) {
           console.error("Cloud upload failed:", cloudError);
           // FALLBACK: Generate Blob URL for local download
           const blob = new Blob([jsonString], { type: "application/json" });
@@ -1114,7 +1112,7 @@ class StorageService {
       const passingRate = total > 0 ? (passing / total) * 100 : 0;
 
       // Question Stats Snapshot (JSONB)
-      const questionStats: any[] = exam.questions
+      const questionStats: Record<string, unknown>[] = exam.questions
           .filter(q => q.questionType !== 'INFO')
           .map(q => {
               let correctCount = 0;
@@ -1156,16 +1154,16 @@ class StorageService {
       };
   }
 
-  private isAnswerCorrect(q: Question, ans: any): boolean {
+  private isAnswerCorrect(q: Question, ans: unknown): boolean {
       if (!ans) return false;
       const normalize = (s: string) => String(s).trim().toLowerCase();
       
       if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-          return normalize(ans) === normalize(q.correctAnswer || '');
+          return normalize(ans as string) === normalize(q.correctAnswer || '');
       }
       if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
           // Simplified check
-          return normalize(ans).length === normalize(q.correctAnswer || '').length; 
+          return normalize(ans as string).length === normalize(q.correctAnswer || '').length; 
       }
       return false; // Other types ignored for simple stats
   }
@@ -1211,10 +1209,10 @@ class StorageService {
           school: s.school_name,
           avg: s.average_score,
           participants: s.total_participants,
-          weakness_count: s.question_stats.filter((qs: any) => qs.correct_rate < 50).length,
+          weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 50).length,
           top_difficulty_questions: s.question_stats
-              .filter((qs: any) => qs.correct_rate < 40)
-              .map((qs: any) => `Q${qs.id.split('-')[1] || qs.id}: ${qs.correct_rate}%`)
+              .filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 40)
+              .map((qs: Record<string, unknown>) => `Q${(qs.id as string).split('-')[1] || qs.id}: ${qs.correct_rate}%`)
               .slice(0, 3)
       }));
 
@@ -1272,11 +1270,12 @@ class StorageService {
           });
 
           return response.text || "Gagal menghasilkan analisis.";
-      } catch (e: any) {
+      } catch (e) {
           console.error("Gemini Error:", e);
           
           // Friendly Error UI for Rate Limits (429)
-          if (e.message?.includes('429') || e.status === 429) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          if (errorMsg.includes('429') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
              return `
                 <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
                     <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
@@ -1294,7 +1293,7 @@ class StorageService {
       const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
       if (error || !data) return null;
 
-      let examData: Exam = {
+      const examData: Exam = {
           code: data.code, authorId: data.author_id, authorSchool: data.school,
           config: data.config, questions: data.questions, status: data.status, createdAt: data.created_at
       };
@@ -1321,7 +1320,7 @@ class StorageService {
                               reader.readAsDataURL(data);
                           });
                       }
-                  } catch (e) {
+                  } catch {
                       console.warn("Direct download failed for archive, falling back to fetch:", bucketPath);
                   }
               }
@@ -1381,10 +1380,11 @@ class StorageService {
     const { data, error } = await query;
     if (error) return [];
     
-    return data.map((row: any) => {
+    return data.map((row: Record<string, unknown>) => {
         // Derive absent number if not present in student object
-        let absentNumber = row.student?.absentNumber || '00';
-        if (absentNumber === '00' && row.student_id) {
+        const student = row.student as Record<string, string> | undefined;
+        let absentNumber = student?.absentNumber || '00';
+        if (absentNumber === '00' && typeof row.student_id === 'string') {
             const parts = row.student_id.split('-');
             if (parts.length >= 2) {
                 const lastPart = parts[parts.length - 1];
@@ -1397,27 +1397,27 @@ class StorageService {
         }
 
         return {
-            id: row.id, // Primary Key
+            id: row.id as number, // Primary Key
             student: { 
-                studentId: row.student_id, 
-                fullName: row.student_name, 
-                class: row.class_name, 
+                studentId: row.student_id as string, 
+                fullName: row.student_name as string, 
+                class: row.class_name as string, 
                 absentNumber: absentNumber 
             },
-            examCode: row.exam_code, 
-            answers: row.answers || {}, // CRITICAL FIX: Fallback to empty object if null
-            score: row.score, 
-            correctAnswers: row.correct_answers,
-            totalQuestions: row.total_questions, 
-            status: row.status, 
-            activityLog: row.activity_log,
-            timestamp: new Date(row.updated_at).getTime(), 
-            location: row.location
+            examCode: row.exam_code as string, 
+            answers: (row.answers as Record<string, string>) || {}, // CRITICAL FIX: Fallback to empty object if null
+            score: row.score as number, 
+            correctAnswers: row.correct_answers as number,
+            totalQuestions: row.total_questions as number, 
+            status: row.status as ResultStatus, 
+            activityLog: row.activity_log as string[],
+            timestamp: new Date(row.updated_at as string).getTime(), 
+            location: row.location as { lat: number; lng: number } | undefined
         };
     });
   }
 
-  async submitExamResult(resultPayload: any): Promise<any> {
+  async submitExamResult(resultPayload: Result): Promise<Result> {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this.addToQueue(resultPayload);
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
@@ -1441,8 +1441,6 @@ class StorageService {
                     total_questions: resultPayload.totalQuestions || 0,
                     location: resultPayload.location,
                     updated_at: new Date().toISOString()
-                    // NOTE: We intentionally DO NOT update student_id, student_name, class_name here.
-                    // This allows teacher edits to persist even if the student client has old data.
                 })
                 .eq('id', resultPayload.student.resultId)
                 .select()
@@ -1481,43 +1479,45 @@ class StorageService {
             student: { ...resultPayload.student, resultId: data?.id },
             isSynced: true 
         };
-    } catch (error: any) {
+    } catch (error) {
         console.error("CRITICAL DB ERROR:", error);
         
-        const isNetworkError = !error.code && error.message === 'Failed to fetch'; 
+        const errObj = error as Record<string, unknown>;
+        const isNetworkError = !errObj.code && errObj.message === 'Failed to fetch'; 
         
         if (isNetworkError) {
             console.warn("Network glitch, adding to queue...");
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
         } else {
-             throw new Error("Gagal menyimpan ke server: " + (error.message || "Izin database ditolak (RLS)."));
+             throw new Error("Gagal menyimpan ke server: " + (errObj.message || "Izin database ditolak (RLS)."));
         }
     }
   }
 
-  private addToQueue(payload: any) {
+  private addToQueue(payload: Result) {
       this.syncQueue = this.syncQueue.filter(item => !(item.examCode === payload.examCode && item.student.studentId === payload.student.studentId));
-      this.syncQueue.push({ ...payload, queuedAt: Date.now() });
+      this.syncQueue.push({ ...payload, timestamp: Date.now() });
       this.saveQueue();
       if(typeof navigator === 'undefined' || navigator.onLine !== false) this.processQueue(); 
   }
 
   private saveQueue() {
-      try { localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue)); } catch(e) {}
+      try { localStorage.setItem('exam_sync_queue', JSON.stringify(this.syncQueue)); } catch { /* ignore */ }
   }
 
   async processQueue() {
       if (this.isProcessingQueue || this.syncQueue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
       this.isProcessingQueue = true;
       const queueCopy = [...this.syncQueue];
-      const remainingQueue: any[] = [];
+      const remainingQueue: Result[] = [];
       
       for (const payload of queueCopy) {
           try {
+             const student = payload.student;
              const { error } = await supabase.from('results').upsert({
-                exam_code: payload.examCode, student_id: payload.student.studentId, student_name: payload.student.fullName,
-                class_name: payload.student.class, answers: payload.answers || {}, status: payload.status,
+                exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
+                class_name: student.class, answers: payload.answers || {}, status: payload.status,
                 activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
                 total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
@@ -1529,7 +1529,7 @@ class StorageService {
                      throw error; 
                  }
              }
-          } catch (e) {
+          } catch {
               remainingQueue.push(payload);
           }
       }
@@ -1625,7 +1625,7 @@ class StorageService {
 
   // --- COLD DATA (CLOUD ARCHIVE) METHODS ---
 
-  async uploadArchive(examCode: string, jsonString: string, metadata?: any): Promise<string> {
+  async uploadArchive(examCode: string, jsonString: string, metadata?: Record<string, unknown>): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
       
       // Default simple filename
@@ -1663,7 +1663,7 @@ class StorageService {
       return data?.path || filename;
   }
 
-  async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: any}[]> {
+  async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: Record<string, unknown>}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
           limit: 100,
           offset: 0,
@@ -1676,9 +1676,9 @@ class StorageService {
           return [];
       }
       
-      return data.map((f: any) => {
+      return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
           let metadata = null;
-          if (f.name.includes('_meta_')) {
+          if (typeof f.name === 'string' && f.name.includes('_meta_')) {
               try {
                   const parts = f.name.split('_meta_');
                   if (parts.length > 1) {
@@ -1699,21 +1699,21 @@ class StorageService {
                           participantCount: parsed.p // NEW: Parse Participant Count
                       };
                   }
-              } catch (e) {
+              } catch {
                   console.warn("Failed to parse metadata from filename:", f.name);
               }
           }
           
-          return {
-              name: f.name,
-              created_at: f.created_at,
-              size: f.metadata?.size || 0,
+              return {
+              name: f.name as string,
+              created_at: f.created_at as string,
+              size: (f.metadata as {size?: number})?.size || 0,
               metadata
           };
       });
   }
 
-  async downloadArchive(path: string): Promise<any> {
+  async downloadArchive(path: string): Promise<Record<string, unknown>> {
       const { data, error } = await supabase.storage.from('archives').download(path);
       if (error) throw error;
       
@@ -1741,7 +1741,7 @@ class StorageService {
       const token = (typeof crypto !== 'undefined' && crypto.randomUUID) 
           ? crypto.randomUUID() 
           : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
               return v.toString(16);
             });
       const newCollaborator = {
