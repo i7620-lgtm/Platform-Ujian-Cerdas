@@ -1,12 +1,12 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
-import { ChartBarIcon, CheckCircleIcon, XMarkIcon, ListBulletIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
+import { ChartBarIcon, CheckCircleIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
 import { parseList } from '../examUtils';
 
 // --- SHARED COMPONENTS ---
 
-export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<any> }> = ({ label, value, color, icon: Icon }) => {
+export const StatWidget: React.FC<{ label: string; value: string | number; color: string; icon?: React.FC<React.SVGProps<SVGSVGElement>> }> = ({ label, value, color, icon: Icon }) => {
     const colorName = color.split('-')[1] || 'gray';
     return (
         <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center gap-4 transition-all hover:shadow-md flex-1 print:border-slate-300 print:shadow-none print:rounded-lg">
@@ -24,7 +24,7 @@ export const StatWidget: React.FC<{ label: string; value: string | number; color
 export const QuestionAnalysisItem: React.FC<{ 
     q: Question; 
     index: number; 
-    stats: any; 
+    stats: { correctRate: number }; 
     examResults: Result[];
     onUpdateKey?: (qId: string, newKey: string) => Promise<void>;
 }> = ({ q, index, stats, examResults, onUpdateKey }) => {
@@ -32,7 +32,7 @@ export const QuestionAnalysisItem: React.FC<{
     const [isEditingKey, setIsEditingKey] = useState(false);
     
     // Initialize tempKey based on question type
-    const getInitialKey = () => {
+    const getInitialKey = React.useCallback(() => {
         if (q.questionType === 'TRUE_FALSE') {
             if (q.trueFalseRows && q.trueFalseRows.length > 0) return JSON.stringify(q.trueFalseRows);
             // Fallback: try to parse correctAnswer if it looks like JSON array
@@ -46,7 +46,7 @@ export const QuestionAnalysisItem: React.FC<{
             return '[]';
         }
         return q.correctAnswer || '';
-    };
+    }, [q]);
 
     const [tempKey, setTempKey] = useState(getInitialKey());
     const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +54,7 @@ export const QuestionAnalysisItem: React.FC<{
     // Update tempKey when q changes (e.g. after save)
     useEffect(() => {
         setTempKey(getInitialKey());
-    }, [q]);
+    }, [getInitialKey]);
 
     const handleSaveKey = async () => {
         if (onUpdateKey) {
@@ -244,7 +244,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                 {(() => {
                                                     try {
                                                         const rows = JSON.parse(tempKey);
-                                                        return rows.map((row: any, i: number) => (
+                                                        return rows.map((row: { text: string; answer: boolean }, i: number) => (
                                                             <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                                                                 <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
                                                                 <div className="flex gap-2 shrink-0">
@@ -273,7 +273,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 </div>
                                                             </div>
                                                         ));
-                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                    } catch { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
                                                 })()}
                                             </div>
                                         ) : q.questionType === 'MATCHING' ? (
@@ -281,7 +281,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                 {(() => {
                                                     try {
                                                         const pairs = JSON.parse(tempKey);
-                                                        return pairs.map((pair: any, i: number) => (
+                                                        return pairs.map((pair: { left: string; right: string }, i: number) => (
                                                             <div key={i} className="flex flex-col gap-1 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
                                                                 <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Pasangan {i+1}</div>
                                                                 <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700" dangerouslySetInnerHTML={{__html: pair.left}}></div>
@@ -299,7 +299,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 />
                                                             </div>
                                                         ));
-                                                    } catch (e) { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
+                                                    } catch { return <p className="text-rose-500 text-xs italic">Gagal memuat data (format tidak valid)</p>; }
                                                 })()}
                                             </div>
                                         ) : (
@@ -386,12 +386,12 @@ export const QuestionAnalysisItem: React.FC<{
                                         try {
                                             if (ans.startsWith('{')) {
                                                 const parsed = JSON.parse(ans);
-                                                displayAns = Object.entries(parsed).map(([k,v]) => `${v}`).join(', ');
+                                                displayAns = Object.entries(parsed).map(([,v]) => `${v}`).join(', ');
                                             } else if (ans.startsWith('[')) {
                                                 const parsed = JSON.parse(ans);
                                                 displayAns = parsed.join(', ');
                                             }
-                                        } catch(e){}
+                                        } catch { /* ignore */ }
 
                                         return (
                                             <li key={idx} className={`text-xs flex justify-between border-b border-slate-100 dark:border-slate-700 pb-1 last:border-0 items-center ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 p-1 rounded -mx-1 border-emerald-100 dark:border-emerald-800' : 'text-slate-600 dark:text-slate-300'}`}>
@@ -418,18 +418,22 @@ export const QuestionAnalysisItem: React.FC<{
     );
 };
 
+const calculateTimeLeft = (exam: Exam) => {
+    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+    const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
+    const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
+    const now = Date.now();
+    if (now < examStartDateTime.getTime()) { return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now }; }
+    const timeLeft = Math.max(0, examEndTime - now);
+    return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
+};
+
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
-    const calculateTimeLeft = () => {
-        const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-        const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
-        const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
-        const now = Date.now();
-        if (now < examStartDateTime.getTime()) { return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now }; }
-        const timeLeft = Math.max(0, examEndTime - now);
-        return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
-    };
-    const [timeState, setTimeState] = useState(calculateTimeLeft());
-    useEffect(() => { const timer = setInterval(() => { setTimeState(calculateTimeLeft()); }, 1000); return () => clearInterval(timer); }, [exam]);
+    const [timeState, setTimeState] = useState(() => calculateTimeLeft(exam));
+    useEffect(() => { 
+        const timer = setInterval(() => { setTimeState(calculateTimeLeft(exam)); }, 1000); 
+        return () => clearInterval(timer); 
+    }, [exam]);
     if (timeState.status === 'FINISHED') return (<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-300 border border-gray-200 dark:border-slate-600`}>Selesai</span>);
     if (timeState.status === 'UPCOMING') return (<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800`}>Belum Dimulai</span>);
     const hours = Math.floor(timeState.diff / (1000 * 60 * 60)); const minutes = Math.floor((timeState.diff % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((timeState.diff % (1000 * 60)) / 1000); const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
