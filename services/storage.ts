@@ -1,4 +1,4 @@
-
+ 
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
