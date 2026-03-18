@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType } from "../../types";
+import { markdownToHtml } from "../teacher/examUtils";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || "" });
 
@@ -22,7 +23,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Menjodohkan: Buatlah 3-5 pasangan item kiri dan kanan. Kembalikan dalam format array of objects di properti 'matchingPairs' dengan format { "left": "item kiri", "right": "pasangan kanan" }.
 
     Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan:
-    - Gunakan tabel Markdown jika diperlukan untuk menyajikan data.
+    - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. Pastikan menggunakan karakter newline (\\n) yang benar pada tabel agar dapat dirender.
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
     - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
@@ -90,17 +91,27 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         }
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Gemini API Error:", error);
-    const errorMessage = error?.message?.toLowerCase() || "";
-    if (error?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
+    const err = error as Error & { status?: number };
+    const errorMessage = err?.message?.toLowerCase() || "";
+    if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
       throw new Error("QUOTA_EXCEEDED");
     }
-    throw new Error(`API Error: ${error?.message || "Terjadi kesalahan jaringan/server."}`);
+    throw new Error(`API Error: ${err?.message || "Terjadi kesalahan jaringan/server."}`);
   }
 
   try {
-    const questions: any[] = JSON.parse(response.text || "[]");
+    const questions: {
+      id: string;
+      questionText: string;
+      options?: string[];
+      correctAnswer?: string;
+      trueFalseRows?: { text: string; answer: boolean }[];
+      matchingPairs?: { left: string; right: string }[];
+      scoreWeight?: number;
+      imageSearchKeyword?: string;
+    }[] = JSON.parse(response.text || "[]");
 
     // Map questionType based on config.type
     let mappedQuestionType: QuestionType = 'ESSAY';
@@ -117,12 +128,26 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     }
 
     const finalQuestions: Question[] = questions.map(q => {
+        const questionText = markdownToHtml(q.questionText || '');
+        const options = q.options ? q.options.map((opt: string) => markdownToHtml(opt || '')) : undefined;
+        
+        let correctAnswer = q.correctAnswer || '';
+        if (mappedQuestionType === 'MULTIPLE_CHOICE') {
+            correctAnswer = markdownToHtml(correctAnswer);
+        } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            // Split by comma, trim, map to html, then JSON stringify
+            const answers = correctAnswer.split(',').map((a: string) => markdownToHtml(a.trim()));
+            correctAnswer = JSON.stringify(answers);
+        } else if (mappedQuestionType === 'FILL_IN_THE_BLANK' || mappedQuestionType === 'ESSAY') {
+            correctAnswer = markdownToHtml(correctAnswer);
+        }
+
         const mappedQ: Question = {
             id: q.id,
-            questionText: q.questionText,
+            questionText: questionText,
             questionType: mappedQuestionType,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
+            options: options,
+            correctAnswer: correctAnswer,
             scoreWeight: q.scoreWeight || 1,
             kisiKisi: config.blueprint,
             level: config.difficulty,
@@ -132,10 +157,13 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle true false rows if needed
         if (mappedQuestionType === 'TRUE_FALSE') {
             if (q.trueFalseRows && q.trueFalseRows.length > 0) {
-                mappedQ.trueFalseRows = q.trueFalseRows;
+                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: boolean }) => ({
+                    text: markdownToHtml(r.text || ''),
+                    answer: r.answer
+                }));
             } else if (q.options) {
                 mappedQ.trueFalseRows = [
-                    { text: 'Pernyataan 1', answer: q.correctAnswer?.toLowerCase().includes('benar') || false }
+                    { text: markdownToHtml('Pernyataan 1'), answer: q.correctAnswer?.toLowerCase().includes('benar') || false }
                 ];
             }
         }
@@ -143,10 +171,13 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle matching pairs if needed
         if (mappedQuestionType === 'MATCHING') {
             if (q.matchingPairs && q.matchingPairs.length > 0) {
-                mappedQ.matchingPairs = q.matchingPairs;
+                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({
+                    left: markdownToHtml(p.left || ''),
+                    right: markdownToHtml(p.right || '')
+                }));
             } else {
                 mappedQ.matchingPairs = [
-                    { left: 'Item 1', right: 'Pasangan 1' }
+                    { left: markdownToHtml('Item 1'), right: markdownToHtml('Pasangan 1') }
                 ];
             }
         }
