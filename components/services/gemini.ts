@@ -83,7 +83,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               explanation: { type: Type.STRING },
               scoreWeight: { type: Type.NUMBER }
             },
-            required: ["id", "questionText", "correctAnswer"]
+            required: config.includeImages 
+              ? ["id", "questionText", "correctAnswer", "imageSearchKeyword"] 
+              : ["id", "questionText", "correctAnswer"]
           }
         }
       }
@@ -170,7 +172,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               const pageId = Object.keys(pages)[0];
               const imageInfo = pages[pageId]?.imageinfo?.[0];
               if (imageInfo?.thumburl) {
-                q.imageUrl = imageInfo.thumburl;
+                q.questionText = `<img src="${imageInfo.thumburl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; display: block;" /><br/>${q.questionText}`;
               }
             }
           } catch (imgError) {
