@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, LockClosedIcon, SunIcon, MoonIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
@@ -299,7 +299,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const totalQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
     const answeredCount = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answers)).length;
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-    const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 max-w-full h-auto" ');
+    const optimizeHtml = (html: string) => html.replace(/<img /g, '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 max-w-full max-h-[50vh] object-contain h-auto" ');
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
