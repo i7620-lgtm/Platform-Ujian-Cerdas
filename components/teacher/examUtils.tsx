@@ -1,4 +1,4 @@
-  
+ 
 import type { Question, QuestionType, Exam, Result } from '../../types';
 
 // --- INTERFACES ---
@@ -1096,14 +1096,14 @@ export const markdownToHtml = (markdown: string): string => {
     // 1. Extract Math to prevent marked from messing it up
     const mathBlocks: string[] = [];
     let processedMarkdown = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
-        const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`;
+        const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
         mathBlocks.push(latex);
         return placeholder;
     });
     
     const mathInlines: string[] = [];
     processedMarkdown = processedMarkdown.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
-        const placeholder = `__MATH_INLINE_${mathInlines.length}__`;
+        const placeholder = `%%%MATH_INLINE_${mathInlines.length}%%%`;
         mathInlines.push(latex);
         return placeholder;
     });
@@ -1111,7 +1111,7 @@ export const markdownToHtml = (markdown: string): string => {
     // 2. Extract Audio
     const audios: string[] = [];
     processedMarkdown = processedMarkdown.replace(/\[\[audio:([^\]]+)\]\]/g, (match, src) => {
-        const placeholder = `__AUDIO_${audios.length}__`;
+        const placeholder = `%%%AUDIO_${audios.length}%%%`;
         audios.push(src);
         return placeholder;
     });
@@ -1121,7 +1121,7 @@ export const markdownToHtml = (markdown: string): string => {
 
     // 4. Restore Audio
     audios.forEach((src, i) => {
-        html = html.replace(`__AUDIO_${i}__`, `<br/><audio controls src="${src}" style="max-width: 100%; display: block; margin: 8px 0;"></audio><br/>`);
+        html = html.replace(`%%%AUDIO_${i}%%%`, `<br/><audio controls src="${src}" style="max-width: 100%; display: block; margin: 8px 0;"></audio><br/>`);
     });
 
     // 5. Restore Math
@@ -1137,11 +1137,11 @@ export const markdownToHtml = (markdown: string): string => {
     };
 
     mathBlocks.forEach((latex, i) => {
-        html = html.replace(`__MATH_BLOCK_${i}__`, renderMath(latex, true));
+        html = html.replace(`%%%MATH_BLOCK_${i}%%%`, renderMath(latex, true));
     });
 
     mathInlines.forEach((latex, i) => {
-        html = html.replace(`__MATH_INLINE_${i}__`, renderMath(latex, false));
+        html = html.replace(`%%%MATH_INLINE_${i}%%%`, renderMath(latex, false));
     });
 
     return html.trim();
