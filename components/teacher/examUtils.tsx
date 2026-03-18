@@ -1088,71 +1088,61 @@ export const htmlToMarkdown = (html: string): string => {
     return markdown.trim();
 };
 
+import { marked } from 'marked';
+
 export const markdownToHtml = (markdown: string): string => {
     if (!markdown) return '';
-    let html = markdown;
+    
+    // 1. Extract Math to prevent marked from messing it up
+    const mathBlocks: string[] = [];
+    let processedMarkdown = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+        const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`;
+        mathBlocks.push(latex);
+        return placeholder;
+    });
+    
+    const mathInlines: string[] = [];
+    processedMarkdown = processedMarkdown.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
+        const placeholder = `__MATH_INLINE_${mathInlines.length}__`;
+        mathInlines.push(latex);
+        return placeholder;
+    });
 
-    // 1. Math (Inline)
-    // From: $\frac{1}{2}$
-    // To: <span ...>...</span>
-    // Note: We need to render this using KaTeX if available, or just restore the wrapper structure.
-    // Since this runs on the client, we can try to use KaTeX.
-    const mathRegex = /\$([^$]+)\$/g;
-    html = html.replace(mathRegex, (match, latex) => {
+    // 2. Extract Audio
+    const audios: string[] = [];
+    processedMarkdown = processedMarkdown.replace(/\[\[audio:([^\]]+)\]\]/g, (match, src) => {
+        const placeholder = `__AUDIO_${audios.length}__`;
+        audios.push(src);
+        return placeholder;
+    });
+
+    // 3. Parse with marked
+    let html = marked.parse(processedMarkdown) as string;
+
+    // 4. Restore Audio
+    audios.forEach((src, i) => {
+        html = html.replace(`__AUDIO_${i}__`, `<br/><audio controls src="${src}" style="max-width: 100%; display: block; margin: 8px 0;"></audio><br/>`);
+    });
+
+    // 5. Restore Math
+    const renderMath = (latex: string, displayMode: boolean) => {
         let rendered = latex;
-        if ((window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex) {
+        const w = window as unknown as { katex?: { renderToString: (latex: string, options: { throwOnError: boolean, displayMode: boolean }) => string } };
+        if (w.katex) {
             try {
-                rendered = (window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex.renderToString(latex, { throwOnError: false, displayMode: false });
+                rendered = w.katex.renderToString(latex, { throwOnError: false, displayMode });
             } catch { /* ignore */ }
         }
-        return `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${rendered}</span>&#8203;`;
+        return `&#8203;<span class="math-visual" style="display: ${displayMode ? 'block' : 'inline-block'}; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${rendered}</span>&#8203;`;
+    };
+
+    mathBlocks.forEach((latex, i) => {
+        html = html.replace(`__MATH_BLOCK_${i}__`, renderMath(latex, true));
     });
 
-    // 2. Images
-    // From: ![alt](src)
-    // To: <img ... />
-    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    html = html.replace(imgRegex, (match, alt, src) => {
-        return `<img src="${src}" alt="${alt}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />`;
+    mathInlines.forEach((latex, i) => {
+        html = html.replace(`__MATH_INLINE_${i}__`, renderMath(latex, false));
     });
 
-    // 3. Audio (Custom)
-    // From: [[audio:src]]
-    // To: <audio ... />
-    const audioRegex = /\[\[audio:([^\]]+)\]\]/g;
-    html = html.replace(audioRegex, (match, src) => {
-        return `<br/><audio controls src="${src}" style="max-width: 100%; display: block; margin: 8px 0;"></audio><br/>`;
-    });
-
-    // 4. Basic Formatting
-    html = html
-        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-        .replace(/\*(.*?)\*/g, '<i>$1</i>')
-        .replace(/__(.*?)__/g, '<u>$1</u>')
-        .replace(/~~(.*?)~~/g, '<s>$1</s>')
-        .replace(/\^(.*?)\^/g, '<sup>$1</sup>')
-        .replace(/~(.*?)~/g, '<sub>$1</sub>');
-
-    // 5. Lists
-    // Unordered
-    html = html.replace(/^- (.*)$/gm, '<li>$1</li>');
-    // Wrap li in ul (simplified) - this is tricky with regex alone for nested lists, 
-    // but for simple lists:
-    // We might need a more robust parser for lists if we want perfect reconstruction.
-    // For now, let's assume the editor handles list creation via execCommand, 
-    // so we just need to make sure it looks okay. 
-    // Actually, simple regex replacement for lists is often insufficient.
-    // Let's rely on the fact that the editor will wrap text in <p> or <div> usually.
-    
-    // 6. Newlines to <br> or <p>
-    // If double newline, make it a paragraph break
-    html = html.replace(/\n\n/g, '</p><p>');
-    html = html.replace(/\n/g, '<br/>');
-    
-    // Wrap everything in a p if not already
-    if (!html.startsWith('<')) {
-        html = `<p>${html}</p>`;
-    }
-
-    return html;
+    return html.trim();
 };
