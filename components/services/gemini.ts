@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai"; 
+import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType } from "../../types";
 import { markdownToHtml } from "../teacher/examUtils";
 
@@ -6,7 +6,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.A
 
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
   const imageInstruction = config.includeImages 
-    ? `\n    - imageSearchKeyword: kata kunci pencarian gambar dalam bahasa Inggris yang sangat spesifik dengan soal (maksimal 2-3 kata, contoh: "chloroplast structure", "borobudur temple", "mitosis"). WAJIB diisi karena pengguna meminta gambar referensi.`
+    ? `\n    - imageSearchKeyword: kata kunci pencarian gambar dalam bahasa Inggris yang sangat spesifik dan akurat untuk soal ini (maksimal 2-3 kata, contoh: "chloroplast structure", "borobudur temple", "mitosis"). WAJIB diisi karena pengguna meminta gambar referensi.`
     : '';
 
   const prompt = `
@@ -15,12 +15,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     Kisi-kisi materi: ${config.blueprint}.
     
     Aturan khusus untuk jenis soal:
-    - Pilihan Ganda: 1 jawaban benar, 4 opsi.
-    - Pilihan Ganda Kompleks: Bisa lebih dari 1 jawaban benar, sertakan semua jawaban benar di 'correctAnswer' (pisahkan dengan koma jika perlu).
-    - Uraian Singkat: Jawaban padat dan jelas.
-    - Esai: Jawaban berupa penjelasan mendalam.
-    - Benar/Salah: Buatlah 1-3 pernyataan terkait konteks soal. Kembalikan dalam format array of objects di properti 'trueFalseRows' dengan format { "text": "pernyataan", "answer": true/false }.
-    - Menjodohkan: Buatlah 3-5 pasangan item kiri dan kanan. Kembalikan dalam format array of objects di properti 'matchingPairs' dengan format { "left": "item kiri", "right": "pasangan kanan" }.
+    - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi).
+    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi).
+    - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
+    - Esai: Wajib isi 'correctAnswer' dengan penjelasan mendalam.
+    - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
+    - Menjodohkan: Wajib isi 'matchingPairs' berupa array of objects { "left": "item kiri", "right": "pasangan kanan" }. Buat 3-5 pasangan.
 
     Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan:
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. Pastikan menggunakan karakter newline (\\n) yang benar pada tabel agar dapat dirender.
@@ -38,6 +38,19 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - explanation: penjelasan singkat mengapa jawaban tersebut benar
     - scoreWeight: bobot nilai (angka)
   `;
+
+  let requiredFields = ["id", "questionText"];
+  if (config.includeImages) requiredFields.push("imageSearchKeyword");
+
+  if (config.type.toLowerCase().includes('pilihan ganda')) {
+      requiredFields.push("options", "correctAnswer");
+  } else if (config.type.toLowerCase().includes('benar/salah') || config.type.toLowerCase().includes('benar salah')) {
+      requiredFields.push("trueFalseRows");
+  } else if (config.type.toLowerCase().includes('menjodohkan')) {
+      requiredFields.push("matchingPairs");
+  } else {
+      requiredFields.push("correctAnswer");
+  }
 
   let response;
   try {
@@ -84,9 +97,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               explanation: { type: Type.STRING },
               scoreWeight: { type: Type.NUMBER }
             },
-            required: config.includeImages 
-              ? ["id", "questionText", "correctAnswer", "imageSearchKeyword"] 
-              : ["id", "questionText", "correctAnswer"]
+            required: requiredFields
           }
         }
       }
@@ -192,8 +203,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const originalQ = questions[i];
         if (originalQ.imageSearchKeyword) {
           try {
-            const keyword = encodeURIComponent(originalQ.imageSearchKeyword + " filetype:bitmap");
-            const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${keyword}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
+            const keyword = encodeURIComponent(originalQ.imageSearchKeyword);
+            const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${keyword}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
             
             const res = await fetch(url);
             const data = await res.json();
@@ -203,7 +214,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               const pageId = Object.keys(pages)[0];
               const imageInfo = pages[pageId]?.imageinfo?.[0];
               if (imageInfo?.thumburl) {
-                q.questionText = `<img src="${imageInfo.thumburl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; display: block;" /><br/>${q.questionText}`;
+                q.questionText = `<img src="${imageInfo.thumburl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 10px 0; display: block;" /><br/>${q.questionText}`;
               }
             }
           } catch (imgError) {
