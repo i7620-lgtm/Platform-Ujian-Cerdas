@@ -27,6 +27,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
     - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
+    - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
 
     Berikan respon dalam format JSON array yang berisi objek dengan properti:
     - id: string unik
