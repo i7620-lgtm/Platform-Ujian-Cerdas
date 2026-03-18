@@ -104,7 +104,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return <TutorialPage onBack={() => setIsMainGuideModalOpen(false)} />;
     }
 
-    const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
+    const handleQuestionsGenerated = (newQuestions: Question[], mode: 'manual' | 'auto') => { 
+        if (newQuestions.length === 0 && mode === 'manual') {
+            setManualMode(true);
+        } else {
+            setQuestions(prev => [...prev, ...newQuestions]); 
+            setManualMode(true); 
+        }
+    };
     
     const resetForm = () => { 
         setQuestions([]); 
