@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai"; 
 import { Question, QuizConfig, QuestionType } from "../../types";
 import { markdownToHtml } from "../teacher/examUtils";
 
