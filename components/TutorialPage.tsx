@@ -13,31 +13,210 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
             title: "1. Buat Akun & Masuk",
             desc: "Daftar sebagai pengajar menggunakan email aktif Anda. Akses dashboard guru yang intuitif untuk mulai mengelola kelas, bank soal, dan sesi ujian Anda. Mendukung Light/Dark mode untuk kenyamanan mata Anda.",
             icon: PresentationChartLineIcon,
-            color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+            color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 overflow-hidden select-none shadow-sm flex h-40">
+                    {/* Sidebar */}
+                    <div className="w-12 md:w-16 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col items-center py-3 gap-3 shrink-0">
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-indigo-600 flex items-center justify-center mb-2"><div className="w-3 h-3 md:w-4 md:h-4 bg-white rounded-sm"></div></div>
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex flex-col items-center justify-center gap-0.5"><div className="w-3 h-2.5 md:w-4 md:h-3 bg-indigo-500 rounded-sm"></div></div>
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded text-slate-400 flex flex-col items-center justify-center gap-0.5"><div className="w-3 h-2.5 md:w-4 md:h-3 bg-slate-300 dark:bg-slate-600 rounded-sm"></div></div>
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded text-slate-400 flex flex-col items-center justify-center gap-0.5"><div className="w-3 h-2.5 md:w-4 md:h-3 bg-slate-300 dark:bg-slate-600 rounded-sm"></div></div>
+                    </div>
+                    {/* Main Content */}
+                    <div className="flex-1 p-3 flex flex-col gap-3 overflow-hidden">
+                        {/* Topbar */}
+                        <div className="flex justify-between items-center">
+                            <div className="h-3 w-20 md:w-24 bg-slate-300 dark:bg-slate-600 rounded"></div>
+                            <div className="flex items-center gap-2">
+                                <div className="h-5 md:h-6 w-16 md:w-20 bg-indigo-600 rounded flex items-center justify-center"><div className="h-1.5 w-8 md:w-10 bg-white/80 rounded"></div></div>
+                                <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                            </div>
+                        </div>
+                        {/* Stats */}
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                                <div className="h-1.5 w-8 md:w-12 bg-slate-300 dark:bg-slate-600 rounded mb-1.5"></div>
+                                <div className="h-2.5 md:h-3 w-4 md:w-6 bg-slate-800 dark:bg-slate-200 rounded"></div>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                                <div className="h-1.5 w-8 md:w-12 bg-slate-300 dark:bg-slate-600 rounded mb-1.5"></div>
+                                <div className="h-2.5 md:h-3 w-4 md:w-6 bg-slate-800 dark:bg-slate-200 rounded"></div>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                                <div className="h-1.5 w-8 md:w-12 bg-slate-300 dark:bg-slate-600 rounded mb-1.5"></div>
+                                <div className="h-2.5 md:h-3 w-4 md:w-6 bg-slate-800 dark:bg-slate-200 rounded"></div>
+                            </div>
+                        </div>
+                        {/* List */}
+                        <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 flex-1 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="h-2 w-16 md:w-20 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                                <div className="h-1.5 w-8 md:w-10 bg-slate-300 dark:bg-slate-600 rounded"></div>
+                            </div>
+                            <div className="h-5 md:h-6 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700 flex items-center px-2 justify-between">
+                                <div className="h-1.5 w-16 md:w-24 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                                <div className="h-2.5 md:h-3 w-8 md:w-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "2. Editor Soal Canggih & Lengkap",
             desc: "Buat soal dengan mudah menggunakan editor WYSIWYG yang mendukung penyematan Audio, Gambar, dan Rumus Matematika (Equation). Tersedia berbagai jenis soal: Pilihan Ganda, Pilihan Ganda Kompleks, Benar/Salah, Menjodohkan, Isian Singkat, dan Uraian/Esai.",
             icon: CloudArrowUpIcon,
-            color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 overflow-hidden select-none shadow-sm p-3 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                        <div className="h-6 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center px-2 justify-between">
+                            <div className="h-1.5 w-16 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                            <div className="w-2 h-2 border-b-2 border-r-2 border-slate-400 transform rotate-45 mb-1"></div>
+                        </div>
+                        <div className="h-6 w-28 bg-gradient-to-r from-indigo-500 to-purple-500 rounded flex items-center justify-center gap-1 shadow-sm">
+                            <SparklesIcon className="w-3 h-3 text-white" />
+                            <div className="h-1.5 w-12 bg-white/90 rounded"></div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex flex-col">
+                        <div className="border-b border-slate-200 dark:border-slate-700 p-1.5 flex gap-1.5 bg-slate-50 dark:bg-slate-800/50">
+                            <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center"><div className="w-2 h-2 bg-slate-400 rounded-sm"></div></div>
+                            <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center"><div className="w-2 h-2 bg-slate-400 rounded-sm"></div></div>
+                            <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-0.5"></div>
+                            <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center"><div className="w-2 h-2 bg-slate-400 rounded-sm"></div></div>
+                        </div>
+                        <div className="p-2 h-12">
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded mb-1.5"></div>
+                            <div className="h-1.5 w-3/4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600"></div>
+                            <div className="flex-1 h-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center px-2"><div className="h-1.5 w-1/3 bg-slate-300 dark:bg-slate-600 rounded"></div></div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full border-4 border-emerald-500 bg-white dark:bg-slate-800"></div>
+                            <div className="flex-1 h-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded flex items-center px-2"><div className="h-1.5 w-1/2 bg-emerald-400 dark:bg-emerald-600 rounded"></div></div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "3. Konfigurasi & Keamanan Ekstra",
             desc: "Atur durasi, acak soal/opsi, dan aktifkan fitur GPS Location Tracking untuk memantau posisi siswa. Gunakan fitur Kartu Undangan untuk membagikan info ujian secara profesional. Tersedia juga fitur Preview Soal untuk mengecek tampilan sebelum dipublikasikan.",
             icon: SparklesIcon,
-            color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+            color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-2">
+                    <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 flex justify-between items-center shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="h-2 w-24 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                            <div className="h-1.5 w-32 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                        </div>
+                        <div className="w-8 h-4 bg-indigo-500 rounded-full relative shadow-inner"><div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div></div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 flex justify-between items-center shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="h-2 w-28 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                            <div className="h-1.5 w-36 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                        </div>
+                        <div className="w-8 h-4 bg-slate-200 dark:bg-slate-600 rounded-full relative shadow-inner"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div></div>
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="flex-1 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                            <div className="h-1.5 w-16 bg-slate-400 dark:bg-slate-500 rounded mb-1.5"></div>
+                            <div className="h-5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded flex items-center px-2"><div className="h-1.5 w-8 bg-slate-700 dark:bg-slate-300 rounded"></div></div>
+                        </div>
+                        <div className="flex-1 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                            <div className="h-1.5 w-16 bg-slate-400 dark:bg-slate-500 rounded mb-1.5"></div>
+                            <div className="h-5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded flex items-center px-2"><div className="h-1.5 w-12 bg-slate-700 dark:bg-slate-300 rounded"></div></div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "4. Bagikan & Monitor Real-time",
             desc: "Bagikan KODE UNIK atau QR Code. Pantau progres siswa secara Real-time. Sistem otomatis menyimpan jawaban siswa ke Cloud (Penyimpanan Aman). Jika waktu habis, jawaban siswa otomatis terkirim.",
             icon: ShareIcon,
-            color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+            color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-3">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 flex items-center justify-between shadow-sm">
+                        <div className="flex flex-col gap-1">
+                            <div className="h-1.5 w-16 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                            <div className="text-lg font-mono font-black tracking-widest text-indigo-600 dark:text-indigo-400">X7Y9Z</div>
+                        </div>
+                        <div className="w-10 h-10 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded flex items-center justify-center p-1">
+                            <div className="w-full h-full bg-slate-800 dark:bg-slate-200 rounded-sm" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px)'}}></div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 shadow-sm flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-400 text-[10px] font-bold">B</div>
+                                <div className="flex flex-col gap-0.5">
+                                    <div className="h-2 w-16 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                                    <div className="h-1.5 w-10 bg-emerald-500 rounded"></div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="h-1.5 w-8 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="w-3/4 h-full bg-emerald-500"></div></div>
+                            </div>
+                        </div>
+                        <div className="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-700 dark:text-amber-400 text-[10px] font-bold">S</div>
+                                <div className="flex flex-col gap-0.5">
+                                    <div className="h-2 w-16 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                                    <div className="h-1.5 w-12 bg-amber-500 rounded"></div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="h-1.5 w-8 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                                <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div className="w-2/5 h-full bg-amber-500"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "5. Analisis, Penilaian & Arsip",
             desc: "Analisis butir soal (tingkat kesulitan, daya beda) tersedia otomatis. Lakukan penilaian manual untuk soal Esai secara personal. Finalisasi data nilai, lalu unduh rekap nilai atau Cetak Arsip Soal & Jawaban dalam format PDF rapi.",
             icon: ChartBarIcon,
-            color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+            color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-3">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-sm">
+                        <div className="h-2 w-24 bg-slate-700 dark:bg-slate-300 rounded mb-3"></div>
+                        <div className="flex items-end gap-1.5 h-16 border-b border-slate-100 dark:border-slate-700 pb-1">
+                            <div className="flex-1 bg-emerald-400 rounded-t" style={{height: '85%'}}></div>
+                            <div className="flex-1 bg-emerald-400 rounded-t" style={{height: '65%'}}></div>
+                            <div className="flex-1 bg-amber-400 rounded-t" style={{height: '45%'}}></div>
+                            <div className="flex-1 bg-rose-400 rounded-t" style={{height: '25%'}}></div>
+                            <div className="flex-1 bg-emerald-400 rounded-t" style={{height: '95%'}}></div>
+                            <div className="flex-1 bg-amber-400 rounded-t" style={{height: '55%'}}></div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="flex-1 h-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm flex items-center justify-center gap-1.5">
+                            <div className="w-3 h-3 rounded-sm bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-sm"></div></div>
+                            <div className="h-1.5 w-12 bg-slate-600 dark:bg-slate-300 rounded"></div>
+                        </div>
+                        <div className="flex-1 h-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm flex items-center justify-center gap-1.5">
+                            <div className="w-3 h-3 rounded-sm bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-sm"></div></div>
+                            <div className="h-1.5 w-12 bg-slate-600 dark:bg-slate-300 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -46,25 +225,106 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
             title: "1. Akses Mudah Tanpa Akun",
             desc: "Cukup masukkan KODE UJIAN dan Nama untuk mulai mengerjakan. Tidak perlu repot mendaftar akun. Mendukung mode Light/Dark sesuai preferensi perangkat Anda.",
             icon: QrCodeIcon,
-            color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+            color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-4 max-w-[240px] mx-auto shadow-sm select-none flex flex-col items-center">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-3 shadow-md">
+                        <div className="w-6 h-6 bg-white rounded-sm"></div>
+                    </div>
+                    <div className="h-3 w-32 bg-slate-800 dark:bg-slate-200 rounded mb-4"></div>
+                    <div className="w-full space-y-2">
+                        <div className="h-10 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center px-3 shadow-sm">
+                            <div className="h-2 w-20 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                        </div>
+                        <div className="h-10 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center px-3 shadow-sm">
+                            <div className="h-2 w-24 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                        </div>
+                        <div className="h-10 bg-indigo-600 rounded flex items-center justify-center shadow-md mt-2">
+                            <div className="h-2 w-16 bg-white/90 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "2. Pengerjaan Fleksibel (Online/Offline)",
             desc: "Aplikasi dirancang ringan dan hemat kuota. Jawaban tersimpan aman di perangkat dan otomatis disinkronkan ke server. Jika koneksi terputus, Anda tetap bisa melanjutkan pengerjaan.",
             icon: AcademicCapIcon,
-            color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-2">
+                    <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center"><div className="w-3 h-3 bg-indigo-500 rounded-sm"></div></div>
+                            <div className="h-2 w-20 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-full border border-emerald-100 dark:border-emerald-800">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <div className="h-1.5 w-10 bg-emerald-600 dark:bg-emerald-400 rounded"></div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-3 shadow-sm space-y-2">
+                        <div className="flex justify-between items-center mb-1">
+                            <div className="h-2 w-12 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                            <div className="h-2 w-16 bg-rose-500 rounded"></div>
+                        </div>
+                        <div className="h-2 w-full bg-slate-700 dark:bg-slate-300 rounded"></div>
+                        <div className="h-2 w-5/6 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                        <div className="h-2 w-4/6 bg-slate-700 dark:bg-slate-300 rounded"></div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "3. Navigasi & Fitur Lengkap",
             desc: "Gunakan menu Daftar Soal untuk melompat ke nomor tertentu. Sistem akan mengingatkan jika ada soal yang masih kosong sebelum Anda mengumpulkan.",
             icon: CheckCircleIcon,
-            color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+            color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-3">
+                    <div className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2 shadow-sm">
+                        <div className="h-1.5 w-24 bg-slate-400 dark:bg-slate-500 rounded mb-2"></div>
+                        <div className="grid grid-cols-5 gap-2">
+                            <div className="aspect-square rounded bg-emerald-500 flex items-center justify-center shadow-sm"><div className="h-2 w-1.5 bg-white rounded-sm"></div></div>
+                            <div className="aspect-square rounded bg-emerald-500 flex items-center justify-center shadow-sm"><div className="h-2 w-1.5 bg-white rounded-sm"></div></div>
+                            <div className="aspect-square rounded bg-indigo-600 flex items-center justify-center ring-2 ring-indigo-200 dark:ring-indigo-900 shadow-sm"><div className="h-2 w-1.5 bg-white rounded-sm"></div></div>
+                            <div className="aspect-square rounded bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center"><div className="h-2 w-1.5 bg-slate-400 dark:bg-slate-500 rounded-sm"></div></div>
+                            <div className="aspect-square rounded bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center"><div className="h-2 w-1.5 bg-slate-400 dark:bg-slate-500 rounded-sm"></div></div>
+                        </div>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                        <div className="flex-1 h-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm flex items-center justify-center"><div className="h-1.5 w-12 bg-slate-600 dark:bg-slate-300 rounded"></div></div>
+                        <div className="flex-1 h-8 bg-indigo-600 rounded shadow-sm flex items-center justify-center"><div className="h-1.5 w-12 bg-white/90 rounded"></div></div>
+                    </div>
+                </div>
+            )
         },
         {
             title: "4. Keamanan & Pengumpulan Otomatis",
             desc: "Sistem Anti-Curang mendeteksi perpindahan aplikasi. Fokuslah mengerjakan! Jika waktu habis, jawaban Anda akan otomatis dikirim ke server, jadi tidak perlu khawatir jawaban hilang.",
             icon: ShieldCheckIcon,
-            color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
+            color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
+            mockup: (
+                <div className="bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 mt-4 p-3 select-none shadow-sm flex flex-col gap-2">
+                    <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded p-2 flex items-start gap-2 shadow-sm">
+                        <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center shrink-0 border border-rose-200 dark:border-rose-800">
+                            <div className="w-2 h-2 bg-rose-500 rounded-sm rotate-45"></div>
+                        </div>
+                        <div className="space-y-1.5 pt-0.5 w-full">
+                            <div className="h-2 w-20 bg-rose-600 dark:bg-rose-400 rounded"></div>
+                            <div className="h-1.5 w-full bg-rose-400 dark:bg-rose-500/70 rounded"></div>
+                            <div className="h-1.5 w-4/5 bg-rose-400 dark:bg-rose-500/70 rounded"></div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><div className="w-2 h-2 bg-emerald-500 rounded-sm"></div></div>
+                            <div className="h-1.5 w-24 bg-slate-600 dark:bg-slate-300 rounded"></div>
+                        </div>
+                        <div className="h-5 w-16 bg-emerald-500 rounded flex items-center justify-center"><div className="h-1.5 w-8 bg-white/90 rounded"></div></div>
+                    </div>
+                </div>
+            )
         }
     ];
 
@@ -117,6 +377,7 @@ export const TutorialPage: React.FC<TutorialPageProps> = ({ onBack }) => {
                                 <div className="ml-16 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all w-full group-hover:border-indigo-100 dark:group-hover:border-indigo-900">
                                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">{step.title}</h3>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{step.desc}</p>
+                                    {step.mockup}
                                 </div>
                             </div>
                         ))}
