@@ -835,7 +835,7 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
             const imgData = await processAnchorCrop(anchor, i);
             currentQObj = {
                 id: `q-${anchor.id}-${Date.now()}`,
-                questionText: `<img src="${imgData}" alt="Soal" style="max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 10px 0;" />`
+                questionText: `<img src="${imgData}" alt="Soal" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; display: block; margin: 10px 0;" />`
             };
             currentOptions = [];
         } else if (anchor.type === 'OPTION') {
@@ -844,7 +844,7 @@ export const parsePdfAndAutoCrop = async (file: File): Promise<Question[]> => {
                     id: anchor.id,
                     // WRAP IMAGE IN HTML TAG
                     promise: processAnchorCrop(anchor, i).then(imgData => {
-                        return `<img src="${imgData}" alt="Opsi" style="max-width: 100%; height: auto; border-radius: 6px; display: block;" />`;
+                        return `<img src="${imgData}" alt="Opsi" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 6px; display: block;" />`;
                     })
                 });
             }
