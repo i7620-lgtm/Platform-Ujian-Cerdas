@@ -110,6 +110,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         } else {
             setQuestions(prev => [...prev, ...newQuestions]); 
             setManualMode(true); 
+            if (mode === 'auto' && newQuestions.length > 0) {
+                setTimeout(() => {
+                    const firstNewQuestionId = newQuestions[0].id;
+                    const element = document.getElementById(firstNewQuestionId);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            }
         }
     };
     
