@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, Suspense } from 'react'; 
+import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
@@ -102,18 +102,24 @@ const App: React.FC = () => {
 
       // FIX: Check schedule before allowing entry (Manual Login)
       if (!isPreview) {
-          const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-          // ROBUST DATE PARSING
-          const [y, m, d] = dateStr.split('-').map(Number);
-          const [h, min] = exam.config.startTime.split(':').map(Number);
+          const mode = exam.config.examMode || 'UJIAN';
           
-          const startTime = new Date(y, m - 1, d, h, min, 0); 
-          const now = new Date();
+          if (mode === 'UJIAN') {
+              const dateStr = exam.config.startDate || exam.config.date;
+              let startTime: Date;
+              if (dateStr.includes('T') && dateStr.length > 10) {
+                  startTime = new Date(dateStr);
+              } else {
+                  startTime = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
+              }
+              
+              const now = new Date();
 
-          if (!isNaN(startTime.getTime()) && now < startTime) {
-              setWaitingExam(exam);
-              setView('WAITING_ROOM');
-              return;
+              if (!isNaN(startTime.getTime()) && now < startTime) {
+                  setWaitingExam(exam);
+                  setView('WAITING_ROOM');
+                  return;
+              }
           }
       }
       
@@ -223,23 +229,32 @@ const App: React.FC = () => {
         storageService.getExamForStudent(code, 'check_schedule', true)
             .then(exam => {
                 if (exam) {
-                    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
+                    const mode = exam.config.examMode || 'UJIAN';
                     
-                    // ROBUST DATE PARSING: Fix for Mobile/Safari
-                    const [y, m, d] = dateStr.split('-').map(Number);
-                    const [h, min] = exam.config.startTime.split(':').map(Number);
-                    
-                    // Create date object manually (Month is 0-indexed)
-                    const startTime = new Date(y, m - 1, d, h, min, 0); 
-                    const now = new Date();
+                    if (mode === 'UJIAN') {
+                        const dateStr = exam.config.startDate || exam.config.date;
+                        
+                        let startTime: Date;
+                        if (dateStr.includes('T') && dateStr.length > 10) {
+                            startTime = new Date(dateStr);
+                        } else {
+                            startTime = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
+                        }
+                        
+                        const now = new Date();
 
-                    // Strict check: Only go to waiting room if startTime is valid AND now < startTime
-                    if (!isNaN(startTime.getTime()) && now < startTime) {
-                        // Too early (Waiting Room)
-                        setWaitingExam(exam);
-                        setView('WAITING_ROOM');
+                        // Strict check: Only go to waiting room if startTime is valid AND now < startTime
+                        if (!isNaN(startTime.getTime()) && now < startTime) {
+                            // Too early (Waiting Room)
+                            setWaitingExam(exam);
+                            setView('WAITING_ROOM');
+                        } else {
+                            // On time (Direct Login)
+                            setPrefillCode(code);
+                            setView('STUDENT_LOGIN');
+                        }
                     } else {
-                        // On time (Direct Login)
+                        // PR Mode: Direct Login
                         setPrefillCode(code);
                         setView('STUDENT_LOGIN');
                     }
