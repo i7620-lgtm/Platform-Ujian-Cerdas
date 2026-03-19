@@ -863,8 +863,46 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 pt-8 border-t border-gray-100 dark:border-slate-700">
                          <div className="md:col-span-2 pb-2 border-b border-gray-100 dark:border-slate-700 mb-2"><h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Waktu & Keamanan</h4></div>
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tanggal Pelaksanaan</label><input type="date" name="date" value={new Date(config.date).toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jam Mulai</label><input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
+
+                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div 
+                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'UJIAN' }))}
+                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === 'UJIAN' || !config.examMode ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/30'}`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.examMode === 'UJIAN' || !config.examMode ? 'border-primary' : 'border-slate-400'}`}>
+                                        {(config.examMode === 'UJIAN' || !config.examMode) && <div className="w-2 h-2 bg-primary rounded-full" />}
+                                    </div>
+                                    <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Ujian</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                    Dikerjakan pada rentang tanggal dan waktu yang ketat.
+                                </p>
+                            </div>
+
+                            <div 
+                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'PR' }))}
+                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === 'PR' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-200'}`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.examMode === 'PR' ? 'border-amber-500' : 'border-slate-400'}`}>
+                                        {config.examMode === 'PR' && <div className="w-2 h-2 bg-amber-500 rounded-full" />}
+                                    </div>
+                                    <span className="font-bold text-sm text-slate-800 dark:text-white">Mode PR / Latihan</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
+                                    Dapat dikerjakan kapan saja sebelum tenggat waktu.
+                                </p>
+                            </div>
+                        </div>
+
+                        {(config.examMode === 'UJIAN' || !config.examMode) && (
+                            <>
+                                <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tanggal Mulai</label><input type="date" name="startDate" value={config.startDate || config.date || new Date().toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
+                                <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jam Mulai</label><input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
+                            </>
+                        )}
+                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tenggat Waktu / Tanggal Selesai</label><input type="date" name="endDate" value={config.endDate || config.date || new Date().toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Durasi Pengerjaan (Menit)</label><input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
                         
                         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
@@ -884,6 +922,66 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
                             </label>
                            )}
+                        </div>
+
+                        <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
+                             <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Bank Soal</h4>
+                             <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                                <label className="flex items-center cursor-pointer group mb-4">
+                                    <input type="checkbox" name="useBankSoal" checked={config.useBankSoal || false} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
+                                    <span className="ml-3 text-sm font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary transition-colors">Gunakan Sistem Bank Soal</span>
+                                </label>
+                                
+                                {config.useBankSoal && (
+                                    <div className="space-y-4 pl-8 border-l-2 border-primary/20 ml-2 animate-fade-in">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Jumlah Soal yang Ditampilkan ke Siswa</label>
+                                            <input 
+                                                type="number" 
+                                                name="bankSoalCount" 
+                                                value={config.bankSoalCount || 10} 
+                                                onChange={handleConfigChange} 
+                                                className="w-full max-w-[200px] p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" 
+                                            />
+                                            <p className="text-[10px] text-slate-500 mt-1">Total soal di editor: {questions.length}</p>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">Proporsi Tingkat Kesulitan (%)</label>
+                                            <div className="flex flex-wrap gap-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 w-12">Mudah</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={config.bankSoalProportions?.mudah || 30} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, mudah: parseInt(e.target.value) || 0 } as any }))} 
+                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 w-12">Sedang</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={config.bankSoalProportions?.sedang || 50} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sedang: parseInt(e.target.value) || 0 } as any }))} 
+                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-rose-600 dark:text-rose-400 w-12">Sulit</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={config.bankSoalProportions?.sulit || 20} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sulit: parseInt(e.target.value) || 0 } as any }))} 
+                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-2 italic">Pastikan Anda telah mengisi "Level Soal" (Mudah/Sedang/Sulit) pada masing-masing soal di editor.</p>
+                                        </div>
+                                    </div>
+                                )}
+                             </div>
                         </div>
 
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
