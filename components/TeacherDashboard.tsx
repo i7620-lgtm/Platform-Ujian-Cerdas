@@ -104,7 +104,23 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return <TutorialPage onBack={() => setIsMainGuideModalOpen(false)} />;
     }
 
-    const handleQuestionsGenerated = (newQuestions: Question[]) => { setQuestions(newQuestions); setManualMode(true); };
+    const handleQuestionsGenerated = (newQuestions: Question[], mode: 'manual' | 'auto') => { 
+        if (newQuestions.length === 0 && mode === 'manual') {
+            setManualMode(true);
+        } else {
+            setQuestions(prev => [...prev, ...newQuestions]); 
+            setManualMode(true); 
+            if (mode === 'auto' && newQuestions.length > 0) {
+                setTimeout(() => {
+                    const firstNewQuestionId = newQuestions[0].id;
+                    const element = document.getElementById(firstNewQuestionId);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            }
+        }
+    };
     
     const resetForm = () => { 
         setQuestions([]); 

@@ -1,5 +1,14 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
+
+export interface QuizConfig {
+  count: number;
+  type: string;
+  subject: string;
+  difficulty: string;
+  blueprint: string;
+  includeImages: boolean;
+}
 
 export interface Question {
   id: string;
