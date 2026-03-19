@@ -204,19 +204,77 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     const cleanExamCode = examCode.toUpperCase().trim();
 
     // FIX: Validasi ketat kelas target sebelum submit
+    let examConfig = null;
     if (cleanExamCode.length === 6) {
         try {
-            const config = await storageService.getExamConfig(cleanExamCode);
-            if (config && config.targetClasses && config.targetClasses.length > 0) {
-                if (!config.targetClasses.includes(studentClass.trim())) {
+            examConfig = await storageService.getExamConfig(cleanExamCode);
+            if (examConfig && examConfig.targetClasses && examConfig.targetClasses.length > 0) {
+                if (!examConfig.targetClasses.includes(studentClass.trim())) {
                     setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
-                    setAvailableClasses(config.targetClasses);
+                    setAvailableClasses(examConfig.targetClasses);
                     setStudentClass(''); 
+                    setIsLoading(false);
                     return;
                 }
             }
         } catch {
             // Ignore error here to allow offline/fallback behavior in onLoginSuccess logic
+        }
+    }
+
+    if (examConfig) {
+        const now = new Date();
+        const mode = examConfig.examMode || 'UJIAN';
+        
+        if (mode === 'UJIAN') {
+            const startDateStr = examConfig.startDate || examConfig.date;
+            if (startDateStr) {
+                let startDateTime: Date;
+                if (startDateStr.includes('T') && startDateStr.length > 10) {
+                    startDateTime = new Date(startDateStr);
+                } else {
+                    startDateTime = new Date(`${startDateStr}T${examConfig.startTime || '00:00'}`);
+                }
+                
+                if (now < startDateTime) {
+                    setError(`Ujian belum dimulai. Jadwal: ${startDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+            const endDateStr = examConfig.endDate || examConfig.date;
+            if (endDateStr) {
+                let endDateTime: Date;
+                if (endDateStr.includes('T') && endDateStr.length > 10) {
+                    endDateTime = new Date(endDateStr);
+                    // If it's falling back to start date ISO string, we need to add the time limit
+                    endDateTime = new Date(endDateTime.getTime() + (examConfig.timeLimit * 60000));
+                } else {
+                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                }
+                if (now > endDateTime) {
+                    setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+        } else if (mode === 'PR') {
+            const endDateStr = examConfig.endDate || examConfig.date;
+            if (endDateStr) {
+                let endDateTime: Date;
+                if (endDateStr.includes('T') && endDateStr.length > 10) {
+                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
+                    // If it falls back to start date, it means it's available until the end of that day
+                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                } else {
+                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                }
+                if (now > endDateTime) {
+                    setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
         }
     }
 
