@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
@@ -72,6 +72,61 @@ function shuffleArray<T>(array: T[]): T[] {
     return newArr;
 }
 
+function selectBankSoalQuestions(questions: Question[], config: ExamConfig): Question[] {
+    if (!config.useBankSoal || !config.bankSoalCount || config.bankSoalCount >= questions.length) {
+        return questions;
+    }
+
+    const totalNeeded = config.bankSoalCount;
+    const props = config.bankSoalProportions || { mudah: 30, sedang: 50, sulit: 20 };
+    
+    const grouped = {
+        mudah: questions.filter(q => q.level?.toLowerCase() === 'mudah'),
+        sedang: questions.filter(q => q.level?.toLowerCase() === 'sedang'),
+        sulit: questions.filter(q => q.level?.toLowerCase() === 'sulit'),
+        unassigned: questions.filter(q => !q.level || !['mudah', 'sedang', 'sulit'].includes(q.level.toLowerCase()))
+    };
+
+    let targetMudah = Math.round((props.mudah / 100) * totalNeeded);
+    let targetSedang = Math.round((props.sedang / 100) * totalNeeded);
+    let targetSulit = Math.round((props.sulit / 100) * totalNeeded);
+
+    let currentTotal = targetMudah + targetSedang + targetSulit;
+    while (currentTotal < totalNeeded) { targetSedang++; currentTotal++; }
+    while (currentTotal > totalNeeded) {
+        if (targetSedang > 0) targetSedang--;
+        else if (targetMudah > 0) targetMudah--;
+        else targetSulit--;
+        currentTotal--;
+    }
+
+    const shuffledMudah = shuffleArray(grouped.mudah);
+    const shuffledSedang = shuffleArray(grouped.sedang);
+    const shuffledSulit = shuffleArray(grouped.sulit);
+    const shuffledUnassigned = shuffleArray(grouped.unassigned);
+
+    const selected: Question[] = [];
+
+    const take = (arr: Question[], count: number) => {
+        const taken = arr.splice(0, count);
+        selected.push(...taken);
+        return count - taken.length;
+    };
+
+    const deficitMudah = take(shuffledMudah, targetMudah);
+    const deficitSedang = take(shuffledSedang, targetSedang);
+    const deficitSulit = take(shuffledSulit, targetSulit);
+
+    const totalDeficit = deficitMudah + deficitSedang + deficitSulit;
+    const remaining = [...shuffledMudah, ...shuffledSedang, ...shuffledSulit, ...shuffledUnassigned];
+    
+    if (totalDeficit > 0) {
+        take(remaining, totalDeficit);
+    }
+
+    return selected;
+}
+
 // --- INDEXED DB HELPER ---
 const DB_NAME = 'UjianCerdasDB';
 const DB_VERSION = 1;
@@ -95,7 +150,7 @@ const initDB = (): Promise<IDBDatabase> => {
 
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
-        let questionsToProcess = [...exam.questions];
+        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
         if (exam.config.shuffleQuestions) {
             questionsToProcess = shuffleArray(questionsToProcess);
         }
@@ -121,7 +176,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     } catch { /* ignore */ }
 
     if (!orderMap) {
-        let questionsToProcess = [...exam.questions];
+        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
         
         // INDEPENDENT LOGIC: Shuffle Questions
         // Only shuffles the order of questions if enabled. Does NOT affect options.
