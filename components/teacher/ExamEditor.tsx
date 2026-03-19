@@ -927,10 +927,22 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
                              <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Bank Soal</h4>
                              <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                                <label className="flex items-center cursor-pointer group mb-4">
+                                <label className="flex items-center cursor-pointer group mb-2">
                                     <input type="checkbox" name="useBankSoal" checked={config.useBankSoal || false} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
                                     <span className="ml-3 text-sm font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary transition-colors">Gunakan Sistem Bank Soal</span>
                                 </label>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 pl-8 leading-relaxed">
+                                    Fitur ini akan mengacak dan memilih soal secara otomatis dari total soal yang Anda buat, berdasarkan proporsi tingkat kesulitan.
+                                    <div className="mt-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                        <strong className="text-slate-700 dark:text-slate-300 block mb-1">Panduan Level Soal:</strong>
+                                        Sistem akan mengenali level soal yang Anda ketik di editor sebagai berikut:
+                                        <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                                            <li><span className="font-semibold text-emerald-600 dark:text-emerald-400">Mudah:</span> "mudah", "lots", "1", "easy", "rendah"</li>
+                                            <li><span className="font-semibold text-amber-600 dark:text-amber-400">Sedang:</span> "sedang", "mots", "2", "medium", "menengah"</li>
+                                            <li><span className="font-semibold text-rose-600 dark:text-rose-400">Sulit:</span> "sulit", "hots", "3", "hard", "tinggi"</li>
+                                        </ul>
+                                    </div>
+                                </div>
                                 
                                 {config.useBankSoal && (
                                     <div className="space-y-4 pl-8 border-l-2 border-primary/20 ml-2 animate-fade-in">
@@ -977,7 +989,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     />
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-2 italic">Pastikan Anda telah mengisi "Level Soal" (Mudah/Sedang/Sulit) pada masing-masing soal di editor.</p>
+                                            <p className="text-[10px] text-slate-500 mt-2 italic">Pastikan Anda telah mengisi "Level Soal" pada masing-masing soal di editor sesuai dengan panduan level di atas.</p>
                                         </div>
                                     </div>
                                 )}
