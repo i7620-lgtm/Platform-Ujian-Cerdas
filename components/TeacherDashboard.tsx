@@ -52,6 +52,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     // Editor State
     const [questions, setQuestions] = useState<Question[]>([]);
     const [config, setConfig] = useState<ExamConfig>({
+        examMode: 'UJIAN',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        useBankSoal: false,
+        bankSoalCount: 10,
+        bankSoalProportions: { mudah: 30, sedang: 50, sulit: 20 },
         timeLimit: 60,
         date: new Date().toISOString().split('T')[0],
         startTime: '08:00',
@@ -155,68 +161,25 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const readableDate = now.toLocaleString('id-ID').replace(/\//g, '-');
         
         // Convert local time to UTC for storage
-        // The date input gives YYYY-MM-DD and time gives HH:MM in local time
-        // We construct a Date object which interprets these as local time
-        const localDateTime = new Date(`${config.date}T${config.startTime}`);
+        const dateToUse = config.startDate || config.date;
+        const localDateTime = new Date(`${dateToUse}T${config.startTime || '00:00'}`);
         // We store the ISO string which is always UTC
         const utcDate = localDateTime.toISOString().split('T')[0];
         const utcTime = localDateTime.toISOString().split('T')[1].substring(0, 5);
-        
-        // Store original config but with UTC values for date/time if needed, 
-        // OR better yet, keep config as is (local preference) but add a specific startTimestamp
-        // For this app structure, we'll update the config to store the ISO string of the start moment
         
         const examData: Exam = {
             code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, 
             questions: sanitizedQuestions, 
             config: {
                 ...config,
-                // We keep date/startTime as is for the editor UI to show what user selected
-                // But we add a calculated field for the absolute start time if the schema allowed
-                // Since schema is fixed, we rely on the client to interpret date/startTime as 
-                // "User's local time when they created it" OR we standardize to UTC.
-                // 
-                // DECISION: To support "09:00 WITA" meaning "01:00 UTC", we must store the 
-                // timezone offset or convert to UTC.
-                // Let's store the full ISO string in a new property if possible, or 
-                // assume config.date and config.startTime are LOCAL to the creator.
-                //
-                // However, to ensure cross-timezone correctness without changing schema:
-                // We will store the UTC date and time in the config.
                 date: utcDate,
+                startDate: utcDate,
                 startTime: utcTime
             },
             createdAt: editingExam?.createdAt || String(readableDate), status
         };
         
-        // REVERTING STRATEGY: Storing UTC in date/startTime fields might break the UI editors 
-        // that expect local time values (YYYY-MM-DD).
-        // BETTER STRATEGY: Store the full ISO string in `date` field? No, `date` is used as type="date" value.
-        //
-        // CORRECT APPROACH REQUESTED BY USER:
-        // "save correctly to database... so when user in Jakarta accesses... it adjusts"
-        //
-        // We will modify the save logic to append the timezone offset to the date string 
-        // or ensure we store a full ISO timestamp in a field.
-        // Since we can't easily change the `Exam` interface in this turn without seeing `types.ts`,
-        // we will use the `date` field to store the full ISO string if possible, OR
-        // we keep using local time components but ensure the *comparison* logic uses 
-        // the creator's timezone.
-        //
-        // BUT the most robust way requested is:
-        // 1. Get local date/time from inputs
-        // 2. Create Date object (which uses browser's timezone)
-        // 3. Convert to UTC ISO string
-        // 4. Save THAT.
-        
-        // Let's try to store the full ISO string in the `date` field, and `startTime` can be ignored or kept for legacy.
-        // But `date` input expects YYYY-MM-DD.
-        
-        // Let's stick to the plan: 
-        // We will store the full ISO string in `date` (e.g. "2023-10-27T01:00:00.000Z")
-        // The UI will need to parse this back to YYYY-MM-DD for the input.
-        
-        const startDateTime = new Date(`${config.date}T${config.startTime}`);
+        const startDateTime = new Date(`${dateToUse}T${config.startTime || '00:00'}`);
         const isoStart = startDateTime.toISOString();
         
         const finalExamData: Exam = {
@@ -224,6 +187,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
              config: {
                  ...config,
                  date: isoStart, // Store full ISO
+                 startDate: isoStart, // Store full ISO
                  startTime: config.startTime // Keep for reference or UI fallback
              }
         };
@@ -263,7 +227,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         // When duplicating, reset date to today (local)
         const today = new Date();
         const localDate = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
-        setConfig({ ...exam.config, date: localDate }); 
+        setConfig({ ...exam.config, date: localDate, startDate: localDate }); 
         setManualMode(true); 
         setEditingExam(null); 
         setGeneratedCode(''); 
@@ -275,7 +239,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setQuestions(examToReuse.questions);
         const today = new Date();
         const localDate = today.toLocaleDateString('en-CA');
-        const newConfig = { ...examToReuse.config, date: localDate };
+        const newConfig = { ...examToReuse.config, date: localDate, startDate: localDate };
         setConfig(newConfig);
         setManualMode(true);
         setEditingExam(null);
@@ -357,12 +321,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setQuestions(exam.questions); 
         
         // Parse the stored ISO date back to local date/time for inputs
-        let localDate = exam.config.date;
+        let localDate = exam.config.startDate || exam.config.date;
         let localTime = exam.config.startTime;
         
         // Check if it's an ISO string (contains 'T' and 'Z' or offset)
-        if (exam.config.date.includes('T')) {
-            const d = new Date(exam.config.date);
+        if (localDate && localDate.includes('T')) {
+            const d = new Date(localDate);
             if (!isNaN(d.getTime())) {
                 // Convert UTC back to local YYYY-MM-DD and HH:MM for inputs
                 localDate = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
@@ -373,6 +337,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setConfig({
             ...exam.config,
             date: localDate,
+            startDate: localDate,
             startTime: localTime
         }); 
         setIsEditModalOpen(true); 
@@ -384,10 +349,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setQuestions(exam.questions); 
             
             // Parse ISO date for draft as well
-            let localDate = exam.config.date;
+            let localDate = exam.config.startDate || exam.config.date;
             let localTime = exam.config.startTime;
-            if (exam.config.date.includes('T')) {
-                const d = new Date(exam.config.date);
+            if (localDate && localDate.includes('T')) {
+                const d = new Date(localDate);
                 if (!isNaN(d.getTime())) {
                     localDate = d.toLocaleDateString('en-CA');
                     localTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -397,6 +362,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setConfig({
                 ...exam.config,
                 date: localDate,
+                startDate: localDate,
                 startTime: localTime
             }); 
             setManualMode(true); 
@@ -411,50 +377,45 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     
     const now = new Date();
     
-    const ongoingExams = publishedExams.filter((exam) => {
-        // Handle both legacy (YYYY-MM-DD + HH:MM) and new (ISO) formats
-        let start: Date;
-        if (exam.config.date.includes('T') && exam.config.date.length > 10) {
-             // New format: date is full ISO string
-             start = new Date(exam.config.date);
-        } else {
-             // Legacy format
-             const dateStr = exam.config.date;
-             start = new Date(`${dateStr}T${exam.config.startTime}`);
-        }
+    const getExamDates = (exam: Exam) => {
+        const mode = exam.config.examMode || 'UJIAN';
+        const startDateStr = exam.config.startDate || exam.config.date;
         
-        const end = new Date(start.getTime() + exam.config.timeLimit * 60 * 1000);
+        let start: Date;
+        if (startDateStr.includes('T') && startDateStr.length > 10) {
+            start = new Date(startDateStr);
+        } else {
+            start = new Date(`${startDateStr}T${exam.config.startTime || '00:00'}`);
+        }
+
+        let end: Date;
+        if (mode === 'PR') {
+            start = new Date(0); // PR is always available before end date
+            end = exam.config.endDate ? new Date(`${exam.config.endDate}T23:59:59`) : new Date(8640000000000000); // Max date if no end date
+        } else {
+            end = exam.config.endDate ? new Date(`${exam.config.endDate}T23:59:59`) : new Date(start.getTime() + exam.config.timeLimit * 60000);
+        }
+
+        return { start, end };
+    };
+
+    const ongoingExams = publishedExams.filter((exam) => {
+        const { start, end } = getExamDates(exam);
         return now >= start && now <= end;
     });
 
     const upcomingExams = publishedExams.filter((exam) => {
-        let start: Date;
-        if (exam.config.date.includes('T') && exam.config.date.length > 10) {
-             start = new Date(exam.config.date);
-        } else {
-             const dateStr = exam.config.date;
-             start = new Date(`${dateStr}T${exam.config.startTime}`);
-        }
+        const { start } = getExamDates(exam);
         return start > now;
     }).sort((a,b) => {
-        const dateA = a.config.date.includes('T') && a.config.date.length > 10 ? new Date(a.config.date) : new Date(`${a.config.date}T${a.config.startTime}`);
-        const dateB = b.config.date.includes('T') && b.config.date.length > 10 ? new Date(b.config.date) : new Date(`${b.config.date}T${b.config.startTime}`);
-        return dateA.getTime() - dateB.getTime();
+        return getExamDates(a).start.getTime() - getExamDates(b).start.getTime();
     });
 
     const finishedExams = publishedExams.filter((exam) => {
-        let start: Date;
-        if (exam.config.date.includes('T') && exam.config.date.length > 10) {
-             start = new Date(exam.config.date);
-        } else {
-             const dateStr = exam.config.date;
-             start = new Date(`${dateStr}T${exam.config.startTime}`);
-        }
-        return start.getTime() + exam.config.timeLimit * 60000 < now.getTime();
+        const { end } = getExamDates(exam);
+        return end < now;
     }).sort((a,b) => {
-        const dateA = a.config.date.includes('T') && a.config.date.length > 10 ? new Date(a.config.date) : new Date(`${a.config.date}T${a.config.startTime}`);
-        const dateB = b.config.date.includes('T') && b.config.date.length > 10 ? new Date(b.config.date) : new Date(`${b.config.date}T${b.config.startTime}`);
-        return dateB.getTime() - dateA.getTime();
+        return getExamDates(b).end.getTime() - getExamDates(a).end.getTime();
     });
 
     const accountType = teacherProfile.accountType || 'guru';
