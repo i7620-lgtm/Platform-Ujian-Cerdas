@@ -80,11 +80,20 @@ function selectBankSoalQuestions(questions: Question[], config: ExamConfig): Que
     const totalNeeded = config.bankSoalCount;
     const props = config.bankSoalProportions || { mudah: 30, sedang: 50, sulit: 20 };
     
+    const getLevelCategory = (level?: string) => {
+        if (!level) return 'unassigned';
+        const l = level.toLowerCase().trim();
+        if (['mudah', 'lots', '1', 'easy', 'rendah'].includes(l)) return 'mudah';
+        if (['sedang', 'mots', '2', 'medium', 'menengah'].includes(l)) return 'sedang';
+        if (['sulit', 'hots', '3', 'hard', 'tinggi'].includes(l)) return 'sulit';
+        return 'unassigned';
+    };
+
     const grouped = {
-        mudah: questions.filter(q => q.level?.toLowerCase() === 'mudah'),
-        sedang: questions.filter(q => q.level?.toLowerCase() === 'sedang'),
-        sulit: questions.filter(q => q.level?.toLowerCase() === 'sulit'),
-        unassigned: questions.filter(q => !q.level || !['mudah', 'sedang', 'sulit'].includes(q.level.toLowerCase()))
+        mudah: questions.filter(q => getLevelCategory(q.level) === 'mudah'),
+        sedang: questions.filter(q => getLevelCategory(q.level) === 'sedang'),
+        sulit: questions.filter(q => getLevelCategory(q.level) === 'sulit'),
+        unassigned: questions.filter(q => getLevelCategory(q.level) === 'unassigned')
     };
 
     let targetMudah = Math.round((props.mudah / 100) * totalNeeded);
