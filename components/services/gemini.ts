@@ -40,7 +40,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - scoreWeight: bobot nilai (angka)
   `;
 
-  let requiredFields = ["id", "questionText"];
+  const requiredFields = ["id", "questionText"];
   if (config.includeImages) requiredFields.push("imageSearchKeyword");
 
   if (config.type.toLowerCase().includes('pilihan ganda')) {
