@@ -12,16 +12,29 @@ interface StudentLoginProps {
   initialCode?: string;
 }
 
-// Helper to parse "ClassName(Limit)" format
+// Helper to parse "SchoolName-ClassName(Limit)" format
 const parseClassConfig = (classString: string) => {
     const match = classString.match(/^(.+?)(?:\((\d+)\))?$/);
     if (match) {
+        const fullString = match[1].trim();
+        const limit = match[2] ? parseInt(match[2], 10) : null;
+        
+        let schoolName = '';
+        let className = fullString;
+        
+        const dashIndex = fullString.indexOf('-');
+        if (dashIndex !== -1) {
+            schoolName = fullString.substring(0, dashIndex).trim();
+            className = fullString.substring(dashIndex + 1).trim();
+        }
+        
         return {
-            name: match[1].trim(),
-            limit: match[2] ? parseInt(match[2], 10) : null
+            schoolName,
+            name: className,
+            limit
         };
     }
-    return { name: classString, limit: null };
+    return { schoolName: '', name: classString, limit: null };
 };
 
 const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
@@ -136,6 +149,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
   const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch { return ''; } });
+  const [schoolName, setSchoolName] = useState(() => { try { return localStorage.getItem('saved_student_school') || ''; } catch { return ''; } });
   const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch { return ''; } });
   const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch { return ''; } });
   
@@ -159,6 +173,16 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     if (prev && !config.targetClasses?.includes(prev)) return '';
                     return prev;
                 });
+                
+                // Auto-fill schoolName if all target classes have the same school name
+                const schools = new Set<string>();
+                config.targetClasses.forEach(c => {
+                    const parsed = parseClassConfig(c);
+                    if (parsed.schoolName) schools.add(parsed.schoolName);
+                });
+                if (schools.size === 1) {
+                    setSchoolName(Array.from(schools)[0]);
+                }
             } else {
                 setAvailableClasses([]);
             }
@@ -196,7 +220,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     e.preventDefault();
     if (isLoading) return;
 
-    if (!examCode || !fullName || !studentClass || !absentNumber) {
+    if (!examCode || !fullName || !schoolName || !studentClass || !absentNumber) {
       setError('Mohon lengkapi semua data identitas.');
       return;
     }
@@ -283,6 +307,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     // Save preference (original text for display)
     try {
         localStorage.setItem('saved_student_fullname', fullName.trim());
+        localStorage.setItem('saved_student_school', schoolName.trim());
         localStorage.setItem('saved_student_class', studentClass.trim());
         localStorage.setItem('saved_student_absent', absentNumber.trim());
     } catch { /* ignore */ }
@@ -298,6 +323,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     
     const studentData: Student = {
         fullName: fullName.trim(), // Keep original for result sheet
+        schoolName: schoolName.trim(),
         class: cleanClassName,
         absentNumber: absentNumber.trim(),
         studentId: compositeId // This is the PK-safe ID
@@ -445,6 +471,22 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 <form onSubmit={handleSubmit} className="space-y-3">
                     
                     <div className="space-y-3">
+                        <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'school' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
+                            <div className="px-4 pt-2">
+                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Asal Sekolah</label>
+                                <input
+                                    type="text"
+                                    value={schoolName}
+                                    onChange={(e) => setSchoolName(e.target.value)}
+                                    onFocus={() => setIsFocused('school')}
+                                    onBlur={() => setIsFocused(null)}
+                                    className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                                    placeholder="Nama sekolah..."
+                                    required
+                                />
+                            </div>
+                        </div>
+
                         <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'name' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                             <div className="px-4 pt-2">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Nama Lengkap</label>
@@ -471,7 +513,14 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                         <div className="relative group">
                                             <select 
                                                 value={studentClass} 
-                                                onChange={(e) => setStudentClass(e.target.value)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setStudentClass(val);
+                                                    const parsed = parseClassConfig(val);
+                                                    if (parsed.schoolName) {
+                                                        setSchoolName(parsed.schoolName);
+                                                    }
+                                                }}
                                                 onFocus={() => setIsFocused('class')}
                                                 onBlur={() => setIsFocused(null)}
                                                 className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
@@ -479,8 +528,9 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                             >
                                                 <option value="" disabled className="dark:bg-slate-900">Pilih...</option>
                                                 {availableClasses.map(c => {
-                                                    const { name } = parseClassConfig(c);
-                                                    return <option key={c} value={c} className="dark:bg-slate-900">{name}</option>;
+                                                    const { schoolName: sName, name } = parseClassConfig(c);
+                                                    const displayName = sName ? `${sName} - ${name}` : name;
+                                                    return <option key={c} value={c} className="dark:bg-slate-900">{displayName}</option>;
                                                 })}
                                             </select>
                                             <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
