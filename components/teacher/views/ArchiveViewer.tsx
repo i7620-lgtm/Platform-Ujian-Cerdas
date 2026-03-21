@@ -1128,7 +1128,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     <div className={`transition-transform duration-300 text-slate-400 ${expandedStudent === r.student.studentId ? 'rotate-180 text-indigo-500' : ''}`}>
                                                         {expandedStudent === r.student.studentId ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
                                                     </div>
-                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
+                                                    <div className="flex flex-col">
+                                                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
+                                                        {r.student.schoolName && <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">{r.student.schoolName}</div>}
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{r.student.class}</td>
