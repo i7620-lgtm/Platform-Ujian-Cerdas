@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface QuizConfig {
@@ -97,6 +97,7 @@ export interface Student {
   class: string;
   absentNumber: string; 
   studentId: string; 
+  schoolName?: string;
   resultId?: number; // Added to track DB Primary Key
 }
 
