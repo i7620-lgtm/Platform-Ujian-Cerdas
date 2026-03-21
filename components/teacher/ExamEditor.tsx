@@ -966,7 +966,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <input 
                                                         type="number" 
                                                         value={config.bankSoalProportions?.mudah || 30} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, mudah: parseInt(e.target.value) || 0 } as any }))} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, mudah: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
                                                         className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
                                                     />
                                                 </div>
@@ -975,7 +975,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <input 
                                                         type="number" 
                                                         value={config.bankSoalProportions?.sedang || 50} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sedang: parseInt(e.target.value) || 0 } as any }))} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sedang: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
                                                         className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
                                                     />
                                                 </div>
@@ -984,7 +984,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <input 
                                                         type="number" 
                                                         value={config.bankSoalProportions?.sulit || 20} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sulit: parseInt(e.target.value) || 0 } as any }))} 
+                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sulit: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
                                                         className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
                                                     />
                                                 </div>
