@@ -238,17 +238,38 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             return;
         }
         
-        let start: Date;
-        // Check if date is ISO string (new format) or YYYY-MM-DD (legacy)
-        if (activeExam.config.date.includes('T') && activeExam.config.date.length > 10) {
-             start = new Date(activeExam.config.date);
-        } else {
-             const dateStr = activeExam.config.date;
-             start = new Date(`${dateStr}T${activeExam.config.startTime}`);
+        const mode = activeExam.config.examMode || 'UJIAN';
+        
+        // Waktu mulai pengerjaan aktual oleh siswa
+        const actualStartTime = initialData?.timestamp || Date.now();
+        const timeLimitMs = activeExam.config.timeLimit * 60 * 1000;
+        let calculatedDeadline = actualStartTime + timeLimitMs;
+
+        // Cek batas akhir ujian (endDate)
+        const endDateStr = activeExam.config.endDate || activeExam.config.date;
+        if (endDateStr) {
+            let endDateTime: Date;
+            if (endDateStr.includes('T') && endDateStr.length > 10) {
+                endDateTime = new Date(endDateStr);
+                if (mode === 'UJIAN' && !activeExam.config.endDate) {
+                    // Jika fallback ke startDate ISO string, tambahkan timeLimit
+                    endDateTime = new Date(endDateTime.getTime() + timeLimitMs);
+                } else if (mode === 'PR' && !activeExam.config.endDate) {
+                    // Jika fallback ke startDate ISO string untuk PR, batasnya akhir hari tersebut
+                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                }
+            } else {
+                endDateTime = new Date(`${endDateStr}T23:59:59`);
+            }
+            
+            // Deadline tidak boleh melebihi batas akhir ujian
+            if (endDateTime.getTime() < calculatedDeadline) {
+                calculatedDeadline = endDateTime.getTime();
+            }
         }
         
-        setDeadline(start.getTime() + (activeExam.config.timeLimit * 60 * 1000));
-    }, [activeExam.config.date, activeExam.config.startTime, activeExam.config.timeLimit, student.class]);
+        setDeadline(calculatedDeadline);
+    }, [activeExam.config, student.class, initialData?.timestamp]);
 
     const [timeLeft, setTimeLeft] = useState(0);
     useEffect(() => {
