@@ -199,8 +199,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 });
                 if (schools.size === 1) {
                     setSchoolName(Array.from(schools)[0]);
-                } else if (schools.size > 1 && !schools.has(schoolName)) {
-                    setSchoolName('');
+                } else if (schools.size > 1) {
+                    setSchoolName(prev => schools.has(prev) ? prev : '');
                 }
             } else {
                 setAvailableClasses([]);
