@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
     define: {
       // PENTING: Ini mengganti 'process.env.API_KEY' di dalam kode frontend
       // dengan nilai string sebenarnya saat aplikasi di-build.
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.API_KEY || process.env.API_KEY)
     },
     server: {
       host: true,
