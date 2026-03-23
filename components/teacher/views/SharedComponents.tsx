@@ -421,9 +421,18 @@ export const QuestionAnalysisItem: React.FC<{
 const calculateTimeLeft = (exam: Exam) => {
     const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
     const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
-    const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
     const now = Date.now();
+    
     if (now < examStartDateTime.getTime()) { return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now }; }
+    
+    if (exam.config.examMode === 'PR' || exam.config.timeLimit === 0) {
+        const endDateStr = exam.config.endDate || exam.config.date;
+        const endDateTime = endDateStr.includes('T') ? new Date(endDateStr) : new Date(`${endDateStr}T23:59:59`);
+        const timeLeft = Math.max(0, endDateTime.getTime() - now);
+        return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft, isUnlimited: true };
+    }
+
+    const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
     const timeLeft = Math.max(0, examEndTime - now);
     return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
 };
@@ -440,10 +449,12 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exa
     const totalMinutesLeft = timeState.diff / (1000 * 60); 
     let colorClass = "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"; 
     let dotClass = "bg-emerald-500"; 
-    if (totalMinutesLeft < 5) { colorClass = "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800 animate-pulse"; dotClass = "bg-rose-500"; } 
-    else if (totalMinutesLeft < 15) { colorClass = "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800"; dotClass = "bg-amber-500"; }
-    if (minimal) { return <span className="font-mono font-bold tracking-tight">{timeString}</span>; }
-    return (<div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colorClass} transition-colors duration-500`}><span className="relative flex h-2 w-2"><span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span><span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}></span></span><span className="font-mono text-sm font-bold tracking-widest tabular-nums">{timeString}</span></div>);
+    if (!timeState.isUnlimited) {
+        if (totalMinutesLeft < 5) { colorClass = "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800 animate-pulse"; dotClass = "bg-rose-500"; } 
+        else if (totalMinutesLeft < 15) { colorClass = "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800"; dotClass = "bg-amber-500"; }
+    }
+    if (minimal) { return <span className="font-mono font-bold tracking-tight">{timeState.isUnlimited ? 'Tanpa Batas' : timeString}</span>; }
+    return (<div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colorClass} transition-colors duration-500`}><span className="relative flex h-2 w-2"><span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span><span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}></span></span><span className="font-mono text-sm font-bold tracking-widest tabular-nums">{timeState.isUnlimited ? 'Tanpa Batas' : timeString}</span></div>);
 };
 
 export const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ text, colorClass = "bg-gray-100 text-gray-600" }) => { 

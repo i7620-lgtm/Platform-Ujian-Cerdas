@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState } from 'react';
-import type { Result, Exam, Question } from '../types';
+import type { Result, Exam } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml } from './teacher/examUtils';
 
 interface StudentResultPageProps {
   result: Result;
@@ -51,7 +51,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 setUnlockError("Token salah atau kadaluarsa.");
                 setIsUnlocking(false); // Stop loading only if failed
             }
-        } catch (err) {
+        } catch {
             setUnlockError("Gagal verifikasi. Cek koneksi.");
             setIsUnlocking(false);
         }
@@ -91,13 +91,13 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 try {
                     const ansObj = JSON.parse(ans);
                     isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-                } catch(e) {}
+                } catch { /* ignore */ }
             }
             else if (q.questionType === 'MATCHING') {
                 try {
                     const ansObj = JSON.parse(ans);
                     isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-                } catch(e) {}
+                } catch { /* ignore */ }
             } else if (q.questionType === 'ESSAY') {
                 isCorrect = false; // Default until graded
             }
@@ -329,7 +329,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                              const ansObj = JSON.parse(studentAns);
                                                              isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
                                                          }
-                                                     } catch(e) {}
+                                                     } catch { /* ignore */ }
                                                 }
 
                                                 if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
@@ -340,16 +340,16 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Soal {idx + 1}</span>
                                                             <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{__html: q.questionText}}></div>
+                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{__html: sanitizeHtml(q.questionText)}}></div>
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
-                                                                <div className={`text-right font-black option-content ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: studentAns}}></div>
+                                                                <div className={`text-right font-black option-content ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(studentAns)}}></div>
                                                             </div>
                                                             {!isCorrect && (
                                                                 <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                                                                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Kunci Jawaban:</span> 
-                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content" dangerouslySetInnerHTML={{__html: correctAns}}></div>
+                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content" dangerouslySetInnerHTML={{__html: sanitizeHtml(correctAns)}}></div>
                                                                 </div>
                                                             )}
                                                         </div>

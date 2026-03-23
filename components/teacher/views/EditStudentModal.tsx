@@ -5,12 +5,13 @@ import { XMarkIcon, CheckCircleIcon } from '../../Icons';
 interface EditStudentModalProps {
     result: Result;
     onClose: () => void;
-    onSave: (id: number, oldId: string, newData: { fullName: string; class: string; absentNumber: string }) => void;
+    onSave: (id: number, oldId: string, newData: { fullName: string; schoolName?: string; class: string; absentNumber: string }) => void;
 }
 
 export const EditStudentModal: React.FC<EditStudentModalProps> = ({ result, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         fullName: result.student.fullName,
+        schoolName: result.student.schoolName || '',
         class: result.student.class,
         absentNumber: result.student.absentNumber
     });
@@ -39,6 +40,16 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ result, onCl
                             onChange={e => setFormData({...formData, fullName: e.target.value})}
                             className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Nama Sekolah</label>
+                        <input 
+                            type="text" 
+                            value={formData.schoolName} 
+                            onChange={e => setFormData({...formData, schoolName: e.target.value})}
+                            className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Opsional"
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">

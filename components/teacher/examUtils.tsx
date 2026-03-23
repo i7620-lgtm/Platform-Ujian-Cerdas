@@ -963,6 +963,15 @@ export const sanitizeHtml = (html: string): string => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
+    // SECURITY FIX: Remove potentially dangerous tags (XSS Protection)
+    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'style', 'base'];
+    dangerousTags.forEach(tag => {
+        const elements = doc.getElementsByTagName(tag);
+        for (let i = elements.length - 1; i >= 0; i--) {
+            elements[i].parentNode?.removeChild(elements[i]);
+        }
+    });
+
     const isMath = (el: Element) => 
         el.classList.contains('math-visual') || 
         el.closest('.math-visual') ||
@@ -974,6 +983,22 @@ export const sanitizeHtml = (html: string): string => {
         (el instanceof HTMLElement && el.style.fontFamily.includes('Noto Sans Balinese'));
 
     doc.body.querySelectorAll('*').forEach(el => {
+        // SECURITY FIX: Remove all inline event handlers (on*)
+        const attrs = el.attributes;
+        for (let i = attrs.length - 1; i >= 0; i--) {
+            if (attrs[i].name.toLowerCase().startsWith('on')) {
+                el.removeAttribute(attrs[i].name);
+            }
+        }
+        
+        // SECURITY FIX: Prevent javascript: URIs
+        if (el.tagName === 'A') {
+            const href = el.getAttribute('href');
+            if (href && href.toLowerCase().trim().startsWith('javascript:')) {
+                el.removeAttribute('href');
+            }
+        }
+
         if (!isMath(el)) {
             if (el instanceof HTMLElement) {
                 // Remove color and background-color styles

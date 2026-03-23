@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
@@ -12,16 +12,29 @@ interface StudentLoginProps {
   initialCode?: string;
 }
 
-// Helper to parse "ClassName(Limit)" format
+// Helper to parse "SchoolName-ClassName(Limit)" format
 const parseClassConfig = (classString: string) => {
     const match = classString.match(/^(.+?)(?:\((\d+)\))?$/);
     if (match) {
+        const fullString = match[1].trim();
+        const limit = match[2] ? parseInt(match[2], 10) : null;
+        
+        let schoolName = '';
+        let className = fullString;
+        
+        const dashIndex = fullString.indexOf('-');
+        if (dashIndex !== -1) {
+            schoolName = fullString.substring(0, dashIndex).trim();
+            className = fullString.substring(dashIndex + 1).trim();
+        }
+        
         return {
-            name: match[1].trim(),
-            limit: match[2] ? parseInt(match[2], 10) : null
+            schoolName,
+            name: className,
+            limit
         };
     }
-    return { name: classString, limit: null };
+    return { schoolName: '', name: classString, limit: null };
 };
 
 const QrScannerModal: React.FC<{ onScanSuccess: (text: string) => void; onClose: () => void }> = ({ onScanSuccess, onClose }) => {
@@ -136,6 +149,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
   const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch { return ''; } });
+  const [schoolName, setSchoolName] = useState(() => { try { return localStorage.getItem('saved_student_school') || ''; } catch { return ''; } });
   const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch { return ''; } });
   const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch { return ''; } });
   
@@ -146,6 +160,23 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   // Derived state for absent limit
   const { limit: absentLimit } = parseClassConfig(studentClass);
+
+  const availableSchools = useMemo(() => {
+      const schools = new Set<string>();
+      availableClasses.forEach(c => {
+          const parsed = parseClassConfig(c);
+          if (parsed.schoolName) schools.add(parsed.schoolName);
+      });
+      return Array.from(schools);
+  }, [availableClasses]);
+
+  const filteredClasses = useMemo(() => {
+      if (!schoolName) return availableClasses;
+      return availableClasses.filter(c => {
+          const parsed = parseClassConfig(c);
+          return !parsed.schoolName || parsed.schoolName === schoolName;
+      });
+  }, [availableClasses, schoolName]);
 
   // Auto-fetch config when code changes to determine if dropdown should be used
   useEffect(() => {
@@ -159,6 +190,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     if (prev && !config.targetClasses?.includes(prev)) return '';
                     return prev;
                 });
+                
+                // Auto-fill schoolName if all target classes have the same school name
+                const schools = new Set<string>();
+                config.targetClasses.forEach(c => {
+                    const parsed = parseClassConfig(c);
+                    if (parsed.schoolName) schools.add(parsed.schoolName);
+                });
+                if (schools.size === 1) {
+                    setSchoolName(Array.from(schools)[0]);
+                } else if (schools.size > 1) {
+                    setSchoolName(prev => schools.has(prev) ? prev : '');
+                }
             } else {
                 setAvailableClasses([]);
             }
@@ -196,7 +239,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     e.preventDefault();
     if (isLoading) return;
 
-    if (!examCode || !fullName || !studentClass || !absentNumber) {
+    if (!examCode || !fullName || !schoolName || !studentClass || !absentNumber) {
       setError('Mohon lengkapi semua data identitas.');
       return;
     }
@@ -204,14 +247,16 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     const cleanExamCode = examCode.toUpperCase().trim();
 
     // FIX: Validasi ketat kelas target sebelum submit
+    let examConfig = null;
     if (cleanExamCode.length === 6) {
         try {
-            const config = await storageService.getExamConfig(cleanExamCode);
-            if (config && config.targetClasses && config.targetClasses.length > 0) {
-                if (!config.targetClasses.includes(studentClass.trim())) {
+            examConfig = await storageService.getExamConfig(cleanExamCode);
+            if (examConfig && examConfig.targetClasses && examConfig.targetClasses.length > 0) {
+                if (!examConfig.targetClasses.includes(studentClass.trim())) {
                     setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
-                    setAvailableClasses(config.targetClasses);
+                    setAvailableClasses(examConfig.targetClasses);
                     setStudentClass(''); 
+                    setIsLoading(false);
                     return;
                 }
             }
@@ -220,11 +265,75 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         }
     }
 
+    if (examConfig) {
+        const now = new Date();
+        const mode = examConfig.examMode || 'UJIAN';
+        
+        if (mode === 'UJIAN') {
+            const startDateStr = examConfig.startDate || examConfig.date;
+            if (startDateStr) {
+                let startDateTime: Date;
+                if (startDateStr.includes('T') && startDateStr.length > 10) {
+                    startDateTime = new Date(startDateStr);
+                } else {
+                    startDateTime = new Date(`${startDateStr}T${examConfig.startTime || '00:00'}`);
+                }
+                
+                if (now < startDateTime) {
+                    setError(`Ujian belum dimulai. Jadwal: ${startDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+            const endDateStr = examConfig.endDate || examConfig.date;
+            if (endDateStr) {
+                let endDateTime: Date;
+                if (endDateStr.includes('T') && endDateStr.length > 10) {
+                    endDateTime = new Date(endDateStr);
+                    if (!examConfig.endDate) {
+                        // If it's falling back to start date ISO string, we need to add the time limit
+                        // If timeLimit is 0 (unlimited), we assume it's available until the end of the day
+                        if (examConfig.timeLimit > 0) {
+                            endDateTime = new Date(endDateTime.getTime() + (examConfig.timeLimit * 60000));
+                        } else {
+                            endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                        }
+                    }
+                } else {
+                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                }
+                if (now > endDateTime) {
+                    setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+        } else if (mode === 'PR') {
+            const endDateStr = examConfig.endDate || examConfig.date;
+            if (endDateStr) {
+                let endDateTime: Date;
+                if (endDateStr.includes('T') && endDateStr.length > 10) {
+                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
+                    // If it falls back to start date, it means it's available until the end of that day
+                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                } else {
+                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                }
+                if (now > endDateTime) {
+                    setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+        }
+    }
+
     setError('');
 
     // Save preference (original text for display)
     try {
         localStorage.setItem('saved_student_fullname', fullName.trim());
+        localStorage.setItem('saved_student_school', schoolName.trim());
         localStorage.setItem('saved_student_class', studentClass.trim());
         localStorage.setItem('saved_student_absent', absentNumber.trim());
     } catch { /* ignore */ }
@@ -240,6 +349,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     
     const studentData: Student = {
         fullName: fullName.trim(), // Keep original for result sheet
+        schoolName: schoolName.trim(),
         class: cleanClassName,
         absentNumber: absentNumber.trim(),
         studentId: compositeId // This is the PK-safe ID
@@ -387,6 +497,46 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 <form onSubmit={handleSubmit} className="space-y-3">
                     
                     <div className="space-y-3">
+                        <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'school' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
+                            <div className="px-4 pt-2">
+                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Asal Sekolah</label>
+                                {availableSchools.length > 0 ? (
+                                    <div className="relative group">
+                                        <select
+                                            value={schoolName}
+                                            onChange={(e) => {
+                                                setSchoolName(e.target.value);
+                                                setStudentClass(''); // Reset class when school changes
+                                            }}
+                                            onFocus={() => setIsFocused('school')}
+                                            onBlur={() => setIsFocused(null)}
+                                            className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                                            required
+                                        >
+                                            <option value="" disabled className="dark:bg-slate-900">Pilih Sekolah...</option>
+                                            {availableSchools.map(s => (
+                                                <option key={s} value={s} className="dark:bg-slate-900">{s}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
+                                            <ChevronDownIcon className="w-4 h-4"/>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={schoolName}
+                                        onChange={(e) => setSchoolName(e.target.value)}
+                                        onFocus={() => setIsFocused('school')}
+                                        onBlur={() => setIsFocused(null)}
+                                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                                        placeholder="Nama sekolah..."
+                                        required
+                                    />
+                                )}
+                            </div>
+                        </div>
+
                         <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'name' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                             <div className="px-4 pt-2">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Nama Lengkap</label>
@@ -409,20 +559,29 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Kelas</label>
                                     
-                                    {availableClasses.length > 0 ? (
+                                    {filteredClasses.length > 0 ? (
                                         <div className="relative group">
                                             <select 
                                                 value={studentClass} 
-                                                onChange={(e) => setStudentClass(e.target.value)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setStudentClass(val);
+                                                    const parsed = parseClassConfig(val);
+                                                    if (parsed.schoolName && !schoolName) {
+                                                        setSchoolName(parsed.schoolName);
+                                                    }
+                                                }}
                                                 onFocus={() => setIsFocused('class')}
                                                 onBlur={() => setIsFocused(null)}
                                                 className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
                                                 required
                                             >
                                                 <option value="" disabled className="dark:bg-slate-900">Pilih...</option>
-                                                {availableClasses.map(c => {
-                                                    const { name } = parseClassConfig(c);
-                                                    return <option key={c} value={c} className="dark:bg-slate-900">{name}</option>;
+                                                {filteredClasses.map(c => {
+                                                    const { schoolName: sName, name } = parseClassConfig(c);
+                                                    // Jika schoolName sudah dipilih, tidak perlu tampilkan nama sekolah di opsi kelas
+                                                    const displayName = (sName && !schoolName) ? `${sName} - ${name}` : name;
+                                                    return <option key={c} value={c} className="dark:bg-slate-900">{displayName}</option>;
                                                 })}
                                             </select>
                                             <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">

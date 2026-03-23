@@ -38,9 +38,19 @@ export interface Question {
 }
 
 export interface ExamConfig {
+  examMode: 'PR' | 'UJIAN'; // NEW: Mode PR atau Ujian
+  startDate?: string; // NEW: Tanggal mulai (hanya untuk Ujian)
+  endDate?: string; // NEW: Tanggal selesai (untuk PR dan Ujian)
+  useBankSoal?: boolean; // NEW: Gunakan sistem bank soal
+  bankSoalCount?: number; // NEW: Jumlah soal yang ditampilkan dari bank
+  bankSoalProportions?: {
+    mudah: number; // Persentase soal mudah
+    sedang: number; // Persentase soal sedang
+    sulit: number; // Persentase soal sulit
+  };
   timeLimit: number; // in minutes
-  date: string;
-  startTime: string; // HH:mm
+  date: string; // (Deprecated, use startDate/endDate)
+  startTime: string; // HH:mm (Deprecated, use startDate/endDate)
   allowRetakes: boolean;
   detectBehavior: boolean;
   autoSubmitInactive: boolean;
@@ -87,6 +97,7 @@ export interface Student {
   class: string;
   absentNumber: string; 
   studentId: string; 
+  schoolName?: string;
   resultId?: number; // Added to track DB Primary Key
 }
 

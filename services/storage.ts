@@ -1,11 +1,22 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API key is missing. AI features will not work.");
+      throw new Error("API key is missing. Please set GEMINI_API_KEY or API_KEY.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -72,6 +83,70 @@ function shuffleArray<T>(array: T[]): T[] {
     return newArr;
 }
 
+function selectBankSoalQuestions(questions: Question[], config: ExamConfig): Question[] {
+    if (!config.useBankSoal || !config.bankSoalCount || config.bankSoalCount >= questions.length) {
+        return questions;
+    }
+
+    const totalNeeded = config.bankSoalCount;
+    const props = config.bankSoalProportions || { mudah: 30, sedang: 50, sulit: 20 };
+    
+    const getLevelCategory = (level?: string) => {
+        if (!level) return 'unassigned';
+        const l = level.toLowerCase().trim();
+        if (['mudah', 'lots', '1', 'easy', 'rendah'].includes(l)) return 'mudah';
+        if (['sedang', 'mots', '2', 'medium', 'menengah'].includes(l)) return 'sedang';
+        if (['sulit', 'hots', '3', 'hard', 'tinggi'].includes(l)) return 'sulit';
+        return 'unassigned';
+    };
+
+    const grouped = {
+        mudah: questions.filter(q => getLevelCategory(q.level) === 'mudah'),
+        sedang: questions.filter(q => getLevelCategory(q.level) === 'sedang'),
+        sulit: questions.filter(q => getLevelCategory(q.level) === 'sulit'),
+        unassigned: questions.filter(q => getLevelCategory(q.level) === 'unassigned')
+    };
+
+    let targetMudah = Math.round((props.mudah / 100) * totalNeeded);
+    let targetSedang = Math.round((props.sedang / 100) * totalNeeded);
+    let targetSulit = Math.round((props.sulit / 100) * totalNeeded);
+
+    let currentTotal = targetMudah + targetSedang + targetSulit;
+    while (currentTotal < totalNeeded) { targetSedang++; currentTotal++; }
+    while (currentTotal > totalNeeded) {
+        if (targetSedang > 0) targetSedang--;
+        else if (targetMudah > 0) targetMudah--;
+        else targetSulit--;
+        currentTotal--;
+    }
+
+    const shuffledMudah = shuffleArray(grouped.mudah);
+    const shuffledSedang = shuffleArray(grouped.sedang);
+    const shuffledSulit = shuffleArray(grouped.sulit);
+    const shuffledUnassigned = shuffleArray(grouped.unassigned);
+
+    const selected: Question[] = [];
+
+    const take = (arr: Question[], count: number) => {
+        const taken = arr.splice(0, count);
+        selected.push(...taken);
+        return count - taken.length;
+    };
+
+    const deficitMudah = take(shuffledMudah, targetMudah);
+    const deficitSedang = take(shuffledSedang, targetSedang);
+    const deficitSulit = take(shuffledSulit, targetSulit);
+
+    const totalDeficit = deficitMudah + deficitSedang + deficitSulit;
+    const remaining = [...shuffledMudah, ...shuffledSedang, ...shuffledSulit, ...shuffledUnassigned];
+    
+    if (totalDeficit > 0) {
+        take(remaining, totalDeficit);
+    }
+
+    return selected;
+}
+
 // --- INDEXED DB HELPER ---
 const DB_NAME = 'UjianCerdasDB';
 const DB_VERSION = 1;
@@ -93,9 +168,35 @@ const initDB = (): Promise<IDBDatabase> => {
     });
 };
 
+const stripAnswersFromQuestion = (q: Question): Question => {
+    const sanitizedQ = { ...q } as Question;
+    
+    // SECURITY FIX: Remove correct answers before sending to client
+    delete sanitizedQ.correctAnswer;
+    
+    if (sanitizedQ.trueFalseRows) {
+        sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
+            const newRow = { ...row };
+            delete newRow.answer;
+            return newRow;
+        });
+    }
+    
+    if (sanitizedQ.matchingPairs) {
+        const rightOptions = sanitizedQ.matchingPairs.map(p => p.right);
+        const shuffledRight = shuffleArray(rightOptions);
+        sanitizedQ.matchingPairs = sanitizedQ.matchingPairs.map((pair, idx) => ({
+            left: pair.left,
+            right: shuffledRight[idx]
+        }));
+    }
+    
+    return sanitizedQ;
+};
+
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
-        let questionsToProcess = [...exam.questions];
+        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
         if (exam.config.shuffleQuestions) {
             questionsToProcess = shuffleArray(questionsToProcess);
         }
@@ -107,7 +208,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
                     sanitizedQ.options = shuffleArray(sanitizedQ.options);
                 }
             }
-            return sanitizedQ;
+            return stripAnswersFromQuestion(sanitizedQ);
         });
         return { ...exam, questions: sanitizedQuestions };
     }
@@ -121,7 +222,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     } catch { /* ignore */ }
 
     if (!orderMap) {
-        let questionsToProcess = [...exam.questions];
+        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
         
         // INDEPENDENT LOGIC: Shuffle Questions
         // Only shuffles the order of questions if enabled. Does NOT affect options.
@@ -172,7 +273,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
                  sanitizedQ.options = validStoredOpts;
              }
         }
-        return sanitizedQ;
+        return stripAnswersFromQuestion(sanitizedQ);
     });
 
     return { ...exam, questions: finalQuestions };
@@ -1264,6 +1365,7 @@ class StorageService {
           const prompt = this.generateAnalysisPrompt(summaries);
           
           // Use the new SDK method
+          const ai = getAI();
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview', 
               contents: prompt
@@ -1424,6 +1526,70 @@ class StorageService {
     }
 
     try {
+        // SECURITY FIX: Recalculate score on server-side (or at least using true DB data before insert)
+        // to prevent client-side manipulation of the score.
+        let calculatedScore = resultPayload.score || 0;
+        let calculatedCorrect = resultPayload.correctAnswers || 0;
+        let calculatedTotal = resultPayload.totalQuestions || 0;
+
+        try {
+            const { data: examData } = await supabase.from('exams').select('questions').eq('code', resultPayload.examCode).single();
+            if (examData && examData.questions) {
+                const questions = examData.questions as Question[];
+                const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                calculatedTotal = scorableQuestions.length;
+                calculatedCorrect = 0;
+
+                const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                const parseList = (str: unknown): string[] => {
+                    if (!str) return [];
+                    try {
+                        const parsed = JSON.parse(String(str));
+                        if (Array.isArray(parsed)) return parsed.map(String);
+                    } catch { /* ignore */ }
+                    return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+                };
+
+                scorableQuestions.forEach((q: Question) => {
+                    const studentAnswer = resultPayload.answers[q.id];
+                    if (!studentAnswer) return;
+
+                    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                         if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                    } 
+                    else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                         const studentSet = new Set(parseList(studentAnswer).map(normalize));
+                         const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                         if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                             calculatedCorrect++;
+                         }
+                    }
+                    else if (q.questionType === 'TRUE_FALSE') {
+                        try {
+                            const ansObj = JSON.parse(studentAnswer);
+                            const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                                return ansObj[idx] === row.answer;
+                            });
+                            if (allCorrect) calculatedCorrect++;
+                        } catch { /* ignore */ }
+                    }
+                    else if (q.questionType === 'MATCHING') {
+                        try {
+                            const ansObj = JSON.parse(studentAnswer);
+                            const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                                return ansObj[idx] === pair.right;
+                            });
+                            if (allCorrect) calculatedCorrect++;
+                        } catch { /* ignore */ }
+                    }
+                });
+
+                calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+            }
+        } catch (err) {
+            console.error("Failed to recalculate score securely", err);
+        }
+
         let data, error;
 
         // CRITICAL FIX: If resultId exists, update by Primary Key ID.
@@ -1436,9 +1602,9 @@ class StorageService {
                     answers: resultPayload.answers || {},
                     status: resultPayload.status,
                     activity_log: resultPayload.activityLog || [],
-                    score: resultPayload.score || 0,
-                    correct_answers: resultPayload.correctAnswers || 0,
-                    total_questions: resultPayload.totalQuestions || 0,
+                    score: calculatedScore,
+                    correct_answers: calculatedCorrect,
+                    total_questions: calculatedTotal,
                     location: resultPayload.location,
                     updated_at: new Date().toISOString()
                 })
@@ -1458,9 +1624,9 @@ class StorageService {
                 answers: resultPayload.answers || {}, 
                 status: resultPayload.status,
                 activity_log: resultPayload.activityLog || [], 
-                score: resultPayload.score || 0, 
-                correct_answers: resultPayload.correctAnswers || 0,
-                total_questions: resultPayload.totalQuestions || 0, 
+                score: calculatedScore, 
+                correct_answers: calculatedCorrect,
+                total_questions: calculatedTotal, 
                 location: resultPayload.location, 
                 updated_at: new Date().toISOString()
             }, { onConflict: 'exam_code,student_id' })
@@ -1514,12 +1680,75 @@ class StorageService {
       
       for (const payload of queueCopy) {
           try {
+             // SECURITY FIX: Recalculate score before processing queue item
+             let calculatedScore = payload.score || 0;
+             let calculatedCorrect = payload.correctAnswers || 0;
+             let calculatedTotal = payload.totalQuestions || 0;
+
+             try {
+                 const { data: examData } = await supabase.from('exams').select('questions').eq('code', payload.examCode).single();
+                 if (examData && examData.questions) {
+                     const questions = examData.questions as Question[];
+                     const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                     calculatedTotal = scorableQuestions.length;
+                     calculatedCorrect = 0;
+
+                     const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                     const parseList = (str: unknown): string[] => {
+                         if (!str) return [];
+                         try {
+                             const parsed = JSON.parse(String(str));
+                             if (Array.isArray(parsed)) return parsed.map(String);
+                         } catch { /* ignore */ }
+                         return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+                     };
+
+                     scorableQuestions.forEach((q: Question) => {
+                         const studentAnswer = payload.answers[q.id];
+                         if (!studentAnswer) return;
+
+                         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                         } 
+                         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                              const studentSet = new Set(parseList(studentAnswer).map(normalize));
+                              const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                                  calculatedCorrect++;
+                              }
+                         }
+                         else if (q.questionType === 'TRUE_FALSE') {
+                             try {
+                                 const ansObj = JSON.parse(studentAnswer);
+                                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                                     return ansObj[idx] === row.answer;
+                                 });
+                                 if (allCorrect) calculatedCorrect++;
+                             } catch { /* ignore */ }
+                         }
+                         else if (q.questionType === 'MATCHING') {
+                             try {
+                                 const ansObj = JSON.parse(studentAnswer);
+                                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                                     return ansObj[idx] === pair.right;
+                                 });
+                                 if (allCorrect) calculatedCorrect++;
+                             } catch { /* ignore */ }
+                         }
+                     });
+
+                     calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+                 }
+             } catch (err) {
+                 console.error("Failed to recalculate score securely in queue", err);
+             }
+
              const student = payload.student;
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
                 class_name: student.class, answers: payload.answers || {}, status: payload.status,
-                activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
-                total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
+                activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
+                total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
              
              if (error) {

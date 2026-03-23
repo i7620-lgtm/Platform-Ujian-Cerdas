@@ -226,12 +226,20 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         const tick = () => {
             let targetDate: number;
             
+            const mode = exam.config.examMode || 'UJIAN';
+            if (mode === 'PR') {
+                setIsStarted(true);
+                setTimeLeft(null);
+                return;
+            }
+
+            const dateStr = exam.config.startDate || exam.config.date;
+            
             // Check if date is ISO string (new format) or YYYY-MM-DD (legacy)
-            if (exam.config.date.includes('T') && exam.config.date.length > 10) {
-                targetDate = new Date(exam.config.date).getTime();
+            if (dateStr.includes('T') && dateStr.length > 10) {
+                targetDate = new Date(dateStr).getTime();
             } else {
-                const dateStr = exam.config.date;
-                targetDate = new Date(`${dateStr}T${exam.config.startTime}`).getTime();
+                targetDate = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`).getTime();
             }
             
             const now = new Date().getTime();
@@ -328,18 +336,23 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
     const getFormattedStartDate = () => {
         if (!exam) return '';
         
+        const mode = exam.config.examMode || 'UJIAN';
+        if (mode === 'PR') {
+            return 'Dapat dikerjakan kapan saja';
+        }
+
         try {
             let date: Date;
-            if (exam.config.date.includes('T') && exam.config.date.length > 10) {
+            const dateStr = exam.config.startDate || exam.config.date;
+            if (dateStr.includes('T') && dateStr.length > 10) {
                 // ISO String (UTC)
-                date = new Date(exam.config.date);
+                date = new Date(dateStr);
             } else {
                 // Legacy
-                const dateStr = exam.config.date;
-                date = new Date(`${dateStr}T${exam.config.startTime}`);
+                date = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
             }
 
-            if (isNaN(date.getTime())) return `${exam.config.date} ${exam.config.startTime}`;
+            if (isNaN(date.getTime())) return `${dateStr} ${exam.config.startTime || '00:00'}`;
             
             const datePart = date.toLocaleDateString('id-ID', { 
                 weekday: 'long', 
@@ -379,7 +392,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             
             return `${datePart} pukul ${timePart} ${timeZoneName}`;
         } catch {
-            return `${exam.config.date} ${exam.config.startTime}`;
+            const dateStr = exam.config.startDate || exam.config.date;
+            return `${dateStr} ${exam.config.startTime || '00:00'}`;
         }
     };
 
