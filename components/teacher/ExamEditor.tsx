@@ -498,7 +498,15 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 return newConfig;
             });
         } else {
-            setConfig(prev => ({ ...prev, [name]: name === 'timeLimit' ? parseInt(value) : value }));
+            setConfig(prev => {
+                const newConfig = { ...prev, [name]: name === 'timeLimit' ? (parseInt(value) || 0) : value };
+                if (name === 'examMode' && value === 'PR') {
+                    newConfig.detectBehavior = false;
+                    newConfig.continueWithPermission = false;
+                    newConfig.trackLocation = false;
+                }
+                return newConfig;
+            });
         }
     };
 
@@ -881,7 +889,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                             </div>
 
                             <div 
-                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'PR' }))}
+                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'PR', detectBehavior: false, continueWithPermission: false, trackLocation: false }))}
                                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === 'PR' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-200'}`}
                             >
                                 <div className="flex items-center gap-2 mb-1">
@@ -903,24 +911,34 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                             </>
                         )}
                         <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tenggat Waktu / Tanggal Selesai</label><input type="date" name="endDate" value={config.endDate || config.date || new Date().toISOString().split('T')[0]} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Durasi Pengerjaan (Menit)</label><input type="number" name="timeLimit" value={config.timeLimit} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
+                        {(config.examMode === 'UJIAN' || !config.examMode) && (
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Durasi Pengerjaan (Menit)</label>
+                                <input type="number" name="timeLimit" value={config.timeLimit || ''} placeholder="0" onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" />
+                                <p className="text-xs text-slate-500 mt-1">Isi 0 untuk tanpa batas waktu.</p>
+                            </div>
+                        )}
                         
                         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Soal</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Opsi</span></label>
                            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Kecurangan</span></label>
-                           {config.detectBehavior && (
-                            <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
-                                <input 
-                                    type="checkbox" 
-                                    name="continueWithPermission" 
-                                    checked={config.continueWithPermission} 
-                                    onChange={handleConfigChange} 
-                                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500" 
-                                />
-                                <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
-                            </label>
+                           {config.examMode !== 'PR' && (
+                               <>
+                                   <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Kecurangan</span></label>
+                                   {config.detectBehavior && (
+                                    <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
+                                        <input 
+                                            type="checkbox" 
+                                            name="continueWithPermission" 
+                                            checked={config.continueWithPermission} 
+                                            onChange={handleConfigChange} 
+                                            className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500" 
+                                        />
+                                        <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
+                                    </label>
+                                   )}
+                               </>
                            )}
                         </div>
 
@@ -1007,7 +1025,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     {hasManualGrading && <div className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai atau Isian Singkat.</div>}
                                 </div>
                                 <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
+                                {config.examMode !== 'PR' && (
+                                    <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
+                                )}
                              </div>
 
                              <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
