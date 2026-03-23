@@ -168,6 +168,32 @@ const initDB = (): Promise<IDBDatabase> => {
     });
 };
 
+const stripAnswersFromQuestion = (q: Question): Question => {
+    const sanitizedQ = { ...q } as Question;
+    
+    // SECURITY FIX: Remove correct answers before sending to client
+    delete sanitizedQ.correctAnswer;
+    
+    if (sanitizedQ.trueFalseRows) {
+        sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
+            const newRow = { ...row };
+            delete newRow.answer;
+            return newRow;
+        });
+    }
+    
+    if (sanitizedQ.matchingPairs) {
+        const rightOptions = sanitizedQ.matchingPairs.map(p => p.right);
+        const shuffledRight = shuffleArray(rightOptions);
+        sanitizedQ.matchingPairs = sanitizedQ.matchingPairs.map((pair, idx) => ({
+            left: pair.left,
+            right: shuffledRight[idx]
+        }));
+    }
+    
+    return sanitizedQ;
+};
+
 const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
     if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
         let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
@@ -182,7 +208,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
                     sanitizedQ.options = shuffleArray(sanitizedQ.options);
                 }
             }
-            return sanitizedQ;
+            return stripAnswersFromQuestion(sanitizedQ);
         });
         return { ...exam, questions: sanitizedQuestions };
     }
@@ -247,7 +273,7 @@ const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
                  sanitizedQ.options = validStoredOpts;
              }
         }
-        return sanitizedQ;
+        return stripAnswersFromQuestion(sanitizedQ);
     });
 
     return { ...exam, questions: finalQuestions };
@@ -1500,6 +1526,70 @@ class StorageService {
     }
 
     try {
+        // SECURITY FIX: Recalculate score on server-side (or at least using true DB data before insert)
+        // to prevent client-side manipulation of the score.
+        let calculatedScore = resultPayload.score || 0;
+        let calculatedCorrect = resultPayload.correctAnswers || 0;
+        let calculatedTotal = resultPayload.totalQuestions || 0;
+
+        try {
+            const { data: examData } = await supabase.from('exams').select('questions').eq('code', resultPayload.examCode).single();
+            if (examData && examData.questions) {
+                const questions = examData.questions as Question[];
+                const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                calculatedTotal = scorableQuestions.length;
+                calculatedCorrect = 0;
+
+                const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                const parseList = (str: unknown): string[] => {
+                    if (!str) return [];
+                    try {
+                        const parsed = JSON.parse(String(str));
+                        if (Array.isArray(parsed)) return parsed.map(String);
+                    } catch { /* ignore */ }
+                    return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+                };
+
+                scorableQuestions.forEach((q: Question) => {
+                    const studentAnswer = resultPayload.answers[q.id];
+                    if (!studentAnswer) return;
+
+                    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                         if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                    } 
+                    else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                         const studentSet = new Set(parseList(studentAnswer).map(normalize));
+                         const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                         if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                             calculatedCorrect++;
+                         }
+                    }
+                    else if (q.questionType === 'TRUE_FALSE') {
+                        try {
+                            const ansObj = JSON.parse(studentAnswer);
+                            const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                                return ansObj[idx] === row.answer;
+                            });
+                            if (allCorrect) calculatedCorrect++;
+                        } catch { /* ignore */ }
+                    }
+                    else if (q.questionType === 'MATCHING') {
+                        try {
+                            const ansObj = JSON.parse(studentAnswer);
+                            const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                                return ansObj[idx] === pair.right;
+                            });
+                            if (allCorrect) calculatedCorrect++;
+                        } catch { /* ignore */ }
+                    }
+                });
+
+                calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+            }
+        } catch (err) {
+            console.error("Failed to recalculate score securely", err);
+        }
+
         let data, error;
 
         // CRITICAL FIX: If resultId exists, update by Primary Key ID.
@@ -1512,9 +1602,9 @@ class StorageService {
                     answers: resultPayload.answers || {},
                     status: resultPayload.status,
                     activity_log: resultPayload.activityLog || [],
-                    score: resultPayload.score || 0,
-                    correct_answers: resultPayload.correctAnswers || 0,
-                    total_questions: resultPayload.totalQuestions || 0,
+                    score: calculatedScore,
+                    correct_answers: calculatedCorrect,
+                    total_questions: calculatedTotal,
                     location: resultPayload.location,
                     updated_at: new Date().toISOString()
                 })
@@ -1534,9 +1624,9 @@ class StorageService {
                 answers: resultPayload.answers || {}, 
                 status: resultPayload.status,
                 activity_log: resultPayload.activityLog || [], 
-                score: resultPayload.score || 0, 
-                correct_answers: resultPayload.correctAnswers || 0,
-                total_questions: resultPayload.totalQuestions || 0, 
+                score: calculatedScore, 
+                correct_answers: calculatedCorrect,
+                total_questions: calculatedTotal, 
                 location: resultPayload.location, 
                 updated_at: new Date().toISOString()
             }, { onConflict: 'exam_code,student_id' })
@@ -1590,12 +1680,75 @@ class StorageService {
       
       for (const payload of queueCopy) {
           try {
+             // SECURITY FIX: Recalculate score before processing queue item
+             let calculatedScore = payload.score || 0;
+             let calculatedCorrect = payload.correctAnswers || 0;
+             let calculatedTotal = payload.totalQuestions || 0;
+
+             try {
+                 const { data: examData } = await supabase.from('exams').select('questions').eq('code', payload.examCode).single();
+                 if (examData && examData.questions) {
+                     const questions = examData.questions as Question[];
+                     const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                     calculatedTotal = scorableQuestions.length;
+                     calculatedCorrect = 0;
+
+                     const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                     const parseList = (str: unknown): string[] => {
+                         if (!str) return [];
+                         try {
+                             const parsed = JSON.parse(String(str));
+                             if (Array.isArray(parsed)) return parsed.map(String);
+                         } catch { /* ignore */ }
+                         return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+                     };
+
+                     scorableQuestions.forEach((q: Question) => {
+                         const studentAnswer = payload.answers[q.id];
+                         if (!studentAnswer) return;
+
+                         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                         } 
+                         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                              const studentSet = new Set(parseList(studentAnswer).map(normalize));
+                              const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                                  calculatedCorrect++;
+                              }
+                         }
+                         else if (q.questionType === 'TRUE_FALSE') {
+                             try {
+                                 const ansObj = JSON.parse(studentAnswer);
+                                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                                     return ansObj[idx] === row.answer;
+                                 });
+                                 if (allCorrect) calculatedCorrect++;
+                             } catch { /* ignore */ }
+                         }
+                         else if (q.questionType === 'MATCHING') {
+                             try {
+                                 const ansObj = JSON.parse(studentAnswer);
+                                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                                     return ansObj[idx] === pair.right;
+                                 });
+                                 if (allCorrect) calculatedCorrect++;
+                             } catch { /* ignore */ }
+                         }
+                     });
+
+                     calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+                 }
+             } catch (err) {
+                 console.error("Failed to recalculate score securely in queue", err);
+             }
+
              const student = payload.student;
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
                 class_name: student.class, answers: payload.answers || {}, status: payload.status,
-                activity_log: payload.activityLog, score: payload.score || 0, correct_answers: payload.correctAnswers || 0,
-                total_questions: payload.totalQuestions || 0, location: payload.location, updated_at: new Date().toISOString()
+                activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
+                total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
              
              if (error) {
