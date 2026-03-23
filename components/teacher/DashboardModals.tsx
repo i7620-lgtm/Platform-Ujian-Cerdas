@@ -21,7 +21,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
     const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
-    const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, class: string, absentNumber: string } | null>(null);
+    const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, schoolName?: string, class: string, absentNumber: string } | null>(null);
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -257,7 +257,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                         <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
                                     </button>
                                 )}
-                                {!isReadOnly && (
+                                {!isReadOnly && displayExam.config.examMode !== 'PR' && (
                                     <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800">
                                         <PlusCircleIcon className="w-4 h-4"/> <span className="hidden sm:inline">Waktu</span>
                                     </button>
@@ -270,12 +270,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         
                         {/* Status Counters */}
                         <div className="flex items-center gap-6 py-2 border-y border-slate-50 dark:border-slate-700/50">
-                            <div className="flex items-center gap-2" title="Locked (Terkunci)">
-                                <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
-                                    {lockedCount}
+                            {displayExam.config.examMode !== 'PR' && (
+                                <div className="flex items-center gap-2" title="Locked (Terkunci)">
+                                    <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
+                                        {lockedCount}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
-                            </div>
+                            )}
                             <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
                                 <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
                                     {onlineCount}
@@ -368,7 +370,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                 </div>
                                             </th>
                                             )}
-                                            {displayExam.config.trackLocation && (
+                                            {displayExam.config.trackLocation && displayExam.config.examMode !== 'PR' && (
                                             <th className="px-5 py-4 text-center w-32">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                                     <SignalIcon className="w-3.5 h-3.5 sm:hidden" />
@@ -404,6 +406,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             <div>
                                                                 <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
                                                                 <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono tracking-wide">#{r.student.studentId.split('-').pop()}</div>
+                                                                {r.student.schoolName && (
+                                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -451,7 +456,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         </span>
                                                     </td>
                                                     )}
-                                                    {displayExam.config.trackLocation && (
+                                                    {displayExam.config.trackLocation && displayExam.config.examMode !== 'PR' && (
                                                     <td className="px-5 py-3 text-center">
                                                         {r.location ? (
                                                             <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2 py-1 rounded transition-colors border border-blue-100 dark:border-blue-900">
@@ -487,6 +492,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                             id: r.id!, // Pass the primary key ID
                                                                             studentId: r.student.studentId, // Keep original studentId for reference if needed
                                                                             fullName: r.student.fullName, 
+                                                                            schoolName: r.student.schoolName || '',
                                                                             class: r.student.class, 
                                                                             absentNumber: derivedAbsent 
                                                                         });
@@ -503,7 +509,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 >
                                                                     <TrashIcon className="w-4 h-4" />
                                                                 </button>
-                                                                {(r.status === 'in_progress' || r.status === 'force_closed') && (
+                                                                {(r.status === 'in_progress' || r.status === 'force_closed') && displayExam.config.examMode !== 'PR' && (
                                                                     <button 
                                                                         onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
                                                                         className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
@@ -518,7 +524,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             ); 
                                         }) : (
                                             <tr>
-                                                <td colSpan={4 + (!isLargeScale ? 2 : 0) + (displayExam.config.trackLocation ? 1 : 0)} className="px-6 py-20 text-center">
+                                                <td colSpan={4 + (!isLargeScale ? 2 : 0) + ((displayExam.config.trackLocation && displayExam.config.examMode !== 'PR') ? 1 : 0)} className="px-6 py-20 text-center">
                                                     <div className="flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-2">
                                                         <UserIcon className="w-8 h-8 opacity-20"/>
                                                         <span className="text-sm font-medium italic">Belum ada siswa yang bergabung...</span>
@@ -555,6 +561,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     value={editingStudent.fullName} 
                                     onChange={e => setEditingStudent({...editingStudent, fullName: e.target.value})}
                                     className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Nama Sekolah</label>
+                                <input 
+                                    type="text" 
+                                    value={editingStudent.schoolName || ''} 
+                                    onChange={e => setEditingStudent({...editingStudent, schoolName: e.target.value})}
+                                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold"
+                                    placeholder="Opsional"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -702,40 +718,42 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </div>
 
                             {/* Step 3 */}
-                            <div className="flex gap-4">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
-                                <div className="w-full">
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Membuka Blokir)</h4>
-                                    <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis dan statusnya menjadi <strong>Locked</strong>.</p>
-                                    
-                                    <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row items-center gap-4 justify-center">
-                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
-                                            <div>
-                                                <p className="font-bold text-sm text-slate-800 dark:text-white">Andi Wijaya</p>
-                                                <span className="px-2 py-0.5 mt-1 inline-block bg-rose-50 text-rose-600 rounded text-[9px] font-black uppercase border border-rose-100">Locked</span>
+                            {displayExam.config.examMode !== 'PR' && (
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
+                                    <div className="w-full">
+                                        <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Membuka Blokir)</h4>
+                                        <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis dan statusnya menjadi <strong>Locked</strong>.</p>
+                                        
+                                        <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row items-center gap-4 justify-center">
+                                            <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-800 dark:text-white">Andi Wijaya</p>
+                                                    <span className="px-2 py-0.5 mt-1 inline-block bg-rose-50 text-rose-600 rounded text-[9px] font-black uppercase border border-rose-100">Locked</span>
+                                                </div>
+                                                <button className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                                                    Buat Token
+                                                </button>
                                             </div>
-                                            <button className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
-                                                Buat Token
-                                            </button>
+                                            <div className="hidden sm:block text-slate-400">
+                                                <ArrowPathIcon className="w-5 h-5 animate-spin-slow" />
+                                            </div>
+                                            <div className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 shadow-inner text-center">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Token Akses</p>
+                                                <span className="text-xl font-mono font-black tracking-widest text-slate-800 dark:text-white">A1B2C</span>
+                                            </div>
                                         </div>
-                                        <div className="hidden sm:block text-slate-400">
-                                            <ArrowPathIcon className="w-5 h-5 animate-spin-slow" />
-                                        </div>
-                                        <div className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 shadow-inner text-center">
-                                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Token Akses</p>
-                                            <span className="text-xl font-mono font-black tracking-widest text-slate-800 dark:text-white">A1B2C</span>
-                                        </div>
-                                    </div>
 
-                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 mb-3">
-                                        <p className="text-xs text-indigo-800 dark:text-indigo-300 font-medium">Untuk membuka blokir, klik tombol <strong>Buat Token</strong> di kolom Aksi pada baris siswa tersebut. Berikan token yang muncul kepada siswa agar mereka dapat melanjutkan ujian.</p>
+                                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 mb-3">
+                                            <p className="text-xs text-indigo-800 dark:text-indigo-300 font-medium">Untuk membuka blokir, klik tombol <strong>Buat Token</strong> di kolom Aksi pada baris siswa tersebut. Berikan token yang muncul kepada siswa agar mereka dapat melanjutkan ujian.</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Step 4 */}
                             <div className="flex gap-4">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">4</div>
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">{displayExam.config.examMode === 'PR' ? '3' : '4'}</div>
                                 <div>
                                     <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Membagikan Link Pantauan (Opsional)</h4>
                                     <p className="mb-3">Jika Anda ingin orang tua atau pengawas lain ikut memantau jalannya ujian secara *real-time* (tanpa bisa mengubah pengaturan), klik tombol <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded font-bold text-xs"><ShareIcon className="w-3 h-3"/> Stream</span>. Bagikan link atau QR Code yang muncul kepada mereka.</p>
@@ -1154,7 +1172,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Nilai</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">B/S/K</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Aktivitas</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Lokasi</th>
+                                            {displayExam.config.trackLocation && displayExam.config.examMode !== 'PR' && (
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Lokasi</th>
+                                            )}
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Aksi</th>
                                         </tr>
                                     </thead>
@@ -1172,6 +1192,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 <div>
                                                                     <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
                                                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
+                                                                    {r.student.schoolName && (
+                                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1191,11 +1214,13 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-800">Aman</span>
                                                             )}
                                                         </td>
-                                                        <td className="px-6 py-4 text-center text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                                            {displayExam.config.trackLocation && r.location ? (
-                                                                <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
-                                                            ) : '-'}
-                                                        </td>
+                                                        {displayExam.config.trackLocation && displayExam.config.examMode !== 'PR' && (
+                                                            <td className="px-6 py-4 text-center text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                                                {r.location ? (
+                                                                    <a href={`https://www.google.com/maps?q=${r.location}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1">Maps ↗</a>
+                                                                ) : '-'}
+                                                            </td>
+                                                        )}
                                                         <td className="px-6 py-4 text-right">
                                                             <button 
                                                                 onClick={(e) => { e.stopPropagation(); handleDeleteResult(r.student.studentId, r.student.fullName); }} 
