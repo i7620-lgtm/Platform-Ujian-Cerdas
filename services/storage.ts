@@ -4,8 +4,19 @@ import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, 
 import { compressImage } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API key is missing. AI features will not work.");
+      throw new Error("API key is missing. Please set GEMINI_API_KEY or API_KEY.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 // Helper: Convert Base64 to Blob for Upload
 const base64ToBlob = (base64: string): Blob => {
@@ -1328,6 +1339,7 @@ class StorageService {
           const prompt = this.generateAnalysisPrompt(summaries);
           
           // Use the new SDK method
+          const ai = getAI();
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview', 
               contents: prompt
