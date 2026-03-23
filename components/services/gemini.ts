@@ -2,9 +2,25 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType } from "../../types";
 import { markdownToHtml } from "../teacher/examUtils";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || "" });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API key is missing. AI features will not work.");
+      // We still initialize it so it doesn't crash the app, but it will throw when used.
+      // Wait, GoogleGenAI throws on instantiation if apiKey is empty.
+      // So we must throw our own error or handle it.
+      throw new Error("API key is missing. Please set GEMINI_API_KEY or API_KEY.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
+  const ai = getAI();
   const imageInstruction = config.includeImages 
     ? `\n    - imageSearchKeyword: kata kunci pencarian gambar dalam bahasa Inggris yang sangat spesifik dan akurat untuk soal ini (maksimal 2-3 kata, contoh: "chloroplast structure", "borobudur temple", "mitosis"). WAJIB diisi karena pengguna meminta gambar referensi.`
     : '';
