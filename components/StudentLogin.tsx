@@ -1,5 +1,5 @@
- 
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
@@ -161,6 +161,23 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   // Derived state for absent limit
   const { limit: absentLimit } = parseClassConfig(studentClass);
 
+  const availableSchools = useMemo(() => {
+      const schools = new Set<string>();
+      availableClasses.forEach(c => {
+          const parsed = parseClassConfig(c);
+          if (parsed.schoolName) schools.add(parsed.schoolName);
+      });
+      return Array.from(schools);
+  }, [availableClasses]);
+
+  const filteredClasses = useMemo(() => {
+      if (!schoolName) return availableClasses;
+      return availableClasses.filter(c => {
+          const parsed = parseClassConfig(c);
+          return !parsed.schoolName || parsed.schoolName === schoolName;
+      });
+  }, [availableClasses, schoolName]);
+
   // Auto-fetch config when code changes to determine if dropdown should be used
   useEffect(() => {
     const checkConfig = async () => {
@@ -182,6 +199,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 });
                 if (schools.size === 1) {
                     setSchoolName(Array.from(schools)[0]);
+                } else if (schools.size > 1 && !schools.has(schoolName)) {
+                    setSchoolName('');
                 }
             } else {
                 setAvailableClasses([]);
@@ -271,8 +290,15 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 let endDateTime: Date;
                 if (endDateStr.includes('T') && endDateStr.length > 10) {
                     endDateTime = new Date(endDateStr);
-                    // If it's falling back to start date ISO string, we need to add the time limit
-                    endDateTime = new Date(endDateTime.getTime() + (examConfig.timeLimit * 60000));
+                    if (!examConfig.endDate) {
+                        // If it's falling back to start date ISO string, we need to add the time limit
+                        // If timeLimit is 0 (unlimited), we assume it's available until the end of the day
+                        if (examConfig.timeLimit > 0) {
+                            endDateTime = new Date(endDateTime.getTime() + (examConfig.timeLimit * 60000));
+                        } else {
+                            endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                        }
+                    }
                 } else {
                     endDateTime = new Date(`${endDateStr}T23:59:59`);
                 }
@@ -474,16 +500,40 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                         <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'school' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                             <div className="px-4 pt-2">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Asal Sekolah</label>
-                                <input
-                                    type="text"
-                                    value={schoolName}
-                                    onChange={(e) => setSchoolName(e.target.value)}
-                                    onFocus={() => setIsFocused('school')}
-                                    onBlur={() => setIsFocused(null)}
-                                    className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
-                                    placeholder="Nama sekolah..."
-                                    required
-                                />
+                                {availableSchools.length > 0 ? (
+                                    <div className="relative group">
+                                        <select
+                                            value={schoolName}
+                                            onChange={(e) => {
+                                                setSchoolName(e.target.value);
+                                                setStudentClass(''); // Reset class when school changes
+                                            }}
+                                            onFocus={() => setIsFocused('school')}
+                                            onBlur={() => setIsFocused(null)}
+                                            className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                                            required
+                                        >
+                                            <option value="" disabled className="dark:bg-slate-900">Pilih Sekolah...</option>
+                                            {availableSchools.map(s => (
+                                                <option key={s} value={s} className="dark:bg-slate-900">{s}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
+                                            <ChevronDownIcon className="w-4 h-4"/>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={schoolName}
+                                        onChange={(e) => setSchoolName(e.target.value)}
+                                        onFocus={() => setIsFocused('school')}
+                                        onBlur={() => setIsFocused(null)}
+                                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                                        placeholder="Nama sekolah..."
+                                        required
+                                    />
+                                )}
                             </div>
                         </div>
 
@@ -509,7 +559,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Kelas</label>
                                     
-                                    {availableClasses.length > 0 ? (
+                                    {filteredClasses.length > 0 ? (
                                         <div className="relative group">
                                             <select 
                                                 value={studentClass} 
@@ -517,7 +567,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                                     const val = e.target.value;
                                                     setStudentClass(val);
                                                     const parsed = parseClassConfig(val);
-                                                    if (parsed.schoolName) {
+                                                    if (parsed.schoolName && !schoolName) {
                                                         setSchoolName(parsed.schoolName);
                                                     }
                                                 }}
@@ -527,9 +577,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                                 required
                                             >
                                                 <option value="" disabled className="dark:bg-slate-900">Pilih...</option>
-                                                {availableClasses.map(c => {
+                                                {filteredClasses.map(c => {
                                                     const { schoolName: sName, name } = parseClassConfig(c);
-                                                    const displayName = sName ? `${sName} - ${name}` : name;
+                                                    // Jika schoolName sudah dipilih, tidak perlu tampilkan nama sekolah di opsi kelas
+                                                    const displayName = (sName && !schoolName) ? `${sName} - ${name}` : name;
                                                     return <option key={c} value={c} className="dark:bg-slate-900">{displayName}</option>;
                                                 })}
                                             </select>
