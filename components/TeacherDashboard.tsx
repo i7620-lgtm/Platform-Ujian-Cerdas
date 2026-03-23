@@ -207,7 +207,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         } else {
             // Check status based on the ISO time
             const start = new Date(isoStart);
-            const end = new Date(start.getTime() + config.timeLimit * 60 * 1000);
+            let end: Date;
+            if (config.examMode === 'PR' || config.timeLimit === 0) {
+                const endDateStr = config.endDate || config.date;
+                end = endDateStr.includes('T') ? new Date(endDateStr.split('T')[0] + 'T23:59:59') : new Date(`${endDateStr}T23:59:59`);
+            } else {
+                end = new Date(start.getTime() + config.timeLimit * 60 * 1000);
+            }
             
             if (now >= start && now <= end) {
                 setView('ONGOING');
@@ -389,11 +395,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         }
 
         let end: Date;
-        if (mode === 'PR') {
-            start = new Date(0); // PR is always available before end date
-            end = exam.config.endDate ? new Date(`${exam.config.endDate}T23:59:59`) : new Date(8640000000000000); // Max date if no end date
+        if (mode === 'PR' || exam.config.timeLimit === 0) {
+            if (mode === 'PR') start = new Date(0); // PR is always available before end date
+            const endDateStr = exam.config.endDate || exam.config.date;
+            end = endDateStr.includes('T') ? new Date(endDateStr.split('T')[0] + 'T23:59:59') : new Date(`${endDateStr}T23:59:59`);
         } else {
-            end = exam.config.endDate ? new Date(`${exam.config.endDate}T23:59:59`) : new Date(start.getTime() + exam.config.timeLimit * 60000);
+            end = new Date(start.getTime() + exam.config.timeLimit * 60000);
         }
 
         return { start, end };
