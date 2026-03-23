@@ -412,7 +412,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             ["Tingkat Kelas", exam.config.classLevel],
             ["Tipe Ujian", exam.config.examType],
             ["Tanggal", exam.config.date],
-            ["Durasi", `${exam.config.timeLimit} Menit`],
+            ["Durasi", exam.config.examMode === 'PR' ? 'Tanpa Batas' : (exam.config.timeLimit > 0 ? `${exam.config.timeLimit} Menit` : 'Tanpa Batas')],
             ["Pembuat", exam.authorName],
             ["Sekolah", exam.authorSchool],
             ["Status", exam.status],
@@ -486,7 +486,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             // Construct Scheduled Times
             const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
             const scheduledStart = new Date(`${dateStr}T${exam.config.startTime}`);
-            const scheduledEnd = new Date(scheduledStart.getTime() + exam.config.timeLimit * 60000);
+            let scheduledEnd: Date;
+            if (exam.config.examMode !== 'PR' && exam.config.timeLimit > 0) {
+                scheduledEnd = new Date(scheduledStart.getTime() + exam.config.timeLimit * 60000);
+            } else {
+                const endDateStr = exam.config.endDate || exam.config.date;
+                scheduledEnd = endDateStr.includes('T') ? new Date(endDateStr.split('T')[0] + 'T23:59:59') : new Date(`${endDateStr}T23:59:59`);
+            }
 
             if (r.status === 'force_closed') {
                 // Lupa Absen / Force Closed -> Use Scheduled Times
