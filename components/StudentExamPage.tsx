@@ -104,7 +104,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const lastBroadcastTimeRef = useRef<number>(0);
     
     // Monitoring Status
-    const isMonitoring = activeExam.config.detectBehavior;
+    const isMonitoring = activeExam.config.detectBehavior && activeExam.config.examMode !== 'PR';
     const monitoringLabel = activeExam.config.continueWithPermission ? 'Diawasi & Terkunci' : 'Diawasi Sistem';
 
     // Click outside to close dropdown
@@ -200,7 +200,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
 
     useEffect(() => {
-        if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior) return;
+        if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior || activeExam.config.examMode === 'PR') return;
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             if (isSubmittingRef.current) return;
             
@@ -224,17 +224,19 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [activeExam, student, handleSubmit, STORAGE_KEY]);
 
     useEffect(() => {
-        if (activeExam.config.trackLocation && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
+        if (activeExam.config.trackLocation && activeExam.config.examMode !== 'PR' && student.class !== 'PREVIEW' && 'geolocation' in navigator) {
             navigator.geolocation.getCurrentPosition((pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`));
         }
-    }, [activeExam.config.trackLocation, student.class]);
+    }, [activeExam.config.trackLocation, activeExam.config.examMode, student.class]);
 
     const [deadline, setDeadline] = useState<number>(0);
 
     useEffect(() => {
         if (student.class === 'PREVIEW') {
+            const mode = activeExam.config.examMode || 'UJIAN';
+            const timeLimitMs = mode === 'PR' ? 0 : (activeExam.config.timeLimit || 0) * 60 * 1000;
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setDeadline(Date.now() + (activeExam.config.timeLimit * 60 * 1000));
+            setDeadline(timeLimitMs > 0 ? Date.now() + timeLimitMs : Infinity);
             return;
         }
         
@@ -242,8 +244,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         
         // Waktu mulai pengerjaan aktual oleh siswa
         const actualStartTime = initialData?.timestamp || Date.now();
-        const timeLimitMs = activeExam.config.timeLimit * 60 * 1000;
-        let calculatedDeadline = actualStartTime + timeLimitMs;
+        const timeLimitMs = mode === 'PR' ? 0 : (activeExam.config.timeLimit || 0) * 60 * 1000;
+        let calculatedDeadline = timeLimitMs > 0 ? actualStartTime + timeLimitMs : Infinity;
 
         // Cek batas akhir ujian (endDate)
         const endDateStr = activeExam.config.endDate || activeExam.config.date;
@@ -253,9 +255,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 endDateTime = new Date(endDateStr);
                 if (mode === 'UJIAN' && !activeExam.config.endDate) {
                     // Jika fallback ke startDate ISO string, tambahkan timeLimit
-                    endDateTime = new Date(endDateTime.getTime() + timeLimitMs);
-                } else if (mode === 'PR' && !activeExam.config.endDate) {
-                    // Jika fallback ke startDate ISO string untuk PR, batasnya akhir hari tersebut
+                    if (timeLimitMs > 0) {
+                        endDateTime = new Date(endDateTime.getTime() + timeLimitMs);
+                    } else {
+                        endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+                    }
+                } else if (mode === 'PR') {
+                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
+                    // If it falls back to start date, it means it's available until the end of that day
                     endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
                 }
             } else {
@@ -263,17 +270,31 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             }
             
             // Deadline tidak boleh melebihi batas akhir ujian
-            if (endDateTime.getTime() < calculatedDeadline) {
+            if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
                 calculatedDeadline = endDateTime.getTime();
             }
         }
         
+        // FIX: For PR mode, if the deadline is somehow in the past but they were allowed to login,
+        // we shouldn't auto-submit immediately. We should give them at least some time or just let it be Infinity.
+        // Actually, if it's PR mode and they are logged in, just let them do it.
+        if (mode === 'PR' && calculatedDeadline < Date.now()) {
+            calculatedDeadline = Infinity;
+        }
+
         setDeadline(calculatedDeadline);
     }, [activeExam.config, student.class, initialData?.timestamp]);
 
     const [timeLeft, setTimeLeft] = useState(0);
     useEffect(() => {
+        if (deadline === 0) return; // Tunggu sampai deadline dihitung
+        
         const tick = () => {
+            if (deadline === Infinity) {
+                setTimeLeft(Infinity);
+                timeLeftRef.current = Infinity;
+                return;
+            }
             const now = Date.now();
             const diff = Math.max(0, Math.floor((deadline - now) / 1000));
             setTimeLeft(diff);
@@ -313,6 +334,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     };
 
     const formatTime = (s: number) => {
+        if (s === Infinity) return "Tanpa Batas Waktu";
         const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
         return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}` : `${m}:${sec.toString().padStart(2,'0')}`;
     };
@@ -343,7 +365,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     <ClockIcon className="w-5 h-5 text-indigo-500 shrink-0" />
                                     <div>
                                         <p className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Batas Waktu</p>
-                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{activeExam.config.timeLimit} Menit</p>
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{activeExam.config.examMode === 'PR' ? 'Tanpa Batas' : (activeExam.config.timeLimit > 0 ? `${activeExam.config.timeLimit} Menit` : 'Tanpa Batas')}</p>
                                     </div>
                                 </div>
 
@@ -357,7 +379,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     </div>
                                 )}
 
-                                {activeExam.config.detectBehavior && (
+                                {activeExam.config.detectBehavior && activeExam.config.examMode !== 'PR' && (
                                     <div className="flex items-center gap-4 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30">
                                         <LockClosedIcon className="w-5 h-5 text-rose-500 shrink-0" />
                                         <div>
@@ -379,7 +401,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                     </div>
                                 )}
 
-                                {activeExam.config.trackLocation && (
+                                {activeExam.config.trackLocation && activeExam.config.examMode !== 'PR' && (
                                     <div className="flex items-center gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
                                         <MapPinIcon className="w-5 h-5 text-emerald-500 shrink-0" />
                                         <div>
