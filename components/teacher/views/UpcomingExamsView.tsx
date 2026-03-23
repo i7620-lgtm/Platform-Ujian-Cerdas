@@ -59,7 +59,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                             : exam.config.startTime + ' Waktu Setempat'
                                         }</span>
                                         <span className="text-gray-300 dark:text-slate-600">•</span>
-                                        <span>{exam.config.timeLimit} Menit</span>
+                                        <span>{exam.config.examMode === 'PR' ? 'Tanpa Batas' : (exam.config.timeLimit > 0 ? `${exam.config.timeLimit} Menit` : 'Tanpa Batas')}</span>
                                     </div>
                                 </div>
                             </div>
