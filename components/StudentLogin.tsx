@@ -341,30 +341,42 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     // Parse class name (remove limit if present) for ID and Data
     const { name: cleanClassName } = parseClassConfig(studentClass);
 
-    // COMPOSITE ID NORMALIZATION (FIXED: Removing Name from ID)
+    // COMPOSITE ID NORMALIZATION
     // ID hanya bergantung pada Kelas dan No Absen agar unik per kursi
     const normClass = normalizeId(cleanClassName);
     const normAbsent = normalizeId(absentNumber);
-    const compositeId = `${normClass}-${normAbsent}`;
+    const seatId = `${normClass}-${normAbsent}`; // Used for local storage to prevent data loss
+    
+    // Format 2: @nama sekolah#nama siswa$kelas%nomor absen
+    const cleanSchool = schoolName.trim();
+    const cleanName = fullName.trim();
+    const cleanClass = cleanClassName.trim();
+    const cleanAbs = absentNumber.trim();
+    const compositeId = `@${cleanSchool}#${cleanName}$${cleanClass}%${cleanAbs}`;
     
     const studentData: Student = {
-        fullName: fullName.trim(), // Keep original for result sheet
-        schoolName: schoolName.trim(),
-        class: cleanClassName,
-        absentNumber: absentNumber.trim(),
-        studentId: compositeId // This is the PK-safe ID
+        fullName: cleanName, // Keep original for result sheet
+        schoolName: cleanSchool,
+        class: cleanClass,
+        absentNumber: cleanAbs,
+        studentId: compositeId // This is the PK-safe ID (Format 2)
     };
 
     setIsLoading(true);
 
     try {
-        const localKey = `exam_local_${cleanExamCode}_${compositeId}`;
+        const localKey = `exam_local_${cleanExamCode}_${seatId}`;
         
         // Use IndexedDB helper instead of localStorage directly
         const hasLocalData = await storageService.getLocalProgress(localKey);
         
         // VALIDASI UTAMA: Cek data remote (server) terlebih dahulu untuk memastikan kepemilikan kursi
-        const remoteResult = await storageService.getStudentResult(cleanExamCode, compositeId);
+        // Karena format studentId bisa Format 1 atau Format 2, kita ambil semua result dan cari berdasarkan kelas & absen
+        const allResults = await storageService.getResults(cleanExamCode);
+        const remoteResult = allResults.find(r => 
+            normalizeId(r.student.class) === normClass && 
+            normalizeId(r.student.absentNumber) === normAbsent
+        );
         
         if (remoteResult) {
             // Jika data server ada, validasi apakah nama yang dimasukkan cocok dengan yang tersimpan
@@ -377,10 +389,14 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             
             if (!isNameMatch) {
                 // BUG FIX: Pesan error spesifik sesuai permintaan
-                setError(`Sudah ada orang lain yang menggunakan kelas dan absen tersebut (dengan nama: ${remoteResult.student.fullName}, kelas: ${remoteResult.student.class}, dan absen: ${absentNumber}).`);
+                setError(`Sudah ada orang lain yang menggunakan kelas dan absen tersebut (dengan nama: ${remoteResult.student.fullName}, kelas: ${remoteResult.student.class}, dan absen: ${remoteResult.student.absentNumber}).`);
                 setIsLoading(false);
                 return;
             }
+
+            // Jika nama cocok, KITA HARUS MENGGUNAKAN studentId YANG SUDAH ADA DI DATABASE
+            // agar tidak membuat record duplikat (karena exam_code + student_id adalah unique key)
+            studentData.studentId = remoteResult.student.studentId;
 
             // Jika nama cocok tapi statusnya sedang berlangsung atau terkunci
             if (!hasLocalData && (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed')) {
@@ -406,18 +422,36 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       // Parse class name (remove limit if present)
       const { name: cleanClassName } = parseClassConfig(studentClass);
 
-      // ID Fix: Konsisten dengan handleSubmit, tanpa nama
+      // ID Fix: Konsisten dengan handleSubmit
       const normClass = normalizeId(cleanClassName);
       const normAbsent = normalizeId(absentNumber);
-      const compositeId = `${normClass}-${normAbsent}`;
+      
+      // Format 2: @nama sekolah#nama siswa$kelas%nomor absen
+      const cleanSchool = schoolName.trim();
+      const cleanName = fullName.trim();
+      const cleanClass = cleanClassName.trim();
+      const cleanAbs = absentNumber.trim();
+      let compositeId = `@${cleanSchool}#${cleanName}$${cleanClass}%${cleanAbs}`;
       
       try {
+          // Cari studentId yang sebenarnya di database berdasarkan kelas & absen
+          const allResults = await storageService.getResults(cleanExamCode);
+          const remoteResult = allResults.find(r => 
+              normalizeId(r.student.class) === normClass && 
+              normalizeId(r.student.absentNumber) === normAbsent
+          );
+
+          if (remoteResult) {
+              compositeId = remoteResult.student.studentId;
+          }
+
           const verified = await storageService.verifyUnlockToken(cleanExamCode, compositeId, token);
           if (verified) {
              const studentData: Student = {
-                fullName: fullName.trim(),
-                class: cleanClassName,
-                absentNumber: absentNumber.trim(),
+                fullName: cleanName,
+                schoolName: cleanSchool,
+                class: cleanClass,
+                absentNumber: cleanAbs,
                 studentId: compositeId
              };
              setIsLocked(false);
