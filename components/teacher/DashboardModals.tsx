@@ -134,6 +134,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         try {
             await storageService.updateStudentData(editingStudent.id, editingStudent.studentId, {
                 fullName: editingStudent.fullName,
+                schoolName: editingStudent.schoolName,
                 class: editingStudent.class,
                 absentNumber: editingStudent.absentNumber
             });
@@ -186,7 +187,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             const studentAnswer = r.answers[q.id];
             if (!studentAnswer) return;
 
-            const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const normalize = (str: unknown) => String(str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                  if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
@@ -868,7 +869,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
 
 
-    const normalize = useCallback((str: string) => str.trim().toLowerCase(), []);
+    const normalize = useCallback((str: string) => str.replace(/<[^>]*>?/gm, '').trim().toLowerCase(), []);
 
     // Enhanced checkAnswerStatus supporting Manual Grading Override
     const checkAnswerStatus = useCallback((q: Question, studentAnswers: Record<string, string>) => {
