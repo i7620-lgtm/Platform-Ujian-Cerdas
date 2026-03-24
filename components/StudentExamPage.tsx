@@ -17,7 +17,7 @@ interface StudentExamPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (str: unknown) => String(str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correctCount = 0;
