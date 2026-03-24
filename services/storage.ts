@@ -1024,7 +1024,7 @@ class StorageService {
     }
   }
 
-  async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, class: string, absentNumber: string }): Promise<void> {
+  async updateStudentData(resultId: number, oldStudentId: string, newData: { fullName: string, schoolName?: string, class: string, absentNumber: string }): Promise<void> {
       // Find by Primary Key ID
       // Note: 'student' column does not exist, we use flat columns
       const { data: currentResult, error: fetchError } = await supabase
@@ -1035,22 +1035,23 @@ class StorageService {
       
       if (fetchError || !currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${resultId})`);
 
-      // Construct new Student ID (Standardized: class-absent)
-      let newStudentId = '';
-      
-      // Sanitize inputs
-      // Remove (limit) from class name if present
-      const cleanClassName = newData.class.replace(/\(\d+\)$/, '').trim();
-      const safeClass = cleanClassName.replace(/\s+/g, '').toLowerCase();
-      const safeAbsent = newData.absentNumber.trim().replace(/\s+/g, '').toLowerCase();
+      // Construct new Student ID (Format 2: @school#name$class%absent)
+      const cleanSchool = (newData.schoolName || '').trim();
+      const cleanName = newData.fullName.trim();
+      const cleanClass = newData.class.replace(/\(\d+\)$/, '').trim();
+      const cleanAbsent = newData.absentNumber.trim();
 
-      newStudentId = `${safeClass}-${safeAbsent}`;
+      const newStudentId = `@${cleanSchool}#${cleanName}$${cleanClass}%${cleanAbsent}`;
+
+      const classNameWithSchool = newData.schoolName 
+          ? `${newData.schoolName}::${newData.class}`
+          : newData.class;
 
       const { error: updateError } = await supabase
           .from('results')
           .update({ 
               student_name: newData.fullName,
-              class_name: newData.class,
+              class_name: classNameWithSchool,
               student_id: newStudentId 
           })
           .eq('id', resultId);
@@ -1474,7 +1475,6 @@ class StorageService {
   async getResults(examCode?: string, className?: string): Promise<Result[]> {
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
-    if (className && className !== 'ALL') query = query.eq('class_name', className);
     
     // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
     query = query.order('updated_at', { ascending: false });
@@ -1482,28 +1482,52 @@ class StorageService {
     const { data, error } = await query;
     if (error) return [];
     
-    return data.map((row: Record<string, unknown>) => {
-        // Derive absent number if not present in student object
-        const student = row.student as Record<string, string> | undefined;
-        let absentNumber = student?.absentNumber || '00';
-        if (absentNumber === '00' && typeof row.student_id === 'string') {
-            const parts = row.student_id.split('-');
-            if (parts.length >= 2) {
-                const lastPart = parts[parts.length - 1];
-                if (!isNaN(parseInt(lastPart))) {
-                    absentNumber = lastPart;
-                } else if (parts.length > 2) {
-                    absentNumber = parts[parts.length - 2];
+    let results = data.map((row: Record<string, unknown>) => {
+        const studentIdStr = row.student_id as string;
+        let absentNumber = '00';
+        let schoolName = '';
+        let dbClassName = row.class_name as string;
+        let studentName = row.student_name as string;
+
+        // Parse Format 2 if applicable
+        if (studentIdStr.startsWith('@') && studentIdStr.includes('#') && studentIdStr.includes('$') && studentIdStr.includes('%')) {
+            const match = studentIdStr.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
+            if (match) {
+                schoolName = match[1];
+                studentName = match[2];
+                dbClassName = match[3];
+                absentNumber = match[4];
+            }
+        } else {
+            // Format 1 Fallback
+            const student = row.student as Record<string, string> | undefined;
+            absentNumber = student?.absentNumber || '00';
+            if (absentNumber === '00' && typeof studentIdStr === 'string') {
+                const parts = studentIdStr.split('-');
+                if (parts.length >= 2) {
+                    const lastPart = parts[parts.length - 1];
+                    if (!isNaN(parseInt(lastPart))) {
+                        absentNumber = lastPart;
+                    } else if (parts.length > 2) {
+                        absentNumber = parts[parts.length - 2];
+                    }
                 }
+            }
+            schoolName = student?.schoolName || '';
+            if (dbClassName && dbClassName.includes('::')) {
+                const parts = dbClassName.split('::');
+                schoolName = parts[0];
+                dbClassName = parts[1];
             }
         }
 
         return {
             id: row.id as number, // Primary Key
             student: { 
-                studentId: row.student_id as string, 
-                fullName: row.student_name as string, 
-                class: row.class_name as string, 
+                studentId: studentIdStr, 
+                fullName: studentName, 
+                class: dbClassName, 
+                schoolName: schoolName,
                 absentNumber: absentNumber 
             },
             examCode: row.exam_code as string, 
@@ -1517,6 +1541,12 @@ class StorageService {
             location: row.location as { lat: number; lng: number } | undefined
         };
     });
+
+    if (className && className !== 'ALL') {
+        results = results.filter(r => r.student.class === className);
+    }
+
+    return results;
   }
 
   async submitExamResult(resultPayload: Result): Promise<Result> {
@@ -1616,11 +1646,15 @@ class StorageService {
              error = updateError;
         } else {
             // Fallback: Upsert by Composite Key (exam_code, student_id) for initial creation
+            const classNameWithSchool = resultPayload.student.schoolName 
+                ? `${resultPayload.student.schoolName}::${resultPayload.student.class}`
+                : resultPayload.student.class;
+
             const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
                 exam_code: resultPayload.examCode, 
                 student_id: resultPayload.student.studentId, 
                 student_name: resultPayload.student.fullName,
-                class_name: resultPayload.student.class, 
+                class_name: classNameWithSchool, 
                 answers: resultPayload.answers || {}, 
                 status: resultPayload.status,
                 activity_log: resultPayload.activityLog || [], 
@@ -1744,9 +1778,13 @@ class StorageService {
              }
 
              const student = payload.student;
+             const classNameWithSchool = student.schoolName 
+                 ? `${student.schoolName}::${student.class}`
+                 : student.class;
+
              const { error } = await supabase.from('results').upsert({
                 exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
-                class_name: student.class, answers: payload.answers || {}, status: payload.status,
+                class_name: classNameWithSchool, answers: payload.answers || {}, status: payload.status,
                 activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
                 total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
              }, { onConflict: 'exam_code,student_id' });
@@ -1770,9 +1808,18 @@ class StorageService {
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
       const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
       if (error || !data) return null;
+      
+      let className = data.class_name as string;
+      let schoolName: string | undefined = undefined;
+      if (className && className.includes('::')) {
+          const parts = className.split('::');
+          schoolName = parts[0];
+          className = parts[1];
+      }
+      
       return {
         id: data.id, // Include Primary Key
-        student: { studentId: data.student_id, fullName: data.student_name, class: data.class_name, absentNumber: '00' },
+        student: { studentId: data.student_id, fullName: data.student_name, class: className, schoolName: schoolName, absentNumber: '00' },
         examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
