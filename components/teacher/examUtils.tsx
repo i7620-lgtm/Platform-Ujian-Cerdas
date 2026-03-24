@@ -55,7 +55,7 @@ export interface QuestionTypeStat {
 export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Result[]): QuestionTypeStat[] => {
     const resultArray = Array.isArray(results) ? results : [results];
     const typeMap: Record<string, { totalQuestions: number; totalAttempt: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').trim().toLowerCase();
+    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
 
     // Initialize map with all types present in exam
     exam.questions.forEach(q => {
@@ -190,7 +190,7 @@ export const parseList = (str: string | undefined | null): string[] => {
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     const catMap: Record<string, { total: number; correct: number }> = {};
     const lvlMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').trim().toLowerCase();
+    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
 
     const checkAnswer = (q: Question, ans: string) => {
         if (!ans) return false;
@@ -253,7 +253,7 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
 export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
     const statsMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').trim().toLowerCase();
+    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
 
     // 1. Calculate Stats per Category
     exam.questions.forEach(q => {
