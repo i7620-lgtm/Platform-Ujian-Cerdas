@@ -493,9 +493,21 @@ class StorageService {
                   return;
               }
 
-              const normalize = (str: string) => (str || '').trim().toLowerCase();
-              const studentAns = normalize(String(ans));
-              const correctAns = normalize(String(q.correctAnswer || ''));
+              const normalize = (str: string, qType: string) => {
+                  const s = String(str || '');
+                  if (qType === 'FILL_IN_THE_BLANK') {
+                      return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+                  }
+                  try {
+                      const div = document.createElement('div');
+                      div.innerHTML = s;
+                      return div.innerHTML;
+                  } catch {
+                      return s;
+                  }
+              };
+              const studentAns = normalize(String(ans), q.questionType);
+              const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
 
               let isCorrect = false;
                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
@@ -511,8 +523,8 @@ class StorageService {
                       } catch { /* ignore */ }
                       return str.split(',').map(s => s.trim()).filter(s => s !== '');
                   };
-                  const sSet = new Set(parseList(studentAns).map(normalize));
-                  const cSet = new Set(parseList(correctAns).map(normalize));
+                  const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+                  const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
                   isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
               }
               else if (q.questionType === 'TRUE_FALSE') {
@@ -1258,14 +1270,35 @@ class StorageService {
 
   private isAnswerCorrect(q: Question, ans: unknown): boolean {
       if (!ans) return false;
-      const normalize = (s: string) => String(s).trim().toLowerCase();
+      const normalize = (s: string, qType: string) => {
+          const str = String(s || '');
+          if (qType === 'FILL_IN_THE_BLANK') {
+              return str.trim().toLowerCase();
+          }
+          try {
+              const div = document.createElement('div');
+              div.innerHTML = str;
+              return div.innerHTML;
+          } catch {
+              return str;
+          }
+      };
       
       if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-          return normalize(ans as string) === normalize(q.correctAnswer || '');
+          return normalize(ans as string, q.questionType) === normalize(q.correctAnswer || '', q.questionType);
       }
       if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-          // Simplified check
-          return normalize(ans as string).length === normalize(q.correctAnswer || '').length; 
+          const parseList = (str: unknown): string[] => {
+              if (!str) return [];
+              try {
+                  const parsed = JSON.parse(String(str));
+                  if (Array.isArray(parsed)) return parsed.map(String);
+              } catch { /* ignore */ }
+              return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+          };
+          const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
+          const cSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
+          return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
       }
       return false; // Other types ignored for simple stats
   }
@@ -1570,7 +1603,19 @@ class StorageService {
                 calculatedTotal = scorableQuestions.length;
                 calculatedCorrect = 0;
 
-                const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                const normalize = (str: unknown, qType: string) => {
+                    const s = String(str || '');
+                    if (qType === 'FILL_IN_THE_BLANK') {
+                        return s.trim().toLowerCase().replace(/\s+/g, ' ');
+                    }
+                    try {
+                        const div = document.createElement('div');
+                        div.innerHTML = s;
+                        return div.innerHTML;
+                    } catch {
+                        return s;
+                    }
+                };
                 const parseList = (str: unknown): string[] => {
                     if (!str) return [];
                     try {
@@ -1585,11 +1630,11 @@ class StorageService {
                     if (!studentAnswer) return;
 
                     if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                         if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                         if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
                     } 
                     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                         const studentSet = new Set(parseList(studentAnswer).map(normalize));
-                         const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                         const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
+                         const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
                          if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                              calculatedCorrect++;
                          }
@@ -1727,7 +1772,19 @@ class StorageService {
                      calculatedTotal = scorableQuestions.length;
                      calculatedCorrect = 0;
 
-                     const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                     const normalize = (str: unknown, qType: string) => {
+                         const s = String(str || '');
+                         if (qType === 'FILL_IN_THE_BLANK') {
+                             return s.trim().toLowerCase().replace(/\s+/g, ' ');
+                         }
+                         try {
+                             const div = document.createElement('div');
+                             div.innerHTML = s;
+                             return div.innerHTML;
+                         } catch {
+                             return s;
+                         }
+                     };
                      const parseList = (str: unknown): string[] => {
                          if (!str) return [];
                          try {
@@ -1742,11 +1799,11 @@ class StorageService {
                          if (!studentAnswer) return;
 
                          if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                              if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) calculatedCorrect++;
+                              if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
                          } 
                          else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                              const studentSet = new Set(parseList(studentAnswer).map(normalize));
-                              const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                              const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
+                              const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
                               if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                                   calculatedCorrect++;
                               }
