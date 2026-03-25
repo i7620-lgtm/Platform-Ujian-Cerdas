@@ -187,14 +187,26 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             const studentAnswer = r.answers[q.id];
             if (!studentAnswer) return;
 
-            const normalize = (str: unknown) => String(str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const normalize = (str: unknown, qType: string) => {
+                const s = String(str || '');
+                if (qType === 'FILL_IN_THE_BLANK') {
+                    return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+                }
+                try {
+                    const div = document.createElement('div');
+                    div.innerHTML = s;
+                    return div.innerHTML;
+                } catch {
+                    return s;
+                }
+            };
 
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                 if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
+                 if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                 const studentSet = new Set(parseList(studentAnswer).map(normalize));
-                 const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+                 const studentSet = new Set(parseList(studentAnswer as string).map(a => normalize(a, q.questionType)));
+                 const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
                  if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                      correctCount++;
                  }
@@ -869,7 +881,18 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
 
 
-    const normalize = useCallback((str: string) => str.replace(/<[^>]*>?/gm, '').trim().toLowerCase(), []);
+    const normalize = useCallback((str: string, qType: string) => {
+        if (qType === 'FILL_IN_THE_BLANK') {
+            return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str;
+            return div.innerHTML;
+        } catch {
+            return str;
+        }
+    }, []);
 
     // Enhanced checkAnswerStatus supporting Manual Grading Override
     const checkAnswerStatus = useCallback((q: Question, studentAnswers: Record<string, string>) => {
@@ -882,15 +905,15 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         const ans = studentAnswers[q.id];
         if (!ans) return 'EMPTY';
 
-        const studentAns = normalize(String(ans));
-        const correctAns = normalize(String(q.correctAnswer || ''));
+        const studentAns = normalize(String(ans), q.questionType);
+        const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
 
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
             return studentAns === correctAns ? 'CORRECT' : 'WRONG';
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(parseList(studentAns).map(normalize));
-            const cSet = new Set(parseList(correctAns).map(normalize));
+            const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+            const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
             if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
             return 'WRONG';
         }
