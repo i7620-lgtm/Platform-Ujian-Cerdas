@@ -14,7 +14,19 @@ interface StudentResultPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: string) => String(str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (str: string, qType: string) => {
+    const s = String(str || '');
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = s;
+        return div.innerHTML;
+    } catch {
+        return s;
+    }
+};
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
@@ -75,16 +87,16 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 return;
             }
 
-            const studentAns = normalize(String(ans));
-            const correctAns = normalize(String(q.correctAnswer || ''));
+            const studentAns = normalize(String(ans), q.questionType);
+            const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
             let isCorrect = false;
 
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                 isCorrect = studentAns === correctAns;
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(parseList(studentAns).map(normalize));
-                const cSet = new Set(parseList(correctAns).map(normalize));
+                const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+                const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
                 isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
             }
             else if (q.questionType === 'TRUE_FALSE') {
@@ -310,8 +322,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 const correctAns = q.correctAnswer || '-';
                                                 
                                                 let isCorrect = false;
-                                                const normalizedStudent = normalize(studentAns);
-                                                const normalizedCorrect = normalize(correctAns);
+                                                const normalizedStudent = normalize(studentAns, q.questionType);
+                                                const normalizedCorrect = normalize(correctAns, q.questionType);
 
                                                 let displayStudentAns = studentAns;
                                                 let displayCorrectAns = correctAns;
@@ -319,14 +331,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                                                     isCorrect = normalizedStudent === normalizedCorrect;
                                                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                    const sSet = new Set(parseList(normalizedStudent).map(normalize));
-                                                    const cSet = new Set(parseList(normalizedCorrect).map(normalize));
+                                                    const sSet = new Set(parseList(studentAns).map(a => normalize(a, q.questionType)));
+                                                    const cSet = new Set(parseList(correctAns).map(a => normalize(a, q.questionType)));
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                     try {
                                                         const parsedStudent = JSON.parse(studentAns);
-                                                        if (Array.isArray(parsedStudent)) displayStudentAns = parsedStudent.map(p => `• ${String(p).replace(/<[^>]*>?/gm, '')}`).join('<br/>');
+                                                        if (Array.isArray(parsedStudent)) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
                                                         const parsedCorrect = JSON.parse(correctAns);
-                                                        if (Array.isArray(parsedCorrect)) displayCorrectAns = parsedCorrect.map(p => `• ${String(p).replace(/<[^>]*>?/gm, '')}`).join('<br/>');
+                                                        if (Array.isArray(parsedCorrect)) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
                                                     } catch {}
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
                                                      isCorrect = false;
