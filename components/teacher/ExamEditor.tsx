@@ -537,12 +537,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 let newCorrectAnswer = q.correctAnswer;
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    if (q.correctAnswer === oldOption) newCorrectAnswer = text; 
+                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
+                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(oldOption)) newCorrectAnswer = text; 
                 } 
                 else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    if (answers.includes(oldOption)) { 
-                        answers = answers.map(a => a === oldOption ? text : a); 
+                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
+                    if (answers.some(a => normalizeHtml(a) === normalizeHtml(oldOption))) { 
+                        answers = answers.map(a => normalizeHtml(a) === normalizeHtml(oldOption) ? text : a); 
                         newCorrectAnswer = JSON.stringify(answers); 
                     } 
                 }
@@ -557,10 +559,19 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) { 
                 let currentAnswers = parseList(q.correctAnswer);
+                const normalizeHtml = (html: string) => {
+                    try {
+                        const div = document.createElement('div');
+                        div.innerHTML = html;
+                        return div.innerHTML;
+                    } catch {
+                        return html;
+                    }
+                };
                 if (isChecked) { 
-                    if (!currentAnswers.includes(option)) currentAnswers.push(option); 
+                    if (!currentAnswers.some(a => normalizeHtml(a) === normalizeHtml(option))) currentAnswers.push(option); 
                 } else { 
-                    currentAnswers = currentAnswers.filter(a => a !== option); 
+                    currentAnswers = currentAnswers.filter(a => normalizeHtml(a) !== normalizeHtml(option)); 
                 } 
                 return { ...q, correctAnswer: JSON.stringify(currentAnswers) }; 
             }
@@ -587,10 +598,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 let newCorrectAnswer = q.correctAnswer; 
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    if (q.correctAnswer === optionToRemove) newCorrectAnswer = newOptions[0] || ''; 
+                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
+                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(optionToRemove)) newCorrectAnswer = newOptions[0] || ''; 
                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    answers = answers.filter(a => a !== optionToRemove); 
+                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
+                    answers = answers.filter(a => normalizeHtml(a) !== normalizeHtml(optionToRemove)); 
                     newCorrectAnswer = JSON.stringify(answers); 
                 } 
                 return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; 
@@ -715,7 +728,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => {
                                                             const currentAnswers = parseList(q.correctAnswer);
-                                                            const isSelected = currentAnswers.includes(option);
+                                                            // Normalize both to handle slight HTML serialization differences
+                                                            const normalizeHtml = (html: string) => {
+                                                                try {
+                                                                    const div = document.createElement('div');
+                                                                    div.innerHTML = html;
+                                                                    return div.innerHTML;
+                                                                } catch {
+                                                                    return html;
+                                                                }
+                                                            };
+                                                            const isSelected = currentAnswers.some(ans => normalizeHtml(ans) === normalizeHtml(option));
                                                             return (
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
                                                                     <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isSelected)}>
