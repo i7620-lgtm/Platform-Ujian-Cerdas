@@ -111,7 +111,18 @@ export const QuestionAnalysisItem: React.FC<{
         return null;
     }, [q]);
 
-    const normalize = (str: string) => str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+    const normalize = (str: string) => {
+        if (q.questionType === 'FILL_IN_THE_BLANK') {
+            return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str;
+            return div.innerHTML;
+        } catch {
+            return str;
+        }
+    };
 
     const isCorrectAnswer = (ans: string) => {
         if (!correctAnswerString) return false;
