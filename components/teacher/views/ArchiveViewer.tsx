@@ -116,21 +116,32 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
     );
 };
 
-const normalize = (str: string) => str.trim().toLowerCase();
+const normalize = (str: string, qType: string) => {
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = str;
+        return div.innerHTML;
+    } catch {
+        return str;
+    }
+};
 
 const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
     const ans = studentAnswers[q.id];
     if (!ans) return 'EMPTY';
 
-    const studentAns = normalize(String(ans));
-    const correctAns = normalize(String(q.correctAnswer || ''));
+    const studentAns = normalize(String(ans), q.questionType);
+    const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
 
     if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
         return studentAns === correctAns ? 'CORRECT' : 'WRONG';
     } 
     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-        const sSet = new Set(parseList(studentAns).map(normalize));
-        const cSet = new Set(parseList(correctAns).map(normalize));
+        const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+        const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
         if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
         return 'WRONG';
     }
@@ -1079,8 +1090,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             )}
                                             
                                             <div className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer === opt ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer === opt && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
-                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => {
+                                                const isSelected = parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType));
+                                                return <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{isSelected && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>
+                                            })}
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
                                             {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 text-sm"><div className="flex-1 font-medium dark:text-slate-200">{p.left}</div><div className="text-slate-300 dark:text-slate-500">→</div><div className="flex-1 font-bold dark:text-slate-200">{p.right}</div></div>)}</div>}
                                             {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && <div className="mt-4 pt-3 border-t dark:border-slate-700"><p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Kunci Jawaban</p><div className="mt-1 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm prose prose-sm max-w-none dark:text-slate-200" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div></div>}
@@ -1706,7 +1720,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     const label = String.fromCharCode(65+i);
                                                     // FIX: Sum counts of all answers that match this option (normalized)
                                                     const count = Object.entries(data.distribution).reduce((acc, [ans, c]) => {
-                                                        return normalize(ans) === normalize(opt) ? acc + (c as number) : acc;
+                                                        if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                            const sSet = new Set(parseList(ans).map(a => normalize(a, originalQ.questionType)));
+                                                            return sSet.has(normalize(opt, originalQ.questionType)) ? acc + (c as number) : acc;
+                                                        }
+                                                        return normalize(ans, originalQ?.questionType || '') === normalize(opt, originalQ?.questionType || '') ? acc + (c as number) : acc;
                                                     }, 0);
                                                     
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
@@ -1757,12 +1775,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
                                                                 } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                                                                     // FIX: Use parseList to match print logic with digital view
-                                                                    const sSet = new Set(parseList(normalize(ans)).map(normalize));
-                                                                    const cSet = new Set(parseList(normalize(originalQ.correctAnswer || '')).map(normalize));
+                                                                    const sSet = new Set(parseList(ans).map(a => normalize(a, originalQ.questionType)));
+                                                                    const cSet = new Set(parseList(originalQ.correctAnswer || '').map(a => normalize(a, originalQ.questionType)));
                                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                                 } else {
-                                                                    const normAns = normalize(ans);
-                                                                    const normKey = normalize(originalQ?.correctAnswer || '');
+                                                                    const normAns = normalize(ans, originalQ?.questionType || '');
+                                                                    const normKey = normalize(originalQ?.correctAnswer || '', originalQ?.questionType || '');
                                                                     isCorrect = normAns === normKey;
                                                                 }
                                                             } catch { /* ignore */ }
@@ -1811,20 +1829,23 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="prose prose-sm max-w-none text-slate-800 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
                                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
-                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${q.correctAnswer === opt ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                     <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
                                                     <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                    {q.correctAnswer === opt && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
+                                                    {normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
                                                 </div>
                                             ))}
                                             
-                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
-                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${q.correctAnswer?.includes(opt) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-                                                    <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
-                                                    <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                    {q.correctAnswer?.includes(opt) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
-                                                </div>
-                                            ))}
+                                            {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => {
+                                                const isSelected = parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType));
+                                                return (
+                                                    <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${isSelected ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                        <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
+                                                        <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                        {isSelected && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
+                                                    </div>
+                                                );
+                                            })}
                                             
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
                                                 <div className="border border-slate-200 rounded-lg overflow-x-auto custom-scrollbar">

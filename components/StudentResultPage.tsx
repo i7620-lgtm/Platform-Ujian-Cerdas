@@ -14,7 +14,19 @@ interface StudentResultPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: string) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (str: string, qType: string) => {
+    const s = String(str || '');
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = s;
+        return div.innerHTML;
+    } catch {
+        return s;
+    }
+};
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
@@ -75,16 +87,16 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 return;
             }
 
-            const studentAns = normalize(String(ans));
-            const correctAns = normalize(String(q.correctAnswer || ''));
+            const studentAns = normalize(String(ans), q.questionType);
+            const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
             let isCorrect = false;
 
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                 isCorrect = studentAns === correctAns;
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(parseList(studentAns).map(normalize));
-                const cSet = new Set(parseList(correctAns).map(normalize));
+                const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+                const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
                 isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
             }
             else if (q.questionType === 'TRUE_FALSE') {
@@ -310,29 +322,46 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 const correctAns = q.correctAnswer || '-';
                                                 
                                                 let isCorrect = false;
-                                                const normalizedStudent = normalize(studentAns);
-                                                const normalizedCorrect = normalize(correctAns);
+                                                const normalizedStudent = normalize(studentAns, q.questionType);
+                                                const normalizedCorrect = normalize(correctAns, q.questionType);
+
+                                                let displayStudentAns = studentAns;
+                                                let displayCorrectAns = correctAns;
 
                                                 if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                                                     isCorrect = normalizedStudent === normalizedCorrect;
                                                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                    const sSet = new Set(parseList(normalizedStudent).map(normalize));
-                                                    const cSet = new Set(parseList(normalizedCorrect).map(normalize));
+                                                    const sSet = new Set(parseList(studentAns).map(a => normalize(a, q.questionType)));
+                                                    const cSet = new Set(parseList(correctAns).map(a => normalize(a, q.questionType)));
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                    try {
+                                                        const parsedStudent = JSON.parse(studentAns);
+                                                        if (Array.isArray(parsedStudent)) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
+                                                        const parsedCorrect = JSON.parse(correctAns);
+                                                        if (Array.isArray(parsedCorrect)) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
+                                                    } catch {}
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
                                                      isCorrect = false;
                                                      try {
                                                          if (q.questionType === 'TRUE_FALSE') {
                                                              const ansObj = JSON.parse(studentAns);
                                                              isCorrect = q.trueFalseRows?.every((row, i) => ansObj[i] === row.answer) ?? false;
+                                                             displayStudentAns = q.trueFalseRows?.map((r, i) => `• ${r.text.replace(/<[^>]*>/g, '')}: <strong>${ansObj[i] ? 'Benar' : 'Salah'}</strong>`).join('<br/>') || studentAns;
+                                                             displayCorrectAns = q.trueFalseRows?.map((r) => `• ${r.text.replace(/<[^>]*>/g, '')}: <strong>${r.answer ? 'Benar' : 'Salah'}</strong>`).join('<br/>') || correctAns;
                                                          } else {
                                                              const ansObj = JSON.parse(studentAns);
                                                              isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
+                                                             displayStudentAns = q.matchingPairs?.map((p, i) => `• ${p.left} → <strong>${ansObj[i] || '-'}</strong>`).join('<br/>') || studentAns;
+                                                             displayCorrectAns = q.matchingPairs?.map((p) => `• ${p.left} → <strong>${p.right}</strong>`).join('<br/>') || correctAns;
                                                          }
-                                                     } catch { /* ignore */ }
+                                                     } catch {
+                                                         if (q.questionType === 'TRUE_FALSE') {
+                                                             displayCorrectAns = q.trueFalseRows?.map((r) => `• ${r.text.replace(/<[^>]*>/g, '')}: <strong>${r.answer ? 'Benar' : 'Salah'}</strong>`).join('<br/>') || correctAns;
+                                                         } else if (q.questionType === 'MATCHING') {
+                                                             displayCorrectAns = q.matchingPairs?.map((p) => `• ${p.left} → <strong>${p.right}</strong>`).join('<br/>') || correctAns;
+                                                         }
+                                                     }
                                                 }
-
-                                                if (!['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK'].includes(q.questionType)) return null; 
 
                                                 return (
                                                     <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 transition-colors">
@@ -344,12 +373,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
-                                                                <div className={`text-right font-black option-content ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(studentAns)}}></div>
+                                                                <div className={`text-right font-black option-content [&_p]:inline ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(displayStudentAns)}}></div>
                                                             </div>
                                                             {!isCorrect && (
                                                                 <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                                                                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Kunci Jawaban:</span> 
-                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content" dangerouslySetInnerHTML={{__html: sanitizeHtml(correctAns)}}></div>
+                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content [&_p]:inline" dangerouslySetInnerHTML={{__html: sanitizeHtml(displayCorrectAns)}}></div>
                                                                 </div>
                                                             )}
                                                         </div>

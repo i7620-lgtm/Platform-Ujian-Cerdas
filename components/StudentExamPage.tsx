@@ -17,7 +17,19 @@ interface StudentExamPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: unknown) => String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (str: unknown, qType: string) => {
+    const s = String(str || '');
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = s;
+        return div.innerHTML;
+    } catch {
+        return s;
+    }
+};
 
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correctCount = 0;
@@ -28,11 +40,11 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
         if (!studentAnswer) return;
 
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer) === normalize(q.correctAnswer)) correctCount++;
+             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(parseList(studentAnswer).map(normalize));
-             const correctSet = new Set(parseList(q.correctAnswer).map(normalize));
+             const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
+             const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                  correctCount++;
              }

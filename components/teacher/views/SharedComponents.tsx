@@ -111,7 +111,18 @@ export const QuestionAnalysisItem: React.FC<{
         return null;
     }, [q]);
 
-    const normalize = (str: string) => str.trim().toLowerCase();
+    const normalize = (str: string) => {
+        if (q.questionType === 'FILL_IN_THE_BLANK') {
+            return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str;
+            return div.innerHTML;
+        } catch {
+            return str;
+        }
+    };
 
     const isCorrectAnswer = (ans: string) => {
         if (!correctAnswerString) return false;
@@ -332,16 +343,22 @@ export const QuestionAnalysisItem: React.FC<{
 
                         <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Distribusi Jawaban Siswa</p>
                         
-                        {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
+                        {['MULTIPLE_CHOICE', 'COMPLEX_MULTIPLE_CHOICE'].includes(q.questionType) && q.options ? (
                             <div className="space-y-2">
                                 {q.options.map((opt, i) => {
                                     // FIX: Sum counts of all answers that match this option (normalized)
                                     const count = Object.entries(distribution.counts).reduce((acc, [ans, c]) => {
+                                        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                            const sSet = new Set(parseList(ans).map(normalize));
+                                            return sSet.has(normalize(opt)) ? acc + c : acc;
+                                        }
                                         return normalize(ans) === normalize(opt) ? acc + c : acc;
                                     }, 0);
                                     
                                     const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
-                                    const isCorrect = opt === q.correctAnswer;
+                                    const isCorrect = q.questionType === 'COMPLEX_MULTIPLE_CHOICE' 
+                                        ? parseList(q.correctAnswer || '').map(normalize).includes(normalize(opt))
+                                        : normalize(opt) === normalize(q.correctAnswer || '');
                                     
                                     return (
                                         <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800' : count > 0 ? 'bg-slate-50 dark:bg-slate-700/50' : ''}`}>
@@ -384,12 +401,18 @@ export const QuestionAnalysisItem: React.FC<{
                                         const isCorrect = isCorrectAnswer(ans);
                                         let displayAns = ans;
                                         try {
-                                            if (ans.startsWith('{')) {
+                                            if (q.questionType === 'TRUE_FALSE' && q.trueFalseRows) {
+                                                const parsed = JSON.parse(ans);
+                                                displayAns = q.trueFalseRows.map((r, i) => `${r.text.replace(/<[^>]*>/g, '')}: ${parsed[i] ? 'Benar' : 'Salah'}`).join(', ');
+                                            } else if (q.questionType === 'MATCHING' && q.matchingPairs) {
+                                                const parsed = JSON.parse(ans);
+                                                displayAns = q.matchingPairs.map((p, i) => `${p.left} → ${parsed[i] || '-'}`).join(', ');
+                                            } else if (ans.startsWith('{')) {
                                                 const parsed = JSON.parse(ans);
                                                 displayAns = Object.entries(parsed).map(([,v]) => `${v}`).join(', ');
                                             } else if (ans.startsWith('[')) {
                                                 const parsed = JSON.parse(ans);
-                                                displayAns = parsed.join(', ');
+                                                displayAns = parsed.map((p: string) => p.replace(/<[^>]*>?/gm, '')).join(', ');
                                             }
                                         } catch { /* ignore */ }
 
@@ -398,7 +421,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                 <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                                                     {isCorrect && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0"/>}
                                                     {/* FIX: Removed truncate, added image styling */}
-                                                    <div className={`italic ${isCorrect ? 'text-emerald-700 dark:text-emerald-400 font-medium' : ''} [&_p]:inline [&_br]:hidden option-content [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                    <div className={`italic ${isCorrect ? 'text-emerald-700 dark:text-emerald-400 font-medium' : ''} [&_p]:inline option-content [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block`} dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                 </div>
                                                 <span className={`font-bold ml-2 ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{count} Siswa</span>
                                             </li>
