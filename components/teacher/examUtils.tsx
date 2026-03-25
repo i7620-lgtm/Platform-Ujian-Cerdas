@@ -55,7 +55,18 @@ export interface QuestionTypeStat {
 export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Result[]): QuestionTypeStat[] => {
     const resultArray = Array.isArray(results) ? results : [results];
     const typeMap: Record<string, { totalQuestions: number; totalAttempt: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+    const normalize = (str: string, qType: string) => {
+        if (qType === 'FILL_IN_THE_BLANK') {
+            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str || '';
+            return div.innerHTML;
+        } catch {
+            return str || '';
+        }
+    };
 
     // Initialize map with all types present in exam
     exam.questions.forEach(q => {
@@ -68,14 +79,14 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
 
     const checkAnswer = (q: Question, ans: string) => {
         if (!ans) return false;
-        const normAns = normalize(String(ans));
-        const normKey = normalize(String(q.correctAnswer || ''));
+        const normAns = normalize(String(ans), q.questionType);
+        const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
 
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
             return normAns === normKey;
         } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(parseList(normAns).map(normalize));
-            const cSet = new Set(parseList(normKey).map(normalize));
+            const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+            const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
             return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
         } else if (q.questionType === 'TRUE_FALSE') {
             try {
@@ -190,18 +201,29 @@ export const parseList = (str: string | undefined | null): string[] => {
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     const catMap: Record<string, { total: number; correct: number }> = {};
     const lvlMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+    const normalize = (str: string, qType: string) => {
+        if (qType === 'FILL_IN_THE_BLANK') {
+            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str || '';
+            return div.innerHTML;
+        } catch {
+            return str || '';
+        }
+    };
 
     const checkAnswer = (q: Question, ans: string) => {
         if (!ans) return false;
-        const normAns = normalize(String(ans));
-        const normKey = normalize(String(q.correctAnswer || ''));
+        const normAns = normalize(String(ans), q.questionType);
+        const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
 
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
             return normAns === normKey;
         } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-            const sSet = new Set(parseList(normAns).map(normalize));
-            const cSet = new Set(parseList(normKey).map(normalize));
+            const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
+            const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
             return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
         } else if (q.questionType === 'TRUE_FALSE') {
             try {
@@ -253,7 +275,18 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
 export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
     const statsMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string) => (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+    const normalize = (str: string, qType: string) => {
+        if (qType === 'FILL_IN_THE_BLANK') {
+            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = str || '';
+            return div.innerHTML;
+        } catch {
+            return str || '';
+        }
+    };
 
     // 1. Calculate Stats per Category
     exam.questions.forEach(q => {
@@ -272,14 +305,14 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
         let isCorrect = false;
         
         if (studentAns) {
-            const normAns = normalize(String(studentAns));
-            const normKey = normalize(String(q.correctAnswer || ''));
+            const normAns = normalize(String(studentAns), q.questionType);
+            const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
 
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                 isCorrect = normAns === normKey;
             } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                const sSet = new Set(parseList(normAns).map(normalize));
-                const cSet = new Set(parseList(normKey).map(normalize));
+                const sSet = new Set(parseList(String(studentAns)).map(a => normalize(a, q.questionType)));
+                const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
                 isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
             } else if (q.questionType === 'TRUE_FALSE') {
                 try {
