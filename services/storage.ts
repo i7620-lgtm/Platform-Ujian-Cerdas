@@ -630,9 +630,19 @@ class StorageService {
 
           return {
               id: r.id,
+              exam_code: (r as any).exam_code,
+              student_id: (r as any).student_id,
+              student_name: (r as any).student_name,
+              class_name: (r as any).class_name,
+              status: (r as any).status,
+              answers: (r as any).answers,
+              activity_log: (r as any).activity_log,
+              location: (r as any).location,
+              unlock_token: (r as any).unlock_token,
               score: score,
               correct_answers: correctCount,
-              total_questions: total
+              total_questions: total,
+              updated_at: new Date().toISOString()
           };
       });
 
