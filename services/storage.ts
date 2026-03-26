@@ -283,6 +283,112 @@ class StorageService {
     private syncQueue: Result[] = [];
     private isProcessingQueue = false;
 
+    private parseList(str: string | undefined | null): string[] {
+        if (!str) return [];
+        
+        const deepParse = (input: string): any => {
+            try {
+                let fixedInput = input;
+                try {
+                    JSON.parse(fixedInput);
+                } catch (e) {
+                    fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+                }
+                const parsed = JSON.parse(fixedInput);
+                if (typeof parsed === 'string') {
+                    return deepParse(parsed);
+                }
+                return parsed;
+            } catch {
+                let cleaned = input.trim();
+                if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
+                if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+                if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
+                cleaned = cleaned.replace(/\\"/g, '"');
+                return cleaned;
+            }
+        };
+
+        try {
+            const parsed = deepParse(str);
+            if (Array.isArray(parsed)) {
+                const flattened: string[] = [];
+                const processItem = (item: any) => {
+                    if (typeof item === 'string') {
+                        if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
+                            try {
+                                const unescaped = deepParse(item);
+                                if (Array.isArray(unescaped)) {
+                                    unescaped.forEach(processItem);
+                                } else {
+                                    flattened.push(String(unescaped));
+                                }
+                            } catch {
+                                flattened.push(String(item));
+                            }
+                        } else {
+                            flattened.push(String(item));
+                        }
+                    } else if (Array.isArray(item)) {
+                        item.forEach(processItem);
+                    } else {
+                        flattened.push(String(item));
+                    }
+                };
+                parsed.forEach(processItem);
+                return flattened;
+            }
+        } catch { /* ignore */ }
+        
+        if (str.includes('<') && str.includes('>')) {
+            return [str.trim()];
+        }
+        
+        let cleanStr = str.trim();
+        if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
+            cleanStr = cleanStr.slice(1, -1);
+        }
+        
+        return cleanStr.split(',').map(s => {
+            let trimmed = s.trim();
+            if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+                trimmed = trimmed.slice(1, -1);
+            }
+            trimmed = trimmed.replace(/\\"/g, '"');
+            return trimmed;
+        }).filter(s => s !== '');
+    }
+
+    private normalize(str: unknown, qType: string): string {
+        const s = String(str || '');
+        if (qType === 'FILL_IN_THE_BLANK') {
+            return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+        try {
+            const div = document.createElement('div');
+            div.innerHTML = s;
+            
+            // Remove math-visual wrappers to compare actual content
+            // Better: replace with LaTeX content to be more robust
+            div.querySelectorAll('.math-visual').forEach(el => {
+                const latex = el.getAttribute('data-latex');
+                if (latex) {
+                    el.replaceWith(document.createTextNode(`$${latex}$`));
+                } else {
+                    while (el.firstChild) {
+                        el.parentNode?.insertBefore(el.firstChild, el);
+                    }
+                    el.parentNode?.removeChild(el);
+                }
+            });
+
+            // Standardize HTML by removing whitespace between tags and trimming
+            return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+        } catch {
+            return s.trim().replace(/\s+/g, ' ');
+        }
+    }
+
     constructor() {
         try {
             const savedQueue = localStorage.getItem('exam_sync_queue');
@@ -493,38 +599,16 @@ class StorageService {
                   return;
               }
 
-              const normalize = (str: string, qType: string) => {
-                  const s = String(str || '');
-                  if (qType === 'FILL_IN_THE_BLANK') {
-                      return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-                  }
-                  try {
-                      const div = document.createElement('div');
-                      div.innerHTML = s;
-                      return div.innerHTML;
-                  } catch {
-                      return s;
-                  }
-              };
-              const studentAns = normalize(String(ans), q.questionType);
-              const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
+              const studentAns = this.normalize(String(ans), q.questionType);
+              const correctAns = this.normalize(String(q.correctAnswer || ''), q.questionType);
 
               let isCorrect = false;
                if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                   isCorrect = studentAns === correctAns;
               } 
               else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                  // parseList logic
-                  const parseList = (str: string) => {
-                      if (!str) return [];
-                      try {
-                          const parsed = JSON.parse(str);
-                          if (Array.isArray(parsed)) return parsed.map(String);
-                      } catch { /* ignore */ }
-                      return str.split(',').map(s => s.trim()).filter(s => s !== '');
-                  };
-                  const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
-                  const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
+                  const sSet = new Set(this.parseList(String(ans)).map(a => this.normalize(a, q.questionType)));
+                  const cSet = new Set(this.parseList(String(q.correctAnswer || '')).map(a => this.normalize(a, q.questionType)));
                   isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
               }
               else if (q.questionType === 'TRUE_FALSE') {
@@ -1270,34 +1354,14 @@ class StorageService {
 
   private isAnswerCorrect(q: Question, ans: unknown): boolean {
       if (!ans) return false;
-      const normalize = (s: string, qType: string) => {
-          const str = String(s || '');
-          if (qType === 'FILL_IN_THE_BLANK') {
-              return str.trim().toLowerCase();
-          }
-          try {
-              const div = document.createElement('div');
-              div.innerHTML = str;
-              return div.innerHTML;
-          } catch {
-              return str;
-          }
-      };
       
       if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-          return normalize(ans as string, q.questionType) === normalize(q.correctAnswer || '', q.questionType);
+          return this.normalize(ans as string, q.questionType) === this.normalize(q.correctAnswer || '', q.questionType);
       }
+      
       if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-          const parseList = (str: unknown): string[] => {
-              if (!str) return [];
-              try {
-                  const parsed = JSON.parse(String(str));
-                  if (Array.isArray(parsed)) return parsed.map(String);
-              } catch { /* ignore */ }
-              return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
-          };
-          const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
-          const cSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
+          const sSet = new Set(this.parseList(String(ans)).map(a => this.normalize(a, q.questionType)));
+          const cSet = new Set(this.parseList(q.correctAnswer).map(a => this.normalize(a, q.questionType)));
           return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
       }
       return false; // Other types ignored for simple stats
@@ -1603,38 +1667,16 @@ class StorageService {
                 calculatedTotal = scorableQuestions.length;
                 calculatedCorrect = 0;
 
-                const normalize = (str: unknown, qType: string) => {
-                    const s = String(str || '');
-                    if (qType === 'FILL_IN_THE_BLANK') {
-                        return s.trim().toLowerCase().replace(/\s+/g, ' ');
-                    }
-                    try {
-                        const div = document.createElement('div');
-                        div.innerHTML = s;
-                        return div.innerHTML;
-                    } catch {
-                        return s;
-                    }
-                };
-                const parseList = (str: unknown): string[] => {
-                    if (!str) return [];
-                    try {
-                        const parsed = JSON.parse(String(str));
-                        if (Array.isArray(parsed)) return parsed.map(String);
-                    } catch { /* ignore */ }
-                    return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
-                };
-
                 scorableQuestions.forEach((q: Question) => {
                     const studentAnswer = resultPayload.answers[q.id];
                     if (!studentAnswer) return;
 
                     if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                         if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
+                         if (q.correctAnswer && this.normalize(studentAnswer, q.questionType) === this.normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
                     } 
                     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                         const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
-                         const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
+                         const studentSet = new Set(this.parseList(studentAnswer).map(a => this.normalize(a, q.questionType)));
+                         const correctSet = new Set(this.parseList(q.correctAnswer).map(a => this.normalize(a, q.questionType)));
                          if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
                              calculatedCorrect++;
                          }
@@ -1772,7 +1814,7 @@ class StorageService {
                      calculatedTotal = scorableQuestions.length;
                      calculatedCorrect = 0;
 
-                     const normalize = (str: unknown, qType: string) => {
+                     const normalize = (str: unknown, qType: string): string => {
                          const s = String(str || '');
                          if (qType === 'FILL_IN_THE_BLANK') {
                              return s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -1780,18 +1822,97 @@ class StorageService {
                          try {
                              const div = document.createElement('div');
                              div.innerHTML = s;
-                             return div.innerHTML;
+
+                             // Remove math-visual wrappers to compare actual content
+                             div.querySelectorAll('.math-visual').forEach(el => {
+                                 while (el.firstChild) {
+                                     el.parentNode?.insertBefore(el.firstChild, el);
+                                 }
+                                 el.parentNode?.removeChild(el);
+                             });
+
+                             // Standardize HTML by removing whitespace between tags and trimming
+                             return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
                          } catch {
-                             return s;
+                             return s.trim().replace(/\s+/g, ' ');
                          }
                      };
+
                      const parseList = (str: unknown): string[] => {
                          if (!str) return [];
+                         const s = String(str);
+                         
+                         const deepParse = (input: string): any => {
+                             try {
+                                 let fixedInput = input;
+                                 try {
+                                     JSON.parse(fixedInput);
+                                 } catch (e) {
+                                     fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+                                 }
+                                 const parsed = JSON.parse(fixedInput);
+                                 if (typeof parsed === 'string') {
+                                     return deepParse(parsed);
+                                 }
+                                 return parsed;
+                             } catch {
+                                 let cleaned = input.trim();
+                                 if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
+                                 if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+                                 if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
+                                 cleaned = cleaned.replace(/\\"/g, '"');
+                                 return cleaned;
+                             }
+                         };
+
                          try {
-                             const parsed = JSON.parse(String(str));
-                             if (Array.isArray(parsed)) return parsed.map(String);
+                             const parsed = deepParse(s);
+                             if (Array.isArray(parsed)) {
+                                 const flattened: string[] = [];
+                                 const processItem = (item: any) => {
+                                     if (typeof item === 'string') {
+                                         if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
+                                             try {
+                                                 const unescaped = deepParse(item);
+                                                 if (Array.isArray(unescaped)) {
+                                                     unescaped.forEach(processItem);
+                                                 } else {
+                                                     flattened.push(String(unescaped));
+                                                 }
+                                             } catch {
+                                                 flattened.push(String(item));
+                                             }
+                                         } else {
+                                             flattened.push(String(item));
+                                         }
+                                     } else if (Array.isArray(item)) {
+                                         item.forEach(processItem);
+                                     } else {
+                                         flattened.push(String(item));
+                                     }
+                                 };
+                                 parsed.forEach(processItem);
+                                 return flattened;
+                             }
                          } catch { /* ignore */ }
-                         return String(str).split(',').map(s => s.trim()).filter(s => s !== '');
+                         
+                         if (s.includes('<') && s.includes('>')) {
+                             return [s.trim()];
+                         }
+                         
+                         let cleanStr = s.trim();
+                         if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
+                             cleanStr = cleanStr.slice(1, -1);
+                         }
+                         
+                         return cleanStr.split(',').map(item => {
+                             let trimmed = item.trim();
+                             if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+                                 trimmed = trimmed.slice(1, -1);
+                             }
+                             trimmed = trimmed.replace(/\\"/g, '"');
+                             return trimmed;
+                         }).filter(item => item !== '');
                      };
 
                      scorableQuestions.forEach((q: Question) => {
