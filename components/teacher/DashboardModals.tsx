@@ -175,7 +175,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     const handleFinishAllExams = async () => {
         const activeCount = localResults.filter(r => r.status === 'in_progress' || r.status === 'force_closed').length;
-        if (!window.confirm(`Apakah Anda yakin ingin menghentikan ujian secara keseluruhan? SEMUA (${activeCount}) siswa akan dipaksa selesai dan ujian ini akan dipindahkan ke tab 'Ujian Selesai'.`)) return;
+        
+        let confirmMsg = `Apakah Anda yakin ingin menghentikan ujian secara keseluruhan? SEMUA (${activeCount}) siswa akan dipaksa selesai dan ujian ini akan dipindahkan ke tab 'Ujian Selesai'.`;
+        if (activeCount === 0) {
+            confirmMsg = "Semua siswa telah selesai. Apakah Anda yakin ingin menutup ujian ini dan memindahkannya ke tab 'Ujian Selesai'?";
+        } else {
+            confirmMsg = `PERHATIAN: Masih ada ${activeCount} siswa yang sedang mengerjakan atau sesi terkunci. Menghentikan ujian akan memaksa pengumpulan jawaban mereka secara otomatis. Lanjutkan?`;
+        }
+
+        if (!window.confirm(confirmMsg)) return;
         
         try {
             setIsRefreshing(true);
@@ -349,9 +357,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             {!isReadOnly && (
                                 <button 
                                     onClick={handleFinishAllExams} 
-                                    className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95 flex items-center gap-2"
+                                    className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all border shadow-sm active:scale-95 flex items-center gap-2 ${
+                                        onlineCount + lockedCount > 0 
+                                            ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                            : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                                    }`}
                                 >
-                                    <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Ujian
+                                    {onlineCount + lockedCount > 0 ? (
+                                        <>
+                                            <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Ujian
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircleIcon className="w-3.5 h-3.5" /> Selesaikan Ujian
+                                        </>
+                                    )}
                                 </button>
                             )}
                         </div>
