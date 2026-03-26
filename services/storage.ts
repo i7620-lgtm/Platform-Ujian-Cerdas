@@ -2031,6 +2031,21 @@ class StorageService {
           .eq('exam_code', examCode)
           .eq('student_id', studentId);
       if (error) throw error;
+
+      // Broadcast to specific student to force submit immediately
+      const channel = supabase.channel(`exam-room-${examCode}`);
+      await channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+              await channel.send({
+                  type: 'broadcast',
+                  event: 'force_submit_exam',
+                  payload: { examCode, studentId, timestamp: Date.now() }
+              });
+              setTimeout(() => {
+                  supabase.removeChannel(channel);
+              }, 1000);
+          }
+      });
   }
 
   async finishAllExams(examCode: string): Promise<void> {
@@ -2043,7 +2058,7 @@ class StorageService {
   }
 
   async stopExamOverall(examCode: string): Promise<void> {
-      // 1. Finish all student exams
+      // 1. Finish all student exams in DB
       await this.finishAllExams(examCode);
 
       // 2. Update exam config to isFinished: true
@@ -2053,6 +2068,22 @@ class StorageService {
           const { error } = await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
           if (error) throw error;
       }
+
+      // 3. Broadcast to all students to force submit immediately
+      const channel = supabase.channel(`exam-room-${examCode}`);
+      await channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+              await channel.send({
+                  type: 'broadcast',
+                  event: 'force_submit_exam',
+                  payload: { examCode, timestamp: Date.now() }
+              });
+              // Give it a tiny bit of time to send before unsubscribing
+              setTimeout(() => {
+                  supabase.removeChannel(channel);
+              }, 1000);
+          }
+      });
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
