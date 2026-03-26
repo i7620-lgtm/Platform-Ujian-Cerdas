@@ -251,6 +251,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
     }, [activeExam.config.trackLocation, activeExam.config.examMode, student.class]);
 
+    useEffect(() => {
+        if (activeExam.config.isFinished && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
+            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            handleSubmit(true, 'completed');
+        }
+    }, [activeExam.config.isFinished, handleSubmit, student.class]);
+
     const [deadline, setDeadline] = useState<number>(0);
 
     useEffect(() => {
