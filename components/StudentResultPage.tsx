@@ -335,11 +335,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                     const cSet = new Set(parseList(correctAns).map(a => normalize(a, q.questionType)));
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                     try {
-                                                        const parsedStudent = JSON.parse(studentAns);
-                                                        if (Array.isArray(parsedStudent)) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
-                                                        const parsedCorrect = JSON.parse(correctAns);
-                                                        if (Array.isArray(parsedCorrect)) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
-                                                    } catch {}
+                                                        const parsedStudent = parseList(studentAns);
+                                                        if (parsedStudent.length > 0) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
+                                                        const parsedCorrect = parseList(correctAns);
+                                                        if (parsedCorrect.length > 0) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
+                                                    } catch { /* ignore */ }
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
                                                      isCorrect = false;
                                                      try {
