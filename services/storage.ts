@@ -581,7 +581,6 @@ class StorageService {
       const updates = results.map((r: Result) => {
           const answers = r.answers;
           let correctCount = 0;
-          let emptyCount = 0;
           
           const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
           
@@ -595,7 +594,6 @@ class StorageService {
 
               const ans = answers[q.id];
               if (!ans) {
-                  emptyCount++;
                   return;
               }
 
@@ -634,7 +632,7 @@ class StorageService {
               id: r.id,
               score: score,
               correct_answers: correctCount,
-              wrong_answers: total - correctCount - emptyCount
+              total_questions: total
           };
       });
 
