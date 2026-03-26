@@ -195,9 +195,19 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 try {
                     const div = document.createElement('div');
                     div.innerHTML = s;
-                    return div.innerHTML;
+                    
+                    // Remove math-visual wrappers to compare actual content
+                    div.querySelectorAll('.math-visual').forEach(el => {
+                        while (el.firstChild) {
+                            el.parentNode?.insertBefore(el.firstChild, el);
+                        }
+                        el.parentNode?.removeChild(el);
+                    });
+
+                    // Standardize HTML by removing whitespace between tags and trimming
+                    return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
                 } catch {
-                    return s;
+                    return s.trim().replace(/\s+/g, ' ');
                 }
             };
 
@@ -854,7 +864,18 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
             // Update local state for questions
             setDisplayExam(prev => ({
                 ...prev,
-                questions: prev.questions.map(q => q.id === qId ? { ...q, correctAnswer: newKey } : q)
+                questions: prev.questions.map(q => {
+                    if (q.id === qId) {
+                        if (q.questionType === 'TRUE_FALSE') {
+                            try { return { ...q, trueFalseRows: JSON.parse(newKey) }; } catch { return q; }
+                        } else if (q.questionType === 'MATCHING') {
+                            try { return { ...q, matchingPairs: JSON.parse(newKey) }; } catch { return q; }
+                        } else {
+                            return { ...q, correctAnswer: newKey };
+                        }
+                    }
+                    return q;
+                })
             }));
 
             // Refresh results to get new scores
@@ -882,15 +903,32 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
 
 
     const normalize = useCallback((str: string, qType: string) => {
+        const s = String(str || '');
         if (qType === 'FILL_IN_THE_BLANK') {
-            return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+            return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
         }
         try {
             const div = document.createElement('div');
-            div.innerHTML = str;
-            return div.innerHTML;
+            div.innerHTML = s;
+            
+            // Remove math-visual wrappers to compare actual content
+            // Better: replace with LaTeX content to be more robust
+            div.querySelectorAll('.math-visual').forEach(el => {
+                const latex = el.getAttribute('data-latex');
+                if (latex) {
+                    el.replaceWith(document.createTextNode(`$${latex}$`));
+                } else {
+                    while (el.firstChild) {
+                        el.parentNode?.insertBefore(el.firstChild, el);
+                    }
+                    el.parentNode?.removeChild(el);
+                }
+            });
+
+            // Standardize HTML by removing whitespace between tags and trimming
+            return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
         } catch {
-            return str;
+            return s.trim().replace(/\s+/g, ' ');
         }
     }, []);
 
