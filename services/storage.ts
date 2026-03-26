@@ -286,12 +286,12 @@ class StorageService {
     private parseList(str: string | undefined | null): string[] {
         if (!str) return [];
         
-        const deepParse = (input: string): any => {
+        const deepParse = (input: string): unknown => {
             try {
                 let fixedInput = input;
                 try {
                     JSON.parse(fixedInput);
-                } catch (e) {
+                } catch {
                     fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
                 }
                 const parsed = JSON.parse(fixedInput);
@@ -313,7 +313,7 @@ class StorageService {
             const parsed = deepParse(str);
             if (Array.isArray(parsed)) {
                 const flattened: string[] = [];
-                const processItem = (item: any) => {
+                const processItem = (item: unknown) => {
                     if (typeof item === 'string') {
                         if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
                             try {
@@ -578,8 +578,9 @@ class StorageService {
       if (resultsError) throw resultsError;
 
       // 5. Recalculate Scores
-      const updates = results.map((r: Result) => {
-          const answers = r.answers;
+      const updates = results.map((r: unknown) => {
+          const row = r as Record<string, unknown>;
+          const answers = row.answers as Record<string, string>;
           let correctCount = 0;
           
           const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
@@ -629,16 +630,16 @@ class StorageService {
           const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
           return {
-              id: r.id,
-              exam_code: (r as any).exam_code,
-              student_id: (r as any).student_id,
-              student_name: (r as any).student_name,
-              class_name: (r as any).class_name,
-              status: (r as any).status,
-              answers: (r as any).answers,
-              activity_log: (r as any).activity_log,
-              location: (r as any).location,
-              unlock_token: (r as any).unlock_token,
+              id: row.id,
+              exam_code: row.exam_code,
+              student_id: row.student_id,
+              student_name: row.student_name,
+              class_name: row.class_name,
+              status: row.status,
+              answers: row.answers,
+              activity_log: row.activity_log,
+              location: row.location,
+              unlock_token: row.unlock_token,
               score: score,
               correct_answers: correctCount,
               total_questions: total,
@@ -1850,12 +1851,12 @@ class StorageService {
                          if (!str) return [];
                          const s = String(str);
                          
-                         const deepParse = (input: string): any => {
+                         const deepParse = (input: string): unknown => {
                              try {
                                  let fixedInput = input;
                                  try {
                                      JSON.parse(fixedInput);
-                                 } catch (e) {
+                                 } catch {
                                      fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
                                  }
                                  const parsed = JSON.parse(fixedInput);
@@ -1877,7 +1878,7 @@ class StorageService {
                              const parsed = deepParse(s);
                              if (Array.isArray(parsed)) {
                                  const flattened: string[] = [];
-                                 const processItem = (item: any) => {
+                                 const processItem = (item: unknown) => {
                                      if (typeof item === 'string') {
                                          if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
                                              try {
@@ -2039,6 +2040,19 @@ class StorageService {
           .eq('exam_code', examCode)
           .in('status', ['in_progress', 'force_closed']);
       if (error) throw error;
+  }
+
+  async stopExamOverall(examCode: string): Promise<void> {
+      // 1. Finish all student exams
+      await this.finishAllExams(examCode);
+
+      // 2. Update exam config to isFinished: true
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      if (data && data.config) {
+          const newConfig = { ...data.config, isFinished: true };
+          const { error } = await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
+          if (error) throw error;
+      }
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
