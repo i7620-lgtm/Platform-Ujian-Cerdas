@@ -25,9 +25,19 @@ const normalize = (str: unknown, qType: string) => {
     try {
         const div = document.createElement('div');
         div.innerHTML = s;
-        return div.innerHTML;
+        
+        // Remove math-visual wrappers to compare actual content
+        div.querySelectorAll('.math-visual').forEach(el => {
+            while (el.firstChild) {
+                el.parentNode?.insertBefore(el.firstChild, el);
+            }
+            el.parentNode?.removeChild(el);
+        });
+
+        // Standardize HTML by removing whitespace between tags and trimming
+        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
     } catch {
-        return s;
+        return s.trim().replace(/\s+/g, ' ');
     }
 };
 
@@ -569,7 +579,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
                                                             <button key={i} onClick={() => { 
-                                                                const newAns = isSelected ? currentAns.filter(a => a !== opt) : [...currentAns, opt]; 
+                                                                const currentlyCheckedOptions = (q.options || []).filter(o => currentAns.includes(o));
+                                                                let newAns;
+                                                                if (isSelected) {
+                                                                    newAns = currentlyCheckedOptions.filter(o => o !== opt);
+                                                                } else {
+                                                                    newAns = currentlyCheckedOptions.includes(opt) ? currentlyCheckedOptions : [...currentlyCheckedOptions, opt];
+                                                                }
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
