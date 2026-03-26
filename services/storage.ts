@@ -1575,9 +1575,7 @@ class StorageService {
        if (files && files.length > 0) {
             await supabase.storage.from('soal').remove(files.map(f => `${code}/${f.name}`));
        }
-  }
-
-  async getResults(examCode?: string, className?: string): Promise<Result[]> {
+  }  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
     let query = supabase.from('results').select('*');
     if (examCode) query = query.eq('exam_code', examCode);
     
@@ -1590,7 +1588,7 @@ class StorageService {
     let results = data.map((row: Record<string, unknown>) => {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
-        let schoolName = '';
+        let dbSchoolName = '';
         let dbClassName = row.class_name as string;
         let studentName = row.student_name as string;
 
@@ -1598,7 +1596,7 @@ class StorageService {
         if (studentIdStr.startsWith('@') && studentIdStr.includes('#') && studentIdStr.includes('$') && studentIdStr.includes('%')) {
             const match = studentIdStr.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
             if (match) {
-                schoolName = match[1];
+                dbSchoolName = match[1];
                 studentName = match[2];
                 dbClassName = match[3];
                 absentNumber = match[4];
@@ -1618,10 +1616,10 @@ class StorageService {
                     }
                 }
             }
-            schoolName = student?.schoolName || '';
+            dbSchoolName = student?.schoolName || '';
             if (dbClassName && dbClassName.includes('::')) {
                 const parts = dbClassName.split('::');
-                schoolName = parts[0];
+                dbSchoolName = parts[0];
                 dbClassName = parts[1];
             }
         }
@@ -1632,7 +1630,7 @@ class StorageService {
                 studentId: studentIdStr, 
                 fullName: studentName, 
                 class: dbClassName, 
-                schoolName: schoolName,
+                schoolName: dbSchoolName,
                 absentNumber: absentNumber 
             },
             examCode: row.exam_code as string, 
@@ -1650,7 +1648,9 @@ class StorageService {
     if (className && className !== 'ALL') {
         results = results.filter(r => r.student.class === className);
     }
-
+    if (schoolName && schoolName !== 'ALL') {
+        results = results.filter(r => r.student.schoolName === schoolName);
+    }
     return results;
   }
 
@@ -2016,6 +2016,29 @@ class StorageService {
       const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
       const currentLog = (data?.activity_log as string[]) || [];
       await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
+  }
+
+  async finishStudentExam(examCode: string, studentId: string): Promise<void> {
+      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
+      const currentLog = (data?.activity_log as string[]) || [];
+      const { error } = await supabase
+          .from('results')
+          .update({ 
+              status: 'completed', 
+              activity_log: [...currentLog, "Ujian dihentikan oleh Guru"] 
+          })
+          .eq('exam_code', examCode)
+          .eq('student_id', studentId);
+      if (error) throw error;
+  }
+
+  async finishAllExams(examCode: string): Promise<void> {
+      const { error } = await supabase
+          .from('results')
+          .update({ status: 'completed' })
+          .eq('exam_code', examCode)
+          .in('status', ['in_progress', 'force_closed']);
+      if (error) throw error;
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
