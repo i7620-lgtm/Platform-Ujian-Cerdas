@@ -13,6 +13,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
+    const [selectedSchool, setSelectedSchool] = useState<string>('ALL');
     const [localResults, setLocalResults] = useState<Result[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
@@ -32,7 +33,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         if (!displayExam?.code) return;
         if (!silent) setIsRefreshing(true);
         try {
-            const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass);
+            const data = await storageService.getResults(displayExam.code, selectedClass === 'ALL' ? '' : selectedClass, selectedSchool === 'ALL' ? '' : selectedSchool);
             setLocalResults(data);
 
             const { data: examData } = await supabase.from('exams').select('config').eq('code', displayExam.code).single();
@@ -41,13 +42,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             }
         } catch (e) { console.error("Fetch failed", e); }
         finally { if (!silent) setIsRefreshing(false); }
-    }, [displayExam?.code, selectedClass]);
+    }, [displayExam?.code, selectedClass, selectedSchool]);
 
     useEffect(() => {
         fetchLatest();
         const intervalId = setInterval(() => { fetchLatest(true); }, 5000);
         return () => clearInterval(intervalId);
-    }, [displayExam?.code, selectedClass, teacherProfile, fetchLatest]);
+    }, [displayExam?.code, selectedClass, selectedSchool, teacherProfile, fetchLatest]);
 
     useEffect(() => {
         if (!displayExam) return;
@@ -83,7 +84,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             supabase.removeChannel(resultChannel);
             supabase.removeChannel(configChannel);
         };
-    }, [displayExam?.code, selectedClass, displayExam, fetchLatest]);
+    }, [displayExam?.code, selectedClass, selectedSchool, displayExam, fetchLatest]);
 
     // Lógica pengurutan: Locked -> Online -> Selesai. Kemudian Kelas & Absen.
     const sortedResults = useMemo(() => {
@@ -157,6 +158,39 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         } catch (e) {
             console.error(e);
             alert("Gagal menghapus data siswa.");
+        }
+    };
+
+    const handleFinishStudentExam = async (studentId: string, studentName: string) => {
+        if (!window.confirm(`Apakah Anda yakin ingin menghentikan ujian untuk "${studentName}"? Siswa tidak akan bisa melanjutkan lagi.`)) return;
+        try {
+            await storageService.finishStudentExam(displayExam.code, studentId);
+            fetchLatest(true);
+            alert("Ujian siswa berhasil dihentikan.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal menghentikan ujian.");
+        }
+    };
+
+    const handleFinishAllExams = async () => {
+        const activeCount = localResults.filter(r => r.status === 'in_progress' || r.status === 'force_closed').length;
+        if (activeCount === 0) {
+            alert("Tidak ada siswa yang sedang aktif.");
+            return;
+        }
+        if (!window.confirm(`Apakah Anda yakin ingin menghentikan ujian untuk SEMUA (${activeCount}) siswa?`)) return;
+        
+        try {
+            setIsRefreshing(true);
+            await storageService.finishAllExams(displayExam.code);
+            fetchLatest(true);
+            alert("Semua ujian siswa berhasil dihentikan.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal menghentikan ujian.");
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -291,43 +325,63 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </div>
                         </div>
                         
-                        {/* Status Counters */}
-                        <div className="flex items-center gap-6 py-2 border-y border-slate-50 dark:border-slate-700/50">
-                            {displayExam.config.examMode !== 'PR' && (
-                                <div className="flex items-center gap-2" title="Locked (Terkunci)">
-                                    <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
-                                        {lockedCount}
+                        {/* Status Counters & Bulk Actions */}
+                        <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-slate-50 dark:border-slate-700/50">
+                            <div className="flex items-center gap-6">
+                                {displayExam.config.examMode !== 'PR' && (
+                                    <div className="flex items-center gap-2" title="Locked (Terkunci)">
+                                        <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
+                                            {lockedCount}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
                                     </div>
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
+                                )}
+                                <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
+                                        {onlineCount}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Online</span>
                                 </div>
+                                <div className="flex items-center gap-2" title="Selesai">
+                                    <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold border border-slate-300 dark:border-slate-500">
+                                        {completedCount}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Selesai</span>
+                                </div>
+                            </div>
+                            
+                            {!isReadOnly && (
+                                <button 
+                                    onClick={handleFinishAllExams} 
+                                    className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95 flex items-center gap-2"
+                                >
+                                    <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Semua
+                                </button>
                             )}
-                            <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
-                                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
-                                    {onlineCount}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Online</span>
-                            </div>
-                            <div className="flex items-center gap-2" title="Selesai">
-                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold border border-slate-300 dark:border-slate-500">
-                                    {completedCount}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Selesai</span>
-                            </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
-                                <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
+                                    <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                    {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Sekolah:</span>
+                                        <select value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
+                                            <option value="ALL">SEMUA SEKOLAH</option>
+                                            {Array.from(new Set(localResults.map(r => r.student.schoolName).filter(Boolean))).map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
+                                        <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
+                                            <option value="ALL">SEMUA KELAS</option>
+                                            {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
-                                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
-                                    <option value="ALL">SEMUA KELAS</option>
-                                    {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Content Area */}
@@ -533,12 +587,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                     <TrashIcon className="w-4 h-4" />
                                                                 </button>
                                                                 {(r.status === 'in_progress' || r.status === 'force_closed') && displayExam.config.examMode !== 'PR' && (
-                                                                    <button 
-                                                                        onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
-                                                                        className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
-                                                                    >
-                                                                        Buat Token
-                                                                    </button>
+                                                                    <div className="flex gap-2">
+                                                                        <button 
+                                                                            onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
+                                                                            className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                        >
+                                                                            Buat Token
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleFinishStudentExam(r.student.studentId, r.student.fullName)} 
+                                                                            className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                        >
+                                                                            Hentikan
+                                                                        </button>
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         )}
