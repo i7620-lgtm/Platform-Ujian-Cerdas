@@ -178,12 +178,12 @@ export const parseList = (str: string | undefined | null): string[] => {
     if (!str) return [];
     
     // Helper to recursively unescape stringified JSON
-    const deepParse = (input: string): any => {
+    const deepParse = (input: string): unknown => {
         try {
             let fixedInput = input;
             try {
                 JSON.parse(fixedInput);
-            } catch (e) {
+            } catch {
                 // If it fails, try replacing literal newlines with escaped newlines
                 fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
             }
@@ -207,7 +207,7 @@ export const parseList = (str: string | undefined | null): string[] => {
         if (Array.isArray(parsed)) {
             // Flatten the array in case it contains stringified arrays
             const flattened: string[] = [];
-            const processItem = (item: any) => {
+            const processItem = (item: unknown) => {
                 if (typeof item === 'string') {
                     // Only deepParse if it looks like a stringified array or object
                     if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
@@ -507,8 +507,7 @@ export const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, 
             ctx.drawImage(sourceImage, x, y, w, h, 0, 0, w, h);
             // Gunakan WebP untuk hasil crop
             resolve(canvas.toDataURL('image/webp', 0.7));
-        } catch (e) {
-            console.error("Crop error:", e);
+        } catch {
             resolve('');
         }
     });
