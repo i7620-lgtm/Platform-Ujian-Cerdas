@@ -266,6 +266,12 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     }
 
     if (examConfig) {
+        if (examConfig.isFinished) {
+            setError('Ujian ini telah dihentikan oleh Guru.');
+            setIsLoading(false);
+            return;
+        }
+
         const now = new Date();
         const mode = examConfig.examMode || 'UJIAN';
         
