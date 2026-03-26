@@ -92,9 +92,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [userLocation, setUserLocation] = useState<string>('');
     
     const [isNavOpen, setIsNavOpen] = useState(false);
-    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+    const [hasAttemptedSubmit] = useState(false);
     const [showConfigIntro, setShowConfigIntro] = useState(true);
-
 
     const [activeExam, setActiveExam] = useState<Exam>(exam);
 
@@ -139,6 +138,68 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [openDropdownId]);
+
+    const isAnswered = (q: Question, currentAnswers: Record<string, string>) => {
+        const ans = currentAnswers[q.id];
+        if (!ans) return false;
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            try {
+                const parsed = JSON.parse(ans);
+                return Array.isArray(parsed) && parsed.length > 0;
+            } catch { return false; }
+        }
+        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+            try {
+                const parsed = JSON.parse(ans);
+                return Object.keys(parsed).length > 0;
+            } catch { return false; }
+        }
+        return ans.trim().length > 0;
+    };
+
+    const handleSubmit = useCallback(async (isAuto = false, status: ResultStatus = 'completed') => {
+        if (isSubmittingRef.current) return;
+        if (!isAuto && !window.confirm('Yakin ingin mengumpulkan jawaban sekarang?')) return;
+
+        setIsSubmitting(true);
+        isSubmittingRef.current = true;
+
+        try {
+            const grading = calculateGrade(activeExam, answersRef.current);
+            await onSubmit(
+                answersRef.current,
+                timeLeftRef.current,
+                status,
+                logRef.current,
+                userLocation,
+                grading
+            );
+            await storageService.clearLocalProgress(STORAGE_KEY);
+        } catch (error) {
+            console.error('Submit error:', error);
+            alert('Gagal mengirim jawaban. Silakan coba lagi.');
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
+    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
+
+    useEffect(() => {
+        let channel: ReturnType<typeof supabase.channel> | null = null;
+        if (!exam.config.disableRealtime) {
+            channel = supabase.channel(`exam-room-${exam.code}`)
+                .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
+                    // If studentId is provided in payload, only submit if it matches current student
+                    if (payload.payload?.studentId && payload.payload.studentId !== student.studentId) return;
+                    
+                    if (student.class !== 'PREVIEW' && !isSubmittingRef.current) {
+                        alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                        handleSubmit(true, 'completed');
+                    }
+                })
+                .subscribe();
+        }
+        return () => { if (channel) supabase.removeChannel(channel); };
+    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, handleSubmit]);
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -192,34 +253,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
-
-    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
-        const v = ansMap[q.id];
-        if (!v) return false;
-        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch { return false; }
-        }
-        return v.trim() !== "";
-    };
-
-    const handleSubmit = useCallback(async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto) {
-            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
-            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
-            if (unansweredCount > 0) {
-                setHasAttemptedSubmit(true);
-                setIsNavOpen(true);
-                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi. Yakin ingin mengumpulkan?`)) return;
-            } else {
-                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban?")) return;
-            }
-        }
-        if (isSubmittingRef.current) return;
-        setIsSubmitting(true);
-        const grading = calculateGrade(activeExam, answersRef.current);
-        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
-        if (status === 'completed' || status === 'force_closed') { storageService.clearLocalProgress(STORAGE_KEY); }
-    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
 
     useEffect(() => {
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior || activeExam.config.examMode === 'PR') return;
