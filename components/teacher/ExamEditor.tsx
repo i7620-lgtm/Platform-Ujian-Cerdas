@@ -558,7 +558,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) { 
-                let currentAnswers = parseList(q.correctAnswer);
+                const currentAnswers = parseList(q.correctAnswer);
                 const normalizeHtml = (html: string) => {
                     try {
                         const div = document.createElement('div');
