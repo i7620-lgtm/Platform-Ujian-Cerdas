@@ -117,15 +117,26 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
 };
 
 const normalize = (str: string, qType: string) => {
+    const s = String(str || '');
     if (qType === 'FILL_IN_THE_BLANK') {
-        return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
     try {
         const div = document.createElement('div');
-        div.innerHTML = str;
-        return div.innerHTML;
+        div.innerHTML = s;
+        
+        // Remove math-visual wrappers to compare actual content
+        div.querySelectorAll('.math-visual').forEach(el => {
+            while (el.firstChild) {
+                el.parentNode?.insertBefore(el.firstChild, el);
+            }
+            el.parentNode?.removeChild(el);
+        });
+
+        // Standardize HTML by removing whitespace between tags and trimming
+        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
     } catch {
-        return str;
+        return s.trim().replace(/\s+/g, ' ');
     }
 };
 
@@ -445,7 +456,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             }
 
             let answerStr = "-";
-            if (q.correctAnswer) {
+            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                answerStr = parseList(q.correctAnswer || '').map(s => s.replace(/<[^>]*>/g, '')).join(", ");
+            } else if (q.correctAnswer) {
                 if (Array.isArray(q.correctAnswer)) {
                     answerStr = q.correctAnswer.join(", ");
                 } else {
