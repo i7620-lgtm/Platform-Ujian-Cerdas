@@ -175,17 +175,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     const handleFinishAllExams = async () => {
         const activeCount = localResults.filter(r => r.status === 'in_progress' || r.status === 'force_closed').length;
-        if (activeCount === 0) {
-            alert("Tidak ada siswa yang sedang aktif.");
-            return;
-        }
-        if (!window.confirm(`Apakah Anda yakin ingin menghentikan ujian untuk SEMUA (${activeCount}) siswa?`)) return;
+        if (!window.confirm(`Apakah Anda yakin ingin menghentikan ujian secara keseluruhan? SEMUA (${activeCount}) siswa akan dipaksa selesai dan ujian ini akan dipindahkan ke tab 'Ujian Selesai'.`)) return;
         
         try {
             setIsRefreshing(true);
-            await storageService.finishAllExams(displayExam.code);
-            fetchLatest(true);
-            alert("Semua ujian siswa berhasil dihentikan.");
+            await storageService.stopExamOverall(displayExam.code);
+            alert("Ujian berhasil dihentikan secara keseluruhan.");
+            onClose(); // Close modal so user sees it moved to Finished tab
         } catch (e) {
             console.error(e);
             alert("Gagal menghentikan ujian.");
@@ -355,7 +351,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     onClick={handleFinishAllExams} 
                                     className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95 flex items-center gap-2"
                                 >
-                                    <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Semua
+                                    <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Ujian
                                 </button>
                             )}
                         </div>
