@@ -1,4 +1,4 @@
- 
+
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
 import { ChartBarIcon, CheckCircleIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
@@ -346,9 +346,9 @@ export const QuestionAnalysisItem: React.FC<{
                                             ) : q.questionType === 'COMPLEX_MULTIPLE_CHOICE' ? (
                                                 <div className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: parseList(q.correctAnswer || '').join(' &bull; ') || '<span class="text-rose-500 italic">Belum diset</span>'}}></div>
                                             ) : q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? (
-                                                <span>{q.trueFalseRows.map((r, i) => `${r.text.replace(/<[^>]*>/g, '')}: ${r.answer ? 'Benar' : 'Salah'}`).join(', ')}</span>
+                                                <span>{q.trueFalseRows.map((r) => `${r.text.replace(/<[^>]*>/g, '')}: ${r.answer ? 'Benar' : 'Salah'}`).join(', ')}</span>
                                             ) : q.questionType === 'MATCHING' && q.matchingPairs ? (
-                                                <span>{q.matchingPairs.map((p, i) => `${p.left} → ${p.right}`).join(', ')}</span>
+                                                <span>{q.matchingPairs.map((p) => `${p.left} → ${p.right}`).join(', ')}</span>
                                             ) : (
                                                 <span className="italic text-slate-500">Edit kunci untuk tipe soal ini belum didukung penuh di tampilan ini.</span>
                                             )}
