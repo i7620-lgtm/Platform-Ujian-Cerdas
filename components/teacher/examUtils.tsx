@@ -55,18 +55,6 @@ export interface QuestionTypeStat {
 export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Result[]): QuestionTypeStat[] => {
     const resultArray = Array.isArray(results) ? results : [results];
     const typeMap: Record<string, { totalQuestions: number; totalAttempt: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     // Initialize map with all types present in exam
     exam.questions.forEach(q => {
@@ -188,12 +176,119 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
 export const parseList = (str: string | undefined | null): string[] => {
     if (!str) return [];
+    
+    // Helper to recursively unescape stringified JSON
+    const deepParse = (input: string): any => {
+        try {
+            let fixedInput = input;
+            try {
+                JSON.parse(fixedInput);
+            } catch (e) {
+                // If it fails, try replacing literal newlines with escaped newlines
+                fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+            }
+            const parsed = JSON.parse(fixedInput);
+            if (typeof parsed === 'string') {
+                return deepParse(parsed);
+            }
+            return parsed;
+        } catch {
+            let cleaned = input.trim();
+            if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
+            if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+            if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
+            cleaned = cleaned.replace(/\\"/g, '"');
+            return cleaned;
+        }
+    };
+
     try {
-        const parsed = JSON.parse(str);
-        if (Array.isArray(parsed)) return parsed.map(String);
+        const parsed = deepParse(str);
+        if (Array.isArray(parsed)) {
+            // Flatten the array in case it contains stringified arrays
+            const flattened: string[] = [];
+            const processItem = (item: any) => {
+                if (typeof item === 'string') {
+                    // Only deepParse if it looks like a stringified array or object
+                    if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
+                        try {
+                            const unescaped = deepParse(item);
+                            if (Array.isArray(unescaped)) {
+                                unescaped.forEach(processItem);
+                            } else {
+                                flattened.push(String(unescaped));
+                            }
+                        } catch {
+                            flattened.push(String(item));
+                        }
+                    } else {
+                        flattened.push(String(item));
+                    }
+                } else if (Array.isArray(item)) {
+                    item.forEach(processItem);
+                } else {
+                    flattened.push(String(item));
+                }
+            };
+            parsed.forEach(processItem);
+            return flattened;
+        }
     } catch { /* ignore */ }
+    
     // Fallback: handle legacy comma-separated
-    return str.split(',').map(s => s.trim()).filter(s => s !== '');
+    // If it looks like HTML, don't split by comma as it might break equations
+    if (str.includes('<') && str.includes('>')) {
+        return [str.trim()];
+    }
+    
+    // If it looks like a broken JSON array (starts with [ and ends with ]), strip them before splitting
+    let cleanStr = str.trim();
+    if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
+        cleanStr = cleanStr.slice(1, -1);
+    }
+    
+    // Split by comma, but try to respect quotes if possible
+    // Simple split for now, but clean up quotes
+    return cleanStr.split(',').map(s => {
+        let trimmed = s.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+            trimmed = trimmed.slice(1, -1);
+        }
+        // Unescape internal quotes
+        trimmed = trimmed.replace(/\\"/g, '"');
+        return trimmed;
+    }).filter(s => s !== '');
+};
+
+// --- HELPER: Normalize Answer String ---
+export const normalize = (str: string, qType: string) => {
+    const s = String(str || '');
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = s;
+        
+        // Remove math-visual wrappers to compare actual content
+        // Better: replace with LaTeX content to be more robust
+        div.querySelectorAll('.math-visual').forEach(el => {
+            const latex = el.getAttribute('data-latex');
+            if (latex) {
+                el.replaceWith(document.createTextNode(`$${latex}$`));
+            } else {
+                while (el.firstChild) {
+                    el.parentNode?.insertBefore(el.firstChild, el);
+                }
+                el.parentNode?.removeChild(el);
+            }
+        });
+
+        // Standardize HTML by removing whitespace between tags and trimming
+        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+    } catch {
+        return s.trim().replace(/\s+/g, ' ');
+    }
 };
 
 // --- ANALYTICS ENGINE (Pure Functions) ---
@@ -201,18 +296,6 @@ export const parseList = (str: string | undefined | null): string[] => {
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     const catMap: Record<string, { total: number; correct: number }> = {};
     const lvlMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     const checkAnswer = (q: Question, ans: string) => {
         if (!ans) return false;
@@ -275,18 +358,6 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
 export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
     const statsMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     // 1. Calculate Stats per Category
     exam.questions.forEach(q => {
@@ -997,7 +1068,7 @@ export const sanitizeHtml = (html: string): string => {
     const doc = parser.parseFromString(html, 'text/html');
     
     // SECURITY FIX: Remove potentially dangerous tags (XSS Protection)
-    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'style', 'base'];
+    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'base'];
     dangerousTags.forEach(tag => {
         const elements = doc.getElementsByTagName(tag);
         for (let i = elements.length - 1; i >= 0; i--) {
@@ -1009,7 +1080,24 @@ export const sanitizeHtml = (html: string): string => {
         el.classList.contains('math-visual') || 
         el.closest('.math-visual') ||
         el.classList.contains('katex') ||
-        el.closest('.katex');
+        el.closest('.katex') ||
+        el.tagName.toLowerCase() === 'math' ||
+        el.closest('math') ||
+        el.classList.contains('MathJax') ||
+        el.closest('.MathJax') ||
+        el.classList.contains('mjx-container') ||
+        el.closest('.mjx-container') ||
+        el.classList.contains('math-tex') ||
+        el.closest('.math-tex');
+
+    // Handle style tags separately to preserve them if they are inside math
+    const styleElements = doc.getElementsByTagName('style');
+    for (let i = styleElements.length - 1; i >= 0; i--) {
+        const el = styleElements[i];
+        if (!isMath(el)) {
+            el.parentNode?.removeChild(el);
+        }
+    }
         
     const isAksaraBali = (el: Element) =>
         el.classList.contains('aksara-bali') ||
