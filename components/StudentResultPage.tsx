@@ -204,8 +204,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
             {/* Elegant Discrepancy Notification - REMOVED AS REQUESTED */}
 
-            <div className={`w-full ${expandedReview ? 'max-w-full' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
-                <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
+            <div className={`w-full ${expandedReview ? 'max-w-full' : 'max-w-5xl'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
+                <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
                     
                     {/* Background decoration */}
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
@@ -219,159 +219,152 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     </div>
                     
                     {showResult ? (
-                        <div className="space-y-8">
-                            <div className="py-6 relative">
-                                {isWaitingForServer ? (
-                                    <div className="flex flex-col items-center justify-center space-y-4">
-                                        <div className="relative">
-                                            <ArrowPathIcon className="w-16 h-16 text-emerald-500 animate-spin" />
-                                            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-emerald-600">...</span>
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                                {/* SCORE CARD */}
+                                <div className="lg:col-span-4 py-6 relative bg-emerald-50/30 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100/50 dark:border-emerald-800/30 flex flex-col items-center justify-center">
+                                    {isWaitingForServer ? (
+                                        <div className="flex flex-col items-center justify-center space-y-3">
+                                            <div className="relative">
+                                                <ArrowPathIcon className="w-12 h-12 text-emerald-500 animate-spin" />
+                                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-emerald-600">...</span>
+                                            </div>
+                                            <p className="text-xs font-bold text-emerald-600 animate-pulse">Menghitung Nilai...</p>
                                         </div>
-                                        <p className="text-sm font-bold text-emerald-600 animate-pulse">Menghitung Nilai Akhir...</p>
-                                        <p className="text-[10px] text-slate-400 max-w-[200px] mx-auto">Jawaban Anda sedang diperiksa secara otomatis oleh sistem.</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <span className="text-7xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block scale-100 transition-transform">{displayScore}</span>
-                                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
-                                        {calculatedStats.hasDiscrepancy && !isWaitingForServer && (
-                                            <span className="absolute top-2 right-1/2 translate-x-12 flex h-3 w-3">
-                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                                            </span>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-
-                            {/* STUDENT & EXAM DETAILS CARD */}
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-3">
-                                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
-                                    Informasi Peserta & Ujian
-                                </h3>
-                                <div className="grid grid-cols-2 gap-y-3 text-[11px]">
-                                    <div>
-                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Nama Siswa</p>
-                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.fullName}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Sekolah</p>
-                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.schoolName || exam.authorSchool || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Kelas</p>
-                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.class}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">No. Absen</p>
-                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.absentNumber}</p>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Mata Pelajaran</p>
-                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{exam.config.subject}</p>
-                                    </div>
+                                    ) : (
+                                        <>
+                                            <span className="text-6xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block">{displayScore}</span>
+                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Nilai Akhir</span>
+                                            {calculatedStats.hasDiscrepancy && !isWaitingForServer && (
+                                                <span className="absolute top-4 right-4 flex h-3 w-3">
+                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
-                            </div>
 
-                            {/* QR CODE & LINK SECTION */}
-                            <div className="flex flex-col items-center justify-center space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                                    <QRCodeCanvas 
-                                        value={`${window.location.origin}/result/${exam.code}/${result.student.studentId}`}
-                                        size={100}
-                                        level="H"
-                                        includeMargin={false}
-                                    />
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-[10px] text-slate-400 font-medium mb-1">Pindai QR untuk akses cepat hasil ujian</p>
-                                    <p className="text-[9px] text-indigo-500 font-mono break-all max-w-[250px] mx-auto">
-                                        {`${window.location.origin}/result/${exam.code}/${result.student.studentId}`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* NEW: DIAGNOSTIC CARD */}
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
-                                <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <ChartBarIcon className="w-4 h-4"/> Analisis Kemampuan
-                                </h3>
-                                
-                                {analysisData.stats.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {analysisData.stats.map((stat) => {
-                                            const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
-                                            return (
-                                                <div key={stat.name}>
-                                                    <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                                        <span>{stat.name}</span>
-                                                        <span>{stat.percentage}%</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                        <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
-                                            <p className="text-xs italic text-slate-600 dark:text-slate-300 font-medium">
-                                                "{analysisData.recommendation}"
-                                            </p>
+                                {/* STUDENT & EXAM DETAILS CARD */}
+                                <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left flex flex-col justify-center">
+                                    <h3 className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 mb-3">
+                                        Informasi Peserta
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                                        <div className="col-span-2">
+                                            <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Nama Siswa</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{result.student.fullName}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Kelas / No</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.class} / {result.student.absentNumber}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Mata Pelajaran</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{exam.config.subject}</p>
                                         </div>
                                     </div>
-                                ) : (
-                                    <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>
-                                )}
-                            </div>
+                                </div>
 
-                            {/* NEW: QUESTION TYPE ANALYSIS CARD */}
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
-                                <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <ChartBarIcon className="w-4 h-4"/> Analisis Jenis Soal
-                                </h3>
-                                
-                                {questionTypeStats.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {questionTypeStats.map((stat) => {
-                                            const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
-                                            return (
-                                                <div key={stat.type}>
-                                                    <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                                        <span>{stat.typeName}</span>
-                                                        <span>{stat.percentage}% ({stat.correct}/{stat.totalAttempt})</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                        <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
+                                {/* QR CODE SECTION */}
+                                <div className="lg:col-span-3 flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-100 dark:border-slate-800">
+                                    <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 mb-2">
+                                        <QRCodeCanvas 
+                                            value={`${window.location.origin}/result/${exam.code}/${result.student.studentId}`}
+                                            size={70}
+                                            level="H"
+                                            includeMargin={false}
+                                        />
                                     </div>
-                                ) : (
-                                    <p className="text-xs text-slate-400 italic">Tidak ada data jenis soal.</p>
-                                )}
+                                    <p className="text-[8px] text-slate-400 font-medium text-center leading-tight">Pindai untuk akses cepat hasil ujian</p>
+                                </div>
                             </div>
 
-                            <div className="flex justify-around border-t border-slate-50 dark:border-slate-800 pt-8">
-                                <div className="text-center group cursor-default">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-emerald-500 transition-colors">Benar</p>
-                                    <p className="text-3xl font-black text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* DIAGNOSTIC CARD */}
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
+                                    <h3 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <ChartBarIcon className="w-3.5 h-3.5"/> Analisis Kemampuan
+                                    </h3>
+                                    
+                                    {analysisData.stats.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {analysisData.stats.map((stat) => {
+                                                const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
+                                                return (
+                                                    <div key={stat.name}>
+                                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                            <span>{stat.name}</span>
+                                                            <span>{stat.percentage}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                                                <p className="text-[10px] italic text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                                                    "{analysisData.recommendation}"
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">Tidak ada data kategori.</p>
+                                    )}
                                 </div>
-                                <div className="text-center group cursor-default">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Total Soal</p>
-                                    <p className="text-3xl font-black text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
+
+                                {/* QUESTION TYPE ANALYSIS CARD */}
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-4">
+                                    <h3 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <ChartBarIcon className="w-3.5 h-3.5"/> Analisis Jenis Soal
+                                    </h3>
+                                    
+                                    {questionTypeStats.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {questionTypeStats.map((stat) => {
+                                                const colorClass = stat.percentage >= 80 ? 'bg-emerald-500' : stat.percentage >= 50 ? 'bg-amber-400' : 'bg-rose-500';
+                                                return (
+                                                    <div key={stat.type}>
+                                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                                            <span>{stat.typeName}</span>
+                                                            <span>{stat.percentage}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div className={`h-full ${colorClass} transition-all duration-1000`} style={{width: `${stat.percentage}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">Tidak ada data jenis soal.</p>
+                                    )}
                                 </div>
                             </div>
-                            
-                            {config.showCorrectAnswer && (
-                                <div className="pt-8">
+
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
+                                <div className="flex gap-8">
+                                    <div className="text-center group cursor-default">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 group-hover:text-emerald-500 transition-colors">Benar</p>
+                                        <p className="text-2xl font-black text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
+                                    </div>
+                                    <div className="text-center group cursor-default">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 group-hover:text-indigo-500 transition-colors">Total Soal</p>
+                                        <p className="text-2xl font-black text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
+                                    </div>
+                                </div>
+                                
+                                {config.showCorrectAnswer && (
                                     <button 
                                         onClick={() => setExpandedReview(!expandedReview)}
-                                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-800 px-6 py-3 rounded-xl transition-all inline-flex items-center gap-2 border border-transparent hover:border-indigo-100 dark:hover:border-slate-700"
+                                        className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-white hover:bg-indigo-600 dark:hover:bg-indigo-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-indigo-100 dark:border-indigo-900/30"
                                     >
                                         {expandedReview ? 'Tutup Pembahasan' : 'Lihat Pembahasan'}
                                         {expandedReview ? <ChevronUpIcon className="w-3 h-3"/> : <ChevronDownIcon className="w-3 h-3"/>}
                                     </button>
+                                )}
+                            </div>
 
                                     {expandedReview && (
                                         <div className="mt-8 space-y-4 text-left border-t border-slate-50 dark:border-slate-800 pt-8 animate-fade-in">
@@ -446,9 +439,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                    ) : (
+                        ) : (
                         <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700">
                             <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Menunggu pengumuman nilai dari pengajar.</p>
                         </div>
