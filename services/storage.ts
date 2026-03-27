@@ -1,7 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
-import { compressImage } from '../components/teacher/examUtils';
+import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
@@ -168,120 +168,120 @@ const initDB = (): Promise<IDBDatabase> => {
     });
 };
 
-const stripAnswersFromQuestion = (q: Question): Question => {
-    const sanitizedQ = { ...q } as Question;
-    
-    // SECURITY FIX: Remove correct answers before sending to client
-    delete sanitizedQ.correctAnswer;
-    
-    if (sanitizedQ.trueFalseRows) {
-        sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
-            const newRow = { ...row };
-            delete newRow.answer;
-            return newRow;
-        });
-    }
-    
-    if (sanitizedQ.matchingPairs) {
-        const rightOptions = sanitizedQ.matchingPairs.map(p => p.right);
-        const shuffledRight = shuffleArray(rightOptions);
-        sanitizedQ.matchingPairs = sanitizedQ.matchingPairs.map((pair, idx) => ({
-            left: pair.left,
-            right: shuffledRight[idx]
-        }));
-    }
-    
-    return sanitizedQ;
-};
-
-const sanitizeExamForStudent = (exam: Exam, studentId?: string): Exam => {
-    if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
-        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        const sanitizedQuestions = questionsToProcess.map(q => {
-            const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-            // Verified: Shuffling options here is safe because answers are stored/graded by text value, not index.
-            if (exam.config.shuffleAnswers) {
-                if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
-                    sanitizedQ.options = shuffleArray(sanitizedQ.options);
-                }
-            }
-            return stripAnswersFromQuestion(sanitizedQ);
-        });
-        return { ...exam, questions: sanitizedQuestions };
-    }
-
-    const STORAGE_KEY_ORDER = `exam_order_${exam.code}_${studentId}`;
-    let orderMap: { qOrder: string[]; optOrders: Record<string, string[]> } | null = null;
-    
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_ORDER);
-        if (stored) orderMap = JSON.parse(stored);
-    } catch { /* ignore */ }
-
-    if (!orderMap) {
-        let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
-        
-        // INDEPENDENT LOGIC: Shuffle Questions
-        // Only shuffles the order of questions if enabled. Does NOT affect options.
-        if (exam.config.shuffleQuestions) {
-            questionsToProcess = shuffleArray(questionsToProcess);
-        }
-        
-        const qOrder = questionsToProcess.map(q => q.id);
-        const optOrders: Record<string, string[]> = {};
-
-        // INDEPENDENT LOGIC: Shuffle Answers
-        // Iterates through questions (whether shuffled or not) and shuffles options if enabled.
-        questionsToProcess.forEach(q => {
-             // Only shuffle options if explicitly enabled in config
-             if (exam.config.shuffleAnswers && q.options && 
-                (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
-                 const shuffledOpts = shuffleArray([...q.options]);
-                 optOrders[q.id] = shuffledOpts;
-             }
-        });
-
-        orderMap = { qOrder, optOrders };
-        try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch { /* ignore */ }
-    }
-
-    const questionMap = new Map(exam.questions.map(q => [q.id, q]));
-    const orderedQuestions: Question[] = [];
-    
-    orderMap.qOrder.forEach(qid => {
-        const q = questionMap.get(qid);
-        if (q) {
-            orderedQuestions.push(q);
-            questionMap.delete(qid);
-        }
-    });
-
-    questionMap.forEach(q => orderedQuestions.push(q));
-
-    const finalQuestions = orderedQuestions.map(q => {
-        const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
-        
-        if (orderMap?.optOrders[q.id] && sanitizedQ.options) {
-             const storedOpts = orderMap.optOrders[q.id];
-             const currentOptSet = new Set(sanitizedQ.options);
-             const validStoredOpts = storedOpts.filter(o => currentOptSet.has(o));
-             
-             if (validStoredOpts.length === sanitizedQ.options.length) {
-                 sanitizedQ.options = validStoredOpts;
-             }
-        }
-        return stripAnswersFromQuestion(sanitizedQ);
-    });
-
-    return { ...exam, questions: finalQuestions };
-};
-
 class StorageService {
     private syncQueue: Result[] = [];
     private isProcessingQueue = false;
+
+    private stripAnswersFromQuestion(q: Question): Question {
+        const sanitizedQ = { ...q } as Question;
+        
+        // SECURITY FIX: Remove correct answers before sending to client
+        delete sanitizedQ.correctAnswer;
+        
+        if (sanitizedQ.trueFalseRows) {
+            sanitizedQ.trueFalseRows = sanitizedQ.trueFalseRows.map(row => {
+                const newRow = { ...row };
+                delete newRow.answer;
+                return newRow;
+            });
+        }
+        
+        if (sanitizedQ.matchingPairs) {
+            const rightOptions = sanitizedQ.matchingPairs.map(p => p.right);
+            const shuffledRight = shuffleArray(rightOptions);
+            sanitizedQ.matchingPairs = sanitizedQ.matchingPairs.map((pair, idx) => ({
+                left: pair.left,
+                right: shuffledRight[idx]
+            }));
+        }
+        
+        return sanitizedQ;
+    }
+
+    private sanitizeExamForStudent(exam: Exam, studentId?: string, includeAnswers = false): Exam {
+        if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
+            let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
+            if (exam.config.shuffleQuestions) {
+                questionsToProcess = shuffleArray(questionsToProcess);
+            }
+            const sanitizedQuestions = questionsToProcess.map(q => {
+                const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+                // Verified: Shuffling options here is safe because answers are stored/graded by text value, not index.
+                if (exam.config.shuffleAnswers) {
+                    if ((sanitizedQ.questionType === 'MULTIPLE_CHOICE' || sanitizedQ.questionType === 'COMPLEX_MULTIPLE_CHOICE') && sanitizedQ.options) {
+                        sanitizedQ.options = shuffleArray(sanitizedQ.options);
+                    }
+                }
+                return includeAnswers ? sanitizedQ : this.stripAnswersFromQuestion(sanitizedQ);
+            });
+            return { ...exam, questions: sanitizedQuestions };
+        }
+
+        const STORAGE_KEY_ORDER = `exam_order_${exam.code}_${studentId}`;
+        let orderMap: { qOrder: string[]; optOrders: Record<string, string[]> } | null = null;
+        
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY_ORDER);
+            if (stored) orderMap = JSON.parse(stored);
+        } catch { /* ignore */ }
+
+        if (!orderMap) {
+            let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
+            
+            // INDEPENDENT LOGIC: Shuffle Questions
+            // Only shuffles the order of questions if enabled. Does NOT affect options.
+            if (exam.config.shuffleQuestions) {
+                questionsToProcess = shuffleArray(questionsToProcess);
+            }
+            
+            const qOrder = questionsToProcess.map(q => q.id);
+            const optOrders: Record<string, string[]> = {};
+
+            // INDEPENDENT LOGIC: Shuffle Answers
+            // Iterates through questions (whether shuffled or not) and shuffles options if enabled.
+            questionsToProcess.forEach(q => {
+                 // Only shuffle options if explicitly enabled in config
+                 if (exam.config.shuffleAnswers && q.options && 
+                    (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE')) {
+                     const shuffledOpts = shuffleArray([...q.options]);
+                     optOrders[q.id] = shuffledOpts;
+                 }
+            });
+
+            orderMap = { qOrder, optOrders };
+            try { localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(orderMap)); } catch { /* ignore */ }
+        }
+
+        const questionMap = new Map(exam.questions.map(q => [q.id, q]));
+        const orderedQuestions: Question[] = [];
+        
+        orderMap.qOrder.forEach(qid => {
+            const q = questionMap.get(qid);
+            if (q) {
+                orderedQuestions.push(q);
+                questionMap.delete(qid);
+            }
+        });
+
+        questionMap.forEach(q => orderedQuestions.push(q));
+
+        const finalQuestions = orderedQuestions.map(q => {
+            const sanitizedQ = { ...q, options: q.options ? [...q.options] : undefined } as Question;
+            
+            if (orderMap?.optOrders[q.id] && sanitizedQ.options) {
+                 const storedOpts = orderMap.optOrders[q.id];
+                 const currentOptSet = new Set(sanitizedQ.options);
+                 const validStoredOpts = storedOpts.filter(o => currentOptSet.has(o));
+                 
+                 if (validStoredOpts.length === sanitizedQ.options.length) {
+                     sanitizedQ.options = validStoredOpts;
+                 }
+            }
+            return includeAnswers ? sanitizedQ : this.stripAnswersFromQuestion(sanitizedQ);
+        });
+
+        return { ...exam, questions: finalQuestions };
+    }
 
     private parseList(str: string | undefined | null): string[] {
         if (!str) return [];
@@ -582,14 +582,22 @@ class StorageService {
           const row = r as Record<string, unknown>;
           const answers = row.answers as Record<string, string>;
           let correctCount = 0;
+          let totalScore = 0;
+          let maxPossibleScore = 0;
           
           const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
           
           scorableQuestions.forEach(q => {
-              // Logic from checkAnswerStatus
+              const weight = q.scoreWeight || 1;
+              maxPossibleScore += weight;
+
+              // Check if teacher has manually graded this question
               const manualGradeKey = `_grade_${q.id}`;
               if (answers[manualGradeKey]) {
-                  if (answers[manualGradeKey] === 'CORRECT') correctCount++;
+                  if (answers[manualGradeKey] === 'CORRECT') {
+                      correctCount++;
+                      totalScore += weight;
+                  }
                   return;
               }
 
@@ -623,11 +631,14 @@ class StorageService {
                   } catch { isCorrect = false; }
               }
 
-              if (isCorrect) correctCount++;
+              if (isCorrect) {
+                  correctCount++;
+                  totalScore += weight;
+              }
           });
 
           const total = scorableQuestions.length;
-          const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+          const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
 
           return {
               id: row.id,
@@ -957,7 +968,16 @@ class StorageService {
           questions: data.questions, 
           status: data.status
       };
-      return sanitizeExamForStudent(exam, studentId);
+
+      let includeAnswers = false;
+      if (studentId && studentId !== 'monitor' && studentId !== 'check_schedule') {
+          const { data: result } = await supabase.from('results').select('status').eq('exam_code', code).eq('student_id', studentId).maybeSingle();
+          if (result && (result.status === 'completed' || result.status === 'force_closed')) {
+              includeAnswers = exam.config.showResultToStudent;
+          }
+      }
+
+      return this.sanitizeExamForStudent(exam, studentId, includeAnswers);
   }
 
   async getExamConfig(code: string): Promise<ExamConfig | null> {
@@ -1327,8 +1347,14 @@ class StorageService {
               
               results.forEach(r => {
                   const ans = r.answers[q.id];
-                  // Normalize and Check (Simplified for stats)
-                  if (this.isAnswerCorrect(q, ans)) correctCount++;
+                  const manualGradeKey = `_grade_${q.id}`;
+                  
+                  // Check manual grade first
+                  if (r.answers[manualGradeKey]) {
+                      if (r.answers[manualGradeKey] === 'CORRECT') correctCount++;
+                  } else if (this.isAnswerCorrect(q, ans)) {
+                      correctCount++;
+                  }
                   
                   // Track distraction
                   if (ans) {
@@ -1687,64 +1713,13 @@ class StorageService {
             });
             resultPayload.answers = mergedAnswers;
 
-            const { data: examData } = await supabase.from('exams').select('questions').eq('code', resultPayload.examCode).single();
-            if (examData && examData.questions) {
-                const questions = examData.questions as Question[];
-                const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
-                calculatedTotal = scorableQuestions.length;
-                calculatedCorrect = 0;
-                let totalScore = 0;
-                let maxPossibleScore = 0;
-
-                scorableQuestions.forEach((q: Question) => {
-                    const weight = q.scoreWeight || 1;
-                    maxPossibleScore += weight;
-
-                    const studentAnswer = resultPayload.answers[q.id];
-                    if (!studentAnswer) return;
-
-                    let isCorrect = false;
-
-                    // Preserve teacher's manual grade if it exists
-                    const manualGradeKey = `_grade_${q.id}`;
-                    if (resultPayload.answers[manualGradeKey]) {
-                        isCorrect = resultPayload.answers[manualGradeKey] === 'CORRECT';
-                    } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                         if (q.correctAnswer && this.normalize(studentAnswer, q.questionType) === this.normalize(q.correctAnswer, q.questionType)) isCorrect = true;
-                    } 
-                    else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                         const studentSet = new Set(this.parseList(studentAnswer).map(a => this.normalize(a, q.questionType)));
-                         const correctSet = new Set(this.parseList(q.correctAnswer).map(a => this.normalize(a, q.questionType)));
-                         if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                             isCorrect = true;
-                         }
-                    }
-                    else if (q.questionType === 'TRUE_FALSE') {
-                        try {
-                            const ansObj = JSON.parse(studentAnswer);
-                            const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
-                                return ansObj[idx] === row.answer;
-                            });
-                            if (allCorrect) isCorrect = true;
-                        } catch { /* ignore */ }
-                    }
-                    else if (q.questionType === 'MATCHING') {
-                        try {
-                            const ansObj = JSON.parse(studentAnswer);
-                            const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                                return ansObj[idx] === pair.right;
-                            });
-                            if (allCorrect) isCorrect = true;
-                        } catch { /* ignore */ }
-                    }
-
-                    if (isCorrect) {
-                        calculatedCorrect++;
-                        totalScore += weight;
-                    }
-                });
-
-                calculatedScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+            const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).single();
+            if (examData) {
+                const exam = examData as Exam;
+                const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, resultPayload.answers || {});
+                calculatedScore = score;
+                calculatedCorrect = correctAnswers;
+                calculatedTotal = totalQuestions;
             }
         } catch (err) {
             console.error("Failed to recalculate score securely", err);
@@ -1871,165 +1846,13 @@ class StorageService {
                  });
                  payload.answers = mergedAnswers;
 
-                 const { data: examData } = await supabase.from('exams').select('questions').eq('code', payload.examCode).single();
-                 if (examData && examData.questions) {
-                     const questions = examData.questions as Question[];
-                     const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
-                     calculatedTotal = scorableQuestions.length;
-                     calculatedCorrect = 0;
-                     let totalScore = 0;
-                     let maxPossibleScore = 0;
-
-                     const normalize = (str: unknown, qType: string): string => {
-                         const s = String(str || '');
-                         if (qType === 'FILL_IN_THE_BLANK') {
-                             return s.trim().toLowerCase().replace(/\s+/g, ' ');
-                         }
-                         try {
-                             const div = document.createElement('div');
-                             div.innerHTML = s;
-
-                             // Remove math-visual wrappers to compare actual content
-                             div.querySelectorAll('.math-visual').forEach(el => {
-                                 while (el.firstChild) {
-                                     el.parentNode?.insertBefore(el.firstChild, el);
-                                 }
-                                 el.parentNode?.removeChild(el);
-                             });
-
-                             // Standardize HTML by removing whitespace between tags and trimming
-                             return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-                         } catch {
-                             return s.trim().replace(/\s+/g, ' ');
-                         }
-                     };
-
-                     const parseList = (str: unknown): string[] => {
-                         if (!str) return [];
-                         const s = String(str);
-                         
-                         const deepParse = (input: string): unknown => {
-                             try {
-                                 let fixedInput = input;
-                                 try {
-                                     JSON.parse(fixedInput);
-                                 } catch {
-                                     fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
-                                 }
-                                 const parsed = JSON.parse(fixedInput);
-                                 if (typeof parsed === 'string') {
-                                     return deepParse(parsed);
-                                 }
-                                 return parsed;
-                             } catch {
-                                 let cleaned = input.trim();
-                                 if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
-                                 if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
-                                 if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
-                                 cleaned = cleaned.replace(/\\"/g, '"');
-                                 return cleaned;
-                             }
-                         };
-
-                         try {
-                             const parsed = deepParse(s);
-                             if (Array.isArray(parsed)) {
-                                 const flattened: string[] = [];
-                                 const processItem = (item: unknown) => {
-                                     if (typeof item === 'string') {
-                                         if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
-                                             try {
-                                                 const unescaped = deepParse(item);
-                                                 if (Array.isArray(unescaped)) {
-                                                     unescaped.forEach(processItem);
-                                                 } else {
-                                                     flattened.push(String(unescaped));
-                                                 }
-                                             } catch {
-                                                 flattened.push(String(item));
-                                             }
-                                         } else {
-                                             flattened.push(String(item));
-                                         }
-                                     } else if (Array.isArray(item)) {
-                                         item.forEach(processItem);
-                                     } else {
-                                         flattened.push(String(item));
-                                     }
-                                 };
-                                 parsed.forEach(processItem);
-                                 return flattened;
-                             }
-                         } catch { /* ignore */ }
-                         
-                         if (s.includes('<') && s.includes('>')) {
-                             return [s.trim()];
-                         }
-                         
-                         let cleanStr = s.trim();
-                         if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
-                             cleanStr = cleanStr.slice(1, -1);
-                         }
-                         
-                         return cleanStr.split(',').map(item => {
-                             let trimmed = item.trim();
-                             if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-                                 trimmed = trimmed.slice(1, -1);
-                             }
-                             trimmed = trimmed.replace(/\\"/g, '"');
-                             return trimmed;
-                         }).filter(item => item !== '');
-                     };
-
-                     scorableQuestions.forEach((q: Question) => {
-                         const weight = q.scoreWeight || 1;
-                         maxPossibleScore += weight;
-
-                         const studentAnswer = payload.answers[q.id];
-                         if (!studentAnswer) return;
-
-                         let isCorrect = false;
-
-                         // Preserve teacher's manual grade if it exists
-                         const manualGradeKey = `_grade_${q.id}`;
-                         if (payload.answers[manualGradeKey]) {
-                             isCorrect = payload.answers[manualGradeKey] === 'CORRECT';
-                         } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                              if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
-                         } 
-                         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                              const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
-                              const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
-                              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                                  isCorrect = true;
-                              }
-                         }
-                         else if (q.questionType === 'TRUE_FALSE') {
-                             try {
-                                 const ansObj = JSON.parse(studentAnswer);
-                                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
-                                     return ansObj[idx] === row.answer;
-                                 });
-                                 if (allCorrect) isCorrect = true;
-                             } catch { /* ignore */ }
-                         }
-                         else if (q.questionType === 'MATCHING') {
-                             try {
-                                 const ansObj = JSON.parse(studentAnswer);
-                                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                                     return ansObj[idx] === pair.right;
-                                 });
-                                 if (allCorrect) isCorrect = true;
-                             } catch { /* ignore */ }
-                         }
-
-                         if (isCorrect) {
-                             calculatedCorrect++;
-                             totalScore += weight;
-                         }
-                     });
-
-                     calculatedScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+                 const { data: examData } = await supabase.from('exams').select('*').eq('code', payload.examCode).single();
+                 if (examData) {
+                     const exam = examData as Exam;
+                     const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, payload.answers || {});
+                     calculatedScore = score;
+                     calculatedCorrect = correctAnswers;
+                     calculatedTotal = totalQuestions;
                  }
              } catch (err) {
                  console.error("Failed to recalculate score securely in queue", err);
