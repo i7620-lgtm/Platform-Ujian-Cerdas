@@ -1,4 +1,4 @@
-
+ 
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
