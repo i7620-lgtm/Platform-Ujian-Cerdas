@@ -22,9 +22,20 @@ const normalize = (str: string, qType: string) => {
     try {
         const div = document.createElement('div');
         div.innerHTML = s;
-        return div.innerHTML;
+        div.querySelectorAll('.math-visual').forEach(el => {
+            const latex = el.getAttribute('data-latex');
+            if (latex) {
+                el.replaceWith(document.createTextNode(`$${latex}$`));
+            } else {
+                while (el.firstChild) {
+                    el.parentNode?.insertBefore(el.firstChild, el);
+                }
+                el.parentNode?.removeChild(el);
+            }
+        });
+        return div.innerHTML.trim();
     } catch {
-        return s;
+        return s.trim().replace(/\s+/g, ' ');
     }
 };
 
@@ -91,7 +102,11 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
             let isCorrect = false;
 
-            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+            // Check if teacher has manually graded this question
+            const manualGradeKey = `_grade_${q.id}`;
+            if (result.answers[manualGradeKey]) {
+                isCorrect = result.answers[manualGradeKey] === 'CORRECT';
+            } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                 isCorrect = studentAns === correctAns;
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
@@ -110,8 +125,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     const ansObj = JSON.parse(ans);
                     isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
                 } catch { /* ignore */ }
-            } else if (q.questionType === 'ESSAY') {
-                isCorrect = false; // Default until graded
             }
 
             if (isCorrect) {
@@ -123,7 +136,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
         const finalScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
         
         return {
-            score: finalScore,
+            score: result.score, // Use the score from the database
+            calculatedScore: finalScore, // Keep calculated score for discrepancy check
             correctAnswers: correctCount,
             totalQuestions: scorableQuestions.length,
             wrongAnswers: scorableQuestions.length - correctCount - emptyCount,
