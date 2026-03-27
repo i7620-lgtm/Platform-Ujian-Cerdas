@@ -43,20 +43,31 @@ const normalize = (str: unknown, qType: string) => {
 
 const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
     let correctCount = 0;
-    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
     
     scorableQuestions.forEach((q: Question) => {
+        const weight = q.scoreWeight || 1;
+        maxPossibleScore += weight;
+
         const studentAnswer = answers[q.id];
         if (!studentAnswer) return;
 
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
+        let isCorrect = false;
+
+        // Check if teacher has manually graded this question (unlikely during exam, but good for consistency)
+        const manualGradeKey = `_grade_${q.id}`;
+        if (answers[manualGradeKey]) {
+            isCorrect = answers[manualGradeKey] === 'CORRECT';
+        } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
              const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
              const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
              if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                 correctCount++;
+                 isCorrect = true;
              }
         }
         else if (q.questionType === 'TRUE_FALSE') {
@@ -65,7 +76,7 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
                     return ansObj[idx] === row.answer;
                 });
-                if (allCorrect) correctCount++;
+                if (allCorrect) isCorrect = true;
             } catch { /* ignore */ }
         }
         else if (q.questionType === 'MATCHING') {
@@ -74,12 +85,17 @@ const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
                     return ansObj[idx] === pair.right;
                 });
-                if (allCorrect) correctCount++;
+                if (allCorrect) isCorrect = true;
             } catch { /* ignore */ }
+        }
+
+        if (isCorrect) {
+            correctCount++;
+            totalScore += weight;
         }
     });
 
-    const score = scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
+    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
     return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
 };
 
