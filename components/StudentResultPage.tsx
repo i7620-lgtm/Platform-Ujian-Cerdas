@@ -1,9 +1,10 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize } from './teacher/examUtils';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface StudentResultPageProps {
   result: Result;
@@ -13,31 +14,6 @@ interface StudentResultPageProps {
   isDarkMode?: boolean;
   toggleTheme?: () => void;
 }
-
-const normalize = (str: string, qType: string) => {
-    const s = String(str || '');
-    if (qType === 'FILL_IN_THE_BLANK') {
-        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-    }
-    try {
-        const div = document.createElement('div');
-        div.innerHTML = s;
-        div.querySelectorAll('.math-visual').forEach(el => {
-            const latex = el.getAttribute('data-latex');
-            if (latex) {
-                el.replaceWith(document.createTextNode(`$${latex}$`));
-            } else {
-                while (el.firstChild) {
-                    el.parentNode?.insertBefore(el.firstChild, el);
-                }
-                el.parentNode?.removeChild(el);
-            }
-        });
-        return div.innerHTML.trim();
-    } catch {
-        return s.trim().replace(/\s+/g, ' ');
-    }
-};
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
@@ -149,6 +125,22 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
     const analysisData = useMemo(() => analyzeStudentPerformance(exam, result), [exam, result]);
     const questionTypeStats = useMemo(() => analyzeQuestionTypePerformance(exam, result), [exam, result]);
 
+    // Check if we are waiting for server-side score calculation
+    const hasAutoGradable = useMemo(() => exam.questions.some(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY'), [exam.questions]);
+    const isWaitingForServer = useMemo(() => {
+        // 1. If status is not completed/force_closed, we are definitely waiting
+        if (result.status === 'in_progress') return true;
+        
+        // 2. If score is 0 but we have auto-gradable questions and calculated score is > 0, we are definitely waiting for the server to update the score field.
+        if (result.score === 0 && hasAutoGradable && (calculatedStats?.calculatedScore || 0) > 0) return true;
+        
+        // 3. If totalQuestions is 0 but exam has scorable questions, it means the server hasn't processed the result yet.
+        const scorableCount = exam.questions.filter(q => q.questionType !== 'INFO').length;
+        if (result.totalQuestions === 0 && scorableCount > 0) return true;
+
+        return false;
+    }, [result.score, result.status, result.totalQuestions, hasAutoGradable, calculatedStats?.calculatedScore, exam.questions]);
+
     if (result.status === 'force_closed') {
         return (
             <div className="min-h-screen flex items-center justify-center bg-rose-50 dark:bg-rose-950 p-6 transition-colors duration-300">
@@ -192,6 +184,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
     }
 
     const showResult = config.showResultToStudent;
+    
+    // REAL-TIME FALLBACK: If server score is 0 but client calculated > 0, use client score for display if we are waiting
+    const displayScore = isWaitingForServer ? (calculatedStats?.calculatedScore || 0) : result.score;
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">
@@ -237,14 +232,74 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     {showResult ? (
                         <div className="space-y-8">
                             <div className="py-6 relative">
-                                <span className="text-7xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block scale-100 transition-transform">{calculatedStats.score}</span>
-                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
-                                {calculatedStats.hasDiscrepancy && (
-                                    <span className="absolute top-2 right-1/2 translate-x-12 flex h-3 w-3">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                                    </span>
+                                {isWaitingForServer ? (
+                                    <div className="flex flex-col items-center justify-center space-y-4">
+                                        <div className="relative">
+                                            <ArrowPathIcon className="w-16 h-16 text-emerald-500 animate-spin" />
+                                            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-emerald-600">...</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-emerald-600 animate-pulse">Menghitung Nilai Akhir...</p>
+                                        <p className="text-[10px] text-slate-400 max-w-[200px] mx-auto">Jawaban Anda sedang diperiksa secara otomatis oleh sistem.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <span className="text-7xl font-black text-slate-800 dark:text-slate-100 tracking-tighter block scale-100 transition-transform">{displayScore}</span>
+                                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2 block">Nilai Akhir</span>
+                                        {calculatedStats.hasDiscrepancy && !isWaitingForServer && (
+                                            <span className="absolute top-2 right-1/2 translate-x-12 flex h-3 w-3">
+                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                            </span>
+                                        )}
+                                    </>
                                 )}
+                            </div>
+
+                            {/* STUDENT & EXAM DETAILS CARD */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 text-left space-y-3">
+                                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
+                                    Informasi Peserta & Ujian
+                                </h3>
+                                <div className="grid grid-cols-2 gap-y-3 text-[11px]">
+                                    <div>
+                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Nama Siswa</p>
+                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.fullName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Sekolah</p>
+                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.schoolName || exam.authorSchool || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Kelas</p>
+                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.class}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">No. Absen</p>
+                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{result.student.absentNumber}</p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className="text-slate-400 dark:text-slate-500 mb-0.5">Mata Pelajaran</p>
+                                        <p className="font-bold text-slate-700 dark:text-slate-200 uppercase">{exam.config.subject}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* QR CODE & LINK SECTION */}
+                            <div className="flex flex-col items-center justify-center space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
+                                    <QRCodeCanvas 
+                                        value={`${window.location.origin}/result/${exam.code}/${result.student.studentId}`}
+                                        size={100}
+                                        level="H"
+                                        includeMargin={false}
+                                    />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[10px] text-slate-400 font-medium mb-1">Pindai QR untuk akses cepat hasil ujian</p>
+                                    <p className="text-[9px] text-indigo-500 font-mono break-all max-w-[250px] mx-auto">
+                                        {`${window.location.origin}/result/${exam.code}/${result.student.studentId}`}
+                                    </p>
+                                </div>
                             </div>
 
                             {/* NEW: DIAGNOSTIC CARD */}
