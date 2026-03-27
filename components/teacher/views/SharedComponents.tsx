@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
 import { ChartBarIcon, CheckCircleIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
-import { parseList } from '../examUtils';
+import { parseList, normalize } from '../examUtils';
 
 // --- SHARED COMPONENTS ---
 
@@ -111,32 +111,33 @@ export const QuestionAnalysisItem: React.FC<{
         return null;
     }, [q]);
 
-    const normalize = (str: string) => {
-        if (q.questionType === 'FILL_IN_THE_BLANK') {
-            return str.replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str;
-            return div.innerHTML;
-        } catch {
-            return str;
-        }
-    };
-
     const isCorrectAnswer = (ans: string) => {
         if (!correctAnswerString) return false;
         
         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // FIX: Use parseList to safely handle JSON array comparison independent of order
-            const sSet = new Set(parseList(ans).map(normalize));
-            const cSet = new Set(parseList(correctAnswerString).map(normalize));
+            const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
+            const cSet = new Set(parseList(correctAnswerString).map(a => normalize(a, q.questionType)));
             return sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+        }
+
+        if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+            } catch { return false; }
+        }
+
+        if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(ans);
+                return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+            } catch { return false; }
         }
 
         if (ans === correctAnswerString) return true;
         if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'MULTIPLE_CHOICE') {
-            return normalize(ans) === normalize(correctAnswerString);
+            return normalize(ans, q.questionType) === normalize(correctAnswerString, q.questionType);
         }
         
         return false;
@@ -183,7 +184,7 @@ export const QuestionAnalysisItem: React.FC<{
                                     </span>
                                     {!isEditingKey ? (
                                         <button 
-                                            onClick={(e) => { e.stopPropagation(); setTempKey(q.correctAnswer || ''); setIsEditingKey(true); }} 
+                                            onClick={(e) => { e.stopPropagation(); setTempKey(getInitialKey()); setIsEditingKey(true); }} 
                                             className="text-[10px] font-bold bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 px-2 py-1 rounded text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors"
                                         >
                                             Ubah Kunci
@@ -212,25 +213,29 @@ export const QuestionAnalysisItem: React.FC<{
                                     <div className="mt-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
-                                                {q.options.map((opt, i) => (
-                                                    <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${tempKey === opt ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-                                                        <input 
-                                                            type="radio" 
-                                                            name={`key-${q.id}`} 
-                                                            value={opt} 
-                                                            checked={tempKey === opt} 
-                                                            onChange={(e) => setTempKey(e.target.value)}
-                                                            className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
-                                                        />
-                                                        <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
-                                                    </label>
-                                                ))}
+                                                {q.options.map((opt, i) => {
+                                                    const isChecked = normalize(tempKey, q.questionType) === normalize(opt, q.questionType);
+                                                    return (
+                                                        <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                                                            <input 
+                                                                type="radio" 
+                                                                name={`key-${q.id}`} 
+                                                                value={opt} 
+                                                                checked={isChecked} 
+                                                                onChange={(e) => setTempKey(e.target.value)}
+                                                                className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                                            />
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                        </label>
+                                                    );
+                                                })}
                                             </div>
                                         ) : q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options ? (
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                                                 {q.options.map((opt, i) => {
                                                     const currentKeys = parseList(tempKey);
-                                                    const isChecked = currentKeys.includes(opt);
+                                                    const normalizedOpt = normalize(opt, q.questionType);
+                                                    const isChecked = currentKeys.some(k => normalize(k, q.questionType) === normalizedOpt);
                                                     return (
                                                         <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                                                             <input 
@@ -238,9 +243,15 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 value={opt} 
                                                                 checked={isChecked} 
                                                                 onChange={(e) => {
-                                                                    const newKeys = e.target.checked 
-                                                                        ? [...currentKeys, opt]
-                                                                        : currentKeys.filter(k => k !== opt);
+                                                                    const currentlyCheckedOptions = (q.options || []).filter(o => 
+                                                                        currentKeys.some(k => normalize(k, q.questionType) === normalize(o, q.questionType))
+                                                                    );
+                                                                    let newKeys;
+                                                                    if (e.target.checked) {
+                                                                        newKeys = currentlyCheckedOptions.includes(opt) ? currentlyCheckedOptions : [...currentlyCheckedOptions, opt];
+                                                                    } else {
+                                                                        newKeys = currentlyCheckedOptions.filter(o => o !== opt);
+                                                                    }
                                                                     setTempKey(JSON.stringify(newKeys));
                                                                 }}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
@@ -328,14 +339,20 @@ export const QuestionAnalysisItem: React.FC<{
                                     </div>
                                 ) : (
                                     <div className="text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">
-                                        {q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK' ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-400 text-[10px] uppercase font-bold">Saat ini:</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-400 text-[10px] uppercase font-bold">Saat ini:</span>
+                                            {q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK' ? (
                                                 <div className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: q.correctAnswer || '<span class="text-rose-500 italic">Belum diset</span>'}}></div>
-                                            </div>
-                                        ) : (
-                                            <span className="italic text-slate-500">Edit kunci untuk tipe soal ini belum didukung penuh di tampilan ini.</span>
-                                        )}
+                                            ) : q.questionType === 'COMPLEX_MULTIPLE_CHOICE' ? (
+                                                <div className="[&_p]:inline [&_img]:max-h-8 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: parseList(q.correctAnswer || '').join(' &bull; ') || '<span class="text-rose-500 italic">Belum diset</span>'}}></div>
+                                            ) : q.questionType === 'TRUE_FALSE' && q.trueFalseRows ? (
+                                                <span>{q.trueFalseRows.map((r) => `${r.text.replace(/<[^>]*>/g, '')}: ${r.answer ? 'Benar' : 'Salah'}`).join(', ')}</span>
+                                            ) : q.questionType === 'MATCHING' && q.matchingPairs ? (
+                                                <span>{q.matchingPairs.map((p) => `${p.left} → ${p.right}`).join(', ')}</span>
+                                            ) : (
+                                                <span className="italic text-slate-500">Edit kunci untuk tipe soal ini belum didukung penuh di tampilan ini.</span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -349,16 +366,16 @@ export const QuestionAnalysisItem: React.FC<{
                                     // FIX: Sum counts of all answers that match this option (normalized)
                                     const count = Object.entries(distribution.counts).reduce((acc, [ans, c]) => {
                                         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                            const sSet = new Set(parseList(ans).map(normalize));
-                                            return sSet.has(normalize(opt)) ? acc + c : acc;
+                                            const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
+                                            return sSet.has(normalize(opt, q.questionType)) ? acc + c : acc;
                                         }
-                                        return normalize(ans) === normalize(opt) ? acc + c : acc;
+                                        return normalize(ans, q.questionType) === normalize(opt, q.questionType) ? acc + c : acc;
                                     }, 0);
                                     
                                     const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
                                     const isCorrect = q.questionType === 'COMPLEX_MULTIPLE_CHOICE' 
-                                        ? parseList(q.correctAnswer || '').map(normalize).includes(normalize(opt))
-                                        : normalize(opt) === normalize(q.correctAnswer || '');
+                                        ? parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType))
+                                        : normalize(opt, q.questionType) === normalize(q.correctAnswer || '', q.questionType);
                                     
                                     return (
                                         <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800' : count > 0 ? 'bg-slate-50 dark:bg-slate-700/50' : ''}`}>

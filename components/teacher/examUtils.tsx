@@ -55,18 +55,6 @@ export interface QuestionTypeStat {
 export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Result[]): QuestionTypeStat[] => {
     const resultArray = Array.isArray(results) ? results : [results];
     const typeMap: Record<string, { totalQuestions: number; totalAttempt: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     // Initialize map with all types present in exam
     exam.questions.forEach(q => {
@@ -77,7 +65,13 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
         typeMap[q.questionType].totalQuestions++;
     });
 
-    const checkAnswer = (q: Question, ans: string) => {
+    const checkAnswer = (q: Question, ans: string, allAnswers: Record<string, string>) => {
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (allAnswers[manualGradeKey]) {
+            return allAnswers[manualGradeKey] === 'CORRECT';
+        }
+
         if (!ans) return false;
         const normAns = normalize(String(ans), q.questionType);
         const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
@@ -109,7 +103,7 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
              if (!typeMap[q.questionType]) return; // Should be initialized, but safety check
 
              typeMap[q.questionType].totalAttempt++;
-             if (checkAnswer(q, result.answers[q.id])) {
+             if (checkAnswer(q, result.answers[q.id], result.answers)) {
                  typeMap[q.questionType].correct++;
              }
         });
@@ -188,12 +182,119 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
 export const parseList = (str: string | undefined | null): string[] => {
     if (!str) return [];
+    
+    // Helper to recursively unescape stringified JSON
+    const deepParse = (input: string): unknown => {
+        try {
+            let fixedInput = input;
+            try {
+                JSON.parse(fixedInput);
+            } catch {
+                // If it fails, try replacing literal newlines with escaped newlines
+                fixedInput = input.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+            }
+            const parsed = JSON.parse(fixedInput);
+            if (typeof parsed === 'string') {
+                return deepParse(parsed);
+            }
+            return parsed;
+        } catch {
+            let cleaned = input.trim();
+            if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
+            if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+            if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
+            cleaned = cleaned.replace(/\\"/g, '"');
+            return cleaned;
+        }
+    };
+
     try {
-        const parsed = JSON.parse(str);
-        if (Array.isArray(parsed)) return parsed.map(String);
+        const parsed = deepParse(str);
+        if (Array.isArray(parsed)) {
+            // Flatten the array in case it contains stringified arrays
+            const flattened: string[] = [];
+            const processItem = (item: unknown) => {
+                if (typeof item === 'string') {
+                    // Only deepParse if it looks like a stringified array or object
+                    if ((item.startsWith('[') && item.endsWith(']')) || (item.startsWith('{') && item.endsWith('}'))) {
+                        try {
+                            const unescaped = deepParse(item);
+                            if (Array.isArray(unescaped)) {
+                                unescaped.forEach(processItem);
+                            } else {
+                                flattened.push(String(unescaped));
+                            }
+                        } catch {
+                            flattened.push(String(item));
+                        }
+                    } else {
+                        flattened.push(String(item));
+                    }
+                } else if (Array.isArray(item)) {
+                    item.forEach(processItem);
+                } else {
+                    flattened.push(String(item));
+                }
+            };
+            parsed.forEach(processItem);
+            return flattened;
+        }
     } catch { /* ignore */ }
+    
     // Fallback: handle legacy comma-separated
-    return str.split(',').map(s => s.trim()).filter(s => s !== '');
+    // If it looks like HTML, don't split by comma as it might break equations
+    if (str.includes('<') && str.includes('>')) {
+        return [str.trim()];
+    }
+    
+    // If it looks like a broken JSON array (starts with [ and ends with ]), strip them before splitting
+    let cleanStr = str.trim();
+    if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
+        cleanStr = cleanStr.slice(1, -1);
+    }
+    
+    // Split by comma, but try to respect quotes if possible
+    // Simple split for now, but clean up quotes
+    return cleanStr.split(',').map(s => {
+        let trimmed = s.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+            trimmed = trimmed.slice(1, -1);
+        }
+        // Unescape internal quotes
+        trimmed = trimmed.replace(/\\"/g, '"');
+        return trimmed;
+    }).filter(s => s !== '');
+};
+
+// --- HELPER: Normalize Answer String ---
+export const normalize = (str: string, qType: string) => {
+    const s = String(str || '');
+    if (qType === 'FILL_IN_THE_BLANK') {
+        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    try {
+        const div = document.createElement('div');
+        div.innerHTML = s;
+        
+        // Remove math-visual wrappers to compare actual content
+        // Better: replace with LaTeX content to be more robust
+        div.querySelectorAll('.math-visual').forEach(el => {
+            const latex = el.getAttribute('data-latex');
+            if (latex) {
+                el.replaceWith(document.createTextNode(`$${latex}$`));
+            } else {
+                while (el.firstChild) {
+                    el.parentNode?.insertBefore(el.firstChild, el);
+                }
+                el.parentNode?.removeChild(el);
+            }
+        });
+
+        // Standardize HTML by removing whitespace between tags and trimming
+        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+    } catch {
+        return s.trim().replace(/\s+/g, ' ');
+    }
 };
 
 // --- ANALYTICS ENGINE (Pure Functions) ---
@@ -201,18 +302,6 @@ export const parseList = (str: string | undefined | null): string[] => {
 export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
     const catMap: Record<string, { total: number; correct: number }> = {};
     const lvlMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     const checkAnswer = (q: Question, ans: string) => {
         if (!ans) return false;
@@ -275,18 +364,6 @@ export const calculateAggregateStats = (exam: Exam, results: Result[]) => {
 
 export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAnalysis => {
     const statsMap: Record<string, { total: number; correct: number }> = {};
-    const normalize = (str: string, qType: string) => {
-        if (qType === 'FILL_IN_THE_BLANK') {
-            return (str || '').replace(/<[^>]*>?/gm, '').trim().toLowerCase();
-        }
-        try {
-            const div = document.createElement('div');
-            div.innerHTML = str || '';
-            return div.innerHTML;
-        } catch {
-            return str || '';
-        }
-    };
 
     // 1. Calculate Stats per Category
     exam.questions.forEach(q => {
@@ -304,7 +381,11 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
         const studentAns = result.answers[q.id];
         let isCorrect = false;
         
-        if (studentAns) {
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (result.answers[manualGradeKey]) {
+            isCorrect = result.answers[manualGradeKey] === 'CORRECT';
+        } else if (studentAns) {
             const normAns = normalize(String(studentAns), q.questionType);
             const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
 
@@ -436,8 +517,7 @@ export const cropImage = (sourceImage: CanvasImageSource, x: number, y: number, 
             ctx.drawImage(sourceImage, x, y, w, h, 0, 0, w, h);
             // Gunakan WebP untuk hasil crop
             resolve(canvas.toDataURL('image/webp', 0.7));
-        } catch (e) {
-            console.error("Crop error:", e);
+        } catch {
             resolve('');
         }
     });
@@ -991,13 +1071,81 @@ export const generateExamCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+/**
+ * Calculates the exam score based on student answers and exam configuration.
+ * Handles weighted scoring and manual grades.
+ */
+export const calculateExamScore = (exam: Exam, answers: Record<string, string>) => {
+    let correctCount = 0;
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+    
+    scorableQuestions.forEach((q: Question) => {
+        const weight = q.scoreWeight || 1;
+        maxPossibleScore += weight;
+
+        const studentAnswer = answers[q.id];
+        
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (answers[manualGradeKey]) {
+            if (answers[manualGradeKey] === 'CORRECT') {
+                correctCount++;
+                totalScore += weight;
+            }
+            return;
+        }
+
+        if (!studentAnswer) return;
+
+        let isCorrect = false;
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+             const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
+             const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
+             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                 isCorrect = true;
+             }
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                    return ansObj[idx] === row.answer;
+                });
+                if (allCorrect) isCorrect = true;
+            } catch { /* ignore */ }
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                    return ansObj[idx] === pair.right;
+                });
+                if (allCorrect) isCorrect = true;
+            } catch { /* ignore */ }
+        }
+
+        if (isCorrect) {
+            correctCount++;
+            totalScore += weight;
+        }
+    });
+
+    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
+};
+
 export const sanitizeHtml = (html: string): string => {
     if (!html) return '';
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
     // SECURITY FIX: Remove potentially dangerous tags (XSS Protection)
-    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'style', 'base'];
+    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'base'];
     dangerousTags.forEach(tag => {
         const elements = doc.getElementsByTagName(tag);
         for (let i = elements.length - 1; i >= 0; i--) {
@@ -1009,7 +1157,24 @@ export const sanitizeHtml = (html: string): string => {
         el.classList.contains('math-visual') || 
         el.closest('.math-visual') ||
         el.classList.contains('katex') ||
-        el.closest('.katex');
+        el.closest('.katex') ||
+        el.tagName.toLowerCase() === 'math' ||
+        el.closest('math') ||
+        el.classList.contains('MathJax') ||
+        el.closest('.MathJax') ||
+        el.classList.contains('mjx-container') ||
+        el.closest('.mjx-container') ||
+        el.classList.contains('math-tex') ||
+        el.closest('.math-tex');
+
+    // Handle style tags separately to preserve them if they are inside math
+    const styleElements = doc.getElementsByTagName('style');
+    for (let i = styleElements.length - 1; i >= 0; i--) {
+        const el = styleElements[i];
+        if (!isMath(el)) {
+            el.parentNode?.removeChild(el);
+        }
+    }
         
     const isAksaraBali = (el: Element) =>
         el.classList.contains('aksara-bali') ||

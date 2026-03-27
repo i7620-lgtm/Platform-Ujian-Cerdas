@@ -63,6 +63,7 @@ export interface ExamConfig {
   enablePublicStream: boolean;
   disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
   trackLocation: boolean;
+  isFinished?: boolean; // NEW: Untuk menghentikan ujian secara paksa
   subject: string;
   classLevel: string;
   targetClasses?: string[]; 

@@ -4,7 +4,7 @@ import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, LockClosedIcon, SunIcon, MoonIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
-import { parseList, sanitizeHtml } from './teacher/examUtils';
+import { parseList, sanitizeHtml, calculateExamScore } from './teacher/examUtils';
 import { AudioPlayer } from './AudioPlayer';
 
 interface StudentExamPageProps {
@@ -17,61 +17,6 @@ interface StudentExamPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: unknown, qType: string) => {
-    const s = String(str || '');
-    if (qType === 'FILL_IN_THE_BLANK') {
-        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-    }
-    try {
-        const div = document.createElement('div');
-        div.innerHTML = s;
-        return div.innerHTML;
-    } catch {
-        return s;
-    }
-};
-
-const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
-    let correctCount = 0;
-    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
-    
-    scorableQuestions.forEach((q: Question) => {
-        const studentAnswer = answers[q.id];
-        if (!studentAnswer) return;
-
-        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
-             const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
-             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                 correctCount++;
-             }
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-            try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
-                    return ansObj[idx] === row.answer;
-                });
-                if (allCorrect) correctCount++;
-            } catch { /* ignore */ }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                    return ansObj[idx] === pair.right;
-                });
-                if (allCorrect) correctCount++;
-            } catch { /* ignore */ }
-        }
-    });
-
-    const score = scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
-    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
-};
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, isDarkMode, toggleTheme }) => {
     const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
@@ -82,9 +27,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const [userLocation, setUserLocation] = useState<string>('');
     
     const [isNavOpen, setIsNavOpen] = useState(false);
-    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+    const [hasAttemptedSubmit] = useState(false);
     const [showConfigIntro, setShowConfigIntro] = useState(true);
-
 
     const [activeExam, setActiveExam] = useState<Exam>(exam);
 
@@ -129,6 +73,68 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [openDropdownId]);
+
+    const isAnswered = (q: Question, currentAnswers: Record<string, string>) => {
+        const ans = currentAnswers[q.id];
+        if (!ans) return false;
+        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            try {
+                const parsed = JSON.parse(ans);
+                return Array.isArray(parsed) && parsed.length > 0;
+            } catch { return false; }
+        }
+        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+            try {
+                const parsed = JSON.parse(ans);
+                return Object.keys(parsed).length > 0;
+            } catch { return false; }
+        }
+        return ans.trim().length > 0;
+    };
+
+    const handleSubmit = useCallback(async (isAuto = false, status: ResultStatus = 'completed') => {
+        if (isSubmittingRef.current) return;
+        if (!isAuto && !window.confirm('Yakin ingin mengumpulkan jawaban sekarang?')) return;
+
+        setIsSubmitting(true);
+        isSubmittingRef.current = true;
+
+        try {
+            const grading = calculateExamScore(activeExam, answersRef.current);
+            await onSubmit(
+                answersRef.current,
+                timeLeftRef.current,
+                status,
+                logRef.current,
+                userLocation,
+                grading
+            );
+            await storageService.clearLocalProgress(STORAGE_KEY);
+        } catch (error) {
+            console.error('Submit error:', error);
+            alert('Gagal mengirim jawaban. Silakan coba lagi.');
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+        }
+    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
+
+    useEffect(() => {
+        let channel: ReturnType<typeof supabase.channel> | null = null;
+        if (!exam.config.disableRealtime) {
+            channel = supabase.channel(`exam-room-${exam.code}`)
+                .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
+                    // If studentId is provided in payload, only submit if it matches current student
+                    if (payload.payload?.studentId && payload.payload.studentId !== student.studentId) return;
+                    
+                    if (student.class !== 'PREVIEW' && !isSubmittingRef.current) {
+                        alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                        handleSubmit(true, 'completed');
+                    }
+                })
+                .subscribe();
+        }
+        return () => { if (channel) supabase.removeChannel(channel); };
+    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, handleSubmit]);
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -183,34 +189,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
-    const isAnswered = (q: Question, ansMap: Record<string, string>) => {
-        const v = ansMap[q.id];
-        if (!v) return false;
-        if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
-            try { return Object.keys(JSON.parse(v)).length > 0; } catch { return false; }
-        }
-        return v.trim() !== "";
-    };
-
-    const handleSubmit = useCallback(async (auto = false, status: ResultStatus = 'completed') => {
-        if (!auto) {
-            const scorableQuestions = activeExam.questions.filter(q => q.questionType !== 'INFO');
-            const unansweredCount = scorableQuestions.filter(q => !isAnswered(q, answersRef.current)).length;
-            if (unansweredCount > 0) {
-                setHasAttemptedSubmit(true);
-                setIsNavOpen(true);
-                if (!confirm(`Masih ada ${unansweredCount} soal yang belum diisi. Yakin ingin mengumpulkan?`)) return;
-            } else {
-                 if (!confirm("Apakah Anda yakin ingin mengumpulkan jawaban?")) return;
-            }
-        }
-        if (isSubmittingRef.current) return;
-        setIsSubmitting(true);
-        const grading = calculateGrade(activeExam, answersRef.current);
-        await onSubmit(answersRef.current, timeLeftRef.current, status, logRef.current, userLocation, grading);
-        if (status === 'completed' || status === 'force_closed') { storageService.clearLocalProgress(STORAGE_KEY); }
-    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
-
     useEffect(() => {
         if (student.class === 'PREVIEW' || !activeExam.config.detectBehavior || activeExam.config.examMode === 'PR') return;
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
@@ -240,6 +218,14 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             navigator.geolocation.getCurrentPosition((pos) => setUserLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`));
         }
     }, [activeExam.config.trackLocation, activeExam.config.examMode, student.class]);
+
+    useEffect(() => {
+        if (activeExam.config.isFinished && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
+            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            handleSubmit(true, 'completed');
+        }
+    }, [activeExam.config.isFinished, handleSubmit, student.class]);
 
     const [deadline, setDeadline] = useState<number>(0);
 
@@ -569,7 +555,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
                                                             <button key={i} onClick={() => { 
-                                                                const newAns = isSelected ? currentAns.filter(a => a !== opt) : [...currentAns, opt]; 
+                                                                const currentlyCheckedOptions = (q.options || []).filter(o => currentAns.includes(o));
+                                                                let newAns;
+                                                                if (isSelected) {
+                                                                    newAns = currentlyCheckedOptions.filter(o => o !== opt);
+                                                                } else {
+                                                                    newAns = currentlyCheckedOptions.includes(opt) ? currentlyCheckedOptions : [...currentlyCheckedOptions, opt];
+                                                                }
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>

@@ -424,7 +424,7 @@ const WysiwygEditor: React.FC<{
     };
     
     // NOTE: Styles are now handled globally in style.css to ensure consistency between Editor and Preview/Draft View.
-    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end overflow-x-auto custom-scrollbar">{showTabs && (<div className="flex gap-1 shrink-0">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: string) => (<button key={t} onClick={() => setActiveTab(t as 'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH')} className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800 shrink-0">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn runCmd={runCmd} cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn runCmd={runCmd} cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn runCmd={runCmd} cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn runCmd={runCmd} cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn runCmd={runCmd} cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn runCmd={runCmd} cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn runCmd={runCmd} cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn runCmd={runCmd} cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn runCmd={runCmd} cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn runCmd={runCmd} cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn runCmd={runCmd} cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); setShowAksara(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"><span className="font-serif italic">ᬅ</span> Aksara Bali</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in shrink-0"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors whitespace-nowrap" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-3 sm:p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto break-words" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={checkActiveFormats} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} /></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal key={showMath ? 'open' : 'closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /><AksaraBaliModal isOpen={showAksara} onClose={() => setShowAksara(false)} onInsert={(text) => { runCmd('insertHTML', `<span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">${text}</span>&nbsp;`); handleInput(); }} /></div>);
+    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end overflow-x-auto custom-scrollbar">{showTabs && (<div className="flex gap-1 shrink-0">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: string) => (<button key={t} onClick={() => setActiveTab(t as 'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH')} className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800 shrink-0">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn runCmd={runCmd} cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn runCmd={runCmd} cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn runCmd={runCmd} cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn runCmd={runCmd} cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn runCmd={runCmd} cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn runCmd={runCmd} cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn runCmd={runCmd} cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn runCmd={runCmd} cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn runCmd={runCmd} cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn runCmd={runCmd} cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn runCmd={runCmd} cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); setShowAksara(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"><span className="font-serif italic">ᬅ</span> Aksara Bali</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in shrink-0"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors whitespace-nowrap" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-3 sm:p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto break-words" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={checkActiveFormats} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} /></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal key={showMath ? 'math-open' : 'math-closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /><AksaraBaliModal isOpen={showAksara} onClose={() => setShowAksara(false)} onInsert={(text) => { runCmd('insertHTML', `<span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">${text}</span>&nbsp;`); handleInput(); }} /></div>);
 };
 
 const createNewQuestion = (type: QuestionType): Question => {
@@ -558,22 +558,42 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) { 
-                let currentAnswers = parseList(q.correctAnswer);
+                const currentAnswers = parseList(q.correctAnswer);
                 const normalizeHtml = (html: string) => {
                     try {
                         const div = document.createElement('div');
-                        div.innerHTML = html;
-                        return div.innerHTML;
+                        div.innerHTML = html || '';
+                        
+                        div.querySelectorAll('.math-visual').forEach(el => {
+                            const latex = el.getAttribute('data-latex');
+                            if (latex) {
+                                el.replaceWith(document.createTextNode(`$${latex}$`));
+                            } else {
+                                while (el.firstChild) {
+                                    el.parentNode?.insertBefore(el.firstChild, el);
+                                }
+                                el.parentNode?.removeChild(el);
+                            }
+                        });
+
+                        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
                     } catch {
-                        return html;
+                        return (html || '').trim().replace(/\s+/g, ' ');
                     }
                 };
+                
+                // Clean up currentAnswers to only include valid options from q.options
+                const currentlyCheckedOptions = (q.options || []).filter(o => 
+                    currentAnswers.some(a => normalizeHtml(a) === normalizeHtml(o))
+                );
+                
+                let newKeys;
                 if (isChecked) { 
-                    if (!currentAnswers.some(a => normalizeHtml(a) === normalizeHtml(option))) currentAnswers.push(option); 
+                    newKeys = currentlyCheckedOptions.includes(option) ? currentlyCheckedOptions : [...currentlyCheckedOptions, option];
                 } else { 
-                    currentAnswers = currentAnswers.filter(a => normalizeHtml(a) !== normalizeHtml(option)); 
+                    newKeys = currentlyCheckedOptions.filter(o => o !== option);
                 } 
-                return { ...q, correctAnswer: JSON.stringify(currentAnswers) }; 
+                return { ...q, correctAnswer: JSON.stringify(newKeys) }; 
             }
             return q;
         }));
@@ -657,52 +677,56 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
                                                 
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={q.category || ''} 
-                                                            onChange={(e) => handleCategoryChange(q.id, e.target.value)}
-                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                            placeholder="Contoh: Aljabar, Teks Prosedur"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Level Soal</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={q.level || ''} 
-                                                            onChange={(e) => handleLevelChange(q.id, e.target.value)}
-                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                            placeholder="Contoh: 1, 2, HOTS, LOTS"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Bobot Nilai</label>
-                                                        <input 
-                                                            type="number" 
-                                                            min="1"
-                                                            value={q.scoreWeight || 1} 
-                                                            onChange={(e) => {
-                                                                const val = parseInt(e.target.value) || 1;
-                                                                setQuestions(prev => prev.map(item => item.id === q.id ? { ...item, scoreWeight: val } : item));
-                                                            }}
-                                                            className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                            placeholder="Default: 1"
-                                                        />
-                                                    </div>
-                                                </div>
+                                                {q.questionType !== 'INFO' && (
+                                                    <>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                                            <div>
+                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={q.category || ''} 
+                                                                    onChange={(e) => handleCategoryChange(q.id, e.target.value)}
+                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                                    placeholder="Contoh: Aljabar, Teks Prosedur"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Level Soal</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={q.level || ''} 
+                                                                    onChange={(e) => handleLevelChange(q.id, e.target.value)}
+                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                                    placeholder="Contoh: 1, 2, HOTS, LOTS"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Bobot Nilai</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="1"
+                                                                    value={q.scoreWeight || 1} 
+                                                                    onChange={(e) => {
+                                                                        const val = parseInt(e.target.value) || 1;
+                                                                        setQuestions(prev => prev.map(item => item.id === q.id ? { ...item, scoreWeight: val } : item));
+                                                                    }}
+                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                                                    placeholder="Default: 1"
+                                                                />
+                                                            </div>
+                                                        </div>
 
-                                                <div className="mb-4">
-                                                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kisi-Kisi Materi</label>
-                                                    <textarea 
-                                                        value={q.kisiKisi || ''} 
-                                                        onChange={(e) => handleKisiKisiChange(q.id, e.target.value)}
-                                                        className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[60px] resize-y"
-                                                        placeholder="Contoh: Peserta didik dapat menentukan hasil operasi hitung campuran bilangan cacah"
-                                                    />
-                                                </div>
+                                                        <div className="mb-4">
+                                                            <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kisi-Kisi Materi</label>
+                                                            <textarea 
+                                                                value={q.kisiKisi || ''} 
+                                                                onChange={(e) => handleKisiKisiChange(q.id, e.target.value)}
+                                                                className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[60px] resize-y"
+                                                                placeholder="Contoh: Peserta didik dapat menentukan hasil operasi hitung campuran bilangan cacah"
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
 
                                                 <WysiwygEditor 
                                                     value={q.questionText} 
@@ -1129,9 +1153,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             </div>
 
             {renderTypeSelectionModal()}
-            <SelectionModal key={isSubjectModalOpen ? 'open' : 'closed'} isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
-            <SelectionModal key={isClassModalOpen ? 'open' : 'closed'} isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
-            <SelectionModal key={isExamTypeModalOpen ? 'open' : 'closed'} isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
+            <SelectionModal key={isSubjectModalOpen ? 'subject-open' : 'subject-closed'} isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
+            <SelectionModal key={isClassModalOpen ? 'class-open' : 'class-closed'} isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
+            <SelectionModal key={isExamTypeModalOpen ? 'exam-type-open' : 'exam-type-closed'} isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
         </div>
     );
 };

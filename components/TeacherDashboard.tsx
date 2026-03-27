@@ -140,21 +140,41 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         if (status === 'PUBLISHED' && questions.length === 0) { alert("Tidak ada soal."); return; }
         
         // Sanitize all questions before saving to ensure no theme-specific styles are stored
-        const sanitizedQuestions = questions.map(q => ({
-            ...q,
-            questionText: sanitizeHtml(q.questionText),
-            options: q.options ? q.options.map(opt => sanitizeHtml(opt)) : undefined,
-            correctAnswer: q.correctAnswer ? sanitizeHtml(q.correctAnswer) : undefined,
-            trueFalseRows: q.trueFalseRows ? q.trueFalseRows.map(row => ({
-                ...row,
-                text: sanitizeHtml(row.text)
-            })) : undefined,
-            matchingPairs: q.matchingPairs ? q.matchingPairs.map(pair => ({
-                ...pair,
-                left: sanitizeHtml(pair.left),
-                right: sanitizeHtml(pair.right)
-            })) : undefined
-        }));
+        const sanitizedQuestions = questions.map(q => {
+            let sanitizedCorrectAnswer = q.correctAnswer;
+            if (q.correctAnswer) {
+                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                    try {
+                        const parsed = JSON.parse(q.correctAnswer);
+                        if (Array.isArray(parsed)) {
+                            sanitizedCorrectAnswer = JSON.stringify(parsed.map(opt => sanitizeHtml(opt)));
+                        } else {
+                            sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                        }
+                    } catch {
+                        sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                    }
+                } else {
+                    sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                }
+            }
+            
+            return {
+                ...q,
+                questionText: sanitizeHtml(q.questionText),
+                options: q.options ? q.options.map(opt => sanitizeHtml(opt)) : undefined,
+                correctAnswer: sanitizedCorrectAnswer,
+                trueFalseRows: q.trueFalseRows ? q.trueFalseRows.map(row => ({
+                    ...row,
+                    text: sanitizeHtml(row.text)
+                })) : undefined,
+                matchingPairs: q.matchingPairs ? q.matchingPairs.map(pair => ({
+                    ...pair,
+                    left: sanitizeHtml(pair.left),
+                    right: sanitizeHtml(pair.right)
+                })) : undefined
+            };
+        });
 
         const code = editingExam ? editingExam.code : generateExamCode();
         const now = new Date();
@@ -408,7 +428,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const ongoingExams = publishedExams.filter((exam) => {
         const { start, end } = getExamDates(exam);
-        return now >= start && now <= end;
+        return now >= start && now <= end && !exam.config.isFinished;
     });
 
     const upcomingExams = publishedExams.filter((exam) => {
@@ -420,7 +440,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const finishedExams = publishedExams.filter((exam) => {
         const { end } = getExamDates(exam);
-        return end < now;
+        return end < now || exam.config.isFinished;
     }).sort((a,b) => {
         return getExamDates(b).end.getTime() - getExamDates(a).end.getTime();
     });
