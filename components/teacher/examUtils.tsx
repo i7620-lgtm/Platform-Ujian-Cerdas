@@ -65,7 +65,13 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
         typeMap[q.questionType].totalQuestions++;
     });
 
-    const checkAnswer = (q: Question, ans: string) => {
+    const checkAnswer = (q: Question, ans: string, allAnswers: Record<string, string>) => {
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (allAnswers[manualGradeKey]) {
+            return allAnswers[manualGradeKey] === 'CORRECT';
+        }
+
         if (!ans) return false;
         const normAns = normalize(String(ans), q.questionType);
         const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
@@ -97,7 +103,7 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
              if (!typeMap[q.questionType]) return; // Should be initialized, but safety check
 
              typeMap[q.questionType].totalAttempt++;
-             if (checkAnswer(q, result.answers[q.id])) {
+             if (checkAnswer(q, result.answers[q.id], result.answers)) {
                  typeMap[q.questionType].correct++;
              }
         });
@@ -375,7 +381,11 @@ export const analyzeStudentPerformance = (exam: Exam, result: Result): StudentAn
         const studentAns = result.answers[q.id];
         let isCorrect = false;
         
-        if (studentAns) {
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (result.answers[manualGradeKey]) {
+            isCorrect = result.answers[manualGradeKey] === 'CORRECT';
+        } else if (studentAns) {
             const normAns = normalize(String(studentAns), q.questionType);
             const normKey = normalize(String(q.correctAnswer || ''), q.questionType);
 
@@ -1059,6 +1069,74 @@ export const parseQuestionsFromPlainText = (text: string): Question[] => {
 
 export const generateExamCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
+};
+
+/**
+ * Calculates the exam score based on student answers and exam configuration.
+ * Handles weighted scoring and manual grades.
+ */
+export const calculateExamScore = (exam: Exam, answers: Record<string, string>) => {
+    let correctCount = 0;
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+    
+    scorableQuestions.forEach((q: Question) => {
+        const weight = q.scoreWeight || 1;
+        maxPossibleScore += weight;
+
+        const studentAnswer = answers[q.id];
+        
+        // Check if teacher has manually graded this question
+        const manualGradeKey = `_grade_${q.id}`;
+        if (answers[manualGradeKey]) {
+            if (answers[manualGradeKey] === 'CORRECT') {
+                correctCount++;
+                totalScore += weight;
+            }
+            return;
+        }
+
+        if (!studentAnswer) return;
+
+        let isCorrect = false;
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
+        } 
+        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+             const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
+             const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
+             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
+                 isCorrect = true;
+             }
+        }
+        else if (q.questionType === 'TRUE_FALSE') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                    return ansObj[idx] === row.answer;
+                });
+                if (allCorrect) isCorrect = true;
+            } catch { /* ignore */ }
+        }
+        else if (q.questionType === 'MATCHING') {
+            try {
+                const ansObj = JSON.parse(studentAnswer);
+                const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
+                    return ansObj[idx] === pair.right;
+                });
+                if (allCorrect) isCorrect = true;
+            } catch { /* ignore */ }
+        }
+
+        if (isCorrect) {
+            correctCount++;
+            totalScore += weight;
+        }
+    });
+
+    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
 };
 
 export const sanitizeHtml = (html: string): string => {
