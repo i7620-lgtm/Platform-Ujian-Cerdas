@@ -350,6 +350,11 @@ const App: React.FC = () => {
     });
     
     if (status === 'completed' || status === 'force_closed') {
+        // RE-FETCH EXAM: Ensure we have the full exam with answers if showResultToStudent is true
+        // This is necessary because the initial fetch at login might have stripped answers
+        const updatedExam = await storageService.getExamForStudent(currentExam.code, currentStudent.studentId, false);
+        if (updatedExam) setCurrentExam(updatedExam);
+        
         setStudentResult(res as unknown as Result);
         setView('STUDENT_RESULT');
         setIsSyncing(false);
