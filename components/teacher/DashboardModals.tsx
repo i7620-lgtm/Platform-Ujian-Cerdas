@@ -1056,17 +1056,27 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const getCalculatedStats = (r: Result) => {
         let correct = 0;
         let empty = 0;
+        let totalScore = 0;
+        let maxPossibleScore = 0;
         const scorableQuestions = displayExam.questions.filter(q => q.questionType !== 'INFO');
         
         scorableQuestions.forEach(q => {
+            const weight = q.scoreWeight || 1;
+            maxPossibleScore += weight;
+
             const status = checkAnswerStatus(q, r.answers);
-            if (status === 'CORRECT') correct++;
-            else if (status === 'EMPTY') empty++;
+            if (status === 'CORRECT') {
+                correct++;
+                totalScore += weight;
+            }
+            else if (status === 'EMPTY') {
+                empty++;
+            }
         });
 
         const total = scorableQuestions.length;
         const wrong = total - correct - empty;
-        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
         
         return { correct, wrong, empty, score };
     };
@@ -1118,14 +1128,21 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         
         // Recalculate Score locally
         let correct = 0;
+        let totalScore = 0;
+        let maxPossibleScore = 0;
         const scorableQuestions = displayExam.questions.filter(q => q.questionType !== 'INFO');
         scorableQuestions.forEach(q => {
+            const weight = q.scoreWeight || 1;
+            maxPossibleScore += weight;
+
             // Using newAnswers which contains the override
             const status = checkAnswerStatus(q, newAnswers);
-            if (status === 'CORRECT') correct++;
+            if (status === 'CORRECT') {
+                correct++;
+                totalScore += weight;
+            }
         });
-        const total = scorableQuestions.length;
-        const newScore = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const newScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
 
         // Optimistic Update
         setResults(prev => prev.map(r => 
