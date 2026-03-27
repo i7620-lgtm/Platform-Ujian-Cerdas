@@ -1,7 +1,7 @@
- 
+
 import React, { useMemo, useState } from 'react';
 import type { Result, Exam } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize } from './teacher/examUtils';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -114,12 +114,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
         return {
             score: result.score, // Use the score from the database
             calculatedScore: finalScore, // Keep calculated score for discrepancy check
-            correctAnswers: correctCount,
-            totalQuestions: scorableQuestions.length,
+            correctAnswers: result.correctAnswers ?? correctCount,
+            totalQuestions: result.totalQuestions ?? scorableQuestions.length,
             wrongAnswers: scorableQuestions.length - correctCount - emptyCount,
             hasDiscrepancy: finalScore !== result.score // Check logic
         };
-    }, [exam.questions, result.answers, result.score]);
+    }, [exam.questions, result.answers, result.score, result.correctAnswers, result.totalQuestions]);
 
     // NEW: Analytical Data for Diagnostic Card
     const analysisData = useMemo(() => analyzeStudentPerformance(exam, result), [exam, result]);
@@ -202,18 +202,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 </div>
             )}
 
-            {/* Elegant Discrepancy Notification */}
-            {calculatedStats.hasDiscrepancy && (
-                <div className="absolute top-6 inset-x-0 flex justify-center z-50 pointer-events-none">
-                    <div className="bg-amber-50/90 dark:bg-amber-900/90 backdrop-blur-md border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-200 px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 max-w-md pointer-events-auto animate-gentle-slide">
-                        <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wider mb-0.5">Pembaruan Nilai</p>
-                            <p className="text-xs opacity-90">Nilai disesuaikan otomatis dengan kunci jawaban terbaru.</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Elegant Discrepancy Notification - REMOVED AS REQUESTED */}
 
             <div className={`w-full ${expandedReview ? 'max-w-full' : 'max-w-sm'} text-center animate-gentle-slide transition-all duration-500 relative z-10`}>
                 <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-black/30 border border-white dark:border-slate-800 relative overflow-hidden">
