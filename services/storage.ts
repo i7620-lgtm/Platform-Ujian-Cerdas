@@ -1807,6 +1807,9 @@ class StorageService {
             ...resultPayload, 
             id: data?.id,
             student: { ...resultPayload.student, resultId: data?.id },
+            score: calculatedScore,
+            correctAnswers: calculatedCorrect,
+            totalQuestions: calculatedTotal,
             isSynced: true 
         };
     } catch (error) {
@@ -2037,12 +2040,31 @@ class StorageService {
                  ? `${student.schoolName}::${student.class}`
                  : student.class;
 
-             const { error } = await supabase.from('results').upsert({
-                exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
-                class_name: classNameWithSchool, answers: payload.answers || {}, status: payload.status,
-                activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
-                total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
-             }, { onConflict: 'exam_code,student_id' });
+             let error;
+             if (student.resultId) {
+                 const { error: updateError } = await supabase
+                     .from('results')
+                     .update({ 
+                         answers: payload.answers || {}, 
+                         status: payload.status,
+                         activity_log: payload.activityLog, 
+                         score: calculatedScore, 
+                         correct_answers: calculatedCorrect,
+                         total_questions: calculatedTotal, 
+                         location: payload.location, 
+                         updated_at: new Date().toISOString()
+                     })
+                     .eq('id', student.resultId);
+                 error = updateError;
+             } else {
+                 const { error: upsertError } = await supabase.from('results').upsert({
+                    exam_code: payload.examCode, student_id: student.studentId, student_name: student.fullName,
+                    class_name: classNameWithSchool, answers: payload.answers || {}, status: payload.status,
+                    activity_log: payload.activityLog, score: calculatedScore, correct_answers: calculatedCorrect,
+                    total_questions: calculatedTotal, location: payload.location, updated_at: new Date().toISOString()
+                 }, { onConflict: 'exam_code,student_id' });
+                 error = upsertError;
+             }
              
              if (error) {
                  if (error.code === '42501' || error.code === 'PGRST301') { 
