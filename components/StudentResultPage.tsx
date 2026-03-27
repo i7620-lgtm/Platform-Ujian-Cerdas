@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { Result, Exam } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
 import { storageService } from '../services/storage';
@@ -18,6 +18,11 @@ interface StudentResultPageProps {
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, exam, onFinish, onResume, isDarkMode, toggleTheme }) => {
     const config = exam.config;
     const [expandedReview, setExpandedReview] = useState(false);
+
+    // Scroll to top on mount
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     
     // Unlock State for Force Closed View
     const [unlockToken, setUnlockToken] = useState('');
@@ -252,6 +257,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                     </h3>
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
                                         <div className="col-span-2">
+                                            <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Nama Sekolah</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{exam.authorSchool || result.student.schoolName || '-'}</p>
+                                        </div>
+                                        <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Nama Siswa</p>
                                             <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{result.student.fullName}</p>
                                         </div>
@@ -262,6 +271,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                         <div>
                                             <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Mata Pelajaran</p>
                                             <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{exam.config.subject}</p>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <p className="text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-tighter">Jenis Evaluasi</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate">{exam.config.examType}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -343,17 +356,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                 </div>
                             </div>
 
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
-                                <div className="flex gap-8">
-                                    <div className="text-center group cursor-default">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 group-hover:text-emerald-500 transition-colors">Benar</p>
-                                        <p className="text-2xl font-black text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{calculatedStats.correctAnswers}</p>
-                                    </div>
-                                    <div className="text-center group cursor-default">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 group-hover:text-indigo-500 transition-colors">Total Soal</p>
-                                        <p className="text-2xl font-black text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">{calculatedStats.totalQuestions}</p>
-                                    </div>
-                                </div>
+                            <div className="flex flex-col md:flex-row items-center justify-end gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
                                 
                                 {config.showCorrectAnswer && (
                                     <button 
