@@ -141,6 +141,12 @@ const normalize = (str: string, qType: string) => {
 };
 
 const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
+    // 1. Check for manual grade override first
+    const manualGradeKey = `_grade_${q.id}`;
+    if (studentAnswers[manualGradeKey]) {
+        return studentAnswers[manualGradeKey]; // 'CORRECT' or 'WRONG'
+    }
+
     const ans = studentAnswers[q.id];
     if (!ans) return 'EMPTY';
 
@@ -177,17 +183,27 @@ const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) 
 const getCalculatedStats = (r: Result, exam: Exam) => {
     let correct = 0;
     let empty = 0;
+    let totalScore = 0;
+    let maxPossibleScore = 0;
     const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
     
     scorableQuestions.forEach(q => {
+        const weight = q.scoreWeight || 1;
+        maxPossibleScore += weight;
+
         const status = checkAnswerStatus(q, r.answers);
-        if (status === 'CORRECT') correct++;
-        else if (status === 'EMPTY') empty++;
+        if (status === 'CORRECT') {
+            correct++;
+            totalScore += weight;
+        }
+        else if (status === 'EMPTY') {
+            empty++;
+        }
     });
 
     const total = scorableQuestions.length;
     const wrong = total - correct - empty;
-    const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
     
     return { correct, wrong, empty, score };
 };
