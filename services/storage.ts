@@ -1669,25 +1669,54 @@ class StorageService {
         let calculatedTotal = resultPayload.totalQuestions || 0;
 
         try {
+            // Fetch existing result to preserve manual grades
+            let existingAnswers: Record<string, string> = {};
+            if (resultPayload.student.resultId) {
+                const { data: existingResult } = await supabase.from('results').select('answers').eq('id', resultPayload.student.resultId).single();
+                if (existingResult && existingResult.answers) {
+                    existingAnswers = existingResult.answers as Record<string, string>;
+                }
+            }
+
+            // Merge answers, preserving manual grades
+            const mergedAnswers = { ...resultPayload.answers };
+            Object.keys(existingAnswers).forEach(key => {
+                if (key.startsWith('_grade_')) {
+                    mergedAnswers[key] = existingAnswers[key];
+                }
+            });
+            resultPayload.answers = mergedAnswers;
+
             const { data: examData } = await supabase.from('exams').select('questions').eq('code', resultPayload.examCode).single();
             if (examData && examData.questions) {
                 const questions = examData.questions as Question[];
-                const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
                 calculatedTotal = scorableQuestions.length;
                 calculatedCorrect = 0;
+                let totalScore = 0;
+                let maxPossibleScore = 0;
 
                 scorableQuestions.forEach((q: Question) => {
+                    const weight = q.scoreWeight || 1;
+                    maxPossibleScore += weight;
+
                     const studentAnswer = resultPayload.answers[q.id];
                     if (!studentAnswer) return;
 
-                    if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                         if (q.correctAnswer && this.normalize(studentAnswer, q.questionType) === this.normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
+                    let isCorrect = false;
+
+                    // Preserve teacher's manual grade if it exists
+                    const manualGradeKey = `_grade_${q.id}`;
+                    if (resultPayload.answers[manualGradeKey]) {
+                        isCorrect = resultPayload.answers[manualGradeKey] === 'CORRECT';
+                    } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                         if (q.correctAnswer && this.normalize(studentAnswer, q.questionType) === this.normalize(q.correctAnswer, q.questionType)) isCorrect = true;
                     } 
                     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                          const studentSet = new Set(this.parseList(studentAnswer).map(a => this.normalize(a, q.questionType)));
                          const correctSet = new Set(this.parseList(q.correctAnswer).map(a => this.normalize(a, q.questionType)));
                          if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                             calculatedCorrect++;
+                             isCorrect = true;
                          }
                     }
                     else if (q.questionType === 'TRUE_FALSE') {
@@ -1696,7 +1725,7 @@ class StorageService {
                             const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
                                 return ansObj[idx] === row.answer;
                             });
-                            if (allCorrect) calculatedCorrect++;
+                            if (allCorrect) isCorrect = true;
                         } catch { /* ignore */ }
                     }
                     else if (q.questionType === 'MATCHING') {
@@ -1705,12 +1734,17 @@ class StorageService {
                             const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
                                 return ansObj[idx] === pair.right;
                             });
-                            if (allCorrect) calculatedCorrect++;
+                            if (allCorrect) isCorrect = true;
                         } catch { /* ignore */ }
+                    }
+
+                    if (isCorrect) {
+                        calculatedCorrect++;
+                        totalScore += weight;
                     }
                 });
 
-                calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+                calculatedScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
             }
         } catch (err) {
             console.error("Failed to recalculate score securely", err);
@@ -1816,12 +1850,32 @@ class StorageService {
              let calculatedTotal = payload.totalQuestions || 0;
 
              try {
+                 // Fetch existing result to preserve manual grades
+                 let existingAnswers: Record<string, string> = {};
+                 if (payload.student.resultId) {
+                     const { data: existingResult } = await supabase.from('results').select('answers').eq('id', payload.student.resultId).single();
+                     if (existingResult && existingResult.answers) {
+                         existingAnswers = existingResult.answers as Record<string, string>;
+                     }
+                 }
+
+                 // Merge answers, preserving manual grades
+                 const mergedAnswers = { ...payload.answers };
+                 Object.keys(existingAnswers).forEach(key => {
+                     if (key.startsWith('_grade_')) {
+                         mergedAnswers[key] = existingAnswers[key];
+                     }
+                 });
+                 payload.answers = mergedAnswers;
+
                  const { data: examData } = await supabase.from('exams').select('questions').eq('code', payload.examCode).single();
                  if (examData && examData.questions) {
                      const questions = examData.questions as Question[];
-                     const scorableQuestions = questions.filter(q => q.questionType !== 'INFO' && q.questionType !== 'ESSAY');
+                     const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
                      calculatedTotal = scorableQuestions.length;
                      calculatedCorrect = 0;
+                     let totalScore = 0;
+                     let maxPossibleScore = 0;
 
                      const normalize = (str: unknown, qType: string): string => {
                          const s = String(str || '');
@@ -1925,17 +1979,26 @@ class StorageService {
                      };
 
                      scorableQuestions.forEach((q: Question) => {
+                         const weight = q.scoreWeight || 1;
+                         maxPossibleScore += weight;
+
                          const studentAnswer = payload.answers[q.id];
                          if (!studentAnswer) return;
 
-                         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                              if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) calculatedCorrect++;
+                         let isCorrect = false;
+
+                         // Preserve teacher's manual grade if it exists
+                         const manualGradeKey = `_grade_${q.id}`;
+                         if (payload.answers[manualGradeKey]) {
+                             isCorrect = payload.answers[manualGradeKey] === 'CORRECT';
+                         } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
+                              if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
                          } 
                          else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                               const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
                               const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
                               if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                                  calculatedCorrect++;
+                                  isCorrect = true;
                               }
                          }
                          else if (q.questionType === 'TRUE_FALSE') {
@@ -1944,7 +2007,7 @@ class StorageService {
                                  const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
                                      return ansObj[idx] === row.answer;
                                  });
-                                 if (allCorrect) calculatedCorrect++;
+                                 if (allCorrect) isCorrect = true;
                              } catch { /* ignore */ }
                          }
                          else if (q.questionType === 'MATCHING') {
@@ -1953,12 +2016,17 @@ class StorageService {
                                  const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
                                      return ansObj[idx] === pair.right;
                                  });
-                                 if (allCorrect) calculatedCorrect++;
+                                 if (allCorrect) isCorrect = true;
                              } catch { /* ignore */ }
+                         }
+
+                         if (isCorrect) {
+                             calculatedCorrect++;
+                             totalScore += weight;
                          }
                      });
 
-                     calculatedScore = calculatedTotal > 0 ? Math.round((calculatedCorrect / calculatedTotal) * 100) : 0;
+                     calculatedScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
                  }
              } catch (err) {
                  console.error("Failed to recalculate score securely in queue", err);
