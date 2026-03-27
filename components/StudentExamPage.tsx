@@ -4,7 +4,7 @@ import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, LockClosedIcon, SunIcon, MoonIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
-import { parseList, sanitizeHtml } from './teacher/examUtils';
+import { parseList, sanitizeHtml, calculateExamScore } from './teacher/examUtils';
 import { AudioPlayer } from './AudioPlayer';
 
 interface StudentExamPageProps {
@@ -17,87 +17,6 @@ interface StudentExamPageProps {
   toggleTheme?: () => void;
 }
 
-const normalize = (str: unknown, qType: string) => {
-    const s = String(str || '');
-    if (qType === 'FILL_IN_THE_BLANK') {
-        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-    }
-    try {
-        const div = document.createElement('div');
-        div.innerHTML = s;
-        
-        // Remove math-visual wrappers to compare actual content
-        div.querySelectorAll('.math-visual').forEach(el => {
-            while (el.firstChild) {
-                el.parentNode?.insertBefore(el.firstChild, el);
-            }
-            el.parentNode?.removeChild(el);
-        });
-
-        // Standardize HTML by removing whitespace between tags and trimming
-        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-    } catch {
-        return s.trim().replace(/\s+/g, ' ');
-    }
-};
-
-const calculateGrade = (exam: Exam, answers: Record<string, string>) => {
-    let correctCount = 0;
-    let totalScore = 0;
-    let maxPossibleScore = 0;
-    const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
-    
-    scorableQuestions.forEach((q: Question) => {
-        const weight = q.scoreWeight || 1;
-        maxPossibleScore += weight;
-
-        const studentAnswer = answers[q.id];
-        if (!studentAnswer) return;
-
-        let isCorrect = false;
-
-        // Check if teacher has manually graded this question (unlikely during exam, but good for consistency)
-        const manualGradeKey = `_grade_${q.id}`;
-        if (answers[manualGradeKey]) {
-            isCorrect = answers[manualGradeKey] === 'CORRECT';
-        } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
-        } 
-        else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-             const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
-             const correctSet = new Set(parseList(q.correctAnswer).map(a => normalize(a, q.questionType)));
-             if (studentSet.size === correctSet.size && [...studentSet].every(val => correctSet.has(val))) {
-                 isCorrect = true;
-             }
-        }
-        else if (q.questionType === 'TRUE_FALSE') {
-            try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
-                    return ansObj[idx] === row.answer;
-                });
-                if (allCorrect) isCorrect = true;
-            } catch { /* ignore */ }
-        }
-        else if (q.questionType === 'MATCHING') {
-            try {
-                const ansObj = JSON.parse(studentAnswer);
-                const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                    return ansObj[idx] === pair.right;
-                });
-                if (allCorrect) isCorrect = true;
-            } catch { /* ignore */ }
-        }
-
-        if (isCorrect) {
-            correctCount++;
-            totalScore += weight;
-        }
-    });
-
-    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
-    return { score, correctAnswers: correctCount, totalQuestions: scorableQuestions.length };
-};
 
 export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student, initialData, onSubmit, isDarkMode, toggleTheme }) => {
     const STORAGE_KEY = `exam_local_${exam.code}_${student.studentId}`;
@@ -181,7 +100,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         isSubmittingRef.current = true;
 
         try {
-            const grading = calculateGrade(activeExam, answersRef.current);
+            const grading = calculateExamScore(activeExam, answersRef.current);
             await onSubmit(
                 answersRef.current,
                 timeLeftRef.current,
