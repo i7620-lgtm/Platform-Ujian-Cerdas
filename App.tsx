@@ -188,7 +188,10 @@ const App: React.FC = () => {
         const parts = pathname.split('/');
         if (parts.length >= 4) {
             const examCode = parts[2].trim().toUpperCase();
-            const studentId = decodeURIComponent(parts[3]);
+            let studentId = decodeURIComponent(parts[3]);
+            if (window.location.hash) {
+                studentId += decodeURIComponent(window.location.hash);
+            }
             
             setIsSyncing(true);
             storageService.getExamForStudent(examCode, studentId, true)
