@@ -284,7 +284,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                     <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 mb-3">
                                         <QRCodeCanvas 
                                             value={`${window.location.origin}/result/${exam.code}/${encodeURIComponent(result.student.studentId)}`}
-                                            size={110}
+                                            size={160}
                                             level="H"
                                             includeMargin={false}
                                         />
