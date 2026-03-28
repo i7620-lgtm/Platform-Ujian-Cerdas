@@ -1316,9 +1316,12 @@ import { marked } from 'marked';
 export const markdownToHtml = (markdown: string): string => {
     if (!markdown) return '';
     
+    // Fix literal \n that might come from AI JSON parsing
+    let processedMarkdown = markdown.replace(/\\n/g, '\n');
+    
     // 1. Extract Math to prevent marked from messing it up
     const mathBlocks: string[] = [];
-    let processedMarkdown = markdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+    processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
         const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
         mathBlocks.push(latex);
         return placeholder;
