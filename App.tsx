@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
+import { ResultNotFoundPage } from './components/ResultNotFoundPage';
 import { TeacherLogin } from './components/TeacherLogin';
 import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
@@ -16,7 +17,7 @@ import { CollaboratorView } from './components/CollaboratorView';
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
-type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE';
+type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE' | 'RESULT_NOT_FOUND';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
@@ -203,17 +204,17 @@ const App: React.FC = () => {
                             setStudentResult(res);
                             setView('STUDENT_RESULT');
                         } else {
-                            alert("Hasil tidak ditemukan.");
+                            setView('RESULT_NOT_FOUND');
                             window.history.replaceState({}, '', '/');
                         }
                     } else {
-                        alert("Ujian tidak ditemukan.");
+                        setView('RESULT_NOT_FOUND');
                         window.history.replaceState({}, '', '/');
                     }
                 })
                 .catch(e => {
                     console.error(e);
-                    alert("Gagal memuat hasil.");
+                    setView('RESULT_NOT_FOUND');
                     window.history.replaceState({}, '', '/');
                 })
                 .finally(() => setIsSyncing(false));
@@ -628,7 +629,13 @@ const App: React.FC = () => {
             />
         )}
         
-        {view === 'STUDENT_RESULT' && studentResult && currentExam && (
+        {view === 'RESULT_NOT_FOUND' && (
+        <ResultNotFoundPage 
+          onBack={() => setView('SELECTOR')}
+        />
+      )}
+
+      {view === 'STUDENT_RESULT' && studentResult && currentExam && (
             <StudentResultPage 
                 result={studentResult} 
                 exam={currentExam} 
