@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
@@ -1909,17 +1909,43 @@ class StorageService {
       const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
       if (error || !data) return null;
       
-      let className = data.class_name as string;
-      let schoolName: string | undefined = undefined;
-      if (className && className.includes('::')) {
-          const parts = className.split('::');
-          schoolName = parts[0];
-          className = parts[1];
+      let absentNumber = '00';
+      let dbSchoolName = '';
+      let dbClassName = data.class_name as string;
+      let studentName = data.student_name as string;
+
+      // Parse Format 2 if applicable
+      if (studentId.startsWith('@') && studentId.includes('#') && studentId.includes('$') && studentId.includes('%')) {
+          const match = studentId.match(/^@(.*?)#(.*?)\$(.*?)%(.*)$/);
+          if (match) {
+              dbSchoolName = match[1];
+              studentName = match[2];
+              dbClassName = match[3];
+              absentNumber = match[4];
+          }
+      } else {
+          // Format 1 Fallback
+          if (dbClassName && dbClassName.includes('::')) {
+              const parts = dbClassName.split('::');
+              dbSchoolName = parts[0];
+              dbClassName = parts[1];
+          }
+          if (typeof studentId === 'string') {
+              const parts = studentId.split('-');
+              if (parts.length >= 2) {
+                  const lastPart = parts[parts.length - 1];
+                  if (!isNaN(parseInt(lastPart))) {
+                      absentNumber = lastPart;
+                  } else if (parts.length > 2) {
+                      absentNumber = parts[parts.length - 2];
+                  }
+              }
+          }
       }
       
       return {
         id: data.id, // Include Primary Key
-        student: { studentId: data.student_id, fullName: data.student_name, class: className, schoolName: schoolName, absentNumber: '00' },
+        student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber },
         examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
         totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location

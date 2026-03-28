@@ -181,6 +181,45 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname;
+
+    // RESULT PAGE DIRECT LINK CHECK (/result/:examCode/:studentId)
+    if (pathname.startsWith('/result/')) {
+        const parts = pathname.split('/');
+        if (parts.length >= 4) {
+            const examCode = parts[2].trim().toUpperCase();
+            let studentId = decodeURIComponent(parts[3]);
+            if (window.location.hash) {
+                studentId += decodeURIComponent(window.location.hash);
+            }
+            
+            setIsSyncing(true);
+            storageService.getExamForStudent(examCode, studentId, true)
+                .then(async (exam) => {
+                    if (exam) {
+                        const res = await storageService.getStudentResult(examCode, studentId);
+                        if (res) {
+                            setCurrentExam(exam);
+                            setStudentResult(res);
+                            setView('STUDENT_RESULT');
+                        } else {
+                            alert("Hasil tidak ditemukan.");
+                            window.history.replaceState({}, '', '/');
+                        }
+                    } else {
+                        alert("Ujian tidak ditemukan.");
+                        window.history.replaceState({}, '', '/');
+                    }
+                })
+                .catch(e => {
+                    console.error(e);
+                    alert("Gagal memuat hasil.");
+                    window.history.replaceState({}, '', '/');
+                })
+                .finally(() => setIsSyncing(false));
+            return;
+        }
+    }
     
     // COLLABORATOR CHECK
     const collabCode = params.get('collab_code');
