@@ -459,22 +459,66 @@ export const QuestionAnalysisItem: React.FC<{
 };
 
 const calculateTimeLeft = (exam: Exam) => {
-    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-    const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
+    const startDateRaw = exam.config.startDate || exam.config.date || '';
+    const endDateRaw = exam.config.endDate;
     const now = Date.now();
-    
-    if (now < examStartDateTime.getTime()) { return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now }; }
-    
-    if (exam.config.examMode === 'PR' || exam.config.timeLimit === 0) {
-        const endDateStr = exam.config.endDate || exam.config.date;
-        const endDateTime = endDateStr.includes('T') ? new Date(endDateStr) : new Date(`${endDateStr}T23:59:59`);
-        const timeLeft = Math.max(0, endDateTime.getTime() - now);
-        return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft, isUnlimited: true };
+
+    let start: Date;
+    if (startDateRaw.includes('T')) {
+        start = new Date(startDateRaw);
+    } else {
+        const startTimeStr = exam.config.startTime || '00:00';
+        start = new Date(`${startDateRaw}T${startTimeStr}`);
     }
 
-    const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
-    const timeLeft = Math.max(0, examEndTime - now);
-    return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
+    if (isNaN(start.getTime())) start = new Date();
+
+    if (now < start.getTime()) {
+        return { status: 'UPCOMING', diff: start.getTime() - now };
+    }
+
+    let end: Date;
+    const endTimeStr = exam.config.endTime || '23:59';
+    const mode = exam.config.examMode || 'UJIAN';
+
+    const getLocalDateStr = (raw: string) => {
+        if (!raw) return '';
+        if (raw.includes('T')) {
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
+        }
+        return raw;
+    };
+
+    const localStartDateStr = getLocalDateStr(startDateRaw);
+    const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
+
+    if (mode === 'PR') {
+        end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+    } else {
+        if (endDateRaw || exam.config.endTime) {
+            if (endDateRaw && endDateRaw.includes('T')) {
+                end = new Date(endDateRaw);
+            } else {
+                end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+            }
+        } else if (exam.config.timeLimit > 0) {
+            end = new Date(start.getTime() + (exam.config.timeLimit || 0) * 60000);
+        } else {
+            end = new Date(`${localStartDateStr}T23:59:59`);
+        }
+    }
+
+    if (isNaN(end.getTime())) {
+        end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    const timeLeft = Math.max(0, end.getTime() - now);
+    return { 
+        status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', 
+        diff: timeLeft, 
+        isUnlimited: mode === 'PR' || exam.config.timeLimit === 0 
+    };
 };
 
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
@@ -505,5 +549,5 @@ export const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ tex
     else if (colorClass.includes("gray")) darkClass = "dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
     else darkClass = "dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
 
-    return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass} ${darkClass}`}>{text}</span>); 
+    return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border border-opacity-50 whitespace-normal break-words ${colorClass} ${darkClass}`}>{text}</span>); 
 };

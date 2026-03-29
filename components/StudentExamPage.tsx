@@ -243,34 +243,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         // Waktu mulai pengerjaan aktual oleh siswa
         const actualStartTime = initialData?.timestamp || Date.now();
         const timeLimitMs = mode === 'PR' ? 0 : (activeExam.config.timeLimit || 0) * 60 * 1000;
-        let calculatedDeadline = timeLimitMs > 0 ? actualStartTime + timeLimitMs : Infinity;
+        
+        // Cek batas akhir ujian (endDate & endTime)
+        const getLocalDateStr = (raw: string) => {
+            if (!raw) return '';
+            if (raw.includes('T')) {
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
+            }
+            return raw;
+        };
 
-        // Cek batas akhir ujian (endDate)
-        const endDateStr = activeExam.config.endDate || activeExam.config.date;
-        if (endDateStr) {
-            let endDateTime: Date;
-            if (endDateStr.includes('T') && endDateStr.length > 10) {
-                endDateTime = new Date(endDateStr);
-                if (mode === 'UJIAN' && !activeExam.config.endDate) {
-                    // Jika fallback ke startDate ISO string, tambahkan timeLimit
-                    if (timeLimitMs > 0) {
-                        endDateTime = new Date(endDateTime.getTime() + timeLimitMs);
-                    } else {
-                        endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
-                    }
-                } else if (mode === 'PR') {
-                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
-                    // If it falls back to start date, it means it's available until the end of that day
-                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
-                }
-            } else {
-                endDateTime = new Date(`${endDateStr}T23:59:59`);
-            }
-            
-            // Deadline tidak boleh melebihi batas akhir ujian
-            if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
-                calculatedDeadline = endDateTime.getTime();
-            }
+        const endDateStr = getLocalDateStr(activeExam.config.endDate || activeExam.config.date);
+        const endTimeStr = activeExam.config.endTime || '23:59';
+        
+        // Tentukan deadline absolut ujian
+        let absoluteExamEndTime: number;
+        if (activeExam.config.endDate && activeExam.config.endDate.includes('T')) {
+            absoluteExamEndTime = new Date(activeExam.config.endDate).getTime();
+        } else {
+            absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+        }
+        
+        let calculatedDeadline: number;
+        
+        if (timeLimitMs > 0) {
+            // Deadline adalah waktu mulai + durasi, tapi tidak boleh melebihi batas akhir ujian
+            calculatedDeadline = Math.min(actualStartTime + timeLimitMs, absoluteExamEndTime);
+        } else {
+            // Jika tidak ada durasi (timeLimit = 0), deadline adalah batas akhir ujian
+            calculatedDeadline = absoluteExamEndTime;
         }
         
         // FIX: For PR mode, if the deadline is somehow in the past but they were allowed to login,

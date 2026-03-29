@@ -291,23 +291,26 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     return;
                 }
             }
-            const endDateStr = examConfig.endDate || examConfig.date;
+            const endDateStr = examConfig.endDate;
             if (endDateStr) {
-                let endDateTime: Date;
-                if (endDateStr.includes('T') && endDateStr.length > 10) {
-                    endDateTime = new Date(endDateStr);
-                    if (!examConfig.endDate) {
-                        // If it's falling back to start date ISO string, we need to add the time limit
-                        // If timeLimit is 0 (unlimited), we assume it's available until the end of the day
-                        if (examConfig.timeLimit > 0) {
-                            endDateTime = new Date(endDateTime.getTime() + (examConfig.timeLimit * 60000));
-                        } else {
-                            endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
-                        }
-                    }
-                } else {
-                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                const endDateTime = new Date(`${endDateStr}T23:59:59`);
+                if (now > endDateTime) {
+                    setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
                 }
+            } else {
+                let endDateTime: Date;
+                const startDateStr = examConfig.startDate || examConfig.date;
+                const startDateTime = startDateStr.includes('T') && startDateStr.length > 10 ? new Date(startDateStr) : new Date(`${startDateStr}T${examConfig.startTime || '00:00'}`);
+                
+                if (examConfig.timeLimit > 0) {
+                    endDateTime = new Date(startDateTime.getTime() + (examConfig.timeLimit * 60000));
+                } else {
+                    const localDateStr = startDateTime.toLocaleDateString('en-CA');
+                    endDateTime = new Date(`${localDateStr}T23:59:59`);
+                }
+                
                 if (now > endDateTime) {
                     setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
                     setIsLoading(false);
@@ -315,16 +318,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 }
             }
         } else if (mode === 'PR') {
-            const endDateStr = examConfig.endDate || examConfig.date;
+            const endDateStr = examConfig.endDate;
             if (endDateStr) {
-                let endDateTime: Date;
-                if (endDateStr.includes('T') && endDateStr.length > 10) {
-                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
-                    // If it falls back to start date, it means it's available until the end of that day
-                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
-                } else {
-                    endDateTime = new Date(`${endDateStr}T23:59:59`);
+                const endDateTime = new Date(`${endDateStr}T23:59:59`);
+                if (now > endDateTime) {
+                    setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                    setIsLoading(false);
+                    return;
                 }
+            } else {
+                const fallbackDate = new Date(examConfig.date || new Date());
+                const localDateStr = fallbackDate.toLocaleDateString('en-CA');
+                const endDateTime = new Date(`${localDateStr}T23:59:59`);
                 if (now > endDateTime) {
                     setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
                     setIsLoading(false);

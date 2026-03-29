@@ -51,6 +51,7 @@ export interface ExamConfig {
   timeLimit: number; // in minutes
   date: string; // (Deprecated, use startDate/endDate)
   startTime: string; // HH:mm (Deprecated, use startDate/endDate)
+  endTime?: string; // HH:mm (NEW: End time for the exam)
   allowRetakes: boolean;
   detectBehavior: boolean;
   autoSubmitInactive: boolean;

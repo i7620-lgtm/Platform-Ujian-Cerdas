@@ -22,10 +22,10 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                             {/* Delete Button */}
                             <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteExam(exam); }} className="absolute top-3 right-3 p-2 bg-white dark:bg-slate-700 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 border border-gray-100 dark:border-slate-600 hover:border-red-100 dark:hover:border-red-900 rounded-full transition-all shadow-sm z-10 opacity-100" title="Hapus Data Ujian & Hasil"><TrashIcon className="w-4 h-4" /></button>
 
-                            <div className="flex items-start gap-4">
-                                <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl border border-gray-100 dark:border-slate-600"><CheckCircleIcon className="w-6 h-6 text-gray-400 dark:text-slate-500 group-hover:text-green-500 dark:group-hover:text-green-400 transition-colors" /></div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral dark:text-white">{exam.config.subject || exam.code}</h3><span className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">{exam.code}</span></div>
+                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                                <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shrink-0"><CheckCircleIcon className="w-6 h-6 text-gray-400 dark:text-slate-500 group-hover:text-green-500 dark:group-hover:text-green-400 transition-colors" /></div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral dark:text-white truncate">{exam.config.subject || exam.code}</h3><span className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded shrink-0">{exam.code}</span></div>
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
                                         <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
