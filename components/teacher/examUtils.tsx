@@ -1319,8 +1319,16 @@ export const markdownToHtml = (markdown: string): string => {
     // Fix literal \n that might come from AI JSON parsing
     let processedMarkdown = markdown.replace(/\\n/g, '\n');
     
-    // Ensure blank lines before markdown tables
-    processedMarkdown = processedMarkdown.replace(/([^\n])\n\|/g, '$1\n\n|');
+    // Fix trailing double pipes in table rows (AI hallucination fix)
+    processedMarkdown = processedMarkdown.replace(/\|\|[ \t]*$/gm, '|');
+
+    // Remove blank lines between table rows (AI hallucination fix)
+    while (processedMarkdown.match(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/)) {
+        processedMarkdown = processedMarkdown.replace(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/g, '$1\n$2');
+    }
+
+    // Ensure blank lines before markdown tables (only if previous line is not part of the table)
+    processedMarkdown = processedMarkdown.replace(/(^|\n)(?![ \t]*\|)([^\n]+)\n([ \t]*\|)/g, '$1$2\n\n$3');
     
     // 1. Extract Math to prevent marked from messing it up
     const mathBlocks: string[] = [];
