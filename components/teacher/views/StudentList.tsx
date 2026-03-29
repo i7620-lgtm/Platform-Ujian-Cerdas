@@ -74,7 +74,7 @@ export const StudentList: React.FC<StudentListProps> = ({ results, onResetLogin,
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{r.student.fullName}</span>
-                                                <span className="text-xs text-slate-400 font-mono mt-0.5">{r.student.studentId}</span>
+                                                <span className="text-xs text-slate-400 font-mono mt-0.5">#{r.student.absentNumber}</span>
                                                 {r.student.schoolName && <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mt-1">{r.student.schoolName}</span>}
                                             </div>
                                         </td>
