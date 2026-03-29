@@ -498,7 +498,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </div>
                                                             <div>
                                                                 <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
-                                                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono tracking-wide">#{r.student.studentId.split('-').pop()}</div>
+                                                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono tracking-wide">#{r.student.absentNumber}</div>
                                                                 {r.student.schoolName && (
                                                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
                                                                 )}
@@ -1348,7 +1348,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                                 </div>
                                                                 <div>
                                                                     <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
-                                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">#{r.student.studentId.split('-').pop()}</div>
+                                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">#{r.student.absentNumber}</div>
                                                                     {r.student.schoolName && (
                                                                         <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
                                                                     )}
