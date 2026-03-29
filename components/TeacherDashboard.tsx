@@ -236,7 +236,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                  date: isoStart, // Store full ISO
                  startDate: isoStart, // Store full ISO
                  startTime: config.startTime, // Keep for reference or UI fallback
-                 endDate: finalEndDate
+                 endDate: finalEndDate,
+                 isFinished: false // Reset on save/publish to ensure it's not stuck in finished state
              }
         };
 
@@ -299,7 +300,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const tomorrow = new Date(today.getTime() + 86400000);
         const localDate = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
         const localTomorrow = tomorrow.toLocaleDateString('en-CA');
-        setConfig({ ...exam.config, date: localDate, startDate: localDate, endDate: localTomorrow }); 
+        setConfig({ 
+            ...exam.config, 
+            date: localDate, 
+            startDate: localDate, 
+            endDate: localTomorrow,
+            isFinished: false // CRITICAL: Reset finished status
+        }); 
         setManualMode(true); 
         setEditingExam(null); 
         setGeneratedCode(''); 
@@ -313,7 +320,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         const tomorrow = new Date(today.getTime() + 86400000);
         const localDate = today.toLocaleDateString('en-CA');
         const localTomorrow = tomorrow.toLocaleDateString('en-CA');
-        const newConfig = { ...examToReuse.config, date: localDate, startDate: localDate, endDate: localTomorrow };
+        const newConfig = { 
+            ...examToReuse.config, 
+            date: localDate, 
+            startDate: localDate, 
+            endDate: localTomorrow,
+            isFinished: false // CRITICAL: Reset finished status
+        };
         setConfig(newConfig);
         setManualMode(true);
         setEditingExam(null);
@@ -505,7 +518,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     const upcomingExams = publishedExams.filter((exam) => {
         const { start } = getExamDates(exam);
-        return start > now;
+        return start > now && !exam.config.isFinished;
     }).sort((a,b) => {
         return getExamDates(a).start.getTime() - getExamDates(b).start.getTime();
     });
