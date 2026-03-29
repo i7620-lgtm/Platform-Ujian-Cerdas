@@ -243,35 +243,36 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         // Waktu mulai pengerjaan aktual oleh siswa
         const actualStartTime = initialData?.timestamp || Date.now();
         const timeLimitMs = mode === 'PR' ? 0 : (activeExam.config.timeLimit || 0) * 60 * 1000;
-        let calculatedDeadline = timeLimitMs > 0 ? actualStartTime + timeLimitMs : Infinity;
+        
+        // Cek batas akhir ujian (endDate & endTime)
+        const getLocalDateStr = (raw: string) => {
+            if (!raw) return '';
+            if (raw.includes('T')) {
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
+            }
+            return raw;
+        };
 
-        // Cek batas akhir ujian (endDate)
-        const endDateStr = activeExam.config.endDate;
-        if (endDateStr) {
-            const endDateTime = new Date(`${endDateStr}T23:59:59`);
-            if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
-                calculatedDeadline = endDateTime.getTime();
-            }
+        const endDateStr = getLocalDateStr(activeExam.config.endDate || activeExam.config.date);
+        const endTimeStr = activeExam.config.endTime || '23:59';
+        
+        // Tentukan deadline absolut ujian
+        let absoluteExamEndTime: number;
+        if (activeExam.config.endDate && activeExam.config.endDate.includes('T')) {
+            absoluteExamEndTime = new Date(activeExam.config.endDate).getTime();
         } else {
-            let endDateTime: Date;
-            if (mode === 'UJIAN') {
-                const startDateStr = activeExam.config.startDate || activeExam.config.date;
-                const startDateTime = startDateStr.includes('T') && startDateStr.length > 10 ? new Date(startDateStr) : new Date(`${startDateStr}T${activeExam.config.startTime || '00:00'}`);
-                if (timeLimitMs > 0) {
-                    endDateTime = new Date(startDateTime.getTime() + timeLimitMs);
-                } else {
-                    const localDateStr = startDateTime.toLocaleDateString('en-CA');
-                    endDateTime = new Date(`${localDateStr}T23:59:59`);
-                }
-            } else {
-                const fallbackDate = new Date(activeExam.config.date || new Date());
-                const localDateStr = fallbackDate.toLocaleDateString('en-CA');
-                endDateTime = new Date(`${localDateStr}T23:59:59`);
-            }
-            
-            if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
-                calculatedDeadline = endDateTime.getTime();
-            }
+            absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+        }
+        
+        let calculatedDeadline: number;
+        
+        if (timeLimitMs > 0) {
+            // Deadline adalah waktu mulai + durasi, tapi tidak boleh melebihi batas akhir ujian
+            calculatedDeadline = Math.min(actualStartTime + timeLimitMs, absoluteExamEndTime);
+        } else {
+            // Jika tidak ada durasi (timeLimit = 0), deadline adalah batas akhir ujian
+            calculatedDeadline = absoluteExamEndTime;
         }
         
         // FIX: For PR mode, if the deadline is somehow in the past but they were allowed to login,
