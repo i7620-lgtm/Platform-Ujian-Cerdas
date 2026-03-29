@@ -16,11 +16,28 @@ export const StudentList: React.FC<StudentListProps> = ({ results, onResetLogin,
     const [searchTerm, setSearchTerm] = useState('');
     const [filterClass, setFilterClass] = useState('');
 
-    const filteredResults = results.filter(r => {
-        const matchName = r.student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchClass = filterClass ? r.student.class === filterClass : true;
-        return matchName && matchClass;
-    });
+    const filteredResults = results
+        .filter(r => {
+            const matchName = r.student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchClass = filterClass ? r.student.class === filterClass : true;
+            return matchName && matchClass;
+        })
+        .sort((a, b) => {
+            // 1. Nama Sekolah
+            const schoolA = a.student.schoolName || '';
+            const schoolB = b.student.schoolName || '';
+            const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+            if (schoolCompare !== 0) return schoolCompare;
+
+            // 2. Kelas
+            const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
+            if (classCompare !== 0) return classCompare;
+
+            // 3. Nomor Absen
+            const absA = parseInt(a.student.absentNumber) || 0;
+            const absB = parseInt(b.student.absentNumber) || 0;
+            return absA - absB;
+        });
 
     const uniqueClasses = Array.from(new Set(results.map(r => r.student.class))).sort();
 
@@ -74,7 +91,7 @@ export const StudentList: React.FC<StudentListProps> = ({ results, onResetLogin,
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{r.student.fullName}</span>
-                                                <span className="text-xs text-slate-400 font-mono mt-0.5">{r.student.studentId}</span>
+                                                <span className="text-xs text-slate-400 font-mono mt-0.5">#{r.student.absentNumber}</span>
                                                 {r.student.schoolName && <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mt-1">{r.student.schoolName}</span>}
                                             </div>
                                         </td>

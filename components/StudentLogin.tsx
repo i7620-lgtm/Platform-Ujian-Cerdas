@@ -377,9 +377,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         const hasLocalData = await storageService.getLocalProgress(localKey);
         
         // VALIDASI UTAMA: Cek data remote (server) terlebih dahulu untuk memastikan kepemilikan kursi
-        // Karena format studentId bisa Format 1 atau Format 2, kita ambil semua result dan cari berdasarkan kelas & absen
+        // Karena format studentId bisa Format 1 atau Format 2, kita ambil semua result dan cari berdasarkan sekolah, kelas & absen
         const allResults = await storageService.getResults(cleanExamCode);
+        const normSchool = normalizeId(schoolName);
         const remoteResult = allResults.find(r => 
+            normalizeId(r.student.schoolName || '') === normSchool &&
             normalizeId(r.student.class) === normClass && 
             normalizeId(r.student.absentNumber) === normAbsent
         );
@@ -440,9 +442,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       let compositeId = `@${cleanSchool}#${cleanName}$${cleanClass}%${cleanAbs}`;
       
       try {
-          // Cari studentId yang sebenarnya di database berdasarkan kelas & absen
+          // Cari studentId yang sebenarnya di database berdasarkan sekolah, kelas & absen
           const allResults = await storageService.getResults(cleanExamCode);
+          const normSchool = normalizeId(schoolName);
           const remoteResult = allResults.find(r => 
+              normalizeId(r.student.schoolName || '') === normSchool &&
               normalizeId(r.student.class) === normClass && 
               normalizeId(r.student.absentNumber) === normAbsent
           );
