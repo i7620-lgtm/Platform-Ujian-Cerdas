@@ -21,53 +21,83 @@ function getAI(): GoogleGenAI {
 
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
   const ai = getAI();
-  const imageInstruction = config.includeImages 
-    ? `\n    - imageSearchKeyword: kata kunci pencarian gambar dalam bahasa Inggris yang sangat spesifik dan akurat untuk soal ini (maksimal 2-3 kata, contoh: "chloroplast structure", "borobudur temple", "mitosis"). WAJIB diisi karena pengguna meminta gambar referensi.`
-    : '';
-
-  const prompt = `
-    Buatlah ${config.count} soal ${config.type} untuk mata pelajaran/materi: ${config.subject}.
-    Tingkat kognitif (Bloom Revisi): ${config.difficulty}.
-    Kisi-kisi materi: ${config.blueprint}.
+  
+  const systemInstruction = `
+    Anda adalah asisten pembuat soal ujian profesional.
+    Tugas Anda adalah membuat soal berkualitas tinggi berdasarkan parameter yang diberikan.
     
-    Aturan khusus untuk jenis soal:
+    ATURAN FORMAT:
+    - Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan.
+    - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
+    - Gunakan bullet points atau numbering untuk daftar.
+    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
+    - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
+    - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
+    - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
+    
+    ATURAN JENIS SOAL:
     - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi).
     - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi).
     - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
     - Esai: Wajib isi 'correctAnswer' dengan penjelasan mendalam.
     - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
     - Menjodohkan: Wajib isi 'matchingPairs' berupa array of objects { "left": "item kiri", "right": "pasangan kanan" }. Buat 3-5 pasangan.
-
-    Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan:
-    - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. Pastikan menggunakan karakter newline (\\n) yang benar pada tabel agar dapat dirender.
-    - Gunakan bullet points atau numbering untuk daftar.
-    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
-    - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
-    - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
-
-    Berikan respon dalam format JSON array yang berisi objek dengan properti:
-    - id: string unik
-    - questionText: teks pertanyaan (gunakan markdown jika perlu)${imageInstruction}
-    - options: array string (hanya untuk Pilihan Ganda dan Pilihan Ganda Kompleks)
-    - correctAnswer: jawaban yang benar (untuk PG Kompleks, sebutkan semua opsi yang benar)
-    - trueFalseRows: array of objects { text: string, answer: boolean } (HANYA untuk soal Benar/Salah)
-    - matchingPairs: array of objects { left: string, right: string } (HANYA untuk soal Menjodohkan)
-    - explanation: penjelasan singkat mengapa jawaban tersebut benar
-    - scoreWeight: bobot nilai (angka)
+    
+    RESPON:
+    - Berikan respon dalam format JSON array.
+    - Pastikan JSON valid dan sesuai dengan schema yang diminta.
   `;
 
-  const requiredFields = ["id", "questionText"];
-  if (config.includeImages) requiredFields.push("imageSearchKeyword");
+  const prompt = `
+    Buatlah ${config.count} soal ${config.type} untuk mata pelajaran/materi: ${config.subject}.
+    Tingkat kognitif (Bloom Revisi): ${config.difficulty}.
+    Kisi-kisi materi: ${config.blueprint}.
+    
+    PENTING: Pastikan urutan soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal.
+  `;
 
-  if (config.type.toLowerCase().includes('pilihan ganda')) {
-      requiredFields.push("options", "correctAnswer");
-  } else if (config.type.toLowerCase().includes('benar/salah') || config.type.toLowerCase().includes('benar salah')) {
-      requiredFields.push("trueFalseRows");
-  } else if (config.type.toLowerCase().includes('menjodohkan')) {
-      requiredFields.push("matchingPairs");
-  } else {
-      requiredFields.push("correctAnswer");
-  }
+  const properties = {
+    id: { type: Type.STRING, description: "ID unik untuk soal" },
+    questionText: { type: Type.STRING, description: "Teks pertanyaan dalam format Markdown" },
+    options: { 
+      type: Type.ARRAY, 
+      items: { type: Type.STRING },
+      description: "Opsi jawaban (hanya untuk PG/PG Kompleks)"
+    },
+    correctAnswer: { type: Type.STRING, description: "Jawaban benar" },
+    explanation: { type: Type.STRING, description: "Penjelasan mengapa jawaban tersebut benar" },
+    scoreWeight: { type: Type.NUMBER, description: "Bobot nilai soal" },
+    trueFalseRows: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          answer: { type: Type.BOOLEAN }
+        },
+        required: ["text", "answer"]
+      },
+      description: "Baris pernyataan untuk soal Benar/Salah"
+    },
+    matchingPairs: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          left: { type: Type.STRING },
+          right: { type: Type.STRING }
+        },
+        required: ["left", "right"]
+      },
+      description: "Pasangan untuk soal Menjodohkan"
+    },
+    ...(config.includeImages ? {
+      imageSearchKeyword: { 
+        type: Type.STRING, 
+        description: "Kata kunci pencarian gambar spesifik dalam bahasa Inggris (2-3 kata)" 
+      }
+    } : {})
+  };
 
   let response;
   try {
@@ -75,49 +105,17 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              questionText: { type: Type.STRING },
-              imageSearchKeyword: { type: Type.STRING },
-              options: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING } 
-              },
-              correctAnswer: { type: Type.STRING },
-              trueFalseRows: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    text: { type: Type.STRING },
-                    answer: { type: Type.BOOLEAN }
-                  },
-                  required: ["text", "answer"]
-                }
-              },
-              matchingPairs: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    left: { type: Type.STRING },
-                    right: { type: Type.STRING }
-                  },
-                  required: ["left", "right"]
-                }
-              },
-              explanation: { type: Type.STRING },
-              scoreWeight: { type: Type.NUMBER }
-            },
-            required: requiredFields
-          }
-        }
-      }
+            properties: properties,
+            required: ["id", "questionText"]
+          },
+        },
+      },
     });
   } catch (error: unknown) {
     console.error("Gemini API Error:", error);
@@ -171,7 +169,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         }
 
         const mappedQ: Question = {
-            id: q.id,
+            id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             questionText: questionText,
             questionType: mappedQuestionType,
             options: options,
