@@ -36,10 +36,16 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                     {exams.map(exam => (
                         <div key={exam.code} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 group">
                             <div className="flex items-start gap-5">
-                                <div className="bg-blue-50 dark:bg-blue-900/20 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 shrink-0">
-                                    <span className="text-[10px] font-bold uppercase">{new Date(exam.config.date).toLocaleDateString('id-ID', { month: 'short' })}</span>
-                                    <span className="text-xl font-black leading-none">{new Date(exam.config.date).getDate()}</span>
-                                </div>
+                                {(() => {
+                                    const startDate = exam.config.startDate || exam.config.date || '';
+                                    const d = startDate.includes('T') ? new Date(startDate) : new Date(`${startDate}T${exam.config.startTime || '00:00'}`);
+                                    return (
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 shrink-0">
+                                            <span className="text-[10px] font-bold uppercase">{d.toLocaleDateString('id-ID', { month: 'short' })}</span>
+                                            <span className="text-xl font-black leading-none">{d.getDate()}</span>
+                                        </div>
+                                    );
+                                })()}
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
                                         <h3 className="font-bold text-lg text-neutral dark:text-white">{exam.config.subject || "Tanpa Judul"}</h3>
@@ -54,9 +60,11 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-3 font-medium">
                                         <span className="flex items-center gap-1.5"><ClockIcon className="w-3.5 h-3.5"/> {
-                                            (exam.config.date.includes('T') && exam.config.date.length > 10) 
-                                            ? new Date(exam.config.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' ' + (new Date(exam.config.date).toLocaleTimeString('id-ID', { timeZoneName: 'short' }).split(' ').pop() || '')
-                                            : exam.config.startTime + ' Waktu Setempat'
+                                            (() => {
+                                                const startDate = exam.config.startDate || exam.config.date || '';
+                                                const d = startDate.includes('T') ? new Date(startDate) : new Date(`${startDate}T${exam.config.startTime || '00:00'}`);
+                                                return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' ' + (d.toLocaleTimeString('id-ID', { timeZoneName: 'short' }).split(' ').pop() || '');
+                                            })()
                                         }</span>
                                         <span className="text-gray-300 dark:text-slate-600">•</span>
                                         <span>{exam.config.examMode === 'PR' ? 'Tanpa Batas' : (exam.config.timeLimit > 0 ? `${exam.config.timeLimit} Menit` : 'Tanpa Batas')}</span>
