@@ -16,11 +16,28 @@ export const StudentList: React.FC<StudentListProps> = ({ results, onResetLogin,
     const [searchTerm, setSearchTerm] = useState('');
     const [filterClass, setFilterClass] = useState('');
 
-    const filteredResults = results.filter(r => {
-        const matchName = r.student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchClass = filterClass ? r.student.class === filterClass : true;
-        return matchName && matchClass;
-    });
+    const filteredResults = results
+        .filter(r => {
+            const matchName = r.student.fullName.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchClass = filterClass ? r.student.class === filterClass : true;
+            return matchName && matchClass;
+        })
+        .sort((a, b) => {
+            // 1. Nama Sekolah
+            const schoolA = a.student.schoolName || '';
+            const schoolB = b.student.schoolName || '';
+            const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+            if (schoolCompare !== 0) return schoolCompare;
+
+            // 2. Kelas
+            const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
+            if (classCompare !== 0) return classCompare;
+
+            // 3. Nomor Absen
+            const absA = parseInt(a.student.absentNumber) || 0;
+            const absB = parseInt(b.student.absentNumber) || 0;
+            return absA - absB;
+        });
 
     const uniqueClasses = Array.from(new Set(results.map(r => r.student.class))).sort();
 
