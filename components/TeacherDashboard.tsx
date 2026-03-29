@@ -53,6 +53,7 @@ const DEFAULT_CONFIG: ExamConfig = {
     timeLimit: 60,
     date: new Date().toLocaleDateString('en-CA'),
     startTime: '08:00',
+    endTime: '10:00',
     allowRetakes: false,
     detectBehavior: true,
     autoSubmitInactive: true,
@@ -209,34 +210,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         
         // We store the ISO string which is always UTC
         const isoStart = !isNaN(localDateTime.getTime()) ? localDateTime.toISOString() : new Date().toISOString();
-        const utcDate = isoStart.split('T')[0];
-        const utcTime = isoStart.split('T')[1].substring(0, 5);
         
+        const endDateToUse = (config.endDate || dateToUse).split('T')[0];
+        const localEndDateTime = new Date(`${endDateToUse}T${config.endTime || '23:59'}:59`);
+        const isoEnd = !isNaN(localEndDateTime.getTime()) ? localEndDateTime.toISOString() : isoStart;
+
         const examData: Exam = {
             code, authorId: teacherProfile.id, authorSchool: teacherProfile.school, 
             questions: sanitizedQuestions, 
             config: {
                 ...config,
-                date: utcDate,
-                startDate: utcDate,
-                startTime: utcTime
+                date: isoStart,
+                startDate: isoStart,
+                endDate: isoEnd,
+                startTime: config.startTime,
+                endTime: config.endTime
             },
             createdAt: editingExam?.createdAt || String(readableDate), status
         };
         
-        let finalEndDate = (config.endDate || '').split('T')[0];
-        if (finalEndDate && dateToUse && finalEndDate < dateToUse) {
-            finalEndDate = dateToUse;
-        }
-        
         const finalExamData: Exam = {
              ...examData,
              config: {
-                 ...config,
-                 date: isoStart, // Store full ISO
-                 startDate: isoStart, // Store full ISO
-                 startTime: config.startTime, // Keep for reference or UI fallback
-                 endDate: finalEndDate,
+                 ...examData.config,
                  isFinished: false // Reset on save/publish to ensure it's not stuck in finished state
              }
         };
@@ -256,29 +252,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         } else {
             // Check status based on the ISO time
             const start = new Date(isoStart);
-            let end: Date;
-            const endDateStr = config.endDate;
-            
-            if (config.examMode === 'PR') {
-                if (endDateStr) {
-                    end = new Date(`${endDateStr}T23:59:59`);
-                } else {
-                    const fallbackDate = new Date(config.date || new Date());
-                    const localDateStr = fallbackDate.toLocaleDateString('en-CA');
-                    end = new Date(`${localDateStr}T23:59:59`);
-                }
-            } else {
-                if (endDateStr) {
-                    end = new Date(`${endDateStr}T23:59:59`);
-                } else {
-                    if (config.timeLimit > 0) {
-                        end = new Date(start.getTime() + config.timeLimit * 60000);
-                    } else {
-                        const localDateStr = start.toLocaleDateString('en-CA');
-                        end = new Date(`${localDateStr}T23:59:59`);
-                    }
-                }
-            }
+            const end = new Date(isoEnd);
             
             if (now >= start && now <= end) {
                 setView('ONGOING');
@@ -408,24 +382,34 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setQuestions(exam.questions); 
         
         // Parse the stored ISO date back to local date/time for inputs
-        let localDate = exam.config.startDate || exam.config.date;
-        let localTime = exam.config.startTime;
+        let localStartDate = exam.config.startDate || exam.config.date;
+        let localEndDate = exam.config.endDate;
+        let localStartTime = exam.config.startTime;
+        let localEndTime = exam.config.endTime;
         
-        // Check if it's an ISO string (contains 'T' and 'Z' or offset)
-        if (localDate && localDate.includes('T')) {
-            const d = new Date(localDate);
+        if (localStartDate && localStartDate.includes('T')) {
+            const d = new Date(localStartDate);
             if (!isNaN(d.getTime())) {
-                // Convert UTC back to local YYYY-MM-DD and HH:MM for inputs
-                localDate = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
-                localTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // HH:MM
+                localStartDate = d.toLocaleDateString('en-CA');
+                localStartTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+        }
+
+        if (localEndDate && localEndDate.includes('T')) {
+            const d = new Date(localEndDate);
+            if (!isNaN(d.getTime())) {
+                localEndDate = d.toLocaleDateString('en-CA');
+                localEndTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             }
         }
         
         setConfig({
             ...exam.config,
-            date: localDate,
-            startDate: localDate,
-            startTime: localTime
+            date: localStartDate,
+            startDate: localStartDate,
+            endDate: localEndDate,
+            startTime: localStartTime,
+            endTime: localEndTime
         }); 
         setIsEditModalOpen(true); 
     };
@@ -435,22 +419,34 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             setEditingExam(exam); 
             setQuestions(exam.questions); 
             
-            // Parse ISO date for draft as well
-            let localDate = exam.config.startDate || exam.config.date;
-            let localTime = exam.config.startTime;
-            if (localDate && localDate.includes('T')) {
-                const d = new Date(localDate);
+            let localStartDate = exam.config.startDate || exam.config.date;
+            let localEndDate = exam.config.endDate;
+            let localStartTime = exam.config.startTime;
+            let localEndTime = exam.config.endTime;
+
+            if (localStartDate && localStartDate.includes('T')) {
+                const d = new Date(localStartDate);
                 if (!isNaN(d.getTime())) {
-                    localDate = d.toLocaleDateString('en-CA');
-                    localTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    localStartDate = d.toLocaleDateString('en-CA');
+                    localStartTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                }
+            }
+
+            if (localEndDate && localEndDate.includes('T')) {
+                const d = new Date(localEndDate);
+                if (!isNaN(d.getTime())) {
+                    localEndDate = d.toLocaleDateString('en-CA');
+                    localEndTime = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                 }
             }
             
             setConfig({
                 ...exam.config,
-                date: localDate,
-                startDate: localDate,
-                startTime: localTime
+                date: localStartDate,
+                startDate: localStartDate,
+                endDate: localEndDate,
+                startTime: localStartTime,
+                endTime: localEndTime
             }); 
             setManualMode(true); 
             setView('UPLOAD'); 
@@ -467,39 +463,47 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const getExamDates = (exam: Exam) => {
         const mode = exam.config.examMode || 'UJIAN';
         const startDateRaw = exam.config.startDate || exam.config.date || '';
-        const startDateStr = startDateRaw.split('T')[0];
-        const startTimeStr = exam.config.startTime || '00:00';
+        const endDateRaw = exam.config.endDate;
         
         let start: Date;
-        if (startDateRaw.includes('T') && startDateRaw.length > 10) {
-            // If it's a full ISO string, parse it directly
+        if (startDateRaw.includes('T')) {
             start = new Date(startDateRaw);
         } else {
-            // Otherwise construct from date and time in local timezone
-            start = new Date(`${startDateStr}T${startTimeStr}`);
+            const startTimeStr = exam.config.startTime || '00:00';
+            start = new Date(`${startDateRaw}T${startTimeStr}`);
         }
 
         if (isNaN(start.getTime())) start = new Date();
 
         let end: Date;
-        const endDateStr = (exam.config.endDate || '').split('T')[0];
+        const endTimeStr = exam.config.endTime || '23:59';
         
+        const getLocalDateStr = (raw: string) => {
+            if (!raw) return '';
+            if (raw.includes('T')) {
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
+            }
+            return raw;
+        };
+
+        const localStartDateStr = getLocalDateStr(startDateRaw);
+        const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
+
         if (mode === 'PR') {
             start = new Date(0); // PR is always available before end date
-            if (endDateStr) {
-                end = new Date(`${endDateStr}T23:59:59`);
-            } else {
-                end = new Date(`${startDateStr}T23:59:59`);
-            }
+            end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
         } else {
-            if (endDateStr) {
-                end = new Date(`${endDateStr}T23:59:59`);
-            } else {
-                if (exam.config.timeLimit > 0) {
-                    end = new Date(start.getTime() + exam.config.timeLimit * 60000);
+            if (endDateRaw || exam.config.endTime) {
+                if (endDateRaw && endDateRaw.includes('T')) {
+                    end = new Date(endDateRaw);
                 } else {
-                    end = new Date(`${startDateStr}T23:59:59`);
+                    end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
                 }
+            } else if (exam.config.timeLimit > 0) {
+                end = new Date(start.getTime() + exam.config.timeLimit * 60000);
+            } else {
+                end = new Date(`${localStartDateStr}T23:59:59`);
             }
         }
 
