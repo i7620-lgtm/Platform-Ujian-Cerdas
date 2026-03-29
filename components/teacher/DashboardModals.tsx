@@ -86,32 +86,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         };
     }, [displayExam?.code, selectedClass, selectedSchool, displayExam, fetchLatest]);
 
-    // Lógica pengurutan: Locked -> Online -> Selesai. Kemudian Kelas & Absen.
+    // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
-        const statusPriority: Record<string, number> = {
-            'force_closed': 1, // Locked
-            'in_progress': 2,  // Online
-            'completed': 3     // Selesai
-        };
-
-        const getAbsentNum = (id: string) => {
-            const parts = id.split('-');
-            const last = parts[parts.length - 1];
-            return parseInt(last) || 0;
-        };
-
         return [...localResults].sort((a, b) => {
-            const pA = statusPriority[a.status || ''] || 99;
-            const pB = statusPriority[b.status || ''] || 99;
+            // 1. Nama Sekolah
+            const schoolA = a.student.schoolName || '';
+            const schoolB = b.student.schoolName || '';
+            const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+            if (schoolCompare !== 0) return schoolCompare;
 
-            if (pA !== pB) return pA - pB;
-            
-            // Urutan kedua: Kelas
+            // 2. Kelas
             const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
             if (classCompare !== 0) return classCompare;
 
-            // Urutan ketiga: No Absen (diambil dari studentId)
-            return getAbsentNum(a.student.studentId) - getAbsentNum(b.student.studentId);
+            // 3. Nomor Absen
+            const absA = parseInt(a.student.absentNumber) || 0;
+            const absB = parseInt(b.student.absentNumber) || 0;
+            return absA - absB;
         });
     }, [localResults]);
 
