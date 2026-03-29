@@ -429,7 +429,7 @@ const WysiwygEditor: React.FC<{
 };
 
 const createNewQuestion = (type: QuestionType): Question => {
-    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '' };
+    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1 };
     switch (type) {
         case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
     }
@@ -505,7 +505,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             if (generatedQuestions && generatedQuestions.length > 0) {
                 const newQ = generatedQuestions[0];
                 setQuestions(questions.map(question => 
-                    question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi } : question
+                    question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi, scoreWeight: newQ.scoreWeight || q.scoreWeight } : question
                 ));
             }
         } catch (error: unknown) {
@@ -709,7 +709,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                  ) : (
                                                      <SparklesIcon className="w-4 h-4" />
                                                  )}
-                                                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Buat dengan AI</span>
+                                                 <span className="text-[10px] font-bold uppercase tracking-wider">Buat dengan AI</span>
                                              </button>
                                          )}
                                          <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-sm">
