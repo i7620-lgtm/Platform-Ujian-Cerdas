@@ -505,5 +505,5 @@ export const MetaBadge: React.FC<{ text: string; colorClass?: string }> = ({ tex
     else if (colorClass.includes("gray")) darkClass = "dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
     else darkClass = "dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
 
-    return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border border-opacity-50 ${colorClass} ${darkClass}`}>{text}</span>); 
+    return (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border border-opacity-50 whitespace-normal break-words ${colorClass} ${darkClass}`}>{text}</span>); 
 };
