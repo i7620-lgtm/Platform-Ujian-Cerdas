@@ -245,3 +245,4 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     throw new Error("Gagal memproses format respons dari AI. Silakan coba lagi.");
   }
 }
+ 
