@@ -209,8 +209,12 @@ export const parseList = (str: string | undefined | null): string[] => {
             return parsed;
         } catch {
             let cleaned = input.trim();
-            if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
-            if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+            if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+                cleaned = cleaned.slice(1, -1);
+            } else {
+                if (cleaned.startsWith('[') && !cleaned.endsWith(']')) cleaned = cleaned.slice(1);
+                if (cleaned.endsWith(']') && !cleaned.startsWith('[')) cleaned = cleaned.slice(0, -1);
+            }
             if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
             cleaned = cleaned.replace(/\\"/g, '"');
             return cleaned;
@@ -248,6 +252,18 @@ export const parseList = (str: string | undefined | null): string[] => {
             parsed.forEach(processItem);
             return flattened;
         }
+        if (typeof parsed === 'string') {
+            // If it looks like HTML, don't split by comma as it might break equations
+            if (parsed.includes('<') && parsed.includes('>')) {
+                return [parsed.trim()];
+            }
+            return parsed.split(',').map(s => {
+                let trimmed = s.trim();
+                if (trimmed.startsWith('"') && trimmed.endsWith('"')) trimmed = trimmed.slice(1, -1);
+                return trimmed.replace(/\\"/g, '"');
+            }).filter(Boolean);
+        }
+        return [String(parsed)];
     } catch { /* ignore */ }
     
     // Fallback: handle legacy comma-separated
