@@ -132,6 +132,7 @@ export const analyzeQuestionTypePerformance = (exam: Exam, results: Result | Res
 };
 
 export interface ClassAnalysis {
+    schoolName: string;
     className: string;
     studentCount: number;
     averageScore: number;
@@ -143,16 +144,19 @@ export interface ClassAnalysis {
 }
 
 export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAnalysis[] => {
-    const classMap: Record<string, Result[]> = {};
+    const groupMap: Record<string, Result[]> = {};
     
-    // Group by class
+    // Group by school and class
     results.forEach(r => {
+        const s = r.student.schoolName || 'Tanpa Sekolah';
         const c = r.student.class || 'Tanpa Kelas';
-        if (!classMap[c]) classMap[c] = [];
-        classMap[c].push(r);
+        const key = `${s}|${c}`;
+        if (!groupMap[key]) groupMap[key] = [];
+        groupMap[key].push(r);
     });
 
-    return Object.entries(classMap).map(([className, classResults]) => {
+    return Object.entries(groupMap).map(([key, classResults]) => {
+        const [schoolName, className] = key.split('|');
         const studentCount = classResults.length;
         const scores = classResults.map(r => r.score);
         const averageScore = studentCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / studentCount) : 0;
@@ -167,6 +171,7 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
         const questionTypeStats = analyzeQuestionTypePerformance(exam, classResults);
 
         return {
+            schoolName,
             className,
             studentCount,
             averageScore,
@@ -176,7 +181,11 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
             passRate,
             questionTypeStats
         };
-    }).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+    }).sort((a, b) => {
+        const s = a.schoolName.localeCompare(b.schoolName);
+        if (s !== 0) return s;
+        return a.className.localeCompare(b.className, undefined, { numeric: true });
+    });
 };
 
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
