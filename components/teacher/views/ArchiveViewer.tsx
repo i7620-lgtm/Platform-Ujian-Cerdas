@@ -525,14 +525,30 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             let endTimeStr = "-";
             
             // Construct Scheduled Times
-            const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-            const scheduledStart = new Date(`${dateStr}T${exam.config.startTime}`);
+            const dateStr = exam.config.startDate || exam.config.date;
+            const scheduledStart = dateStr.includes('T') && dateStr.length > 10 ? new Date(dateStr) : new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
             let scheduledEnd: Date;
-            if (exam.config.examMode !== 'PR' && exam.config.timeLimit > 0) {
-                scheduledEnd = new Date(scheduledStart.getTime() + exam.config.timeLimit * 60000);
+            const endDateStr = exam.config.endDate;
+            
+            if (exam.config.examMode === 'PR') {
+                if (endDateStr) {
+                    scheduledEnd = new Date(`${endDateStr}T23:59:59`);
+                } else {
+                    const fallbackDate = new Date(exam.config.date || new Date());
+                    const localDateStr = fallbackDate.toLocaleDateString('en-CA');
+                    scheduledEnd = new Date(`${localDateStr}T23:59:59`);
+                }
             } else {
-                const endDateStr = exam.config.endDate || exam.config.date;
-                scheduledEnd = endDateStr.includes('T') ? new Date(endDateStr.split('T')[0] + 'T23:59:59') : new Date(`${endDateStr}T23:59:59`);
+                if (endDateStr) {
+                    scheduledEnd = new Date(`${endDateStr}T23:59:59`);
+                } else {
+                    if (exam.config.timeLimit > 0) {
+                        scheduledEnd = new Date(scheduledStart.getTime() + exam.config.timeLimit * 60000);
+                    } else {
+                        const localDateStr = scheduledStart.toLocaleDateString('en-CA');
+                        scheduledEnd = new Date(`${localDateStr}T23:59:59`);
+                    }
+                }
             }
 
             if (r.status === 'force_closed') {
