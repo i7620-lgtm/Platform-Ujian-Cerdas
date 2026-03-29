@@ -246,28 +246,29 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         let calculatedDeadline = timeLimitMs > 0 ? actualStartTime + timeLimitMs : Infinity;
 
         // Cek batas akhir ujian (endDate)
-        const endDateStr = activeExam.config.endDate || activeExam.config.date;
+        const endDateStr = activeExam.config.endDate;
         if (endDateStr) {
+            const endDateTime = new Date(`${endDateStr}T23:59:59`);
+            if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
+                calculatedDeadline = endDateTime.getTime();
+            }
+        } else {
             let endDateTime: Date;
-            if (endDateStr.includes('T') && endDateStr.length > 10) {
-                endDateTime = new Date(endDateStr);
-                if (mode === 'UJIAN' && !activeExam.config.endDate) {
-                    // Jika fallback ke startDate ISO string, tambahkan timeLimit
-                    if (timeLimitMs > 0) {
-                        endDateTime = new Date(endDateTime.getTime() + timeLimitMs);
-                    } else {
-                        endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
-                    }
-                } else if (mode === 'PR') {
-                    // PR doesn't have a time limit based end date, it's just available anytime before the end date
-                    // If it falls back to start date, it means it's available until the end of that day
-                    endDateTime = new Date(endDateStr.split('T')[0] + 'T23:59:59');
+            if (mode === 'UJIAN') {
+                const startDateStr = activeExam.config.startDate || activeExam.config.date;
+                const startDateTime = startDateStr.includes('T') && startDateStr.length > 10 ? new Date(startDateStr) : new Date(`${startDateStr}T${activeExam.config.startTime || '00:00'}`);
+                if (timeLimitMs > 0) {
+                    endDateTime = new Date(startDateTime.getTime() + timeLimitMs);
+                } else {
+                    const localDateStr = startDateTime.toLocaleDateString('en-CA');
+                    endDateTime = new Date(`${localDateStr}T23:59:59`);
                 }
             } else {
-                endDateTime = new Date(`${endDateStr}T23:59:59`);
+                const fallbackDate = new Date(activeExam.config.date || new Date());
+                const localDateStr = fallbackDate.toLocaleDateString('en-CA');
+                endDateTime = new Date(`${localDateStr}T23:59:59`);
             }
             
-            // Deadline tidak boleh melebihi batas akhir ujian
             if (!isNaN(endDateTime.getTime()) && endDateTime.getTime() < calculatedDeadline) {
                 calculatedDeadline = endDateTime.getTime();
             }
