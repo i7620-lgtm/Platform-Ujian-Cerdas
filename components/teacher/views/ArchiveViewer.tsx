@@ -225,6 +225,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<ArchiveTab>('DETAIL');
     const [selectedClass, setSelectedClass] = useState<string>('ALL');
+    const [selectedSchool, setSelectedSchool] = useState<string>('ALL');
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
     const [cloudArchives, setCloudArchives] = useState<{name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]>([]);
     const [isLoadingCloud, setIsLoadingCloud] = useState(false);
@@ -782,16 +783,32 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         });
     }, [archiveData]);
 
-    const uniqueClasses = useMemo(() => {
+    const uniqueSchools = useMemo(() => {
         if (!archiveData) return [];
-        const classes = new Set(archiveData.results.map(r => r.student.class));
-        return Array.from(classes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+        const schools = new Set(archiveData.results.map(r => r.student.schoolName || 'Tanpa Sekolah'));
+        return Array.from(schools).sort();
     }, [archiveData]);
 
+    const uniqueClasses = useMemo(() => {
+        if (!archiveData) return [];
+        let results = archiveData.results;
+        if (selectedSchool !== 'ALL') {
+            results = results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool);
+        }
+        const classes = new Set(results.map(r => r.student.class));
+        return Array.from(classes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [archiveData, selectedSchool]);
+
     const filteredResults = useMemo(() => {
-        if (selectedClass === 'ALL') return sortedResults;
-        return sortedResults.filter(r => r.student.class === selectedClass);
-    }, [sortedResults, selectedClass]);
+        let results = sortedResults;
+        if (selectedSchool !== 'ALL') {
+            results = results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool);
+        }
+        if (selectedClass !== 'ALL') {
+            results = results.filter(r => r.student.class === selectedClass);
+        }
+        return results;
+    }, [sortedResults, selectedSchool, selectedClass]);
 
     const toggleStudent = (id: string) => {
         if (expandedStudent === id) setExpandedStudent(null);
@@ -858,8 +875,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const classAnalysisData = useMemo(() => {
         if (!archiveData) return [];
-        return analyzeClassPerformance(archiveData.exam, archiveData.results);
-    }, [archiveData]);
+        let results = archiveData.results;
+        if (selectedSchool !== 'ALL') {
+            results = results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool);
+        }
+        return analyzeClassPerformance(archiveData.exam, results);
+    }, [archiveData, selectedSchool]);
 
     const questionTypeStats = useMemo(() => {
         if (!archiveData) return [];
@@ -1136,20 +1157,39 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
                 {activeTab === 'STUDENTS' && (
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-                        {uniqueClasses.length > 1 && (
+                        {(uniqueSchools.length > 1 || uniqueClasses.length > 1) && (
                             <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">Filter Kelas:</span>
-                                    <select 
-                                        value={selectedClass} 
-                                        onChange={(e) => setSelectedClass(e.target.value)}
-                                        className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                                    >
-                                        <option value="ALL">Semua Kelas ({sortedResults.length})</option>
-                                        {uniqueClasses.map(c => (
-                                            <option key={c} value={c}>{c} ({sortedResults.filter(r => r.student.class === c).length})</option>
-                                        ))}
-                                    </select>
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {uniqueSchools.length > 1 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">Sekolah:</span>
+                                            <select 
+                                                value={selectedSchool} 
+                                                onChange={(e) => { setSelectedSchool(e.target.value); setSelectedClass('ALL'); }}
+                                                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                            >
+                                                <option value="ALL">Semua Sekolah ({archiveData.results.length})</option>
+                                                {uniqueSchools.map(s => (
+                                                    <option key={s} value={s}>{s} ({archiveData.results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === s).length})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {uniqueClasses.length > 1 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">Kelas:</span>
+                                            <select 
+                                                value={selectedClass} 
+                                                onChange={(e) => setSelectedClass(e.target.value)}
+                                                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                            >
+                                                <option value="ALL">Semua Kelas ({sortedResults.filter(r => selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool).length})</option>
+                                                {uniqueClasses.map(c => (
+                                                    <option key={c} value={c}>{c} ({sortedResults.filter(r => r.student.class === c && (selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool)).length})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="text-xs font-bold text-slate-400">
                                     Menampilkan {filteredResults.length} Siswa
@@ -1161,79 +1201,100 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                                 <tr>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Siswa</th>
-                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kelas</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sekolah / Kelas</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Nilai</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">B/S/K</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Aktivitas</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {filteredResults.map(r => {
-                                    const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
+                                {uniqueSchools.map(school => {
+                                    const schoolResults = filteredResults.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === school);
+                                    if (schoolResults.length === 0) return null;
+                                    
                                     return (
-                                    <React.Fragment key={r.student.studentId}>
-                                        <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30 cursor-pointer group transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`transition-transform duration-300 text-slate-400 ${expandedStudent === r.student.studentId ? 'rotate-180 text-indigo-500' : ''}`}>
-                                                        {expandedStudent === r.student.studentId ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
-                                                        {r.student.schoolName && <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">{r.student.schoolName}</div>}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{r.student.class}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' : score >= 50 ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30' : 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30'}`}>
-                                                    {score}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
-                                                <span className="text-emerald-600 dark:text-emerald-400" title="Benar">{correct}</span> / <span className="text-rose-600 dark:text-rose-400" title="Salah">{wrong}</span> / <span className="text-slate-400 dark:text-slate-500" title="Kosong">{empty}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {r.activityLog && r.activityLog.length > 0 ? (
-                                                    <span className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded font-bold text-[10px] border border-amber-100 dark:border-amber-800">{r.activityLog.length} Log</span>
-                                                ) : (
-                                                    <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded font-bold text-[10px] border border-emerald-100 dark:border-emerald-800">Aman</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                        {expandedStudent === r.student.studentId && (
-                                            <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
-                                                <td colSpan={5} className="p-6">
-                                                    <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div> Benar</span>
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
-                                                        <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-1 mt-2">
-                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                            const status = checkAnswerStatus(q, r.answers);
-                                                            let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
-                                                            if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
-                                                            else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
-                                                            return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
-                                                        })}
-                                                    </div>
-                                                    
-                                                    {r.activityLog && r.activityLog.length > 0 && (
-                                                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                                            <h4 className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-2">
-                                                                <ExclamationTriangleIcon className="w-3 h-3"/> Riwayat Aktivitas & Kecurangan
-                                                            </h4>
-                                                            <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4 font-mono bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                                                                {r.activityLog.map((log, i) => <li key={i}>{log}</li>)}
-                                                            </ul>
-                                                        </div>
+                                        <React.Fragment key={school}>
+                                            {selectedSchool === 'ALL' && (
+                                                <tr className="bg-slate-50/80 dark:bg-slate-700/50">
+                                                    <td colSpan={5} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
+                                                        Sekolah: {school} ({schoolResults.length} Siswa)
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {schoolResults.map(r => {
+                                                const { correct, wrong, empty, score } = getCalculatedStats(r, exam);
+                                                return (
+                                                <React.Fragment key={r.student.studentId}>
+                                                    <tr onClick={() => toggleStudent(r.student.studentId)} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30 cursor-pointer group transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`transition-transform duration-300 text-slate-400 ${expandedStudent === r.student.studentId ? 'rotate-180 text-indigo-500' : ''}`}>
+                                                                    {expandedStudent === r.student.studentId ? <ChevronUpIcon className="w-4 h-4"/> : <ChevronDownIcon className="w-4 h-4"/>}
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{r.student.fullName}</div>
+                                                                    {r.student.schoolName && <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">{r.student.schoolName}</div>}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{r.student.schoolName || 'Tanpa Sekolah'}</span>
+                                                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Kelas {r.student.class}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={`text-sm font-black px-2 py-1 rounded ${score >= 75 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' : score >= 50 ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30' : 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30'}`}>
+                                                                {score}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                            <span className="text-emerald-600 dark:text-emerald-400" title="Benar">{correct}</span> / <span className="text-rose-600 dark:text-rose-400" title="Salah">{wrong}</span> / <span className="text-slate-400 dark:text-slate-500" title="Kosong">{empty}</span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            {r.activityLog && r.activityLog.length > 0 ? (
+                                                                <span className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded font-bold text-[10px] border border-amber-100 dark:border-amber-800">{r.activityLog.length} Log</span>
+                                                            ) : (
+                                                                <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded font-bold text-[10px] border border-emerald-100 dark:border-emerald-800">Aman</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                    {expandedStudent === r.student.studentId && (
+                                                        <tr className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
+                                                            <td colSpan={5} className="p-6">
+                                                                <div className="flex items-center gap-4 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-300 dark:bg-emerald-600 rounded"></div> Benar</span>
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-300 dark:bg-rose-600 rounded"></div> Salah</span>
+                                                                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div> Kosong</span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                        const status = checkAnswerStatus(q, r.answers);
+                                                                        let bgClass = 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200'; 
+                                                                        if (status === 'CORRECT') bgClass = 'bg-emerald-300 dark:bg-emerald-600 text-slate-900 dark:text-white';
+                                                                        else if (status === 'WRONG') bgClass = 'bg-rose-300 dark:bg-rose-600 text-slate-900 dark:text-white';
+                                                                        return <div key={q.id} title={`Soal ${idx+1}: ${status === 'CORRECT' ? 'Benar' : status === 'EMPTY' ? 'Kosong' : 'Salah'}`} className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${bgClass} cursor-help transition-transform hover:scale-110`}>{idx + 1}</div>;
+                                                                    })}
+                                                                </div>
+                                                                
+                                                                {r.activityLog && r.activityLog.length > 0 && (
+                                                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                                        <h4 className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-2">
+                                                                            <ExclamationTriangleIcon className="w-3 h-3"/> Riwayat Aktivitas & Kecurangan
+                                                                        </h4>
+                                                                        <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4 font-mono bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                            {r.activityLog.map((log, i) => <li key={i}>{log}</li>)}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
                                                     )}
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                )})}
+                                                </React.Fragment>
+                                            )})}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </tbody>
                          </table>
                         </div>
@@ -1307,6 +1368,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             <table className="w-full text-left min-w-[800px]">
                                 <thead className="bg-slate-50 dark:bg-slate-700">
                                     <tr>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
@@ -1316,41 +1378,58 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                    {classAnalysisData.map((c, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                            <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{c.className}</td>
-                                            <td className="px-6 py-4 text-center text-sm text-slate-600 dark:text-slate-300">{c.studentCount} Siswa</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`px-2 py-1 rounded font-bold text-xs ${c.averageScore >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
-                                                    {c.averageScore}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
-                                                {c.lowestScore} - {c.highestScore}
-                                            </td>
-                                            {archiveData.exam.config.kkm && (
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <span className={`font-bold text-sm ${c.passRate >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                            {c.passRate}%
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-400">({c.passCount} Tuntas)</span>
-                                                    </div>
-                                                </td>
-                                            )}
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-wrap gap-2">
-                                                    {c.questionTypeStats.slice(0, 3).map((qt, i) => (
-                                                        <div key={i} className="text-[10px] px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1" title={`${qt.typeName}: ${qt.percentage}% Benar`}>
-                                                            <span className="text-slate-500 dark:text-slate-400 uppercase font-bold">{qt.type.substring(0, 3)}</span>
-                                                            <span className={`font-bold ${qt.percentage >= 70 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{qt.percentage}%</span>
-                                                        </div>
-                                                    ))}
-                                                    {c.questionTypeStats.length > 3 && <span className="text-[10px] text-slate-400 self-center">+{c.questionTypeStats.length - 3} lainnya</span>}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {uniqueSchools.map(school => {
+                                        const schoolAnalysis = classAnalysisData.filter(c => c.schoolName === school);
+                                        if (schoolAnalysis.length === 0) return null;
+                                        
+                                        return (
+                                            <React.Fragment key={school}>
+                                                {selectedSchool === 'ALL' && (
+                                                    <tr className="bg-slate-50/80 dark:bg-slate-700/50">
+                                                        <td colSpan={7} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
+                                                            Sekolah: {school}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {schoolAnalysis.map((c, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                        <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{c.schoolName}</td>
+                                                        <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{c.className}</td>
+                                                        <td className="px-6 py-4 text-center text-sm text-slate-600 dark:text-slate-300">{c.studentCount} Siswa</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={`px-2 py-1 rounded font-bold text-xs ${c.averageScore >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                                {c.averageScore}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
+                                                            {c.lowestScore} - {c.highestScore}
+                                                        </td>
+                                                        {archiveData.exam.config.kkm && (
+                                                            <td className="px-6 py-4 text-center">
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    <span className={`font-bold text-sm ${c.passRate >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                        {c.passRate}%
+                                                                    </span>
+                                                                    <span className="text-[10px] text-slate-400">({c.passCount} Tuntas)</span>
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {c.questionTypeStats.slice(0, 3).map((qt, i) => (
+                                                                    <div key={i} className="text-[10px] px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1" title={`${qt.typeName}: ${qt.percentage}% Benar`}>
+                                                                        <span className="text-slate-500 dark:text-slate-400 uppercase font-bold">{qt.type.substring(0, 3)}</span>
+                                                                        <span className={`font-bold ${qt.percentage >= 70 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{qt.percentage}%</span>
+                                                                    </div>
+                                                                ))}
+                                                                {c.questionTypeStats.length > 3 && <span className="text-[10px] text-slate-400 self-center">+{c.questionTypeStats.length - 3} lainnya</span>}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -1398,6 +1477,43 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             <p className="text-lg font-black text-blue-700">{totalStudents}</p>
                         </div>
                     </div>
+
+                    {/* School Summary Table */}
+                    {uniqueSchools.length > 1 && (
+                        <div className="mb-4">
+                            <p className="text-[10px] font-bold uppercase text-slate-500 mb-2">Ringkasan Per Sekolah</p>
+                            <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                <thead className="bg-slate-100">
+                                    <tr>
+                                        <th className="border border-slate-300 p-1 text-left">Nama Sekolah</th>
+                                        <th className="border border-slate-300 p-1 text-center w-16">Siswa</th>
+                                        <th className="border border-slate-300 p-1 text-center w-16">Rerata</th>
+                                        <th className="border border-slate-300 p-1 text-center w-16">Max</th>
+                                        <th className="border border-slate-300 p-1 text-center w-16">Min</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {uniqueSchools.map(school => {
+                                        const schoolResults = archiveData.results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === school);
+                                        if (schoolResults.length === 0) return null;
+                                        const scores = schoolResults.map(r => getCalculatedStats(r, exam).score);
+                                        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / schoolResults.length);
+                                        const max = Math.max(...scores);
+                                        const min = Math.min(...scores);
+                                        return (
+                                            <tr key={school}>
+                                                <td className="border border-slate-300 p-1 font-bold">{school}</td>
+                                                <td className="border border-slate-300 p-1 text-center">{schoolResults.length}</td>
+                                                <td className="border border-slate-300 p-1 text-center font-bold">{avg}</td>
+                                                <td className="border border-slate-300 p-1 text-center text-emerald-700">{max}</td>
+                                                <td className="border border-slate-300 p-1 text-center text-rose-700">{min}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         {/* Kategori */}
@@ -1477,232 +1593,248 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
                 <div className="page-break"></div>
 
-                {/* 2. LAPORAN PER KELAS */}
-                {uniqueClasses.length > 0 ? (
-                    uniqueClasses.map((className, classIdx) => {
-                        const classResults = sortedResults.filter(r => r.student.class === className);
-                        const classTotal = classResults.length;
-                        const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
-                        const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
-                        const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
-                        const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                        // const kkm = exam.config.kkm || 75;
-                        // const passedCount = classScores.filter(s => s >= kkm).length; 
+                {/* 2. LAPORAN PER SEKOLAH & KELAS */}
+                {uniqueSchools.map((schoolName, schoolIdx) => {
+                    const schoolClasses = Array.from(new Set(
+                        sortedResults
+                            .filter(r => (r.student.schoolName || 'Tanpa Sekolah') === schoolName)
+                            .map(r => r.student.class)
+                    )).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-                        return (
-                            <div key={className}>
-                                <div className="mb-8 avoid-break">
-                                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">2.{classIdx + 1}. Laporan Kelas {className}</h3>
-                                    
-                                    {/* A. ANALISIS KELAS */}
-                                    <div className="mb-4 bg-white border border-slate-300 rounded p-4">
-                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">A. Analisis Kelas {className}</h4>
-                                        
-                                        {/* Stat Grid */}
-                                        <div className="grid grid-cols-4 gap-4 text-center mb-6">
-                                            <div className="p-2 bg-slate-50 rounded border border-slate-200">
-                                                <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
-                                                <span className="font-black text-lg text-slate-800">{classAvg}</span>
-                                            </div>
-                                            <div className="p-2 bg-emerald-50 rounded border border-emerald-100">
-                                                <span className="block text-emerald-600 uppercase text-[9px] font-bold">Tertinggi</span>
-                                                <span className="font-black text-lg text-emerald-700">{classMax}</span>
-                                            </div>
-                                            <div className="p-2 bg-rose-50 rounded border border-rose-100">
-                                                <span className="block text-rose-600 uppercase text-[9px] font-bold">Terendah</span>
-                                                <span className="font-black text-lg text-rose-700">{classMin}</span>
-                                            </div>
-                                            <div className="p-2 bg-blue-50 rounded border border-blue-100">
-                                                <span className="block text-blue-600 uppercase text-[9px] font-bold">Partisipan</span>
-                                                <span className="font-black text-lg text-blue-700">{classTotal}</span>
-                                            </div>
-                                        </div>
+                    return (
+                        <div key={schoolName}>
+                            <div className="page-break"></div>
+                            <div className="bg-slate-900 text-white p-4 mb-6 rounded-lg flex justify-between items-center">
+                                <h2 className="text-xl font-black uppercase tracking-widest">SEKOLAH: {schoolName}</h2>
+                                <span className="text-xs font-bold opacity-70">Bagian {schoolIdx + 2}</span>
+                            </div>
 
-                                        {/* Detailed Stats Grid (Category, Level, Type) */}
-                                        {(() => {
-                                            // Calculate stats specific to this class
-                                            const { categoryStats: classCatStats, levelStats: classLevelStats } = calculateAggregateStats(exam, classResults);
-                                            const classTypeStats = analyzeQuestionTypePerformance(exam, classResults);
+                            {schoolClasses.map((className, classIdx) => {
+                                const classResults = sortedResults.filter(r => 
+                                    (r.student.schoolName || 'Tanpa Sekolah') === schoolName && 
+                                    r.student.class === className
+                                );
+                                const classTotal = classResults.length;
+                                const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
+                                const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
+                                const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
+                                const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
 
-                                            return (
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    {/* Kategori */}
-                                                    <div>
-                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi</p>
-                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
-                                                            <tbody>
-                                                                {classCatStats.length > 0 ? classCatStats.map(s => {
-                                                                    let bgClass = '';
-                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
-                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
-                                                                    else bgClass = 'print-bg-red';
-                                                                    
-                                                                    return (
-                                                                        <tr key={s.name}>
-                                                                            <td className="border p-1">{s.name}</td>
-                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
-                                                                        </tr>
-                                                                    )
-                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
-                                                            </tbody>
-                                                        </table>
+                                return (
+                                    <div key={`${schoolName}-${className}`} className="mb-12">
+                                        <div className="mb-8 avoid-break">
+                                            <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">
+                                                {schoolIdx + 2}.{classIdx + 1}. Laporan Kelas {className}
+                                            </h3>
+                                            
+                                            {/* A. ANALISIS KELAS */}
+                                            <div className="mb-4 bg-white border border-slate-300 rounded p-4">
+                                                <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">A. Analisis Kelas {className} ({schoolName})</h4>
+                                                
+                                                {/* Stat Grid */}
+                                                <div className="grid grid-cols-4 gap-4 text-center mb-6">
+                                                    <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                                                        <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
+                                                        <span className="font-black text-lg text-slate-800">{classAvg}</span>
                                                     </div>
-                                                    {/* Level */}
-                                                    <div>
-                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Tingkat Kesulitan</p>
-                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Level</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
-                                                            <tbody>
-                                                                {classLevelStats.length > 0 ? classLevelStats.map(s => {
-                                                                    let bgClass = '';
-                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
-                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
-                                                                    else bgClass = 'print-bg-red';
-
-                                                                    return (
-                                                                        <tr key={s.name}>
-                                                                            <td className="border p-1">{s.name}</td>
-                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
-                                                                        </tr>
-                                                                    )
-                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
-                                                            </tbody>
-                                                        </table>
+                                                    <div className="p-2 bg-emerald-50 rounded border border-emerald-100">
+                                                        <span className="block text-emerald-600 uppercase text-[9px] font-bold">Tertinggi</span>
+                                                        <span className="font-black text-lg text-emerald-700">{classMax}</span>
                                                     </div>
-                                                    {/* Jenis Soal */}
-                                                    <div>
-                                                        <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Jenis Soal</p>
-                                                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                                                            <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Jenis</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
-                                                            <tbody>
-                                                                {classTypeStats.length > 0 ? classTypeStats.map(s => {
-                                                                    let bgClass = '';
-                                                                    if (s.percentage >= 80) bgClass = 'print-bg-green';
-                                                                    else if (s.percentage >= 50) bgClass = 'print-bg-orange';
-                                                                    else bgClass = 'print-bg-red';
-
-                                                                    return (
-                                                                        <tr key={s.type}>
-                                                                            <td className="border p-1">{s.typeName}</td>
-                                                                            <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
-                                                                        </tr>
-                                                                    )
-                                                                }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
-                                                            </tbody>
-                                                        </table>
+                                                    <div className="p-2 bg-rose-50 rounded border border-rose-100">
+                                                        <span className="block text-rose-600 uppercase text-[9px] font-bold">Terendah</span>
+                                                        <span className="font-black text-lg text-rose-700">{classMin}</span>
+                                                    </div>
+                                                    <div className="p-2 bg-blue-50 rounded border border-blue-100">
+                                                        <span className="block text-blue-600 uppercase text-[9px] font-bold">Partisipan</span>
+                                                        <span className="font-black text-lg text-blue-700">{classTotal}</span>
                                                     </div>
                                                 </div>
-                                            );
-                                        })()}
-                                    </div>
 
-                                    {/* B. REKAPITULASI HASIL KELAS */}
-                                    <div className="mb-4">
-                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">B. Rekapitulasi Hasil Kelas {className}</h4>
-                                        <div className="overflow-x-auto custom-scrollbar">
-                                            <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
-                                                <thead>
-                                                    <tr className="bg-slate-100">
-                                                        <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                                        <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
-                                                        <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
-                                                        <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
-                                                        <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {classResults.map((r, index) => {
-                                                        const { score } = getCalculatedStats(r, exam);
-                                                        return (
-                                                            <tr key={r.student.studentId} className="avoid-break">
-                                                                <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                                                <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                                <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
-                                                                <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
-                                                                <td className="border border-slate-300 p-1">
-                                                                    <div className="flex flex-wrap gap-0.5">
-                                                                        {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
-                                                                            const status = checkAnswerStatus(q, r.answers);
-                                                                            let bgClass = 'print-bg-gray'; 
-                                                                            if (status === 'CORRECT') bgClass = 'print-bg-green';
-                                                                            else if (status === 'WRONG') bgClass = 'print-bg-red';
+                                                {/* Detailed Stats Grid (Category, Level, Type) */}
+                                                {(() => {
+                                                    // Calculate stats specific to this class
+                                                    const { categoryStats: classCatStats, levelStats: classLevelStats } = calculateAggregateStats(exam, classResults);
+                                                    const classTypeStats = analyzeQuestionTypePerformance(exam, classResults);
+
+                                                    return (
+                                                        <div className="grid grid-cols-3 gap-4">
+                                                            {/* Kategori */}
+                                                            <div>
+                                                                <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Penguasaan Materi</p>
+                                                                <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                                    <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Kategori</th><th className="border p-1 text-right w-16">Penguasaan</th></tr></thead>
+                                                                    <tbody>
+                                                                        {classCatStats.length > 0 ? classCatStats.map(s => {
+                                                                            let bgClass = '';
+                                                                            if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                            else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                            else bgClass = 'print-bg-red';
                                                                             
                                                                             return (
-                                                                                <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
-                                                                                    {idx + 1}
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {/* C. ANALISIS INDIVIDU KELAS */}
-                                    <div className="mb-4">
-                                        <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">C. Analisis Individu Kelas {className}</h4>
-                                        <div className="overflow-x-auto custom-scrollbar">
-                                            <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
-                                                <thead>
-                                                    <tr className="bg-slate-100">
-                                                        <th className="border border-slate-300 p-1 text-center w-8">No</th>
-                                                        <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
-                                                        <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
-                                                        <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
-                                                        <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {classResults.map((r, index) => {
-                                                        const analysis = analyzeStudentPerformance(exam, r);
-                                                        return (
-                                                            <tr key={r.student.studentId} className="avoid-break">
-                                                                <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
-                                                                <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                                <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
-                                                                <td className="border border-slate-300 p-1">
-                                                                    <div className="flex flex-wrap gap-2">
-                                                                        {analysis.stats.map(stat => {
-                                                                            let textClass = 'text-emerald-700';
-                                                                            if (stat.percentage < 50) textClass = 'text-rose-700';
-                                                                            else if (stat.percentage < 80) textClass = 'text-amber-700';
+                                                                                <tr key={s.name}>
+                                                                                    <td className="border p-1">{s.name}</td>
+                                                                                    <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                                </tr>
+                                                                            )
+                                                                        }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            {/* Level */}
+                                                            <div>
+                                                                <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Tingkat Kesulitan</p>
+                                                                <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                                    <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Level</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                                                                    <tbody>
+                                                                        {classLevelStats.length > 0 ? classLevelStats.map(s => {
+                                                                            let bgClass = '';
+                                                                            if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                            else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                            else bgClass = 'print-bg-red';
 
                                                                             return (
-                                                                                <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                                                                    <span className="font-semibold">{stat.name}:</span>
-                                                                                    <span className={`font-bold ${textClass}`}>
-                                                                                        {stat.percentage}%
-                                                                                    </span>
-                                                                                </span>
-                                                                            );
-                                                                        })}
-                                                                        {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
-                                                                    "{analysis.recommendation}"
-                                                                </td>
+                                                                                <tr key={s.name}>
+                                                                                    <td className="border p-1">{s.name}</td>
+                                                                                    <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                                </tr>
+                                                                            )
+                                                                        }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            {/* Jenis Soal */}
+                                                            <div>
+                                                                <p className="text-[10px] font-bold uppercase mb-2 text-slate-500">Persentase Jenis Soal</p>
+                                                                <table className="w-full border-collapse border border-slate-300 text-[10px]">
+                                                                    <thead className="bg-slate-100"><tr><th className="border p-1 text-left">Jenis</th><th className="border p-1 text-right w-16">Ketuntasan</th></tr></thead>
+                                                                    <tbody>
+                                                                        {classTypeStats.length > 0 ? classTypeStats.map(s => {
+                                                                            let bgClass = '';
+                                                                            if (s.percentage >= 80) bgClass = 'print-bg-green';
+                                                                            else if (s.percentage >= 50) bgClass = 'print-bg-orange';
+                                                                            else bgClass = 'print-bg-red';
+
+                                                                            return (
+                                                                                <tr key={s.type}>
+                                                                                    <td className="border p-1">{s.typeName}</td>
+                                                                                    <td className={`border p-1 text-right font-bold ${bgClass}`}>{s.percentage}%</td>
+                                                                                </tr>
+                                                                            )
+                                                                        }) : <tr><td colSpan={2} className="border p-1 italic text-center">Data tidak tersedia</td></tr>}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
+                                            {/* B. REKAPITULASI HASIL KELAS */}
+                                            <div className="mb-4">
+                                                <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">B. Rekapitulasi Hasil Kelas {className}</h4>
+                                                <div className="overflow-x-auto custom-scrollbar">
+                                                    <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
+                                                        <thead>
+                                                            <tr className="bg-slate-100">
+                                                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                                <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
+                                                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
+                                                                <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
+                                                                <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
                                                             </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
+                                                        </thead>
+                                                        <tbody>
+                                                            {classResults.map((r, index) => {
+                                                                const { score } = getCalculatedStats(r, exam);
+                                                                return (
+                                                                    <tr key={r.student.studentId} className="avoid-break">
+                                                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                                        <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
+                                                                        <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
+                                                                        <td className="border border-slate-300 p-1">
+                                                                            <div className="flex flex-wrap gap-0.5">
+                                                                                {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
+                                                                                    const status = checkAnswerStatus(q, r.answers);
+                                                                                    let bgClass = 'print-bg-gray'; 
+                                                                                    if (status === 'CORRECT') bgClass = 'print-bg-green';
+                                                                                    else if (status === 'WRONG') bgClass = 'print-bg-red';
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={q.id} className={`w-4 h-4 flex items-center justify-center text-[8px] font-bold border border-transparent ${bgClass}`}>
+                                                                                            {idx + 1}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {/* C. ANALISIS INDIVIDU KELAS */}
+                                            <div className="mb-4">
+                                                <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">C. Analisis Individu Kelas {className}</h4>
+                                                <div className="overflow-x-auto custom-scrollbar">
+                                                    <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
+                                                        <thead>
+                                                            <tr className="bg-slate-100">
+                                                                <th className="border border-slate-300 p-1 text-center w-8">No</th>
+                                                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
+                                                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
+                                                                <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
+                                                                <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {classResults.map((r, index) => {
+                                                                const analysis = analyzeStudentPerformance(exam, r);
+                                                                return (
+                                                                    <tr key={r.student.studentId} className="avoid-break">
+                                                                        <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
+                                                                        <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
+                                                                        <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
+                                                                        <td className="border border-slate-300 p-1">
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {analysis.stats.map(stat => {
+                                                                                    let textClass = 'text-emerald-700';
+                                                                                    if (stat.percentage < 50) textClass = 'text-rose-700';
+                                                                                    else if (stat.percentage < 80) textClass = 'text-amber-700';
+                                                                                    return (
+                                                                                        <span key={stat.name} className="inline-flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                                                            <span className="font-semibold">{stat.name}:</span>
+                                                                                            <span className={`font-bold ${textClass}`}>
+                                                                                                {stat.percentage}%
+                                                                                            </span>
+                                                                                        </span>
+                                                                                    );
+                                                                                })}
+                                                                                {analysis.stats.length === 0 && <span className="text-slate-400 italic">-</span>}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="border border-slate-300 p-1 font-medium italic text-slate-700">
+                                                                            "{analysis.recommendation}"
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
                                         </div>
+                                        <div className="page-break"></div>
                                     </div>
-                                </div>
-                                <div className="page-break"></div>
-                            </div>
-                        );
-                    })
-                ) : (
-                    <div className="mb-4 italic text-slate-500">Data kelas tidak tersedia.</div>
-                )}
+                                );
+                            })}
+                        </div>
+                    );
+                })}
 
                 {/* 3. ANALISIS BUTIR SOAL */}
                 <div className="mb-4">
