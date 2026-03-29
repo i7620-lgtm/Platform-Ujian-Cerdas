@@ -459,22 +459,38 @@ export const QuestionAnalysisItem: React.FC<{
 };
 
 const calculateTimeLeft = (exam: Exam) => {
-    const dateStr = exam.config.date.includes('T') ? exam.config.date.split('T')[0] : exam.config.date;
-    const examStartDateTime = new Date(`${dateStr}T${exam.config.startTime}`);
+    const dateStr = exam.config.startDate || exam.config.date;
+    const examStartDateTime = dateStr.includes('T') && dateStr.length > 10 ? new Date(dateStr) : new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
     const now = Date.now();
     
     if (now < examStartDateTime.getTime()) { return { status: 'UPCOMING', diff: examStartDateTime.getTime() - now }; }
     
-    if (exam.config.examMode === 'PR' || exam.config.timeLimit === 0) {
-        const endDateStr = exam.config.endDate || exam.config.date;
-        const endDateTime = endDateStr.includes('T') ? new Date(endDateStr) : new Date(`${endDateStr}T23:59:59`);
-        const timeLeft = Math.max(0, endDateTime.getTime() - now);
-        return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft, isUnlimited: true };
+    const endDateStr = exam.config.endDate;
+    let endDateTime: Date;
+    
+    if (exam.config.examMode === 'PR') {
+        if (endDateStr) {
+            endDateTime = new Date(`${endDateStr}T23:59:59`);
+        } else {
+            const fallbackDate = new Date(exam.config.date || new Date());
+            const localDateStr = fallbackDate.toLocaleDateString('en-CA');
+            endDateTime = new Date(`${localDateStr}T23:59:59`);
+        }
+    } else {
+        if (endDateStr) {
+            endDateTime = new Date(`${endDateStr}T23:59:59`);
+        } else {
+            if (exam.config.timeLimit > 0) {
+                endDateTime = new Date(examStartDateTime.getTime() + exam.config.timeLimit * 60000);
+            } else {
+                const localDateStr = examStartDateTime.toLocaleDateString('en-CA');
+                endDateTime = new Date(`${localDateStr}T23:59:59`);
+            }
+        }
     }
 
-    const examEndTime = examStartDateTime.getTime() + exam.config.timeLimit * 60 * 1000;
-    const timeLeft = Math.max(0, examEndTime - now);
-    return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft };
+    const timeLeft = Math.max(0, endDateTime.getTime() - now);
+    return { status: timeLeft === 0 ? 'FINISHED' : 'ONGOING', diff: timeLeft, isUnlimited: exam.config.examMode === 'PR' || exam.config.timeLimit === 0 };
 };
 
 export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({ exam, minimal = false }) => {
