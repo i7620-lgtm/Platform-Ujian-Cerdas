@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType } from "../../types";
-import { markdownToHtml } from "../teacher/examUtils";
+import { markdownToHtml, normalize } from "../teacher/examUtils";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -64,7 +64,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       items: { type: Type.STRING },
       description: "Opsi jawaban (hanya untuk PG/PG Kompleks)"
     },
-    correctAnswer: { type: Type.STRING, description: "Jawaban benar" },
+    correctAnswer: { type: Type.STRING, description: "Jawaban benar. WAJIB diisi untuk semua jenis soal kecuali INFO. Untuk PG/PG Kompleks, harus sama persis dengan teks di options." },
     explanation: { type: Type.STRING, description: "Penjelasan mengapa jawaban tersebut benar" },
     scoreWeight: { type: Type.NUMBER, description: "Bobot nilai soal" },
     trueFalseRows: {
@@ -159,13 +159,51 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         
         let correctAnswer = q.correctAnswer || '';
         if (mappedQuestionType === 'MULTIPLE_CHOICE') {
-            correctAnswer = markdownToHtml(correctAnswer);
+            // Find the option that matches the correct answer most closely
+            const normalizedCorrect = normalize(correctAnswer, mappedQuestionType);
+            const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedCorrect);
+            if (matchingOption) {
+                correctAnswer = matchingOption;
+            } else {
+                // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
+                const fallbackOption = options?.find(opt => 
+                    normalize(opt, mappedQuestionType).includes(normalizedCorrect) || 
+                    normalizedCorrect.includes(normalize(opt, mappedQuestionType))
+                );
+                if (fallbackOption) correctAnswer = fallbackOption;
+            }
         } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // Split by comma, trim, map to html, then JSON stringify
-            const answers = correctAnswer.split(',').map((a: string) => markdownToHtml(a.trim()));
-            correctAnswer = JSON.stringify(answers);
+            // Check if it's already a JSON array string
+            try {
+                let answers: string[] = [];
+                const parsed = JSON.parse(correctAnswer);
+                if (Array.isArray(parsed)) {
+                    answers = parsed.map((a: string) => a.trim());
+                } else {
+                    answers = correctAnswer.split(',').map((a: string) => a.trim());
+                }
+                
+                // Map each answer to the closest matching option
+                const mappedAnswers = answers.map(ans => {
+                    const normalizedAns = normalize(ans, mappedQuestionType);
+                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
+                    return matchingOption || markdownToHtml(ans);
+                });
+                
+                correctAnswer = JSON.stringify(mappedAnswers);
+            } catch {
+                const answers = correctAnswer.split(',').map((a: string) => a.trim());
+                const mappedAnswers = answers.map(ans => {
+                    const normalizedAns = normalize(ans, mappedQuestionType);
+                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
+                    return matchingOption || markdownToHtml(ans);
+                });
+                correctAnswer = JSON.stringify(mappedAnswers);
+            }
         } else if (mappedQuestionType === 'FILL_IN_THE_BLANK' || mappedQuestionType === 'ESSAY') {
-            correctAnswer = markdownToHtml(correctAnswer);
+            // Do not convert to HTML for fill in the blank or essay to preserve the raw text answer
+            correctAnswer = correctAnswer.trim();
         }
 
         const mappedQ: Question = {

@@ -6,10 +6,11 @@ import {
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon
+    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon
 } from '../Icons';
 import { compressImage, parseList, sanitizeHtml } from './examUtils';
 import { EXAM_TYPES } from './constants';
+import { generateQuestions } from '../services/gemini';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -428,7 +429,7 @@ const WysiwygEditor: React.FC<{
 };
 
 const createNewQuestion = (type: QuestionType): Question => {
-    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '' };
+    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1 };
     switch (type) {
         case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
     }
@@ -482,6 +483,38 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
     const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); 
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
+    const [isGeneratingId, setIsGeneratingId] = useState<string | null>(null);
+
+    const handleGenerateSingleQuestion = async (q: Question) => {
+        setIsGeneratingId(q.id);
+        try {
+            const aiConfig = {
+                subject: q.category || config.subject || 'Umum',
+                count: 1,
+                type: q.questionType === 'MULTIPLE_CHOICE' ? 'Pilihan Ganda' :
+                      q.questionType === 'COMPLEX_MULTIPLE_CHOICE' ? 'Pilihan Ganda Kompleks' :
+                      q.questionType === 'TRUE_FALSE' ? 'Benar/Salah' :
+                      q.questionType === 'MATCHING' ? 'Menjodohkan' :
+                      q.questionType === 'FILL_IN_THE_BLANK' ? 'Isian Singkat' : 'Esai',
+                difficulty: q.level || 'Sedang',
+                blueprint: q.kisiKisi || '',
+                includeImages: false
+            };
+            
+            const generatedQuestions = await generateQuestions(aiConfig);
+            if (generatedQuestions && generatedQuestions.length > 0) {
+                const newQ = generatedQuestions[0];
+                setQuestions(questions.map(question => 
+                    question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi, scoreWeight: newQ.scoreWeight || q.scoreWeight } : question
+                ));
+            }
+        } catch (error: unknown) {
+            alert(`Gagal membuat soal dengan AI: ${(error as Error).message}`);
+        } finally {
+            setIsGeneratingId(null);
+        }
+    };
+
     const questionsSectionRef = useRef<HTMLDivElement>(null);
     const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
     
@@ -662,7 +695,23 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                         return (
                             <React.Fragment key={q.id}>
                                 <div id={q.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-visible">
-                                     <div className="absolute top-4 right-4 flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
+                                     <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity z-20">
+                                         {q.questionType !== 'INFO' && (
+                                             <button 
+                                                 type="button" 
+                                                 onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
+                                                 disabled={isGeneratingId === q.id}
+                                                 className="flex items-center gap-1 p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm disabled:opacity-50" 
+                                                 title="Buat dengan AI"
+                                             >
+                                                 {isGeneratingId === q.id ? (
+                                                     <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                                 ) : (
+                                                     <SparklesIcon className="w-4 h-4" />
+                                                 )}
+                                                 <span className="text-[10px] font-bold uppercase tracking-wider">Buat dengan AI</span>
+                                             </button>
+                                         )}
                                          <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                                             <select value={q.questionType} onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)} className="appearance-none bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white dark:hover:bg-slate-600 hover:border-gray-300 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
                                                 <option value="MULTIPLE_CHOICE">Pilihan Ganda</option><option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option><option value="TRUE_FALSE">Benar / Salah</option><option value="MATCHING">Menjodohkan</option><option value="ESSAY">Esai / Uraian</option><option value="FILL_IN_THE_BLANK">Isian Singkat</option><option value="INFO">Info / Teks</option>

@@ -29,9 +29,9 @@ export const ResultNotFoundPage: React.FC<ResultNotFoundPageProps> = ({ onBack }
               Mengapa hal ini terjadi?
             </h3>
             <ul className="list-disc list-inside space-y-1 ml-1">
-              <li>Data ujian mungkin telah diarsipkan oleh Bapak/Ibu Guru.</li>
+              <li>Data ujian mungkin telah diarsipkan oleh Bapak/Ibu Guru untuk keperluan rekapitulasi nilai.</li>
               <li>Ada pembaruan data identitas (nama/kelas) di sistem.</li>
-              <li>Ujian telah dihapus untuk persiapan sesi baru.</li>
+              <li>Ujian telah ditutup untuk persiapan sesi pembelajaran baru.</li>
             </ul>
           </div>
 
@@ -48,7 +48,7 @@ export const ResultNotFoundPage: React.FC<ResultNotFoundPageProps> = ({ onBack }
               <UserIcon className="w-5 h-5" />
             </div>
             <p className="text-emerald-700 dark:text-emerald-400 font-medium">
-              Silakan hubungi Bapak/Ibu Guru pengampu mata pelajaran untuk mendapatkan salinan nilai atau sertifikat hasil ujianmu.
+              Silakan hubungi Bapak/Ibu Guru pengampu mata pelajaran untuk mendapatkan salinan nilai atau sertifikat hasil ujianmu. Terus semangat belajarnya!
             </p>
           </div>
         </div>
