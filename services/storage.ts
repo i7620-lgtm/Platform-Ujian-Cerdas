@@ -2043,7 +2043,43 @@ class StorageService {
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
       const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
       if (data && data.config) {
-          const newConfig = { ...data.config, timeLimit: (data.config.timeLimit || 0) + additionalMinutes };
+          const oldConfig = data.config as ExamConfig;
+          const newTimeLimit = (oldConfig.timeLimit || 0) + additionalMinutes;
+          
+          let newEndDate = oldConfig.endDate;
+          let newEndTime = oldConfig.endTime;
+
+          // If endDate is an ISO string, update it
+          if (oldConfig.endDate && oldConfig.endDate.includes('T')) {
+              const dateObj = new Date(oldConfig.endDate);
+              if (!isNaN(dateObj.getTime())) {
+                  dateObj.setMinutes(dateObj.getMinutes() + additionalMinutes);
+                  newEndDate = dateObj.toISOString();
+                  
+                  // Also update endTime string for UI consistency (HH:mm)
+                  // We use local time for the endTime string as it's usually displayed in local context
+                  const hours = dateObj.getHours().toString().padStart(2, '0');
+                  const mins = dateObj.getMinutes().toString().padStart(2, '0');
+                  newEndTime = `${hours}:${mins}`;
+              }
+          } else if (oldConfig.endTime) {
+              // Fallback if only endTime is set (as HH:mm)
+              // This is less reliable but better than nothing
+              const [h, m] = oldConfig.endTime.split(':').map(Number);
+              if (!isNaN(h) && !isNaN(m)) {
+                  const totalMins = h * 60 + m + additionalMinutes;
+                  const newH = Math.floor(totalMins / 60) % 24;
+                  const newM = totalMins % 60;
+                  newEndTime = `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+              }
+          }
+
+          const newConfig = { 
+              ...oldConfig, 
+              timeLimit: newTimeLimit,
+              endDate: newEndDate,
+              endTime: newEndTime
+          };
           await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
       }
   }
