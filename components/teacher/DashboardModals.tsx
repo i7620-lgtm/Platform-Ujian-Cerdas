@@ -106,7 +106,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             if (schoolCompare !== 0) return schoolCompare;
 
             // 2. Kelas
-            const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
+            const classA = a.student.class || '';
+            const classB = b.student.class || '';
+            const classCompare = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
             if (classCompare !== 0) return classCompare;
 
             // 3. Nomor Absen
@@ -930,7 +932,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         try {
             const data = await storageService.getResults(displayExam.code, undefined);
             
-            // SORTING LOGIC: Sort by School, then Class, then by Absent Number
+            // SORTING LOGIC: Sort by School, then Class, then by Absent Number (from ID)
             const sortedData = data.sort((a, b) => {
                 // 1. Nama Sekolah
                 const schoolA = a.student.schoolName || '';
@@ -941,8 +943,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                 // 2. Kelas
                 const classA = a.student.class || '';
                 const classB = b.student.class || '';
-                const classCompare = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
-                if (classCompare !== 0) return classCompare;
+                // Compare class alphanumerically (e.g. 1A, 1B, 2, 10)
+                const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+                if (c !== 0) return c;
 
                 // 3. Nomor Absen
                 const absA = parseInt(a.student.absentNumber) || 0;
