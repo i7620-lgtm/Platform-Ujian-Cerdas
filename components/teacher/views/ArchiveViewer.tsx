@@ -506,15 +506,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         
         // Sort results same as UI
         const sorted = [...results].sort((a, b) => {
+            // 1. Nama Sekolah
+            const schoolA = a.student.schoolName || '';
+            const schoolB = b.student.schoolName || '';
+            const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+            if (schoolCompare !== 0) return schoolCompare;
+
+            // 2. Kelas
             const classA = a.student.class || '';
             const classB = b.student.class || '';
-            const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
-            if (c !== 0) return c;
-            const getAbs = (id: string) => {
-                const parts = id.split('-');
-                return parseInt(parts[parts.length-1]) || 0;
-            }
-            return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+            const classCompare = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+            if (classCompare !== 0) return classCompare;
+
+            // 3. Nomor Absen
+            const absA = parseInt(a.student.absentNumber) || 0;
+            const absB = parseInt(b.student.absentNumber) || 0;
+            return absA - absB;
         });
 
         sorted.forEach((r, idx) => {
@@ -780,22 +787,26 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
     }, [archiveData]);
 
-    // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
+    // SORTING LOGIC: Sort by School, then Class, then by Absent Number
     const sortedResults = useMemo(() => {
         if (!archiveData) return [];
         return [...archiveData.results].sort((a, b) => {
+            // 1. Nama Sekolah
+            const schoolA = a.student.schoolName || '';
+            const schoolB = b.student.schoolName || '';
+            const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+            if (schoolCompare !== 0) return schoolCompare;
+
+            // 2. Kelas
             const classA = a.student.class || '';
             const classB = b.student.class || '';
-            // Compare class alphanumerically
-            const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
-            if (c !== 0) return c;
+            const classCompare = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
+            if (classCompare !== 0) return classCompare;
 
-            // Extract absent number from ID (last part)
-            const getAbs = (id: string) => {
-                const parts = id.split('-');
-                return parseInt(parts[parts.length-1]) || 0;
-            }
-            return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+            // 3. Nomor Absen
+            const absA = parseInt(a.student.absentNumber) || 0;
+            const absB = parseInt(b.student.absentNumber) || 0;
+            return absA - absB;
         });
     }, [archiveData]);
 
