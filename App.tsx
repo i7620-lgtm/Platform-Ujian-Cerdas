@@ -13,6 +13,7 @@ import { ProfileCompletionModal } from './components/teacher/ProfileCompletionMo
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
+import { supabase } from './lib/supabase';
 
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
 const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
@@ -90,6 +91,62 @@ const App: React.FC = () => {
     };
     checkSession();
   }, []);
+
+  useEffect(() => {
+    if ((view === 'STUDENT_EXAM' || view === 'STUDENT_RESULT') && currentStudent && currentStudent.resultId && currentStudent.class !== 'PREVIEW') {
+      const channel = supabase.channel(`student-result-${currentStudent.resultId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'results', filter: `id=eq.${currentStudent.resultId}` }, async (payload) => {
+            const newStudentName = payload.new.student_name;
+            const newClassName = payload.new.class_name;
+            const newStudentId = payload.new.student_id;
+            
+            if (newStudentName && newClassName && newStudentId) {
+                const [schoolName, className] = newClassName.includes('::') ? newClassName.split('::') : ['', newClassName];
+                const absentMatch = newStudentId.match(/%([^%]+)$/);
+                const absentNumber = absentMatch ? absentMatch[1] : '';
+
+                setCurrentStudent(prev => {
+                    if (!prev) return null;
+                    
+                    // Update localStorage so next login uses the updated data
+                    try {
+                        localStorage.setItem('saved_student_fullname', newStudentName.trim());
+                        localStorage.setItem('saved_student_class', className.trim());
+                        localStorage.setItem('saved_student_absent', absentNumber.trim());
+                        if (schoolName) localStorage.setItem('saved_student_school', schoolName.trim());
+                    } catch { /* ignore */ }
+
+                    return {
+                        ...prev,
+                        fullName: newStudentName,
+                        class: className,
+                        schoolName: schoolName,
+                        absentNumber: absentNumber,
+                        studentId: newStudentId
+                    };
+                });
+                
+                // Update studentResult if it exists
+                setStudentResult(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        student: {
+                            ...prev.student,
+                            fullName: newStudentName,
+                            class: className,
+                            schoolName: schoolName,
+                            absentNumber: absentNumber,
+                            studentId: newStudentId
+                        }
+                    };
+                });
+            }
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [view, currentStudent, currentExam?.code]);
 
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
