@@ -169,20 +169,47 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         return () => { if (channel) supabase.removeChannel(channel); clearInterval(pollInterval); };
     }, [exam.code, exam.config.disableRealtime]);
 
+    const isLoadedRef = useRef(false);
+    const prevStorageKeyRef = useRef(STORAGE_KEY);
+    const loadPromiseRef = useRef<Promise<void> | null>(null);
+
+    useEffect(() => {
+        if (prevStorageKeyRef.current !== STORAGE_KEY) {
+            const oldKey = prevStorageKeyRef.current;
+            const newKey = STORAGE_KEY;
+            prevStorageKeyRef.current = STORAGE_KEY;
+
+            const copyData = async () => {
+                if (loadPromiseRef.current) {
+                    await loadPromiseRef.current;
+                }
+                storageService.saveLocalProgress(newKey, { answers: answersRef.current, logs: logRef.current, lastUpdated: Date.now() });
+                storageService.clearLocalProgress(oldKey);
+            };
+            copyData();
+        }
+    }, [STORAGE_KEY]);
+
     useEffect(() => {
         const loadState = async () => {
-            try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
-            const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
-            if (localData) {
-                setAnswers(localData.answers || {});
-                answersRef.current = localData.answers || {};
-                if (localData.logs) logRef.current = localData.logs;
-                return;
-            }
-            if (initialData?.answers) {
-                setAnswers(initialData.answers);
-                answersRef.current = initialData.answers;
-            }
+            if (isLoadedRef.current) return;
+            isLoadedRef.current = true;
+            
+            loadPromiseRef.current = (async () => {
+                try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
+                const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
+                if (localData) {
+                    setAnswers(localData.answers || {});
+                    answersRef.current = localData.answers || {};
+                    if (localData.logs) logRef.current = localData.logs;
+                    return;
+                }
+                if (initialData?.answers) {
+                    setAnswers(initialData.answers);
+                    answersRef.current = initialData.answers;
+                }
+            })();
+            await loadPromiseRef.current;
         };
         loadState();
     }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam]);
