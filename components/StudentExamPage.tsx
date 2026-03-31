@@ -6,6 +6,47 @@ import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { parseList, sanitizeHtml, calculateExamScore } from './teacher/examUtils';
 import { AudioPlayer } from './AudioPlayer';
+import { ChartRenderer } from './ChartRenderer';
+import type { ChartData } from '../types';
+
+const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefined, optimizeHtml: (h: string) => string) => {
+    const optimized = optimizeHtml(html);
+    if (!chartData) {
+        return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
+    }
+
+    const parts = optimized.split(/<(?:div|span)[^>]*data-chart="true"[^>]*>.*?<\/(?:div|span)>/i);
+
+    if (parts.length === 1) {
+        return (
+            <>
+                <div dangerouslySetInnerHTML={{ __html: optimized }}></div>
+                <div className="mb-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="h-[300px] w-full">
+                        <ChartRenderer data={chartData} />
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    return (
+        <>
+            {parts.map((part, index) => (
+                <React.Fragment key={index}>
+                    <div dangerouslySetInnerHTML={{ __html: part }}></div>
+                    {index < parts.length - 1 && (
+                        <div className="my-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <div className="h-[300px] w-full">
+                                <ChartRenderer data={chartData} />
+                            </div>
+                        </div>
+                    )}
+                </React.Fragment>
+            ))}
+        </>
+    );
+};
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -559,7 +600,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             </div>
                                         )}
                                         <div className="prose prose-slate dark:prose-invert max-w-none font-medium leading-relaxed mb-6">
-                                            <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
+                                            {renderQuestionTextWithChart(q.questionText, q.chartData, optimizeHtml)}
                                         </div>
 
                                         <div className="space-y-4">
