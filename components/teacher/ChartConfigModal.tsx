@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useEffect } from 'react';
 import { ChartData } from '../../types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon } from '../Icons';
