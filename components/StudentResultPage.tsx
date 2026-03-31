@@ -5,6 +5,47 @@ import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIco
 import { storageService } from '../services/storage';
 import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize } from './teacher/examUtils';
 import { QRCodeCanvas } from 'qrcode.react';
+import { ChartRenderer } from './ChartRenderer';
+import type { ChartData } from '../types';
+
+const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefined) => {
+    const sanitized = sanitizeHtml(html);
+    if (!chartData) {
+        return <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>;
+    }
+
+    const parts = sanitized.split(/<(?:div|span)[^>]*data-chart="true"[^>]*>.*?<\/(?:div|span)>/i);
+
+    if (parts.length === 1) {
+        return (
+            <>
+                <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
+                <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="h-[250px] w-full">
+                        <ChartRenderer data={chartData} />
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    return (
+        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+            {parts.map((part, index) => (
+                <React.Fragment key={index}>
+                    <div dangerouslySetInnerHTML={{ __html: part }}></div>
+                    {index < parts.length - 1 && (
+                        <div className="my-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <div className="h-[250px] w-full">
+                                <ChartRenderer data={chartData} />
+                            </div>
+                        </div>
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+};
 
 interface StudentResultPageProps {
   result: Result;
@@ -446,7 +487,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Soal {idx + 1}</span>
                                                             <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{__html: sanitizeHtml(q.questionText)}}></div>
+                                                        {renderQuestionTextWithChart(q.questionText, q.chartData)}
+                                                        
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
