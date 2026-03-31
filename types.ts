@@ -10,6 +10,18 @@ export interface QuizConfig {
   includeImages: boolean;
 }
 
+export interface ChartData {
+  type: 'bar' | 'line' | 'pie';
+  title?: string;
+  labels: string[];
+  datasets: {
+    label: string;
+    data: number[];
+    backgroundColor?: string[];
+    borderColor?: string[];
+  }[];
+}
+
 export interface Question {
   id: string;
   questionText: string;
@@ -19,6 +31,7 @@ export interface Question {
   imageUrl?: string; 
   audioUrl?: string; // URL Audio
   optionImages?: (string | null)[];
+  chartData?: ChartData; // NEW: Data untuk diagram (batang, garis, lingkaran)
   
   // Metadata Baru
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
