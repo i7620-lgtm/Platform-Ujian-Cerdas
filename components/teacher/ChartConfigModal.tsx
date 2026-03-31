@@ -101,7 +101,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as any)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-transparent dark:text-white"
+                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-900 dark:text-white"
               >
                 <option value="bar">Diagram Batang (Bar)</option>
                 <option value="line">Diagram Garis (Line)</option>
@@ -116,14 +116,14 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <div className="space-x-2">
                 <button
                   onClick={handleAddLabel}
-                  className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"
+                  className="px-3 py-1 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded-lg text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors flex items-center gap-1 border border-transparent dark:border-blue-500/30"
                 >
                   <PlusCircleIcon className="w-4 h-4" /> Tambah Label
                 </button>
                 {type !== 'pie' && (
                   <button
                     onClick={handleAddDataset}
-                    className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center gap-1"
+                    className="px-3 py-1 bg-green-50 dark:bg-green-500/20 text-green-600 dark:text-green-300 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-500/30 transition-colors flex items-center gap-1 border border-transparent dark:border-green-500/30"
                   >
                     <PlusCircleIcon className="w-4 h-4" /> Tambah Dataset
                   </button>
