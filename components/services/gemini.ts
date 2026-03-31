@@ -31,6 +31,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
+    - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), isi field 'chartData' dengan data yang sesuai.
     - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
@@ -91,6 +93,27 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       },
       description: "Pasangan untuk soal Menjodohkan"
     },
+    chartData: {
+      type: Type.OBJECT,
+      properties: {
+        type: { type: Type.STRING, enum: ["bar", "line", "pie"] },
+        title: { type: Type.STRING },
+        labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+        datasets: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              label: { type: Type.STRING },
+              data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+            },
+            required: ["label", "data"]
+          }
+        }
+      },
+      required: ["type", "labels", "datasets"],
+      description: "Data untuk membuat diagram (batang, garis, atau lingkaran)"
+    },
     ...(config.includeImages ? {
       imageSearchKeyword: { 
         type: Type.STRING, 
@@ -135,6 +158,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       correctAnswer?: string;
       trueFalseRows?: { text: string; answer: boolean }[];
       matchingPairs?: { left: string; right: string }[];
+      chartData?: any;
       scoreWeight?: number;
       imageSearchKeyword?: string;
     }[] = JSON.parse(response.text || "[]");
@@ -215,7 +239,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             scoreWeight: q.scoreWeight || 1,
             kisiKisi: config.blueprint,
             level: config.difficulty,
-            category: config.subject
+            category: config.subject,
+            chartData: q.chartData
         };
         
         // Handle true false rows if needed
