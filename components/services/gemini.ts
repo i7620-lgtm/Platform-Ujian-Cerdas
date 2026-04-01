@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Question, QuizConfig, QuestionType } from "../../types";
+import { Question, QuizConfig, QuestionType, ChartData } from "../../types";
 import { markdownToHtml, normalize } from "../teacher/examUtils";
 
 let aiInstance: GoogleGenAI | null = null;
@@ -158,7 +158,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       correctAnswer?: string;
       trueFalseRows?: { text: string; answer: boolean }[];
       matchingPairs?: { left: string; right: string }[];
-      chartData?: any;
+      chartData?: ChartData;
       scoreWeight?: number;
       imageSearchKeyword?: string;
     }[] = JSON.parse(response.text || "[]");
