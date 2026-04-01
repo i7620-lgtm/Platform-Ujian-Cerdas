@@ -27,6 +27,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
 
   useEffect(() => {
     if (initialData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setType(initialData.type);
       setTitle(initialData.title || '');
       setLabels(initialData.labels);
@@ -92,7 +93,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-transparent dark:text-white"
+                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white dark:placeholder-slate-400"
                 placeholder="Contoh: Penjualan Bulanan"
               />
             </div>
@@ -100,8 +101,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Jenis Diagram</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as any)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-900 dark:text-white"
+                onChange={(e) => setType(e.target.value as 'bar' | 'line' | 'pie')}
+                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
               >
                 <option value="bar">Diagram Batang (Bar)</option>
                 <option value="line">Diagram Garis (Line)</option>
@@ -116,14 +117,14 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <div className="space-x-2">
                 <button
                   onClick={handleAddLabel}
-                  className="px-3 py-1 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded-lg text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors flex items-center gap-1 border border-transparent dark:border-blue-500/30"
+                  className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-600 dark:text-white rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors flex items-center gap-1 inline-flex"
                 >
                   <PlusCircleIcon className="w-4 h-4" /> Tambah Label
                 </button>
                 {type !== 'pie' && (
                   <button
                     onClick={handleAddDataset}
-                    className="px-3 py-1 bg-green-50 dark:bg-green-500/20 text-green-600 dark:text-green-300 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-500/30 transition-colors flex items-center gap-1 border border-transparent dark:border-green-500/30"
+                    className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-600 dark:text-white rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-700 transition-colors flex items-center gap-1 inline-flex"
                   >
                     <PlusCircleIcon className="w-4 h-4" /> Tambah Dataset
                   </button>
@@ -147,7 +148,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                               newDatasets[i].label = e.target.value;
                               setDatasets(newDatasets);
                             }}
-                            className="bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none w-24 dark:text-white"
+                            className="border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none w-24 bg-transparent dark:text-white"
                           />
                           {datasets.length > 1 && (
                             <button onClick={() => handleDeleteDataset(i)} className="text-red-500 hover:text-red-700">
@@ -172,7 +173,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                             newLabels[labelIdx] = e.target.value;
                             setLabels(newLabels);
                           }}
-                          className="w-full bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none dark:text-white"
+                          className="w-full border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none bg-transparent dark:text-white"
                         />
                       </td>
                       {datasets.map((dataset, datasetIdx) => (
@@ -185,7 +186,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                               newDatasets[datasetIdx].data[labelIdx] = Number(e.target.value);
                               setDatasets(newDatasets);
                             }}
-                            className="w-full p-1 border dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-transparent dark:text-white"
+                            className="w-full p-1 border dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
                           />
                         </td>
                       ))}
