@@ -31,7 +31,9 @@ export interface Question {
   imageUrl?: string; 
   audioUrl?: string; // URL Audio
   optionImages?: (string | null)[];
-  chartData?: ChartData; // NEW: Data untuk diagram (batang, garis, lingkaran)
+  chartData?: ChartData; 
+  optionCharts?: (ChartData | null)[];
+  correctAnswerChart?: ChartData;
   
   // Metadata Baru
   category?: string; // e.g., "Teks Prosedur", "Aljabar"
@@ -42,11 +44,14 @@ export interface Question {
   matchingPairs?: {
     left: string;
     right: string; 
+    leftChart?: ChartData;
+    rightChart?: ChartData;
   }[];
 
   trueFalseRows?: {
     text: string;
     answer: boolean; 
+    chartData?: ChartData;
   }[];
 }
 
