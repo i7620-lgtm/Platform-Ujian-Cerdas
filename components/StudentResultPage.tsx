@@ -14,9 +14,11 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
         return <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>;
     }
 
-    const parts = sanitized.split(/<(?:div|span)[^>]*data-chart="true"[^>]*>.*?<\/(?:div|span)>/i);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized, 'text/html');
+    const chartNode = doc.querySelector('[data-chart="true"]');
 
-    if (parts.length === 1) {
+    if (!chartNode) {
         return (
             <>
                 <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
@@ -28,6 +30,13 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
             </>
         );
     }
+
+    const marker = '___CHART_MARKER___';
+    chartNode.insertAdjacentText('beforebegin', marker);
+    chartNode.remove();
+    
+    const newHtml = doc.body.innerHTML;
+    const parts = newHtml.split(marker);
 
     return (
         <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
@@ -345,7 +354,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
                                 {/* QR CODE SECTION */}
                                 <div className="lg:col-span-3 flex flex-col items-center justify-center p-5 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                    <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 mb-3">
+                                    <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-3">
                                         <QRCodeCanvas 
                                             value={`${window.location.origin}/result/${exam.code}/${encodeURIComponent(result.student.studentId)}`}
                                             size={160}
