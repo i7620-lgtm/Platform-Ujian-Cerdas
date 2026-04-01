@@ -15,9 +15,11 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
         return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
     }
 
-    const parts = optimized.split(/<(?:div|span)[^>]*data-chart="true"[^>]*>.*?<\/(?:div|span)>/i);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(optimized, 'text/html');
+    const chartNode = doc.querySelector('[data-chart="true"]');
 
-    if (parts.length === 1) {
+    if (!chartNode) {
         return (
             <>
                 <div dangerouslySetInnerHTML={{ __html: optimized }}></div>
@@ -29,6 +31,13 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
             </>
         );
     }
+
+    const marker = '___CHART_MARKER___';
+    chartNode.insertAdjacentText('beforebegin', marker);
+    chartNode.remove();
+    
+    const newHtml = doc.body.innerHTML;
+    const parts = newHtml.split(marker);
 
     return (
         <>
@@ -161,6 +170,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
+        let resultChannel: ReturnType<typeof supabase.channel> | null = null;
         if (!exam.config.disableRealtime) {
             channel = supabase.channel(`exam-room-${exam.code}`)
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
@@ -173,9 +183,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     }
                 })
                 .subscribe();
+
+            if (student.resultId) {
+                resultChannel = supabase.channel(`student-result-${student.resultId}`)
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'results', filter: `id=eq.${student.resultId}` }, (payload) => {
+                        const newStatus = payload.new.status;
+                        if ((newStatus === 'completed' || newStatus === 'force_closed') && !isSubmittingRef.current && student.class !== 'PREVIEW') {
+                            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                            handleSubmit(true, newStatus);
+                        }
+                    })
+                    .subscribe();
+            }
         }
-        return () => { if (channel) supabase.removeChannel(channel); };
-    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, handleSubmit]);
+        return () => { 
+            if (channel) supabase.removeChannel(channel); 
+            if (resultChannel) supabase.removeChannel(resultChannel);
+        };
+    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, student.resultId, handleSubmit]);
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -204,11 +229,20 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         return { ...prev, config: data.config };
                     });
                 }
+                
+                // Also poll result status in case realtime is disabled or missed
+                if (student.resultId && student.class !== 'PREVIEW') {
+                    const { data: resultData } = await supabase.from('results').select('status').eq('id', student.resultId).single();
+                    if (resultData && (resultData.status === 'completed' || resultData.status === 'force_closed') && !isSubmittingRef.current) {
+                        alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                        handleSubmit(true, resultData.status);
+                    }
+                }
             } catch { /* ignore */ }
         }, 15000);
 
         return () => { if (channel) supabase.removeChannel(channel); clearInterval(pollInterval); };
-    }, [exam.code, exam.config.disableRealtime]);
+    }, [exam.code, exam.config.disableRealtime, student.resultId, student.class, handleSubmit]);
 
     const isLoadedRef = useRef(false);
     const prevStorageKeyRef = useRef(STORAGE_KEY);
