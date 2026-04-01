@@ -1,4 +1,4 @@
- 
+
 import React from 'react';
 import {
   BarChart,
@@ -28,7 +28,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
 
   // Transform data for Recharts
   const chartData = labels.map((label, index) => {
-    const entry: any = { name: label };
+    const entry: Record<string, string | number> = { name: label };
     datasets.forEach(dataset => {
       entry[dataset.label] = dataset.data[index];
     });
@@ -76,7 +76,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
             </LineChart>
           </ResponsiveContainer>
         );
-      case 'pie':
+      case 'pie': {
         // Pie chart usually takes one dataset
         const pieData = labels.map((label, index) => ({
           name: label,
@@ -104,15 +104,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
             </PieChart>
           </ResponsiveContainer>
         );
+      }
       default:
         return null;
     }
   };
 
   return (
-    <div className="my-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-      {title && <h3 className="text-center font-bold mb-4 text-gray-700">{title}</h3>}
-      {renderChart()}
+    <div className="w-full h-full flex flex-col">
+      {title && <h3 className="text-center font-bold mb-4 text-gray-700 dark:text-slate-200">{title}</h3>}
+      <div className="flex-1 min-h-0">
+        {renderChart()}
+      </div>
     </div>
   );
 };
