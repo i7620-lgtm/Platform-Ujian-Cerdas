@@ -1712,12 +1712,26 @@ class StorageService {
         try {
             // Fetch existing result to preserve manual grades
             let existingAnswers: Record<string, string> = {};
+            let existingStatus: string | undefined;
+            let existingLog: string[] = [];
             if (resultPayload.student.resultId) {
-                const { data: existingResult } = await supabase.from('results').select('answers').eq('id', resultPayload.student.resultId).single();
-                if (existingResult && existingResult.answers) {
-                    existingAnswers = existingResult.answers as Record<string, string>;
+                const { data: existingResult } = await supabase.from('results').select('answers, status, activity_log').eq('id', resultPayload.student.resultId).single();
+                if (existingResult) {
+                    if (existingResult.answers) existingAnswers = existingResult.answers as Record<string, string>;
+                    existingStatus = existingResult.status;
+                    if (existingResult.activity_log) existingLog = existingResult.activity_log as string[];
                 }
             }
+
+            // If the exam was already completed/force_closed by teacher, and this is just an auto-save (in_progress), reject it
+            if ((existingStatus === 'completed' || existingStatus === 'force_closed') && resultPayload.status === 'in_progress') {
+                console.warn("Exam already finished by teacher. Ignoring auto-save.");
+                return { ...resultPayload, status: existingStatus as ResultStatus };
+            }
+
+            // Merge activity logs to preserve teacher's force stop logs
+            const mergedLogs = Array.from(new Set([...existingLog, ...(resultPayload.activityLog || [])]));
+            resultPayload.activityLog = mergedLogs;
 
             // Merge answers, preserving manual grades
             const mergedAnswers = { ...resultPayload.answers };
