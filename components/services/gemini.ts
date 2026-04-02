@@ -39,8 +39,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi soal yang harus dijawab oleh siswa.
     
     ATURAN JENIS SOAL:
-    - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi).
-    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi).
+    - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi). PENTING: Acak posisi jawaban yang benar agar tidak selalu berada di opsi pertama (A).
+    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi). Acak posisi jawaban yang benar.
     - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
     - Esai: Wajib isi 'correctAnswer' dengan jawaban yang diharapkan.
     - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
@@ -49,6 +49,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     RESPON:
     - Berikan respon dalam format JSON array.
     - Pastikan JSON valid dan sesuai dengan schema yang diminta.
+    - WAJIB mengisi field 'correctAnswer' untuk semua jenis soal kecuali INFO.
   `;
 
   const prompt = `
@@ -200,7 +201,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         let correctAnswer = q.correctAnswer || '';
         if (mappedQuestionType === 'MULTIPLE_CHOICE') {
             // Find the option that matches the correct answer most closely
-            const normalizedCorrect = normalize(correctAnswer, mappedQuestionType);
+            const htmlCorrectAnswer = markdownToHtml(correctAnswer);
+            const normalizedCorrect = normalize(htmlCorrectAnswer, mappedQuestionType);
             const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedCorrect);
             if (matchingOption) {
                 correctAnswer = matchingOption;
@@ -211,6 +213,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                     normalizedCorrect.includes(normalize(opt, mappedQuestionType))
                 );
                 if (fallbackOption) correctAnswer = fallbackOption;
+                else correctAnswer = htmlCorrectAnswer; // Use HTML if no match
             }
         } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // Split by comma, trim, map to html, then JSON stringify
@@ -226,18 +229,20 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 
                 // Map each answer to the closest matching option
                 const mappedAnswers = answers.map(ans => {
-                    const normalizedAns = normalize(ans, mappedQuestionType);
+                    const htmlAns = markdownToHtml(ans);
+                    const normalizedAns = normalize(htmlAns, mappedQuestionType);
                     const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || markdownToHtml(ans);
+                    return matchingOption || htmlAns;
                 });
                 
                 correctAnswer = JSON.stringify(mappedAnswers);
             } catch {
                 const answers = correctAnswer.split(',').map((a: string) => a.trim());
                 const mappedAnswers = answers.map(ans => {
-                    const normalizedAns = normalize(ans, mappedQuestionType);
+                    const htmlAns = markdownToHtml(ans);
+                    const normalizedAns = normalize(htmlAns, mappedQuestionType);
                     const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || markdownToHtml(ans);
+                    return matchingOption || htmlAns;
                 });
                 correctAnswer = JSON.stringify(mappedAnswers);
             }
