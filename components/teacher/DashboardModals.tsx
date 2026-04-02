@@ -4,7 +4,7 @@ import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIc
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
-import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance } from './examUtils';
+import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; isReadOnly?: boolean; }
@@ -228,30 +228,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             const studentAnswer = r.answers[q.id];
             if (!studentAnswer) return;
 
-            const normalize = (str: unknown, qType: string) => {
-                const s = String(str || '');
-                if (qType === 'FILL_IN_THE_BLANK') {
-                    return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-                }
-                try {
-                    const div = document.createElement('div');
-                    div.innerHTML = s;
-                    
-                    // Remove math-visual wrappers to compare actual content
-                    div.querySelectorAll('.math-visual').forEach(el => {
-                        while (el.firstChild) {
-                            el.parentNode?.insertBefore(el.firstChild, el);
-                        }
-                        el.parentNode?.removeChild(el);
-                    });
-
-                    // Standardize HTML by removing whitespace between tags and trimming
-                    return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-                } catch {
-                    return s.trim().replace(/\s+/g, ' ');
-                }
-            };
-
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                  if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
             } 
@@ -266,6 +242,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 try {
                     const ansObj = JSON.parse(studentAnswer);
                     const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                        if (ansObj[idx] === undefined) return false;
                         return ansObj[idx] === row.answer;
                     });
                     if (allCorrect) correctCount++;
@@ -275,7 +252,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 try {
                     const ansObj = JSON.parse(studentAnswer);
                     const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                        return ansObj[idx] === pair.right;
+                        if (ansObj[idx] === undefined) return false;
+                        return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
                     });
                     if (allCorrect) correctCount++;
                 } catch { /* ignore */ }
