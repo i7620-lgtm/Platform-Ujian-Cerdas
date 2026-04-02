@@ -124,14 +124,20 @@ export const QuestionAnalysisItem: React.FC<{
         if (q.questionType === 'TRUE_FALSE') {
             try {
                 const ansObj = JSON.parse(ans);
-                return q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                return q.trueFalseRows?.every((row, idx) => {
+                    if (ansObj[idx] === undefined) return false;
+                    return ansObj[idx] === row.answer;
+                }) ?? false;
             } catch { return false; }
         }
 
         if (q.questionType === 'MATCHING') {
             try {
                 const ansObj = JSON.parse(ans);
-                return q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                return q.matchingPairs?.every((pair, idx) => {
+                    if (ansObj[idx] === undefined) return false;
+                    return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                }) ?? false;
             } catch { return false; }
         }
 
@@ -252,6 +258,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                     } else {
                                                                         newKeys = currentlyCheckedOptions.filter(o => o !== opt);
                                                                     }
+                                                                    newKeys.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                                     setTempKey(JSON.stringify(newKeys));
                                                                 }}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
