@@ -416,6 +416,16 @@ export const QuestionAnalysisItem: React.FC<{
                                             </div> :
                                         q.questionType === 'MATCHING' && q.matchingPairs ?
                                             q.matchingPairs.map(p => `${p.left}→${p.right}`).join(', ') :
+                                        q.questionType === 'COMPLEX_MULTIPLE_CHOICE' ?
+                                            (() => {
+                                                try {
+                                                    const parsed = JSON.parse(q.correctAnswer || '[]');
+                                                    parsed.sort((a: string, b: string) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                                    return <span dangerouslySetInnerHTML={{__html: parsed.join(', ')}}></span>;
+                                                } catch {
+                                                    return <span dangerouslySetInnerHTML={{__html: q.correctAnswer || ''}}></span>;
+                                                }
+                                            })() :
                                             <span dangerouslySetInnerHTML={{__html: q.correctAnswer || ''}}></span>
                                         }
                                     </div>
@@ -436,6 +446,9 @@ export const QuestionAnalysisItem: React.FC<{
                                                 displayAns = Object.entries(parsed).map(([,v]) => `${v}`).join(', ');
                                             } else if (ans.startsWith('[')) {
                                                 const parsed = JSON.parse(ans);
+                                                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                                    parsed.sort((a: string, b: string) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                                }
                                                 displayAns = parsed.map((p: string) => p.replace(/<[^>]*>?/gm, '')).join(', ');
                                             }
                                         } catch { /* ignore */ }
