@@ -274,14 +274,64 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
                 const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
                 if (localData) {
-                    setAnswers(localData.answers || {});
-                    answersRef.current = localData.answers || {};
+                    const loadedAnswers = localData.answers || {};
+                    // Fix sorting for old data
+                    Object.keys(loadedAnswers).forEach(qId => {
+                        const q = activeExam.questions.find(q => q.id === qId);
+                        if (q) {
+                            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (Array.isArray(parsed)) {
+                                        parsed.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                        loadedAnswers[qId] = JSON.stringify(parsed);
+                                    }
+                                } catch { /* ignore */ }
+                            } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                        const sortedObj: Record<number, any> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                        loadedAnswers[qId] = JSON.stringify(sortedObj);
+                                    }
+                                } catch { /* ignore */ }
+                            }
+                        }
+                    });
+                    setAnswers(loadedAnswers);
+                    answersRef.current = loadedAnswers;
                     if (localData.logs) logRef.current = localData.logs;
                     return;
                 }
                 if (initialData?.answers) {
-                    setAnswers(initialData.answers);
-                    answersRef.current = initialData.answers;
+                    const loadedAnswers = { ...initialData.answers };
+                    // Fix sorting for old data
+                    Object.keys(loadedAnswers).forEach(qId => {
+                        const q = activeExam.questions.find(q => q.id === qId);
+                        if (q) {
+                            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (Array.isArray(parsed)) {
+                                        parsed.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                        loadedAnswers[qId] = JSON.stringify(parsed);
+                                    }
+                                } catch { /* ignore */ }
+                            } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                        const sortedObj: Record<number, any> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                        loadedAnswers[qId] = JSON.stringify(sortedObj);
+                                    }
+                                } catch { /* ignore */ }
+                            }
+                        }
+                    });
+                    setAnswers(loadedAnswers);
+                    answersRef.current = loadedAnswers;
                 }
             })();
             await loadPromiseRef.current;
