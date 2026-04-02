@@ -32,7 +32,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
     - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel.
-    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), isi field 'chartData' dengan data yang sesuai.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), isi field 'chartData' pada tingkat soal. Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
     - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
@@ -58,6 +58,28 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     PENTING: Pastikan urutan soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal.
   `;
 
+  const chartDataSchema = {
+    type: Type.OBJECT,
+    properties: {
+      type: { type: Type.STRING, enum: ["bar", "line", "pie"] },
+      title: { type: Type.STRING },
+      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+      datasets: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            label: { type: Type.STRING },
+            data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+          },
+          required: ["label", "data"]
+        }
+      }
+    },
+    required: ["type", "labels", "datasets"],
+    description: "Data untuk membuat diagram (batang, garis, atau lingkaran)"
+  };
+
   const properties = {
     id: { type: Type.STRING, description: "ID unik untuk soal" },
     questionText: { type: Type.STRING, description: "Teks pertanyaan dalam format Markdown" },
@@ -66,7 +88,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       items: { type: Type.STRING },
       description: "Opsi jawaban (hanya untuk PG/PG Kompleks)"
     },
+    optionCharts: {
+      type: Type.ARRAY,
+      items: chartDataSchema,
+      description: "Data diagram untuk setiap opsi jawaban (opsional, urutan harus sesuai dengan options)"
+    },
     correctAnswer: { type: Type.STRING, description: "Jawaban benar. WAJIB diisi untuk semua jenis soal kecuali INFO. Untuk PG/PG Kompleks, harus sama persis dengan teks di options." },
+    correctAnswerChart: {
+      ...chartDataSchema,
+      description: "Data diagram untuk jawaban benar (opsional, berguna untuk soal isian/esai)"
+    },
     explanation: { type: Type.STRING, description: "Penjelasan mengapa jawaban tersebut benar" },
     scoreWeight: { type: Type.NUMBER, description: "Bobot nilai soal" },
     trueFalseRows: {
@@ -75,7 +106,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         type: Type.OBJECT,
         properties: {
           text: { type: Type.STRING },
-          answer: { type: Type.BOOLEAN }
+          answer: { type: Type.BOOLEAN },
+          chartData: chartDataSchema
         },
         required: ["text", "answer"]
       },
@@ -87,33 +119,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         type: Type.OBJECT,
         properties: {
           left: { type: Type.STRING },
-          right: { type: Type.STRING }
+          right: { type: Type.STRING },
+          leftChart: chartDataSchema,
+          rightChart: chartDataSchema
         },
         required: ["left", "right"]
       },
       description: "Pasangan untuk soal Menjodohkan"
     },
-    chartData: {
-      type: Type.OBJECT,
-      properties: {
-        type: { type: Type.STRING, enum: ["bar", "line", "pie"] },
-        title: { type: Type.STRING },
-        labels: { type: Type.ARRAY, items: { type: Type.STRING } },
-        datasets: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              label: { type: Type.STRING },
-              data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
-            },
-            required: ["label", "data"]
-          }
-        }
-      },
-      required: ["type", "labels", "datasets"],
-      description: "Data untuk membuat diagram (batang, garis, atau lingkaran)"
-    },
+    chartData: chartDataSchema,
     ...(config.includeImages ? {
       imageSearchKeyword: { 
         type: Type.STRING, 
@@ -155,9 +169,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       id: string;
       questionText: string;
       options?: string[];
+      optionCharts?: (ChartData | null)[];
       correctAnswer?: string;
-      trueFalseRows?: { text: string; answer: boolean }[];
-      matchingPairs?: { left: string; right: string }[];
+      correctAnswerChart?: ChartData;
+      trueFalseRows?: { text: string; answer: boolean; chartData?: ChartData }[];
+      matchingPairs?: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }[];
       chartData?: ChartData;
       scoreWeight?: number;
       imageSearchKeyword?: string;
@@ -235,7 +251,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             questionText: questionText,
             questionType: mappedQuestionType,
             options: options,
+            optionCharts: q.optionCharts,
             correctAnswer: correctAnswer,
+            correctAnswerChart: q.correctAnswerChart,
             scoreWeight: q.scoreWeight || 1,
             kisiKisi: config.blueprint,
             level: config.difficulty,
@@ -246,9 +264,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle true false rows if needed
         if (mappedQuestionType === 'TRUE_FALSE') {
             if (q.trueFalseRows && q.trueFalseRows.length > 0) {
-                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: boolean }) => ({
+                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: boolean; chartData?: ChartData }) => ({
                     text: markdownToHtml(r.text || ''),
-                    answer: r.answer
+                    answer: r.answer,
+                    chartData: r.chartData
                 }));
             } else if (q.options) {
                 mappedQ.trueFalseRows = [
@@ -260,9 +279,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle matching pairs if needed
         if (mappedQuestionType === 'MATCHING') {
             if (q.matchingPairs && q.matchingPairs.length > 0) {
-                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({
+                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
                     left: markdownToHtml(p.left || ''),
-                    right: markdownToHtml(p.right || '')
+                    right: markdownToHtml(p.right || ''),
+                    leftChart: p.leftChart,
+                    rightChart: p.rightChart
                 }));
             } else {
                 mappedQ.matchingPairs = [
