@@ -203,17 +203,35 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             // Find the option that matches the correct answer most closely
             const htmlCorrectAnswer = markdownToHtml(correctAnswer);
             const normalizedCorrect = normalize(htmlCorrectAnswer, mappedQuestionType);
-            const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedCorrect);
+            
+            // Helper to strip A., B., etc.
+            const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
+            const strippedCorrect = stripPrefix(normalizedCorrect);
+
+            const matchingOption = options?.find(opt => {
+                const normOpt = normalize(opt, mappedQuestionType);
+                return normOpt === normalizedCorrect || stripPrefix(normOpt) === strippedCorrect;
+            });
+
             if (matchingOption) {
                 correctAnswer = matchingOption;
             } else {
-                // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
-                const fallbackOption = options?.find(opt => 
-                    normalize(opt, mappedQuestionType).includes(normalizedCorrect) || 
-                    normalizedCorrect.includes(normalize(opt, mappedQuestionType))
-                );
-                if (fallbackOption) correctAnswer = fallbackOption;
-                else correctAnswer = htmlCorrectAnswer; // Use HTML if no match
+                // Check if correctAnswer is just a letter A, B, C, D, E or "Jawaban A"
+                const letterMatch = correctAnswer.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                if (letterMatch && options) {
+                    const index = letterMatch[1].charCodeAt(0) - 65;
+                    if (index >= 0 && index < options.length) {
+                        correctAnswer = options[index];
+                    }
+                } else {
+                    // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
+                    const fallbackOption = options?.find(opt => {
+                        const normOpt = normalize(opt, mappedQuestionType);
+                        return normOpt.includes(strippedCorrect) || strippedCorrect.includes(normOpt);
+                    });
+                    if (fallbackOption) correctAnswer = fallbackOption;
+                    else correctAnswer = htmlCorrectAnswer; // Use HTML if no match
+                }
             }
         } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // Split by comma, trim, map to html, then JSON stringify
@@ -231,8 +249,26 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 const mappedAnswers = answers.map(ans => {
                     const htmlAns = markdownToHtml(ans);
                     const normalizedAns = normalize(htmlAns, mappedQuestionType);
-                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || htmlAns;
+                    
+                    const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
+                    const strippedAns = stripPrefix(normalizedAns);
+
+                    const matchingOption = options?.find(opt => {
+                        const normOpt = normalize(opt, mappedQuestionType);
+                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns;
+                    });
+
+                    if (matchingOption) return matchingOption;
+
+                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                    if (letterMatch && options) {
+                        const index = letterMatch[1].charCodeAt(0) - 65;
+                        if (index >= 0 && index < options.length) {
+                            return options[index];
+                        }
+                    }
+
+                    return htmlAns;
                 });
                 
                 correctAnswer = JSON.stringify(mappedAnswers);
@@ -241,8 +277,26 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 const mappedAnswers = answers.map(ans => {
                     const htmlAns = markdownToHtml(ans);
                     const normalizedAns = normalize(htmlAns, mappedQuestionType);
-                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || htmlAns;
+                    
+                    const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
+                    const strippedAns = stripPrefix(normalizedAns);
+
+                    const matchingOption = options?.find(opt => {
+                        const normOpt = normalize(opt, mappedQuestionType);
+                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns;
+                    });
+
+                    if (matchingOption) return matchingOption;
+
+                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                    if (letterMatch && options) {
+                        const index = letterMatch[1].charCodeAt(0) - 65;
+                        if (index >= 0 && index < options.length) {
+                            return options[index];
+                        }
+                    }
+
+                    return htmlAns;
                 });
                 correctAnswer = JSON.stringify(mappedAnswers);
             }
