@@ -1139,6 +1139,7 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
             try {
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                    if (ansObj[idx] === undefined) return false;
                     return ansObj[idx] === row.answer;
                 });
                 if (allCorrect) isCorrect = true;
@@ -1148,7 +1149,8 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
             try {
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                    return ansObj[idx] === pair.right;
+                    if (ansObj[idx] === undefined) return false;
+                    return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
                 });
                 if (allCorrect) isCorrect = true;
             } catch { /* ignore */ }
