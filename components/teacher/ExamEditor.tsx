@@ -558,7 +558,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             const generatedQuestions = await generateQuestions(aiConfig);
             if (generatedQuestions && generatedQuestions.length > 0) {
                 const newQ = generatedQuestions[0];
-                setQuestions(questions.map(question => 
+                setQuestions(prev => prev.map(question => 
                     question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi, scoreWeight: newQ.scoreWeight || q.scoreWeight } : question
                 ));
             }
