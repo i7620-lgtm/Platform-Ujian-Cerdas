@@ -469,8 +469,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                     try {
                                                         const parsedStudent = parseList(studentAns);
+                                                        parsedStudent.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                         if (parsedStudent.length > 0) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
                                                         const parsedCorrect = parseList(correctAns);
+                                                        parsedCorrect.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                         if (parsedCorrect.length > 0) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
                                                     } catch { /* ignore */ }
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
