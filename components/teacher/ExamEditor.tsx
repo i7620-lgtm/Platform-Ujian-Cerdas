@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { Question, QuestionType, ExamConfig, ChartData } from '../../types';
@@ -710,6 +710,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 } else { 
                     newKeys = currentlyCheckedOptions.filter(o => o !== option);
                 } 
+                newKeys.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                 return { ...q, correctAnswer: JSON.stringify(newKeys) }; 
             }
             return q;
