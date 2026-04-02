@@ -148,13 +148,19 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             else if (q.questionType === 'TRUE_FALSE') {
                 try {
                     const ansObj = JSON.parse(ans);
-                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                    isCorrect = q.trueFalseRows?.every((row, idx) => {
+                        if (ansObj[idx] === undefined) return false;
+                        return ansObj[idx] === row.answer;
+                    }) ?? false;
                 } catch { /* ignore */ }
             }
             else if (q.questionType === 'MATCHING') {
                 try {
                     const ansObj = JSON.parse(ans);
-                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                    isCorrect = q.matchingPairs?.every((pair, idx) => {
+                        if (ansObj[idx] === undefined) return false;
+                        return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                    }) ?? false;
                 } catch { /* ignore */ }
             }
 
