@@ -271,6 +271,54 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         e.preventDefault(); e.stopPropagation();
     };
 
+    const fixArchiveDataSorting = (data: ArchiveData): ArchiveData => {
+        const fixedResults = data.results.map(r => {
+            const newAnswers = { ...r.answers };
+            let changed = false;
+            
+            Object.keys(newAnswers).forEach(qId => {
+                const q = data.exam.questions.find(q => q.id === qId);
+                if (q) {
+                    if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                        try {
+                            const parsed = JSON.parse(newAnswers[qId]);
+                            if (Array.isArray(parsed)) {
+                                const originalStr = newAnswers[qId];
+                                parsed.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                const newStr = JSON.stringify(parsed);
+                                if (originalStr !== newStr) {
+                                    newAnswers[qId] = newStr;
+                                    changed = true;
+                                }
+                            }
+                        } catch { /* ignore */ }
+                    } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                        try {
+                            const parsed = JSON.parse(newAnswers[qId]);
+                            if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                const originalStr = newAnswers[qId];
+                                const sortedObj: Record<number, any> = {};
+                                Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                const newStr = JSON.stringify(sortedObj);
+                                if (originalStr !== newStr) {
+                                    newAnswers[qId] = newStr;
+                                    changed = true;
+                                }
+                            }
+                        } catch { /* ignore */ }
+                    }
+                }
+            });
+            
+            if (changed) {
+                return { ...r, answers: newAnswers };
+            }
+            return r;
+        });
+        
+        return { ...data, results: fixedResults };
+    };
+
     const processFile = (file: File) => {
         setError('');
         setFixMessage('');
@@ -286,7 +334,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 if (typeof result === 'string') {
                     const data: ArchiveData = JSON.parse(result);
                     if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
-                        setArchiveData(data);
+                        setArchiveData(fixArchiveDataSorting(data));
                         setActiveTab('DETAIL');
                         setSourceType('LOCAL');
                         setSelectedClass('ALL');
@@ -309,7 +357,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             const data = await storageService.downloadArchive(filename) as ArchiveData | null;
             if (data && data.exam && data.exam.questions) {
-                setArchiveData(data);
+                setArchiveData(fixArchiveDataSorting(data));
                 setActiveTab('DETAIL');
                 setSourceType('CLOUD');
                 setSelectedClass('ALL');
@@ -413,7 +461,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             setSourceType('CLOUD'); // Switch mode to cloud
-            setArchiveData(finalPayload); // Update view with optimized data
+            setArchiveData(fixArchiveDataSorting(finalPayload)); // Update view with optimized data
             alert("Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.");
         } catch(e) {
             console.error(e);
@@ -771,7 +819,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 repairedAt: new Date().toISOString()
             };
 
-            setArchiveData(fixedArchive);
+            setArchiveData(fixArchiveDataSorting(fixedArchive));
 
             const jsonString = JSON.stringify(fixedArchive, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
@@ -2094,7 +2142,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             ...archiveData,
                             exam: { ...archiveData.exam, ...updated }
                         };
-                        setArchiveData(updatedData);
+                        setArchiveData(fixArchiveDataSorting(updatedData));
                         setShowEditMetadata(false);
                         handleUploadToCloud(updatedData);
                     }} 
