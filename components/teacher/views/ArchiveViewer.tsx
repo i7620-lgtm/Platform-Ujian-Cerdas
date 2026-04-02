@@ -1962,7 +1962,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     isCorrect = originalQ.trueFalseRows?.every((row, idx) => parsed[idx] === row.answer) ?? false;
                                                                 } else if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                                                                     // FIX: Use parseList to match print logic with digital view
-                                                                    const sSet = new Set(parseList(ans).map(a => normalize(a, originalQ.questionType)));
+                                                                    const parsed = parseList(ans);
+                                                                    parsed.sort((a, b) => (originalQ.options || []).indexOf(a) - (originalQ.options || []).indexOf(b));
+                                                                    displayAns = parsed.join(', ');
+                                                                    const sSet = new Set(parsed.map(a => normalize(a, originalQ.questionType)));
                                                                     const cSet = new Set(parseList(originalQ.correctAnswer || '').map(a => normalize(a, originalQ.questionType)));
                                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                                 } else {
