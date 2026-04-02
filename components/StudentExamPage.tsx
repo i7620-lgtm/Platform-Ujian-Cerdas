@@ -659,13 +659,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
                                                             <button key={i} onClick={() => { 
-                                                                const currentlyCheckedOptions = (q.options || []).filter(o => currentAns.includes(o));
-                                                                let newAns;
-                                                                if (isSelected) {
-                                                                    newAns = currentlyCheckedOptions.filter(o => o !== opt);
-                                                                } else {
-                                                                    newAns = currentlyCheckedOptions.includes(opt) ? currentlyCheckedOptions : [...currentlyCheckedOptions, opt];
-                                                                }
+                                                                let newAns = isSelected ? currentAns.filter(o => o !== opt) : [...currentAns, opt];
+                                                                newAns.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
@@ -690,14 +685,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                 </div>
                                                                 <div className="flex gap-3">
                                                                     <button 
-                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))}
+                                                                        onClick={() => {
+                                                                            const newAnsObj = { ...currentAnsObj, [i]: true };
+                                                                            const sortedAnsObj: Record<number, boolean> = {};
+                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
+                                                                        }}
                                                                         className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isTrue ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                                     >
                                                                         {isTrue && <CheckCircleIcon className="w-4 h-4" />}
                                                                         Benar
                                                                     </button>
                                                                     <button 
-                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))}
+                                                                        onClick={() => {
+                                                                            const newAnsObj = { ...currentAnsObj, [i]: false };
+                                                                            const sortedAnsObj: Record<number, boolean> = {};
+                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
+                                                                        }}
                                                                         className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isFalse ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                                     >
                                                                         {isFalse && <CheckCircleIcon className="w-4 h-4" />}
@@ -756,7 +761,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                                     <div 
                                                                                         key={idx} 
                                                                                         onClick={() => {
-                                                                                            handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: opt }));
+                                                                                            const newAnsObj = { ...currentAnsObj, [i]: opt };
+                                                                                            const sortedAnsObj: Record<number, string> = {};
+                                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
                                                                                             setOpenDropdownId(null);
                                                                                         }}
                                                                                         className={`p-3 text-sm cursor-pointer border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors ${selectedValue === opt ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}
