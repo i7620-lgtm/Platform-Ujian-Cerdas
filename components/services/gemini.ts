@@ -22,26 +22,28 @@ function getAI(): GoogleGenAI {
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
   const ai = getAI();
   
-  const systemInstruction = `
+    const systemInstruction = `
     Anda adalah asisten pembuat soal ujian profesional.
     Tugas Anda adalah membuat soal berkualitas tinggi berdasarkan parameter yang diberikan.
     
     ATURAN FORMAT:
-    - Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan.
+    - Gunakan format Markdown secara maksimal pada teks pertanyaan.
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
     - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel.
     - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), isi field 'chartData' pada tingkat soal. Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
+    - PENTING UNTUK DIAGRAM: Jika Anda membuat diagram, Anda WAJIB menyisipkan tag HTML <span class="chart-placeholder" data-chart="true" style="display: block;"></span> di dalam teks (questionText, opsi, dll) tepat di mana diagram tersebut harus ditampilkan.
     - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
+    - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi soal yang harus dijawab oleh siswa.
     
     ATURAN JENIS SOAL:
     - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi).
     - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi).
     - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
-    - Esai: Wajib isi 'correctAnswer' dengan penjelasan mendalam.
+    - Esai: Wajib isi 'correctAnswer' dengan jawaban yang diharapkan.
     - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
     - Menjodohkan: Wajib isi 'matchingPairs' berupa array of objects { "left": "item kiri", "right": "pasangan kanan" }. Buat 3-5 pasangan.
     
@@ -98,7 +100,6 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       ...chartDataSchema,
       description: "Data diagram untuk jawaban benar (opsional, berguna untuk soal isian/esai)"
     },
-    explanation: { type: Type.STRING, description: "Penjelasan mengapa jawaban tersebut benar" },
     scoreWeight: { type: Type.NUMBER, description: "Bobot nilai soal" },
     trueFalseRows: {
       type: Type.ARRAY,
