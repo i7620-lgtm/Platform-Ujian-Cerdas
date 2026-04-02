@@ -165,14 +165,20 @@ const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) 
     else if (q.questionType === 'TRUE_FALSE') {
          try {
             const ansObj = JSON.parse(ans);
-            const allCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer);
+            const allCorrect = q.trueFalseRows?.every((row, idx) => {
+                if (ansObj[idx] === undefined) return false;
+                return ansObj[idx] === row.answer;
+            });
             return allCorrect ? 'CORRECT' : 'WRONG';
         } catch { return 'WRONG'; }
     }
     else if (q.questionType === 'MATCHING') {
         try {
             const ansObj = JSON.parse(ans);
-            const allCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right);
+            const allCorrect = q.matchingPairs?.every((pair, idx) => {
+                if (ansObj[idx] === undefined) return false;
+                return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+            });
             return allCorrect ? 'CORRECT' : 'WRONG';
         } catch { return 'WRONG'; }
     }
