@@ -596,64 +596,8 @@ class StorageService {
       const updates = results.map((r: unknown) => {
           const row = r as Record<string, unknown>;
           const answers = row.answers as Record<string, string>;
-          let correctCount = 0;
-          let totalScore = 0;
-          let maxPossibleScore = 0;
           
-          const scorableQuestions = questions.filter(q => q.questionType !== 'INFO');
-          
-          scorableQuestions.forEach(q => {
-              const weight = q.scoreWeight || 1;
-              maxPossibleScore += weight;
-
-              // Check if teacher has manually graded this question
-              const manualGradeKey = `_grade_${q.id}`;
-              if (answers[manualGradeKey]) {
-                  if (answers[manualGradeKey] === 'CORRECT') {
-                      correctCount++;
-                      totalScore += weight;
-                  }
-                  return;
-              }
-
-              const ans = answers[q.id];
-              if (!ans) {
-                  return;
-              }
-
-              const studentAns = this.normalize(String(ans), q.questionType);
-              const correctAns = this.normalize(String(q.correctAnswer || ''), q.questionType);
-
-              let isCorrect = false;
-               if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                  isCorrect = studentAns === correctAns;
-              } 
-              else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                  const sSet = new Set(this.parseList(String(ans)).map(a => this.normalize(a, q.questionType)));
-                  const cSet = new Set(this.parseList(String(q.correctAnswer || '')).map(a => this.normalize(a, q.questionType)));
-                  isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
-              }
-              else if (q.questionType === 'TRUE_FALSE') {
-                   try {
-                      const ansObj = JSON.parse(ans);
-                      isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
-                  } catch { isCorrect = false; }
-              }
-              else if (q.questionType === 'MATCHING') {
-                  try {
-                      const ansObj = JSON.parse(ans);
-                      isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
-                  } catch { isCorrect = false; }
-              }
-
-              if (isCorrect) {
-                  correctCount++;
-                  totalScore += weight;
-              }
-          });
-
-          const total = scorableQuestions.length;
-          const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+          const { score, correctAnswers, totalQuestions } = calculateExamScore({ questions } as Exam, answers);
 
           return {
               id: row.id,
@@ -667,8 +611,8 @@ class StorageService {
               location: row.location,
               unlock_token: row.unlock_token,
               score: score,
-              correct_answers: correctCount,
-              total_questions: total,
+              correct_answers: correctAnswers,
+              total_questions: totalQuestions,
               updated_at: new Date().toISOString()
           };
       });
