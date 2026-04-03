@@ -40,7 +40,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     
     ATURAN JENIS SOAL:
     - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi). PENTING: Acak posisi jawaban yang benar agar tidak selalu berada di opsi pertama (A).
-    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi). Acak posisi jawaban yang benar.
+    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan dengan "|||", contoh: "Opsi 1|||Opsi 2", harus sama persis dengan opsi). Acak posisi jawaban yang benar.
     - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
     - Esai: Wajib isi 'correctAnswer' dengan jawaban yang diharapkan.
     - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
@@ -198,7 +198,13 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const questionText = markdownToHtml(q.questionText || '');
         const options = q.options ? q.options.map((opt: string) => markdownToHtml(opt || '')) : undefined;
         
-        let correctAnswer = q.correctAnswer || '';
+        let correctAnswer: any = q.correctAnswer || '';
+        if (Array.isArray(correctAnswer)) {
+            correctAnswer = JSON.stringify(correctAnswer);
+        } else if (typeof correctAnswer !== 'string') {
+            correctAnswer = String(correctAnswer);
+        }
+        
         if (mappedQuestionType === 'MULTIPLE_CHOICE') {
             // Find the option that matches the correct answer most closely
             const htmlCorrectAnswer = markdownToHtml(correctAnswer);
@@ -216,10 +222,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             if (matchingOption) {
                 correctAnswer = matchingOption;
             } else {
-                // Check if correctAnswer is just a letter A, B, C, D, E or "Jawaban A"
-                const letterMatch = correctAnswer.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                // Check if correctAnswer is just a letter A, B, C, D, E or "Jawaban A" or numbers 1-5
+                const letterMatch = correctAnswer.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
                 if (letterMatch && options) {
-                    const index = letterMatch[1].charCodeAt(0) - 65;
+                    const char = letterMatch[1];
+                    let index = -1;
+                    if (char >= 'A' && char <= 'E') {
+                        index = char.charCodeAt(0) - 65;
+                    } else if (char >= '1' && char <= '5') {
+                        index = parseInt(char) - 1;
+                    }
                     if (index >= 0 && index < options.length) {
                         correctAnswer = options[index];
                     }
@@ -240,9 +252,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 let answers: string[] = [];
                 const parsed = JSON.parse(correctAnswer);
                 if (Array.isArray(parsed)) {
-                    answers = parsed.map((a: string) => a.trim());
+                    answers = parsed.map((a: any) => typeof a === 'string' ? a.trim() : String(a));
                 } else {
-                    answers = correctAnswer.split(',').map((a: string) => a.trim());
+                    answers = String(correctAnswer).split(/\|\|\|/).map((a: string) => a.trim()).filter(a => a);
+                    if (answers.length <= 1 && String(correctAnswer).includes(',')) {
+                        answers = String(correctAnswer).split(',').map((a: string) => a.trim()).filter(a => a);
+                    }
                 }
                 
                 // Map each answer to the closest matching option
@@ -250,19 +265,26 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                     const htmlAns = markdownToHtml(ans);
                     const normalizedAns = normalize(htmlAns, mappedQuestionType);
                     
-                    const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
+                    const stripPrefix = (str: string) => str.replace(/^[A-E1-5][\.\)]\s*/i, '').trim();
                     const strippedAns = stripPrefix(normalizedAns);
 
                     const matchingOption = options?.find(opt => {
                         const normOpt = normalize(opt, mappedQuestionType);
-                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns;
+                        const isShortOption = normOpt.length < 3;
+                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns || (!isShortOption && (normOpt.includes(strippedAns) || strippedAns.includes(normOpt)));
                     });
 
                     if (matchingOption) return matchingOption;
 
-                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
                     if (letterMatch && options) {
-                        const index = letterMatch[1].charCodeAt(0) - 65;
+                        const char = letterMatch[1];
+                        let index = -1;
+                        if (char >= 'A' && char <= 'E') {
+                            index = char.charCodeAt(0) - 65;
+                        } else if (char >= '1' && char <= '5') {
+                            index = parseInt(char) - 1;
+                        }
                         if (index >= 0 && index < options.length) {
                             return options[index];
                         }
@@ -273,24 +295,34 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 
                 correctAnswer = JSON.stringify(mappedAnswers);
             } catch {
-                const answers = correctAnswer.split(',').map((a: string) => a.trim());
+                let answers = String(correctAnswer).split(/\|\|\|/).map((a: string) => a.trim()).filter(a => a);
+                if (answers.length <= 1 && String(correctAnswer).includes(',')) {
+                    answers = String(correctAnswer).split(',').map((a: string) => a.trim()).filter(a => a);
+                }
                 const mappedAnswers = answers.map(ans => {
                     const htmlAns = markdownToHtml(ans);
                     const normalizedAns = normalize(htmlAns, mappedQuestionType);
                     
-                    const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
+                    const stripPrefix = (str: string) => str.replace(/^[A-E1-5][\.\)]\s*/i, '').trim();
                     const strippedAns = stripPrefix(normalizedAns);
 
                     const matchingOption = options?.find(opt => {
                         const normOpt = normalize(opt, mappedQuestionType);
-                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns;
+                        const isShortOption = normOpt.length < 3;
+                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns || (!isShortOption && (normOpt.includes(strippedAns) || strippedAns.includes(normOpt)));
                     });
 
                     if (matchingOption) return matchingOption;
 
-                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E])[\.\)]?$/);
+                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
                     if (letterMatch && options) {
-                        const index = letterMatch[1].charCodeAt(0) - 65;
+                        const char = letterMatch[1];
+                        let index = -1;
+                        if (char >= 'A' && char <= 'E') {
+                            index = char.charCodeAt(0) - 65;
+                        } else if (char >= '1' && char <= '5') {
+                            index = parseInt(char) - 1;
+                        }
                         if (index >= 0 && index < options.length) {
                             return options[index];
                         }
