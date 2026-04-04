@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../../types";
-import { markdownToHtml, normalize } from "../teacher/examUtils";
+import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../teacher/examUtils";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -150,7 +150,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           items: {
             type: Type.OBJECT,
             properties: properties,
-            required: ["id", "questionText"]
+            required: ["id", "questionText", "correctAnswer"]
           },
         },
       },
@@ -198,32 +198,23 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const questionText = markdownToHtml(q.questionText || '');
         const options = q.options ? q.options.map((opt: string) => markdownToHtml(opt || '')) : undefined;
         
-        let correctAnswer: any = q.correctAnswer || '';
+        let correctAnswer: string | string[] | number | boolean = q.correctAnswer || '';
         if (Array.isArray(correctAnswer)) {
             correctAnswer = JSON.stringify(correctAnswer);
         } else if (typeof correctAnswer !== 'string') {
             correctAnswer = String(correctAnswer);
         }
-        
-        if (mappedQuestionType === 'MULTIPLE_CHOICE') {
+               if (mappedQuestionType === 'MULTIPLE_CHOICE') {
             // Find the option that matches the correct answer most closely
             const htmlCorrectAnswer = markdownToHtml(correctAnswer);
-            const normalizedCorrect = normalize(htmlCorrectAnswer, mappedQuestionType);
             
-            // Helper to strip A., B., etc.
-            const stripPrefix = (str: string) => str.replace(/^[A-E][\.\)]\s*/i, '').trim();
-            const strippedCorrect = stripPrefix(normalizedCorrect);
-
-            const matchingOption = options?.find(opt => {
-                const normOpt = normalize(opt, mappedQuestionType);
-                return normOpt === normalizedCorrect || stripPrefix(normOpt) === strippedCorrect;
-            });
+            const matchingOption = options?.find(opt => isAnswerMatch(htmlCorrectAnswer, opt, mappedQuestionType));
 
             if (matchingOption) {
                 correctAnswer = matchingOption;
             } else {
                 // Check if correctAnswer is just a letter A, B, C, D, E or "Jawaban A" or numbers 1-5
-                const letterMatch = correctAnswer.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
+                const letterMatch = String(correctAnswer).trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[.)]?$/);
                 if (letterMatch && options) {
                     const char = letterMatch[1];
                     let index = -1;
@@ -234,107 +225,64 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                     }
                     if (index >= 0 && index < options.length) {
                         correctAnswer = options[index];
+                    } else {
+                        correctAnswer = htmlCorrectAnswer;
                     }
                 } else {
                     // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
                     const fallbackOption = options?.find(opt => {
                         const normOpt = normalize(opt, mappedQuestionType);
-                        return normOpt.includes(strippedCorrect) || strippedCorrect.includes(normOpt);
+                        const normAns = normalize(htmlCorrectAnswer, mappedQuestionType);
+                        return (normOpt.length > 3 && normAns.includes(normOpt)) || 
+                               (normAns.length > 3 && normOpt.includes(normAns));
                     });
-                    if (fallbackOption) correctAnswer = fallbackOption;
-                    else correctAnswer = htmlCorrectAnswer; // Use HTML if no match
+                    correctAnswer = fallbackOption || htmlCorrectAnswer;
                 }
             }
         } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // Split by comma, trim, map to html, then JSON stringify
-            // Check if it's already a JSON array string
-            try {
-                let answers: string[] = [];
-                const parsed = JSON.parse(correctAnswer);
-                if (Array.isArray(parsed)) {
-                    answers = parsed.map((a: any) => typeof a === 'string' ? a.trim() : String(a));
-                } else {
-                    answers = String(correctAnswer).split(/\|\|\|/).map((a: string) => a.trim()).filter(a => a);
-                    if (answers.length <= 1 && String(correctAnswer).includes(',')) {
-                        answers = String(correctAnswer).split(',').map((a: string) => a.trim()).filter(a => a);
+            const splitAnswers = parseList(correctAnswer);
+            
+            // Map each answer to the closest matching option
+            const mappedAnswers = splitAnswers.map(ans => {
+                const htmlAns = markdownToHtml(ans);
+
+                const matchingOption = options?.find(opt => isAnswerMatch(htmlAns, opt, mappedQuestionType));
+                if (matchingOption) return matchingOption;
+
+                const letterMatch = String(ans).trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[.)]?$/);
+                if (letterMatch && options) {
+                    const char = letterMatch[1];
+                    let index = -1;
+                    if (char >= 'A' && char <= 'E') {
+                        index = char.charCodeAt(0) - 65;
+                    } else if (char >= '1' && char <= '5') {
+                        index = parseInt(char) - 1;
+                    }
+                    if (index >= 0 && index < options.length) {
+                        return options[index];
                     }
                 }
-                
-                // Map each answer to the closest matching option
-                const mappedAnswers = answers.map(ans => {
-                    const htmlAns = markdownToHtml(ans);
-                    const normalizedAns = normalize(htmlAns, mappedQuestionType);
-                    
-                    const stripPrefix = (str: string) => str.replace(/^[A-E1-5][\.\)]\s*/i, '').trim();
-                    const strippedAns = stripPrefix(normalizedAns);
 
-                    const matchingOption = options?.find(opt => {
-                        const normOpt = normalize(opt, mappedQuestionType);
-                        const isShortOption = normOpt.length < 3;
-                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns || (!isShortOption && (normOpt.includes(strippedAns) || strippedAns.includes(normOpt)));
-                    });
-
-                    if (matchingOption) return matchingOption;
-
-                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
-                    if (letterMatch && options) {
-                        const char = letterMatch[1];
-                        let index = -1;
-                        if (char >= 'A' && char <= 'E') {
-                            index = char.charCodeAt(0) - 65;
-                        } else if (char >= '1' && char <= '5') {
-                            index = parseInt(char) - 1;
-                        }
-                        if (index >= 0 && index < options.length) {
-                            return options[index];
-                        }
-                    }
-
-                    return htmlAns;
+                // Fallback for complex answers
+                const fallbackOption = options?.find(opt => {
+                    const normOpt = normalize(opt, mappedQuestionType);
+                    const normAns = normalize(htmlAns, mappedQuestionType);
+                    return (normOpt.length > 3 && normAns.includes(normOpt)) || 
+                           (normAns.length > 3 && normOpt.includes(normAns));
                 });
                 
-                correctAnswer = JSON.stringify(mappedAnswers);
-            } catch {
-                let answers = String(correctAnswer).split(/\|\|\|/).map((a: string) => a.trim()).filter(a => a);
-                if (answers.length <= 1 && String(correctAnswer).includes(',')) {
-                    answers = String(correctAnswer).split(',').map((a: string) => a.trim()).filter(a => a);
-                }
-                const mappedAnswers = answers.map(ans => {
-                    const htmlAns = markdownToHtml(ans);
-                    const normalizedAns = normalize(htmlAns, mappedQuestionType);
-                    
-                    const stripPrefix = (str: string) => str.replace(/^[A-E1-5][\.\)]\s*/i, '').trim();
-                    const strippedAns = stripPrefix(normalizedAns);
-
-                    const matchingOption = options?.find(opt => {
-                        const normOpt = normalize(opt, mappedQuestionType);
-                        const isShortOption = normOpt.length < 3;
-                        return normOpt === normalizedAns || stripPrefix(normOpt) === strippedAns || (!isShortOption && (normOpt.includes(strippedAns) || strippedAns.includes(normOpt)));
-                    });
-
-                    if (matchingOption) return matchingOption;
-
-                    const letterMatch = ans.trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[\.\)]?$/);
-                    if (letterMatch && options) {
-                        const char = letterMatch[1];
-                        let index = -1;
-                        if (char >= 'A' && char <= 'E') {
-                            index = char.charCodeAt(0) - 65;
-                        } else if (char >= '1' && char <= '5') {
-                            index = parseInt(char) - 1;
-                        }
-                        if (index >= 0 && index < options.length) {
-                            return options[index];
-                        }
-                    }
-
-                    return htmlAns;
-                });
-                correctAnswer = JSON.stringify(mappedAnswers);
-            }
+                return fallbackOption || htmlAns;
+            });
+            
+            // Ensure we only have unique answers and they are valid options if possible
+            const uniqueAnswers = Array.from(new Set(mappedAnswers));
+            correctAnswer = JSON.stringify(uniqueAnswers);
         } else if (mappedQuestionType === 'FILL_IN_THE_BLANK' || mappedQuestionType === 'ESSAY') {
             // Do not convert to HTML for fill in the blank or essay to preserve the raw text answer
-            correctAnswer = correctAnswer.trim();
+            correctAnswer = String(correctAnswer).trim();
+        } else {
+            correctAnswer = markdownToHtml(correctAnswer);
         }
 
         const mappedQ: Question = {
@@ -355,11 +303,23 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle true false rows if needed
         if (mappedQuestionType === 'TRUE_FALSE') {
             if (q.trueFalseRows && q.trueFalseRows.length > 0) {
-                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: boolean; chartData?: ChartData }) => ({
-                    text: markdownToHtml(r.text || ''),
-                    answer: r.answer,
-                    chartData: r.chartData
-                }));
+                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: string | boolean | number; chartData?: ChartData }) => {
+                    // Ensure answer is a boolean even if AI returns string "true"/"false" or "Benar"/"Salah"
+                    let boolAnswer = !!r.answer;
+                    if (typeof r.answer === 'string') {
+                        const lower = r.answer.toLowerCase();
+                        if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak') {
+                            boolAnswer = false;
+                        } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya') {
+                            boolAnswer = true;
+                        }
+                    }
+                    return {
+                        text: markdownToHtml(r.text || ''),
+                        answer: boolAnswer,
+                        chartData: r.chartData
+                    };
+                });
             } else if (q.options) {
                 mappedQ.trueFalseRows = [
                     { text: markdownToHtml('Pernyataan 1'), answer: q.correctAnswer?.toLowerCase().includes('benar') || false }
