@@ -291,8 +291,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 try {
                                     const parsed = JSON.parse(loadedAnswers[qId]);
                                     if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                                        const sortedObj: Record<number, any> = {};
-                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                        const sortedObj: Record<number, string | boolean | number> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = (parsed as Record<number, string | boolean | number>)[k]);
                                         loadedAnswers[qId] = JSON.stringify(sortedObj);
                                     }
                                 } catch { /* ignore */ }
@@ -322,8 +322,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                 try {
                                     const parsed = JSON.parse(loadedAnswers[qId]);
                                     if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                                        const sortedObj: Record<number, any> = {};
-                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                        const sortedObj: Record<number, string | boolean | number> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = (parsed as Record<number, string | boolean | number>)[k]);
                                         loadedAnswers[qId] = JSON.stringify(sortedObj);
                                     }
                                 } catch { /* ignore */ }
@@ -337,7 +337,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             await loadPromiseRef.current;
         };
         loadState();
-    }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam]);
+    }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam, activeExam.questions]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
@@ -709,7 +709,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
                                                             <button key={i} onClick={() => { 
-                                                                let newAns = isSelected ? currentAns.filter(o => o !== opt) : [...currentAns, opt];
+                                                                const newAns = isSelected ? currentAns.filter(o => o !== opt) : [...currentAns, opt];
                                                                 newAns.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
