@@ -9,7 +9,7 @@ import {
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon, ChartBarIcon
 } from '../Icons';
-import { compressImage, parseList, sanitizeHtml } from './examUtils';
+import { compressImage, parseList, sanitizeHtml, normalize, isAnswerMatch } from './examUtils';
 import { EXAM_TYPES } from './constants';
 import { generateQuestions } from '../services/gemini';
 import { ChartRenderer } from '../ChartRenderer';
@@ -287,7 +287,7 @@ const WysiwygEditor: React.FC<{
                 }
             }
         }
-    }, [value]);
+    }, [value, chartData]);
 
     useEffect(() => {
         if (editorRef.current) {
@@ -658,14 +658,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 let newCorrectAnswer = q.correctAnswer;
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(oldOption)) newCorrectAnswer = text; 
+                    if (isAnswerMatch(q.correctAnswer, oldOption, q.questionType)) newCorrectAnswer = text; 
                 } 
                 else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (answers.some(a => normalizeHtml(a) === normalizeHtml(oldOption))) { 
-                        answers = answers.map(a => normalizeHtml(a) === normalizeHtml(oldOption) ? text : a); 
+                    if (answers.some(a => isAnswerMatch(a, oldOption, q.questionType))) { 
+                        answers = answers.map(a => isAnswerMatch(a, oldOption, q.questionType) ? text : a); 
                         newCorrectAnswer = JSON.stringify(answers); 
                     } 
                 }
@@ -680,32 +678,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) { 
                 const currentAnswers = parseList(q.correctAnswer);
-                const normalizeHtml = (html: string) => {
-                    try {
-                        const div = document.createElement('div');
-                        div.innerHTML = html || '';
-                        
-                        div.querySelectorAll('.math-visual').forEach(el => {
-                            const latex = el.getAttribute('data-latex');
-                            if (latex) {
-                                el.replaceWith(document.createTextNode(`$${latex}$`));
-                            } else {
-                                while (el.firstChild) {
-                                    el.parentNode?.insertBefore(el.firstChild, el);
-                                }
-                                el.parentNode?.removeChild(el);
-                            }
-                        });
-
-                        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-                    } catch {
-                        return (html || '').trim().replace(/\s+/g, ' ');
-                    }
-                };
-                
                 // Clean up currentAnswers to only include valid options from q.options
                 const currentlyCheckedOptions = (q.options || []).filter(o => 
-                    currentAnswers.some(a => normalizeHtml(a) === normalizeHtml(o))
+                    currentAnswers.some(a => isAnswerMatch(a, o, q.questionType))
                 );
                 
                 let newKeys;
@@ -741,12 +716,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 let newCorrectAnswer = q.correctAnswer; 
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(optionToRemove)) newCorrectAnswer = newOptions[0] || ''; 
+                    if (isAnswerMatch(q.correctAnswer, optionToRemove, q.questionType)) newCorrectAnswer = newOptions[0] || ''; 
                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    answers = answers.filter(a => normalizeHtml(a) !== normalizeHtml(optionToRemove)); 
+                    answers = answers.filter(a => !isAnswerMatch(a, optionToRemove, q.questionType)); 
                     newCorrectAnswer = JSON.stringify(answers); 
                 } 
                 return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts, correctAnswer: newCorrectAnswer }; 
@@ -880,22 +853,29 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                 
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
-                                                        {q.options.map((option, i) => (
-                                                            <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${q.correctAnswer === option ? 'bg-emerald-50/50 dark:bg-emerald-900/20' : ''}`}>
-                                                                <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}><div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${q.correctAnswer === option ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-emerald-300 dark:group-hover/opt:border-emerald-500'}`}>{q.correctAnswer === option && <div className="w-2 h-2 bg-white rounded-full" />}</div></div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <WysiwygEditor 
-                                                                        value={option} 
-                                                                        onChange={(val) => handleOptionTextChange(q.id, i, val)} 
-                                                                        placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
-                                                                        minHeight="40px" 
-                                                                        onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
-                                                                        chartData={q.optionCharts?.[i] || undefined}
-                                                                    />
+                                                        {q.options.map((option, i) => {
+                                                            const isSelected = isAnswerMatch(q.correctAnswer, option, q.questionType);
+                                                            return (
+                                                                <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/20' : ''}`}>
+                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}>
+                                                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-emerald-300 dark:group-hover/opt:border-emerald-500'}`}>
+                                                                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <WysiwygEditor 
+                                                                            value={option} 
+                                                                            onChange={(val) => handleOptionTextChange(q.id, i, val)} 
+                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
+                                                                            minHeight="40px" 
+                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
+                                                                            chartData={q.optionCharts?.[i] || undefined}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
                                                                 </div>
-                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
@@ -904,17 +884,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => {
                                                             const currentAnswers = parseList(q.correctAnswer);
-                                                            // Normalize both to handle slight HTML serialization differences
-                                                            const normalizeHtml = (html: string) => {
-                                                                try {
-                                                                    const div = document.createElement('div');
-                                                                    div.innerHTML = html;
-                                                                    return div.innerHTML;
-                                                                } catch {
-                                                                    return html;
-                                                                }
-                                                            };
-                                                            const isSelected = currentAnswers.some(ans => normalizeHtml(ans) === normalizeHtml(option));
+                                                            const isSelected = currentAnswers.some(ans => isAnswerMatch(ans, option, q.questionType));
                                                             return (
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
                                                                     <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isSelected)}>
