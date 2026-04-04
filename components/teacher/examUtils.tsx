@@ -189,6 +189,23 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
 };
 
 // --- HELPER: Parse List (Supports JSON Array or Legacy CSV) ---
+export const stripPrefix = (str: string) => str.replace(/^[A-E1-5][.)]\s*/i, '').trim();
+
+export const isAnswerMatch = (ans: string | undefined | null, opt: string | undefined | null, type: QuestionType): boolean => {
+    if (!ans || !opt) return false;
+    if (ans === opt) return true;
+    
+    const normAns = normalize(ans, type);
+    const normOpt = normalize(opt, type);
+    if (normAns === normOpt) return true;
+    
+    const strippedAns = stripPrefix(normAns);
+    const strippedOpt = stripPrefix(normOpt);
+    if (strippedAns === strippedOpt && strippedAns.length > 0) return true;
+    
+    return false;
+};
+
 export const parseList = (str: string | undefined | null): string[] => {
     if (!str) return [];
     
@@ -253,7 +270,11 @@ export const parseList = (str: string | undefined | null): string[] => {
             return flattened;
         }
         if (typeof parsed === 'string') {
-            // If it looks like HTML, don't split by comma as it might break equations
+            // Try splitting by ||| first as it's the most robust delimiter
+            if (parsed.includes('|||')) {
+                return parsed.split('|||').map(s => s.trim()).filter(Boolean);
+            }
+            // If it looks like HTML, don't split by comma as it might break equations or tags
             if (parsed.includes('<') && parsed.includes('>')) {
                 return [parsed.trim()];
             }
@@ -266,7 +287,11 @@ export const parseList = (str: string | undefined | null): string[] => {
         return [String(parsed)];
     } catch { /* ignore */ }
     
-    // Fallback: handle legacy comma-separated
+    // Fallback: handle legacy comma-separated or ||| separated
+    if (str.includes('|||')) {
+        return str.split('|||').map(s => s.trim()).filter(Boolean);
+    }
+    
     // If it looks like HTML, don't split by comma as it might break equations
     if (str.includes('<') && str.includes('>')) {
         return [str.trim()];
@@ -293,16 +318,18 @@ export const parseList = (str: string | undefined | null): string[] => {
 
 // --- HELPER: Normalize Answer String ---
 export const normalize = (str: string, qType: string) => {
-    const s = String(str || '');
+    const s = String(str || '').trim();
+    
+    // For short answers, we want to be very aggressive in stripping HTML
     if (qType === 'FILL_IN_THE_BLANK') {
         return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
+    
     try {
         const div = document.createElement('div');
         div.innerHTML = s;
         
         // Remove math-visual wrappers to compare actual content
-        // Better: replace with LaTeX content to be more robust
         div.querySelectorAll('.math-visual').forEach(el => {
             const latex = el.getAttribute('data-latex');
             if (latex) {
@@ -315,10 +342,17 @@ export const normalize = (str: string, qType: string) => {
             }
         });
 
-        // Standardize HTML by removing whitespace between tags and trimming
-        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+        // Standardize HTML by removing whitespace between tags and collapsing spaces
+        let html = div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+        
+        // Strip wrapping <p> tags if they are the only ones (common from markdownToHtml)
+        if (html.startsWith('<p>') && html.endsWith('</p>') && (html.match(/<p>/g) || []).length === 1) {
+            html = html.substring(3, html.length - 4).trim();
+        }
+        
+        return html;
     } catch {
-        return s.trim().replace(/\s+/g, ' ');
+        return s.replace(/\s+/g, ' ').trim();
     }
 };
 
@@ -1139,6 +1173,7 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
             try {
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                    if (ansObj[idx] === undefined) return false;
                     return ansObj[idx] === row.answer;
                 });
                 if (allCorrect) isCorrect = true;
@@ -1148,7 +1183,8 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
             try {
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                    return ansObj[idx] === pair.right;
+                    if (ansObj[idx] === undefined) return false;
+                    return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
                 });
                 if (allCorrect) isCorrect = true;
             } catch { /* ignore */ }

@@ -252,12 +252,36 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
         try {
             examConfig = await storageService.getExamConfig(cleanExamCode);
             if (examConfig && examConfig.targetClasses && examConfig.targetClasses.length > 0) {
+                const schools = new Set<string>();
+                examConfig.targetClasses.forEach(c => {
+                    const parsed = parseClassConfig(c);
+                    if (parsed.schoolName) schools.add(parsed.schoolName);
+                });
+                
+                if (schools.size > 0 && !schools.has(schoolName.trim())) {
+                    setError('Asal Sekolah tidak valid. Harap pilih dari daftar sekolah yang tersedia.');
+                    setSchoolName('');
+                    setIsLoading(false);
+                    return;
+                }
+
                 if (!examConfig.targetClasses.includes(studentClass.trim())) {
                     setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
                     setAvailableClasses(examConfig.targetClasses);
                     setStudentClass(''); 
                     setIsLoading(false);
                     return;
+                }
+                
+                const { limit } = parseClassConfig(studentClass.trim());
+                if (limit && limit > 0) {
+                    const num = parseInt(absentNumber, 10);
+                    if (isNaN(num) || num < 1 || num > limit || num.toString() !== absentNumber.trim()) {
+                        setError(`No. Absen tidak valid. Harap pilih antara 1 hingga ${limit}.`);
+                        setAbsentNumber('');
+                        setIsLoading(false);
+                        return;
+                    }
                 }
             }
         } catch {
@@ -608,7 +632,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Kelas</label>
                                     
-                                    {filteredClasses.length > 0 ? (
+                                    {availableClasses.length > 0 ? (
                                         <div className="relative group">
                                             <select 
                                                 value={studentClass} 

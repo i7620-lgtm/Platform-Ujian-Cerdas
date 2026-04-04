@@ -5,6 +5,56 @@ import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIco
 import { storageService } from '../services/storage';
 import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize } from './teacher/examUtils';
 import { QRCodeCanvas } from 'qrcode.react';
+import { ChartRenderer } from './ChartRenderer';
+import type { ChartData } from '../types';
+
+const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefined) => {
+    const sanitized = sanitizeHtml(html);
+    if (!chartData) {
+        return <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized, 'text/html');
+    const chartNode = doc.querySelector('[data-chart="true"]');
+
+    if (!chartNode) {
+        return (
+            <>
+                <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
+                <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="h-[250px] w-full">
+                        <ChartRenderer data={chartData} />
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    const marker = '___CHART_MARKER___';
+    chartNode.insertAdjacentText('beforebegin', marker);
+    chartNode.remove();
+    
+    const newHtml = doc.body.innerHTML;
+    const parts = newHtml.split(marker);
+
+    return (
+        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+            {parts.map((part, index) => (
+                <React.Fragment key={index}>
+                    <div dangerouslySetInnerHTML={{ __html: part }}></div>
+                    {index < parts.length - 1 && (
+                        <div className="my-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <div className="h-[250px] w-full">
+                                <ChartRenderer data={chartData} />
+                            </div>
+                        </div>
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+};
 
 interface StudentResultPageProps {
   result: Result;
@@ -98,13 +148,19 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             else if (q.questionType === 'TRUE_FALSE') {
                 try {
                     const ansObj = JSON.parse(ans);
-                    isCorrect = q.trueFalseRows?.every((row, idx) => ansObj[idx] === row.answer) ?? false;
+                    isCorrect = q.trueFalseRows?.every((row, idx) => {
+                        if (ansObj[idx] === undefined) return false;
+                        return ansObj[idx] === row.answer;
+                    }) ?? false;
                 } catch { /* ignore */ }
             }
             else if (q.questionType === 'MATCHING') {
                 try {
                     const ansObj = JSON.parse(ans);
-                    isCorrect = q.matchingPairs?.every((pair, idx) => ansObj[idx] === pair.right) ?? false;
+                    isCorrect = q.matchingPairs?.every((pair, idx) => {
+                        if (ansObj[idx] === undefined) return false;
+                        return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                    }) ?? false;
                 } catch { /* ignore */ }
             }
 
@@ -304,7 +360,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
                                 {/* QR CODE SECTION */}
                                 <div className="lg:col-span-3 flex flex-col items-center justify-center p-5 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                    <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 mb-3">
+                                    <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-3">
                                         <QRCodeCanvas 
                                             value={`${window.location.origin}/result/${exam.code}/${encodeURIComponent(result.student.studentId)}`}
                                             size={160}
@@ -413,8 +469,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                     isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
                                                     try {
                                                         const parsedStudent = parseList(studentAns);
+                                                        parsedStudent.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                         if (parsedStudent.length > 0) displayStudentAns = parsedStudent.map(p => `• ${p}`).join('<br/>');
                                                         const parsedCorrect = parseList(correctAns);
+                                                        parsedCorrect.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                         if (parsedCorrect.length > 0) displayCorrectAns = parsedCorrect.map(p => `• ${p}`).join('<br/>');
                                                     } catch { /* ignore */ }
                                                 } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
@@ -446,7 +504,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Soal {idx + 1}</span>
                                                             <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wide ${isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'}`}>{isCorrect ? 'Benar' : 'Salah'}</span>
                                                         </div>
-                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{__html: sanitizeHtml(q.questionText)}}></div>
+                                                        {renderQuestionTextWithChart(q.questionText, q.chartData)}
+                                                        
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 

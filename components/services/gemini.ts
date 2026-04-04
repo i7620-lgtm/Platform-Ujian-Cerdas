@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Question, QuizConfig, QuestionType } from "../../types";
-import { markdownToHtml, normalize } from "../teacher/examUtils";
+import { Question, QuizConfig, QuestionType, ChartData } from "../../types";
+import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../teacher/examUtils";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -22,30 +22,34 @@ function getAI(): GoogleGenAI {
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
   const ai = getAI();
   
-  const systemInstruction = `
+    const systemInstruction = `
     Anda adalah asisten pembuat soal ujian profesional.
     Tugas Anda adalah membuat soal berkualitas tinggi berdasarkan parameter yang diberikan.
     
     ATURAN FORMAT:
-    - Gunakan format Markdown secara maksimal pada teks pertanyaan dan penjelasan.
+    - Gunakan format Markdown secara maksimal pada teks pertanyaan.
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
-    - Gunakan ASCII art atau tabel untuk diagram sederhana jika relevan.
+    - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal. JANGAN gunakan tabel atau ASCII art jika soal secara eksplisit meminta diagram/grafik. Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
+    - PENTING UNTUK DIAGRAM: Jika Anda membuat diagram, Anda WAJIB menyisipkan tag HTML <span class="chart-placeholder" data-chart="true" style="display: block;"></span> di dalam teks (questionText, opsi, dll) tepat di mana diagram tersebut harus ditampilkan.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
+    - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi soal yang harus dijawab oleh siswa.
     
     ATURAN JENIS SOAL:
-    - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi).
-    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan koma, harus sama persis dengan opsi).
+    - Pilihan Ganda: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi). PENTING: Acak posisi jawaban yang benar agar tidak selalu berada di opsi pertama (A).
+    - Pilihan Ganda Kompleks: Wajib isi 'options' (4-5 opsi) dan 'correctAnswer' (semua jawaban benar dipisahkan dengan "|||", contoh: "Opsi 1|||Opsi 2", harus sama persis dengan opsi). Acak posisi jawaban yang benar.
     - Uraian Singkat: Wajib isi 'correctAnswer' dengan jawaban padat dan jelas.
-    - Esai: Wajib isi 'correctAnswer' dengan penjelasan mendalam.
+    - Esai: Wajib isi 'correctAnswer' dengan jawaban yang diharapkan.
     - Benar/Salah: Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan", "answer": true/false }. Buat 3-5 pernyataan.
     - Menjodohkan: Wajib isi 'matchingPairs' berupa array of objects { "left": "item kiri", "right": "pasangan kanan" }. Buat 3-5 pasangan.
     
     RESPON:
     - Berikan respon dalam format JSON array.
     - Pastikan JSON valid dan sesuai dengan schema yang diminta.
+    - WAJIB mengisi field 'correctAnswer' untuk semua jenis soal kecuali INFO.
   `;
 
   const prompt = `
@@ -56,6 +60,28 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     PENTING: Pastikan urutan soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal.
   `;
 
+  const chartDataSchema = {
+    type: Type.OBJECT,
+    properties: {
+      type: { type: Type.STRING, enum: ["bar", "line", "pie"] },
+      title: { type: Type.STRING },
+      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+      datasets: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            label: { type: Type.STRING },
+            data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+          },
+          required: ["label", "data"]
+        }
+      }
+    },
+    required: ["type", "labels", "datasets"],
+    description: "Data untuk membuat diagram (batang, garis, atau lingkaran)"
+  };
+
   const properties = {
     id: { type: Type.STRING, description: "ID unik untuk soal" },
     questionText: { type: Type.STRING, description: "Teks pertanyaan dalam format Markdown" },
@@ -64,8 +90,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       items: { type: Type.STRING },
       description: "Opsi jawaban (hanya untuk PG/PG Kompleks)"
     },
+    optionCharts: {
+      type: Type.ARRAY,
+      items: chartDataSchema,
+      description: "Data diagram untuk setiap opsi jawaban (opsional, urutan harus sesuai dengan options)"
+    },
     correctAnswer: { type: Type.STRING, description: "Jawaban benar. WAJIB diisi untuk semua jenis soal kecuali INFO. Untuk PG/PG Kompleks, harus sama persis dengan teks di options." },
-    explanation: { type: Type.STRING, description: "Penjelasan mengapa jawaban tersebut benar" },
+    correctAnswerChart: {
+      ...chartDataSchema,
+      description: "Data diagram untuk jawaban benar (opsional, berguna untuk soal isian/esai)"
+    },
     scoreWeight: { type: Type.NUMBER, description: "Bobot nilai soal" },
     trueFalseRows: {
       type: Type.ARRAY,
@@ -73,7 +107,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         type: Type.OBJECT,
         properties: {
           text: { type: Type.STRING },
-          answer: { type: Type.BOOLEAN }
+          answer: { type: Type.BOOLEAN },
+          chartData: chartDataSchema
         },
         required: ["text", "answer"]
       },
@@ -85,12 +120,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         type: Type.OBJECT,
         properties: {
           left: { type: Type.STRING },
-          right: { type: Type.STRING }
+          right: { type: Type.STRING },
+          leftChart: chartDataSchema,
+          rightChart: chartDataSchema
         },
         required: ["left", "right"]
       },
       description: "Pasangan untuk soal Menjodohkan"
     },
+    chartData: chartDataSchema,
     ...(config.includeImages ? {
       imageSearchKeyword: { 
         type: Type.STRING, 
@@ -112,7 +150,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           items: {
             type: Type.OBJECT,
             properties: properties,
-            required: ["id", "questionText"]
+            required: ["id", "questionText", "correctAnswer"]
           },
         },
       },
@@ -132,9 +170,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       id: string;
       questionText: string;
       options?: string[];
+      optionCharts?: (ChartData | null)[];
       correctAnswer?: string;
-      trueFalseRows?: { text: string; answer: boolean }[];
-      matchingPairs?: { left: string; right: string }[];
+      correctAnswerChart?: ChartData;
+      trueFalseRows?: { text: string; answer: boolean; chartData?: ChartData }[];
+      matchingPairs?: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }[];
+      chartData?: ChartData;
       scoreWeight?: number;
       imageSearchKeyword?: string;
     }[] = JSON.parse(response.text || "[]");
@@ -157,53 +198,91 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const questionText = markdownToHtml(q.questionText || '');
         const options = q.options ? q.options.map((opt: string) => markdownToHtml(opt || '')) : undefined;
         
-        let correctAnswer = q.correctAnswer || '';
-        if (mappedQuestionType === 'MULTIPLE_CHOICE') {
+        let correctAnswer: string | string[] | number | boolean = q.correctAnswer || '';
+        if (Array.isArray(correctAnswer)) {
+            correctAnswer = JSON.stringify(correctAnswer);
+        } else if (typeof correctAnswer !== 'string') {
+            correctAnswer = String(correctAnswer);
+        }
+               if (mappedQuestionType === 'MULTIPLE_CHOICE') {
             // Find the option that matches the correct answer most closely
-            const normalizedCorrect = normalize(correctAnswer, mappedQuestionType);
-            const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedCorrect);
+            const htmlCorrectAnswer = markdownToHtml(correctAnswer);
+            
+            const matchingOption = options?.find(opt => isAnswerMatch(htmlCorrectAnswer, opt, mappedQuestionType));
+
             if (matchingOption) {
                 correctAnswer = matchingOption;
             } else {
-                // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
-                const fallbackOption = options?.find(opt => 
-                    normalize(opt, mappedQuestionType).includes(normalizedCorrect) || 
-                    normalizedCorrect.includes(normalize(opt, mappedQuestionType))
-                );
-                if (fallbackOption) correctAnswer = fallbackOption;
+                // Check if correctAnswer is just a letter A, B, C, D, E or "Jawaban A" or numbers 1-5
+                const letterMatch = String(correctAnswer).trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[.)]?$/);
+                if (letterMatch && options) {
+                    const char = letterMatch[1];
+                    let index = -1;
+                    if (char >= 'A' && char <= 'E') {
+                        index = char.charCodeAt(0) - 65;
+                    } else if (char >= '1' && char <= '5') {
+                        index = parseInt(char) - 1;
+                    }
+                    if (index >= 0 && index < options.length) {
+                        correctAnswer = options[index];
+                    } else {
+                        correctAnswer = htmlCorrectAnswer;
+                    }
+                } else {
+                    // Fallback: if no exact match, try to find an option that contains the correct answer or vice versa
+                    const fallbackOption = options?.find(opt => {
+                        const normOpt = normalize(opt, mappedQuestionType);
+                        const normAns = normalize(htmlCorrectAnswer, mappedQuestionType);
+                        return (normOpt.length > 3 && normAns.includes(normOpt)) || 
+                               (normAns.length > 3 && normOpt.includes(normAns));
+                    });
+                    correctAnswer = fallbackOption || htmlCorrectAnswer;
+                }
             }
         } else if (mappedQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             // Split by comma, trim, map to html, then JSON stringify
-            // Check if it's already a JSON array string
-            try {
-                let answers: string[] = [];
-                const parsed = JSON.parse(correctAnswer);
-                if (Array.isArray(parsed)) {
-                    answers = parsed.map((a: string) => a.trim());
-                } else {
-                    answers = correctAnswer.split(',').map((a: string) => a.trim());
+            const splitAnswers = parseList(correctAnswer);
+            
+            // Map each answer to the closest matching option
+            const mappedAnswers = splitAnswers.map(ans => {
+                const htmlAns = markdownToHtml(ans);
+
+                const matchingOption = options?.find(opt => isAnswerMatch(htmlAns, opt, mappedQuestionType));
+                if (matchingOption) return matchingOption;
+
+                const letterMatch = String(ans).trim().toUpperCase().match(/^(?:JAWABAN\s+|OPSI\s+|PILIHAN\s+)?([A-E1-5])[.)]?$/);
+                if (letterMatch && options) {
+                    const char = letterMatch[1];
+                    let index = -1;
+                    if (char >= 'A' && char <= 'E') {
+                        index = char.charCodeAt(0) - 65;
+                    } else if (char >= '1' && char <= '5') {
+                        index = parseInt(char) - 1;
+                    }
+                    if (index >= 0 && index < options.length) {
+                        return options[index];
+                    }
                 }
-                
-                // Map each answer to the closest matching option
-                const mappedAnswers = answers.map(ans => {
-                    const normalizedAns = normalize(ans, mappedQuestionType);
-                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || markdownToHtml(ans);
+
+                // Fallback for complex answers
+                const fallbackOption = options?.find(opt => {
+                    const normOpt = normalize(opt, mappedQuestionType);
+                    const normAns = normalize(htmlAns, mappedQuestionType);
+                    return (normOpt.length > 3 && normAns.includes(normOpt)) || 
+                           (normAns.length > 3 && normOpt.includes(normAns));
                 });
                 
-                correctAnswer = JSON.stringify(mappedAnswers);
-            } catch {
-                const answers = correctAnswer.split(',').map((a: string) => a.trim());
-                const mappedAnswers = answers.map(ans => {
-                    const normalizedAns = normalize(ans, mappedQuestionType);
-                    const matchingOption = options?.find(opt => normalize(opt, mappedQuestionType) === normalizedAns);
-                    return matchingOption || markdownToHtml(ans);
-                });
-                correctAnswer = JSON.stringify(mappedAnswers);
-            }
+                return fallbackOption || htmlAns;
+            });
+            
+            // Ensure we only have unique answers and they are valid options if possible
+            const uniqueAnswers = Array.from(new Set(mappedAnswers));
+            correctAnswer = JSON.stringify(uniqueAnswers);
         } else if (mappedQuestionType === 'FILL_IN_THE_BLANK' || mappedQuestionType === 'ESSAY') {
             // Do not convert to HTML for fill in the blank or essay to preserve the raw text answer
-            correctAnswer = correctAnswer.trim();
+            correctAnswer = String(correctAnswer).trim();
+        } else {
+            correctAnswer = markdownToHtml(correctAnswer);
         }
 
         const mappedQ: Question = {
@@ -211,20 +290,36 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             questionText: questionText,
             questionType: mappedQuestionType,
             options: options,
+            optionCharts: q.optionCharts,
             correctAnswer: correctAnswer,
+            correctAnswerChart: q.correctAnswerChart,
             scoreWeight: q.scoreWeight || 1,
             kisiKisi: config.blueprint,
             level: config.difficulty,
-            category: config.subject
+            category: config.subject,
+            chartData: q.chartData
         };
         
         // Handle true false rows if needed
         if (mappedQuestionType === 'TRUE_FALSE') {
             if (q.trueFalseRows && q.trueFalseRows.length > 0) {
-                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: boolean }) => ({
-                    text: markdownToHtml(r.text || ''),
-                    answer: r.answer
-                }));
+                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: string | boolean | number; chartData?: ChartData }) => {
+                    // Ensure answer is a boolean even if AI returns string "true"/"false" or "Benar"/"Salah"
+                    let boolAnswer = !!r.answer;
+                    if (typeof r.answer === 'string') {
+                        const lower = r.answer.toLowerCase();
+                        if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak') {
+                            boolAnswer = false;
+                        } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya') {
+                            boolAnswer = true;
+                        }
+                    }
+                    return {
+                        text: markdownToHtml(r.text || ''),
+                        answer: boolAnswer,
+                        chartData: r.chartData
+                    };
+                });
             } else if (q.options) {
                 mappedQ.trueFalseRows = [
                     { text: markdownToHtml('Pernyataan 1'), answer: q.correctAnswer?.toLowerCase().includes('benar') || false }
@@ -235,9 +330,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         // Handle matching pairs if needed
         if (mappedQuestionType === 'MATCHING') {
             if (q.matchingPairs && q.matchingPairs.length > 0) {
-                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({
+                mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
                     left: markdownToHtml(p.left || ''),
-                    right: markdownToHtml(p.right || '')
+                    right: markdownToHtml(p.right || ''),
+                    leftChart: p.leftChart,
+                    rightChart: p.rightChart
                 }));
             } else {
                 mappedQ.matchingPairs = [

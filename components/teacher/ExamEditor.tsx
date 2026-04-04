@@ -1,16 +1,19 @@
- 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Question, QuestionType, ExamConfig } from '../../types';
+import { createPortal } from 'react-dom';
+import type { Question, QuestionType, ExamConfig, ChartData } from '../../types';
 import { 
     TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, SpeakerWaveIcon,
     FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
     TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon
+    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon, ChartBarIcon
 } from '../Icons';
-import { compressImage, parseList, sanitizeHtml } from './examUtils';
+import { compressImage, parseList, sanitizeHtml, normalize, isAnswerMatch } from './examUtils';
 import { EXAM_TYPES } from './constants';
 import { generateQuestions } from '../services/gemini';
+import { ChartRenderer } from '../ChartRenderer';
+import { ChartConfigModal } from './ChartConfigModal';
 
 // --- TIPE DATA & KONSTANTA ---
 interface ExamEditorProps {
@@ -245,7 +248,9 @@ const WysiwygEditor: React.FC<{
     placeholder?: string; 
     minHeight?: string; 
     showTabs?: boolean;
-}> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px", showTabs = true }) => {
+    onChartClick?: () => void;
+    chartData?: ChartData;
+}> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px", showTabs = true, onChartClick, chartData }) => {
     const editorRef = useRef<HTMLDivElement>(null); 
     const fileInputRef = useRef<HTMLInputElement>(null); 
     const audioInputRef = useRef<HTMLInputElement>(null); 
@@ -257,10 +262,8 @@ const WysiwygEditor: React.FC<{
     const [showMath, setShowMath] = useState(false); 
     const [showTable, setShowTable] = useState(false);
     const [showAksara, setShowAksara] = useState(false);
+    const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
     
-    // Local state to handle immediate updates without re-rendering parent
-    const [, setLocalValue] = useState(value);
-
     // Sync local state with prop value
     useEffect(() => {
         if (editorRef.current) {
@@ -276,13 +279,26 @@ const WysiwygEditor: React.FC<{
             
             if (value !== currentHtml) {
                 if (!isFocused || !currentHtml || currentHtml === '<p><br></p>') {
-                    editorRef.current.innerHTML = value;
-                    // eslint-disable-next-line react-hooks/set-state-in-effect
-                    setLocalValue(value);
+                    let newHtml = value;
+                    if (chartData && !newHtml.includes('data-chart="true"')) {
+                        newHtml += `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
+                    }
+                    editorRef.current.innerHTML = newHtml;
                 }
             }
         }
-    }, [value]);
+    }, [value, chartData]);
+
+    useEffect(() => {
+        if (editorRef.current) {
+            const node = editorRef.current.querySelector('[data-chart="true"]');
+            if (node && chartData) {
+                const textSpan = node.querySelector('.chart-placeholder-text') as HTMLElement;
+                if (textSpan) textSpan.style.display = 'none';
+            }
+            setChartNode(node as HTMLElement);
+        }
+    }, [value, chartData]);
     
     // Cleanup debounce on unmount
     useEffect(() => {
@@ -293,8 +309,12 @@ const WysiwygEditor: React.FC<{
 
     const handleInput = () => { 
         if (editorRef.current) { 
-            const html = editorRef.current.innerHTML;
-            setLocalValue(html); // Update local state immediately
+            const clone = editorRef.current.cloneNode(true) as HTMLElement;
+            const chartNodes = clone.querySelectorAll('[data-chart="true"]');
+            chartNodes.forEach(node => {
+                node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
+            });
+            const html = clone.innerHTML;
 
             // Debounce onChange to prevent heavy re-renders of parent
             if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -314,7 +334,12 @@ const WysiwygEditor: React.FC<{
             clearTimeout(debounceRef.current);
             debounceRef.current = null;
             if (editorRef.current) {
-                const html = editorRef.current.innerHTML;
+                const clone = editorRef.current.cloneNode(true) as HTMLElement;
+            const chartNodes = clone.querySelectorAll('[data-chart="true"]');
+            chartNodes.forEach(node => {
+                node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
+            });
+                const html = clone.innerHTML;
                 onChange(sanitizeHtml(html));
             }
         }
@@ -322,8 +347,29 @@ const WysiwygEditor: React.FC<{
     };
 
     const saveSelection = () => { const sel = window.getSelection(); if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) { savedRange.current = sel.getRangeAt(0).cloneRange(); } };
-    const restoreSelection = () => { const sel = window.getSelection(); if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); } else if (editorRef.current) { editorRef.current.focus(); const range = document.createRange(); range.selectNodeContents(editorRef.current); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); } };
+    const restoreSelection = () => { 
+        if (editorRef.current) editorRef.current.focus();
+        const sel = window.getSelection(); 
+        if (sel && savedRange.current) { 
+            sel.removeAllRanges(); 
+            sel.addRange(savedRange.current); 
+        } else if (editorRef.current && sel) { 
+            const range = document.createRange(); 
+            range.selectNodeContents(editorRef.current); 
+            range.collapse(false); 
+            sel.removeAllRanges(); 
+            sel.addRange(range); 
+        } 
+    };
     const checkActiveFormats = () => { saveSelection(); const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList']; const active = cmds.filter(cmd => document.queryCommandState(cmd)); setActiveCmds(active); const selection = window.getSelection(); let inTable = false; if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE' || node.nodeName === 'TD' || node.nodeName === 'TH') { inTable = true; break; } node = node.parentNode; } } setIsInsideTable(inTable); };
+    const handleEditorClick = (e: React.MouseEvent) => {
+        checkActiveFormats();
+        const target = e.target as HTMLElement;
+        if (target.closest('.chart-placeholder') && onChartClick) {
+            onChartClick();
+        }
+    };
+
     const runCmd = (cmd: string, val?: string) => { 
         // Only restore selection if the editor lost focus. 
         // Restoring selection when already focused can reset pending format states (like toggling off superscript).
@@ -425,7 +471,7 @@ const WysiwygEditor: React.FC<{
     };
     
     // NOTE: Styles are now handled globally in style.css to ensure consistency between Editor and Preview/Draft View.
-    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end overflow-x-auto custom-scrollbar">{showTabs && (<div className="flex gap-1 shrink-0">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: string) => (<button key={t} onClick={() => setActiveTab(t as 'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH')} className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800 shrink-0">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn runCmd={runCmd} cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn runCmd={runCmd} cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn runCmd={runCmd} cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn runCmd={runCmd} cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn runCmd={runCmd} cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn runCmd={runCmd} cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn runCmd={runCmd} cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn runCmd={runCmd} cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn runCmd={runCmd} cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn runCmd={runCmd} cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn runCmd={runCmd} cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><TableCellsIcon className="w-4 h-4"/> Tabel</button><button onMouseDown={(e) => {e.preventDefault(); setShowAksara(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"><span className="font-serif italic">ᬅ</span> Aksara Bali</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in shrink-0"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors whitespace-nowrap" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-3 sm:p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto break-words" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={checkActiveFormats} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} /></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal key={showMath ? 'math-open' : 'math-closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /><AksaraBaliModal isOpen={showAksara} onClose={() => setShowAksara(false)} onInsert={(text) => { runCmd('insertHTML', `<span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">${text}</span>&nbsp;`); handleInput(); }} /></div>);
+    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end overflow-x-auto custom-scrollbar">{showTabs && (<div className="flex gap-1 shrink-0">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: string) => (<button key={t} onClick={() => setActiveTab(t as 'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH')} className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800 shrink-0">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn runCmd={runCmd} cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn runCmd={runCmd} cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn runCmd={runCmd} cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn runCmd={runCmd} cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn runCmd={runCmd} cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn runCmd={runCmd} cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn runCmd={runCmd} cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn runCmd={runCmd} cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn runCmd={runCmd} cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn runCmd={runCmd} cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn runCmd={runCmd} cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><TableCellsIcon className="w-4 h-4"/> Tabel</button>{onChartClick && (<button onMouseDown={(e) => { e.preventDefault(); const placeholderHtml = `<span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`; if (editorRef.current && !editorRef.current.innerHTML.includes('data-chart="true"')) { restoreSelection(); document.execCommand('insertHTML', false, placeholderHtml); handleInput(); } onChartClick(); }} className="flex items-center gap-1.5 px-3 py-1 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 rounded text-xs font-bold hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors whitespace-nowrap"><ChartBarIcon className="w-4 h-4"/> Diagram</button>)}<button onMouseDown={(e) => {e.preventDefault(); setShowAksara(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"><span className="font-serif italic">ᬅ</span> Aksara Bali</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in shrink-0"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors whitespace-nowrap" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-3 sm:p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto break-words" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={handleEditorClick} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} suppressContentEditableWarning={true} />{chartNode && chartData && createPortal(<div className="w-full pointer-events-none"><ChartRenderer data={chartData} /></div>, chartNode)}</div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} /><TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} /><VisualMathModal key={showMath ? 'math-open' : 'math-closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /><AksaraBaliModal isOpen={showAksara} onClose={() => setShowAksara(false)} onInsert={(text) => { runCmd('insertHTML', `<span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">${text}</span>&nbsp;`); handleInput(); }} /></div>);
 };
 
 const createNewQuestion = (type: QuestionType): Question => {
@@ -434,6 +480,13 @@ const createNewQuestion = (type: QuestionType): Question => {
         case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
     }
 };
+
+interface ChartTarget {
+    qId: string;
+    type: 'question' | 'option' | 'tf' | 'matching' | 'correctAnswer';
+    index?: number;
+    subIndex?: 'left' | 'right';
+}
 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
     questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
@@ -479,6 +532,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     }, [hasManualGrading, config.showResultToStudent, setConfig]);
 
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
+    const [editingChartTarget, setEditingChartTarget] = useState<ChartTarget | null>(null);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
     const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); 
@@ -504,7 +558,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             const generatedQuestions = await generateQuestions(aiConfig);
             if (generatedQuestions && generatedQuestions.length > 0) {
                 const newQ = generatedQuestions[0];
-                setQuestions(questions.map(question => 
+                setQuestions(prev => prev.map(question => 
                     question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi, scoreWeight: newQ.scoreWeight || q.scoreWeight } : question
                 ));
             }
@@ -544,6 +598,40 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     };
 
     const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
+    const handleSaveChart = (data: ChartData) => {
+        if (editingChartTarget) {
+            const { qId, type, index, subIndex } = editingChartTarget;
+            setQuestions(prev => prev.map(q => {
+                if (q.id === qId) {
+                    const updated = { ...q };
+                    if (type === 'question') {
+                        updated.chartData = data;
+                    } else if (type === 'option' && index !== undefined) {
+                        const optionCharts = [...(q.optionCharts || [])];
+                        while (optionCharts.length <= index) optionCharts.push(null);
+                        optionCharts[index] = data;
+                        updated.optionCharts = optionCharts;
+                    } else if (type === 'tf' && index !== undefined) {
+                        const trueFalseRows = [...(q.trueFalseRows || [])];
+                        trueFalseRows[index] = { ...trueFalseRows[index], chartData: data };
+                        updated.trueFalseRows = trueFalseRows;
+                    } else if (type === 'matching' && index !== undefined && subIndex) {
+                        const matchingPairs = [...(q.matchingPairs || [])];
+                        if (subIndex === 'left') {
+                            matchingPairs[index] = { ...matchingPairs[index], leftChart: data };
+                        } else {
+                            matchingPairs[index] = { ...matchingPairs[index], rightChart: data };
+                        }
+                        updated.matchingPairs = matchingPairs;
+                    } else if (type === 'correctAnswer') {
+                        updated.correctAnswerChart = data;
+                    }
+                    return updated;
+                }
+                return q;
+            }));
+        }
+    };
     const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
     const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
     const handleLevelChange = (id: string, level: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, level } : q));
@@ -570,14 +658,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 let newCorrectAnswer = q.correctAnswer;
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(oldOption)) newCorrectAnswer = text; 
+                    if (isAnswerMatch(q.correctAnswer, oldOption, q.questionType)) newCorrectAnswer = text; 
                 } 
                 else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (answers.some(a => normalizeHtml(a) === normalizeHtml(oldOption))) { 
-                        answers = answers.map(a => normalizeHtml(a) === normalizeHtml(oldOption) ? text : a); 
+                    if (answers.some(a => isAnswerMatch(a, oldOption, q.questionType))) { 
+                        answers = answers.map(a => isAnswerMatch(a, oldOption, q.questionType) ? text : a); 
                         newCorrectAnswer = JSON.stringify(answers); 
                     } 
                 }
@@ -592,32 +678,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         setQuestions(prev => prev.map(q => {
             if (q.id === questionId) { 
                 const currentAnswers = parseList(q.correctAnswer);
-                const normalizeHtml = (html: string) => {
-                    try {
-                        const div = document.createElement('div');
-                        div.innerHTML = html || '';
-                        
-                        div.querySelectorAll('.math-visual').forEach(el => {
-                            const latex = el.getAttribute('data-latex');
-                            if (latex) {
-                                el.replaceWith(document.createTextNode(`$${latex}$`));
-                            } else {
-                                while (el.firstChild) {
-                                    el.parentNode?.insertBefore(el.firstChild, el);
-                                }
-                                el.parentNode?.removeChild(el);
-                            }
-                        });
-
-                        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-                    } catch {
-                        return (html || '').trim().replace(/\s+/g, ' ');
-                    }
-                };
-                
                 // Clean up currentAnswers to only include valid options from q.options
                 const currentlyCheckedOptions = (q.options || []).filter(o => 
-                    currentAnswers.some(a => normalizeHtml(a) === normalizeHtml(o))
+                    currentAnswers.some(a => isAnswerMatch(a, o, q.questionType))
                 );
                 
                 let newKeys;
@@ -626,6 +689,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 } else { 
                     newKeys = currentlyCheckedOptions.filter(o => o !== option);
                 } 
+                newKeys.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                 return { ...q, correctAnswer: JSON.stringify(newKeys) }; 
             }
             return q;
@@ -640,7 +704,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
         else { const newQuestions = [...questions]; newQuestions.splice(insertIndex + 1, 0, newQuestion); setQuestions(newQuestions); }
         setIsTypeSelectionModalOpen(false); setInsertIndex(null);
     };
-    const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages }; } return q; })); };
+    const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; const newOptionCharts = q.optionCharts ? [...q.optionCharts, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts }; } return q; })); };
     
     const handleDeleteOption = (questionId: string, indexToRemove: number) => { 
         setQuestions(prev => prev.map(q => { 
@@ -648,18 +712,17 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 const optionToRemove = q.options[indexToRemove]; 
                 const newOptions = q.options.filter((_, i) => i !== indexToRemove); 
                 const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; 
+                const newOptionCharts = q.optionCharts ? q.optionCharts.filter((_, i) => i !== indexToRemove) : undefined; 
                 let newCorrectAnswer = q.correctAnswer; 
                 
                 if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    if (normalizeHtml(q.correctAnswer || '') === normalizeHtml(optionToRemove)) newCorrectAnswer = newOptions[0] || ''; 
+                    if (isAnswerMatch(q.correctAnswer, optionToRemove, q.questionType)) newCorrectAnswer = newOptions[0] || ''; 
                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
                     let answers = parseList(q.correctAnswer);
-                    const normalizeHtml = (html: string) => { try { const div = document.createElement('div'); div.innerHTML = html; return div.innerHTML; } catch { return html; } };
-                    answers = answers.filter(a => normalizeHtml(a) !== normalizeHtml(optionToRemove)); 
+                    answers = answers.filter(a => !isAnswerMatch(a, optionToRemove, q.questionType)); 
                     newCorrectAnswer = JSON.stringify(answers); 
                 } 
-                return { ...q, options: newOptions, optionImages: newOptionImages, correctAnswer: newCorrectAnswer }; 
+                return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts, correctAnswer: newCorrectAnswer }; 
             } 
             return q; 
         })); 
@@ -697,20 +760,22 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 <div id={q.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-visible">
                                      <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity z-20">
                                          {q.questionType !== 'INFO' && (
-                                             <button 
-                                                 type="button" 
-                                                 onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
-                                                 disabled={isGeneratingId === q.id}
-                                                 className="flex items-center gap-1 p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm disabled:opacity-50" 
-                                                 title="Buat dengan AI"
-                                             >
-                                                 {isGeneratingId === q.id ? (
-                                                     <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                                                 ) : (
-                                                     <SparklesIcon className="w-4 h-4" />
-                                                 )}
-                                                 <span className="text-[10px] font-bold uppercase tracking-wider">Buat dengan AI</span>
-                                             </button>
+                                             <>
+                                                 <button 
+                                                     type="button" 
+                                                     onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
+                                                     disabled={isGeneratingId === q.id}
+                                                     className="flex items-center gap-1 p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm disabled:opacity-50" 
+                                                     title="Buat dengan AI"
+                                                 >
+                                                     {isGeneratingId === q.id ? (
+                                                         <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                                     ) : (
+                                                         <SparklesIcon className="w-4 h-4" />
+                                                     )}
+                                                     <span className="text-[10px] font-bold uppercase tracking-wider">AI</span>
+                                                 </button>
+                                             </>
                                          )}
                                          <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                                             <select value={q.questionType} onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)} className="appearance-none bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white dark:hover:bg-slate-600 hover:border-gray-300 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
@@ -782,17 +847,35 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     onChange={(val) => handleQuestionTextChange(q.id, val)} 
                                                     placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} 
                                                     minHeight="80px"
+                                                    onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'question' })}
+                                                    chartData={q.chartData}
                                                 />
                                                 
                                                 {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
                                                     <div className="mt-6 space-y-3">
-                                                        {q.options.map((option, i) => (
-                                                            <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${q.correctAnswer === option ? 'bg-emerald-50/50 dark:bg-emerald-900/20' : ''}`}>
-                                                                <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}><div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${q.correctAnswer === option ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-emerald-300 dark:group-hover/opt:border-emerald-500'}`}>{q.correctAnswer === option && <div className="w-2 h-2 bg-white rounded-full" />}</div></div>
-                                                                <div className="flex-1 min-w-0"><WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" /></div>
-                                                                <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
-                                                            </div>
-                                                        ))}
+                                                        {q.options.map((option, i) => {
+                                                            const isSelected = isAnswerMatch(q.correctAnswer, option, q.questionType);
+                                                            return (
+                                                                <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/20' : ''}`}>
+                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}>
+                                                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-emerald-300 dark:group-hover/opt:border-emerald-500'}`}>
+                                                                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <WysiwygEditor 
+                                                                            value={option} 
+                                                                            onChange={(val) => handleOptionTextChange(q.id, i, val)} 
+                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
+                                                                            minHeight="40px" 
+                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
+                                                                            chartData={q.optionCharts?.[i] || undefined}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                         <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
                                                     </div>
                                                 )}
@@ -801,17 +884,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                     <div className="mt-6 space-y-3">
                                                         {q.options.map((option, i) => {
                                                             const currentAnswers = parseList(q.correctAnswer);
-                                                            // Normalize both to handle slight HTML serialization differences
-                                                            const normalizeHtml = (html: string) => {
-                                                                try {
-                                                                    const div = document.createElement('div');
-                                                                    div.innerHTML = html;
-                                                                    return div.innerHTML;
-                                                                } catch {
-                                                                    return html;
-                                                                }
-                                                            };
-                                                            const isSelected = currentAnswers.some(ans => normalizeHtml(ans) === normalizeHtml(option));
+                                                            const isSelected = currentAnswers.some(ans => isAnswerMatch(ans, option, q.questionType));
                                                             return (
                                                                 <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
                                                                     <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isSelected)}>
@@ -820,7 +893,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                         </div>
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
-                                                                        <WysiwygEditor value={option} onChange={(val) => handleOptionTextChange(q.id, i, val)} placeholder={`Opsi ${String.fromCharCode(65 + i)}`} minHeight="40px" />
+                                                                        <WysiwygEditor 
+                                                                            value={option} 
+                                                                            onChange={(val) => handleOptionTextChange(q.id, i, val)} 
+                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
+                                                                            minHeight="40px" 
+                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
+                                                                            chartData={q.optionCharts?.[i] || undefined}
+                                                                        />
                                                                     </div>
                                                                     <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
                                                                         <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
@@ -846,6 +926,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                         onChange={(val) => handleTrueFalseRowTextChange(q.id, i, val)} 
                                                                         minHeight="80px" 
                                                                         placeholder={`Pernyataan ${i+1}`}
+                                                                        onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'tf', index: i })}
+                                                                        chartData={row.chartData}
                                                                     />
                                                                 </div>
                                                                 <div className="w-full sm:col-span-4 flex items-center justify-center gap-2 h-full pt-2">
@@ -883,6 +965,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                         onChange={(val) => handleMatchingPairChange(q.id, i, 'left', val)} 
                                                                         minHeight="120px" 
                                                                         placeholder="Item Kiri"
+                                                                        onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'matching', index: i, subIndex: 'left' })}
+                                                                        chartData={pair.leftChart}
                                                                     />
                                                                 </div>
                                                                 <div className="text-slate-300 dark:text-slate-600 hidden md:block select-none">→</div>
@@ -893,6 +977,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                                             onChange={(val) => handleMatchingPairChange(q.id, i, 'right', val)} 
                                                                             minHeight="120px" 
                                                                             placeholder="Pasangan Kanan"
+                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'matching', index: i, subIndex: 'right' })}
+                                                                            chartData={pair.rightChart}
                                                                         />
                                                                     </div>
                                                                     <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all shrink-0"><TrashIcon className="w-4 h-4"/></button>
@@ -906,7 +992,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                  {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
                                                     <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-700">
                                                         <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3 block">{q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}</label>
-                                                        <WysiwygEditor value={q.correctAnswer || ''} onChange={(val) => handleCorrectAnswerChange(q.id, val)} placeholder="Tulis kunci jawaban..." minHeight="60px" />
+                                                        <WysiwygEditor 
+                                                            value={q.correctAnswer || ''} 
+                                                            onChange={(val) => handleCorrectAnswerChange(q.id, val)} 
+                                                            placeholder="Tulis kunci jawaban..." 
+                                                            minHeight="60px" 
+                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'correctAnswer' })}
+                                                            chartData={q.correctAnswerChart}
+                                                        />
                                                     </div>
                                                 )}
                                             </div>
@@ -1206,6 +1299,82 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             <SelectionModal key={isSubjectModalOpen ? 'subject-open' : 'subject-closed'} isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
             <SelectionModal key={isClassModalOpen ? 'class-open' : 'class-closed'} isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
             <SelectionModal key={isExamTypeModalOpen ? 'exam-type-open' : 'exam-type-closed'} isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
+            
+            {editingChartTarget && (
+                <ChartConfigModal 
+                    isOpen={!!editingChartTarget}
+                    onClose={() => setEditingChartTarget(null)}
+                    onSave={handleSaveChart}
+                    onDelete={() => {
+                        if (editingChartTarget) {
+                            const { qId, type, index, subIndex } = editingChartTarget;
+                            setQuestions(prev => prev.map(q => {
+                                if (q.id === qId) {
+                                    const updated = { ...q };
+                                    let fieldToUpdate = '';
+                                    if (type === 'question') fieldToUpdate = q.questionText;
+                                    else if (type === 'option' && index !== undefined && q.options) fieldToUpdate = q.options[index];
+                                    else if (type === 'tf' && index !== undefined && q.trueFalseRows) fieldToUpdate = q.trueFalseRows[index].text;
+                                    else if (type === 'matching' && index !== undefined && q.matchingPairs) {
+                                        fieldToUpdate = subIndex === 'left' ? q.matchingPairs[index].left : q.matchingPairs[index].right;
+                                    } else if (type === 'correctAnswer') fieldToUpdate = q.correctAnswer || '';
+
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString(fieldToUpdate, 'text/html');
+                                    const chartNode = doc.querySelector('[data-chart="true"]');
+                                    if (chartNode) {
+                                        chartNode.remove();
+                                    }
+                                    const newHtml = doc.body.innerHTML;
+
+                                    if (type === 'question') {
+                                        updated.questionText = newHtml;
+                                        updated.chartData = undefined;
+                                    } else if (type === 'option' && index !== undefined && q.options) {
+                                        const newOptions = [...q.options];
+                                        newOptions[index] = newHtml;
+                                        updated.options = newOptions;
+                                        const newOptionCharts = [...(q.optionCharts || [])];
+                                        if (newOptionCharts[index]) newOptionCharts[index] = null;
+                                        updated.optionCharts = newOptionCharts;
+                                    } else if (type === 'tf' && index !== undefined && q.trueFalseRows) {
+                                        const newRows = [...q.trueFalseRows];
+                                        newRows[index] = { ...newRows[index], text: newHtml, chartData: undefined };
+                                        updated.trueFalseRows = newRows;
+                                    } else if (type === 'matching' && index !== undefined && q.matchingPairs) {
+                                        const newPairs = [...q.matchingPairs];
+                                        if (subIndex === 'left') {
+                                            newPairs[index] = { ...newPairs[index], left: newHtml, leftChart: undefined };
+                                        } else {
+                                            newPairs[index] = { ...newPairs[index], right: newHtml, rightChart: undefined };
+                                        }
+                                        updated.matchingPairs = newPairs;
+                                    } else if (type === 'correctAnswer') {
+                                        updated.correctAnswer = newHtml;
+                                        updated.correctAnswerChart = undefined;
+                                    }
+                                    return updated;
+                                }
+                                return q;
+                            }));
+                        }
+                    }}
+                    initialData={(() => {
+                        if (!editingChartTarget) return undefined;
+                        const { qId, type, index, subIndex } = editingChartTarget;
+                        const q = questions.find(item => item.id === qId);
+                        if (!q) return undefined;
+                        if (type === 'question') return q.chartData;
+                        if (type === 'option' && index !== undefined) return q.optionCharts?.[index] || undefined;
+                        if (type === 'tf' && index !== undefined) return q.trueFalseRows?.[index].chartData;
+                        if (type === 'matching' && index !== undefined) {
+                            return subIndex === 'left' ? q.matchingPairs?.[index].leftChart : q.matchingPairs?.[index].rightChart;
+                        }
+                        if (type === 'correctAnswer') return q.correctAnswerChart;
+                        return undefined;
+                    })()}
+                />
+            )}
         </div>
     );
 };

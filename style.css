@@ -1,4 +1,4 @@
-
+ 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -245,4 +245,24 @@
       background-color: transparent !important;
       color: inherit !important;
   }
+}
+
+/* --- Recharts Dark Mode Fixes --- */
+.dark .recharts-text {
+  fill: #cbd5e1;
+}
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: #334155;
+}
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.dark .recharts-tooltip-item {
+  color: #f1f5f9 !important;
+}
+.dark .recharts-legend-item-text {
+  color: #cbd5e1 !important;
 }

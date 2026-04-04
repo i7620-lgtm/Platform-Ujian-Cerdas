@@ -6,6 +6,56 @@ import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { parseList, sanitizeHtml, calculateExamScore } from './teacher/examUtils';
 import { AudioPlayer } from './AudioPlayer';
+import { ChartRenderer } from './ChartRenderer';
+import type { ChartData } from '../types';
+
+const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefined, optimizeHtml: (h: string) => string) => {
+    const optimized = optimizeHtml(html);
+    if (!chartData) {
+        return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(optimized, 'text/html');
+    const chartNode = doc.querySelector('[data-chart="true"]');
+
+    if (!chartNode) {
+        return (
+            <>
+                <div dangerouslySetInnerHTML={{ __html: optimized }}></div>
+                <div className="mb-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="h-[300px] w-full">
+                        <ChartRenderer data={chartData} />
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    const marker = '___CHART_MARKER___';
+    chartNode.insertAdjacentText('beforebegin', marker);
+    chartNode.remove();
+    
+    const newHtml = doc.body.innerHTML;
+    const parts = newHtml.split(marker);
+
+    return (
+        <>
+            {parts.map((part, index) => (
+                <React.Fragment key={index}>
+                    <div dangerouslySetInnerHTML={{ __html: part }}></div>
+                    {index < parts.length - 1 && (
+                        <div className="my-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <div className="h-[300px] w-full">
+                                <ChartRenderer data={chartData} />
+                            </div>
+                        </div>
+                    )}
+                </React.Fragment>
+            ))}
+        </>
+    );
+};
 
 interface StudentExamPageProps {
   exam: Exam;
@@ -120,6 +170,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
+        let resultChannel: ReturnType<typeof supabase.channel> | null = null;
         if (!exam.config.disableRealtime) {
             channel = supabase.channel(`exam-room-${exam.code}`)
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
@@ -132,9 +183,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     }
                 })
                 .subscribe();
+
+            if (student.resultId) {
+                resultChannel = supabase.channel(`student-result-${student.resultId}`)
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'results', filter: `id=eq.${student.resultId}` }, (payload) => {
+                        const newStatus = payload.new.status;
+                        if ((newStatus === 'completed' || newStatus === 'force_closed') && !isSubmittingRef.current && student.class !== 'PREVIEW') {
+                            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                            handleSubmit(true, newStatus);
+                        }
+                    })
+                    .subscribe();
+            }
         }
-        return () => { if (channel) supabase.removeChannel(channel); };
-    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, handleSubmit]);
+        return () => { 
+            if (channel) supabase.removeChannel(channel); 
+            if (resultChannel) supabase.removeChannel(resultChannel);
+        };
+    }, [exam.code, exam.config.disableRealtime, student.studentId, student.class, student.resultId, handleSubmit]);
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -163,29 +229,115 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         return { ...prev, config: data.config };
                     });
                 }
+                
+                // Also poll result status in case realtime is disabled or missed
+                if (student.resultId && student.class !== 'PREVIEW') {
+                    const { data: resultData } = await supabase.from('results').select('status').eq('id', student.resultId).single();
+                    if (resultData && (resultData.status === 'completed' || resultData.status === 'force_closed') && !isSubmittingRef.current) {
+                        alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                        handleSubmit(true, resultData.status);
+                    }
+                }
             } catch { /* ignore */ }
         }, 15000);
 
         return () => { if (channel) supabase.removeChannel(channel); clearInterval(pollInterval); };
-    }, [exam.code, exam.config.disableRealtime]);
+    }, [exam.code, exam.config.disableRealtime, student.resultId, student.class, handleSubmit]);
+
+    const isLoadedRef = useRef(false);
+    const prevStorageKeyRef = useRef(STORAGE_KEY);
+    const loadPromiseRef = useRef<Promise<void> | null>(null);
+
+    useEffect(() => {
+        if (prevStorageKeyRef.current !== STORAGE_KEY) {
+            const oldKey = prevStorageKeyRef.current;
+            const newKey = STORAGE_KEY;
+            prevStorageKeyRef.current = STORAGE_KEY;
+
+            const copyData = async () => {
+                if (loadPromiseRef.current) {
+                    await loadPromiseRef.current;
+                }
+                storageService.saveLocalProgress(newKey, { answers: answersRef.current, logs: logRef.current, lastUpdated: Date.now() });
+                storageService.clearLocalProgress(oldKey);
+            };
+            copyData();
+        }
+    }, [STORAGE_KEY]);
 
     useEffect(() => {
         const loadState = async () => {
-            try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
-            const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
-            if (localData) {
-                setAnswers(localData.answers || {});
-                answersRef.current = localData.answers || {};
-                if (localData.logs) logRef.current = localData.logs;
-                return;
-            }
-            if (initialData?.answers) {
-                setAnswers(initialData.answers);
-                answersRef.current = initialData.answers;
-            }
+            if (isLoadedRef.current) return;
+            isLoadedRef.current = true;
+            
+            loadPromiseRef.current = (async () => {
+                try { localStorage.setItem(CACHED_EXAM_KEY, JSON.stringify(exam)); } catch { /* ignore */ }
+                const localData = await storageService.getLocalProgress(STORAGE_KEY) as { answers?: Record<string, string>, logs?: string[] } | null;
+                if (localData) {
+                    const loadedAnswers = localData.answers || {};
+                    // Fix sorting for old data
+                    Object.keys(loadedAnswers).forEach(qId => {
+                        const q = activeExam.questions.find(q => q.id === qId);
+                        if (q) {
+                            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (Array.isArray(parsed)) {
+                                        parsed.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                        loadedAnswers[qId] = JSON.stringify(parsed);
+                                    }
+                                } catch { /* ignore */ }
+                            } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                        const sortedObj: Record<number, string | boolean | number> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = (parsed as Record<number, string | boolean | number>)[k]);
+                                        loadedAnswers[qId] = JSON.stringify(sortedObj);
+                                    }
+                                } catch { /* ignore */ }
+                            }
+                        }
+                    });
+                    setAnswers(loadedAnswers);
+                    answersRef.current = loadedAnswers;
+                    if (localData.logs) logRef.current = localData.logs;
+                    return;
+                }
+                if (initialData?.answers) {
+                    const loadedAnswers = { ...initialData.answers };
+                    // Fix sorting for old data
+                    Object.keys(loadedAnswers).forEach(qId => {
+                        const q = activeExam.questions.find(q => q.id === qId);
+                        if (q) {
+                            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (Array.isArray(parsed)) {
+                                        parsed.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
+                                        loadedAnswers[qId] = JSON.stringify(parsed);
+                                    }
+                                } catch { /* ignore */ }
+                            } else if (q.questionType === 'TRUE_FALSE' || q.questionType === 'MATCHING') {
+                                try {
+                                    const parsed = JSON.parse(loadedAnswers[qId]);
+                                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                        const sortedObj: Record<number, string | boolean | number> = {};
+                                        Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = (parsed as Record<number, string | boolean | number>)[k]);
+                                        loadedAnswers[qId] = JSON.stringify(sortedObj);
+                                    }
+                                } catch { /* ignore */ }
+                            }
+                        }
+                    });
+                    setAnswers(loadedAnswers);
+                    answersRef.current = loadedAnswers;
+                }
+            })();
+            await loadPromiseRef.current;
         };
         loadState();
-    }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam]);
+    }, [STORAGE_KEY, CACHED_EXAM_KEY, initialData, exam, activeExam.questions]);
 
     useEffect(() => { isSubmittingRef.current = isSubmitting; }, [isSubmitting]);
 
@@ -532,7 +684,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                             </div>
                                         )}
                                         <div className="prose prose-slate dark:prose-invert max-w-none font-medium leading-relaxed mb-6">
-                                            <div dangerouslySetInnerHTML={{ __html: optimizeHtml(q.questionText) }}></div>
+                                            {renderQuestionTextWithChart(q.questionText, q.chartData, optimizeHtml)}
                                         </div>
 
                                         <div className="space-y-4">
@@ -557,13 +709,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         const isSelected = currentAns.includes(opt);
                                                         return (
                                                             <button key={i} onClick={() => { 
-                                                                const currentlyCheckedOptions = (q.options || []).filter(o => currentAns.includes(o));
-                                                                let newAns;
-                                                                if (isSelected) {
-                                                                    newAns = currentlyCheckedOptions.filter(o => o !== opt);
-                                                                } else {
-                                                                    newAns = currentlyCheckedOptions.includes(opt) ? currentlyCheckedOptions : [...currentlyCheckedOptions, opt];
-                                                                }
+                                                                const newAns = isSelected ? currentAns.filter(o => o !== opt) : [...currentAns, opt];
+                                                                newAns.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
@@ -588,14 +735,24 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                 </div>
                                                                 <div className="flex gap-3">
                                                                     <button 
-                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: true }))}
+                                                                        onClick={() => {
+                                                                            const newAnsObj = { ...currentAnsObj, [i]: true };
+                                                                            const sortedAnsObj: Record<number, boolean> = {};
+                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
+                                                                        }}
                                                                         className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isTrue ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                                     >
                                                                         {isTrue && <CheckCircleIcon className="w-4 h-4" />}
                                                                         Benar
                                                                     </button>
                                                                     <button 
-                                                                        onClick={() => handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: false }))}
+                                                                        onClick={() => {
+                                                                            const newAnsObj = { ...currentAnsObj, [i]: false };
+                                                                            const sortedAnsObj: Record<number, boolean> = {};
+                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
+                                                                        }}
                                                                         className={`flex-1 py-2.5 px-4 rounded-lg border font-bold text-sm transition-all flex items-center justify-center gap-2 ${isFalse ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                                     >
                                                                         {isFalse && <CheckCircleIcon className="w-4 h-4" />}
@@ -654,7 +811,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                                     <div 
                                                                                         key={idx} 
                                                                                         onClick={() => {
-                                                                                            handleAnswerChange(q.id, JSON.stringify({ ...currentAnsObj, [i]: opt }));
+                                                                                            const newAnsObj = { ...currentAnsObj, [i]: opt };
+                                                                                            const sortedAnsObj: Record<number, string> = {};
+                                                                                            Object.keys(newAnsObj).map(Number).sort((a, b) => a - b).forEach(k => sortedAnsObj[k] = newAnsObj[k]);
+                                                                                            handleAnswerChange(q.id, JSON.stringify(sortedAnsObj));
                                                                                             setOpenDropdownId(null);
                                                                                         }}
                                                                                         className={`p-3 text-sm cursor-pointer border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors ${selectedValue === opt ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}

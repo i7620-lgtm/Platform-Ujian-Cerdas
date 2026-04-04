@@ -4,7 +4,7 @@ import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIc
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
-import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance } from './examUtils';
+import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; isReadOnly?: boolean; }
@@ -14,6 +14,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
     const [selectedSchool, setSelectedSchool] = useState<string>('ALL');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'LOCKED' | 'ONLINE' | 'COMPLETED'>('ALL');
     const [localResults, setLocalResults] = useState<Result[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isAddTimeOpen, setIsAddTimeOpen] = useState(false);
@@ -88,7 +89,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
-        return [...localResults].sort((a, b) => {
+        let filtered = [...localResults];
+        if (statusFilter === 'LOCKED') {
+            filtered = filtered.filter(r => r.status === 'force_closed');
+        } else if (statusFilter === 'ONLINE') {
+            filtered = filtered.filter(r => r.status === 'in_progress');
+        } else if (statusFilter === 'COMPLETED') {
+            filtered = filtered.filter(r => r.status === 'completed');
+        }
+
+        return filtered.sort((a, b) => {
             // 1. Nama Sekolah
             const schoolA = a.student.schoolName || '';
             const schoolB = b.student.schoolName || '';
@@ -96,7 +106,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             if (schoolCompare !== 0) return schoolCompare;
 
             // 2. Kelas
-            const classCompare = a.student.class.localeCompare(b.student.class, undefined, { numeric: true, sensitivity: 'base' });
+            const classA = a.student.class || '';
+            const classB = b.student.class || '';
+            const classCompare = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
             if (classCompare !== 0) return classCompare;
 
             // 3. Nomor Absen
@@ -104,7 +116,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             const absB = parseInt(b.student.absentNumber) || 0;
             return absA - absB;
         });
-    }, [localResults]);
+    }, [localResults, statusFilter]);
 
     if (!displayExam) return null;
 
@@ -216,30 +228,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             const studentAnswer = r.answers[q.id];
             if (!studentAnswer) return;
 
-            const normalize = (str: unknown, qType: string) => {
-                const s = String(str || '');
-                if (qType === 'FILL_IN_THE_BLANK') {
-                    return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-                }
-                try {
-                    const div = document.createElement('div');
-                    div.innerHTML = s;
-                    
-                    // Remove math-visual wrappers to compare actual content
-                    div.querySelectorAll('.math-visual').forEach(el => {
-                        while (el.firstChild) {
-                            el.parentNode?.insertBefore(el.firstChild, el);
-                        }
-                        el.parentNode?.removeChild(el);
-                    });
-
-                    // Standardize HTML by removing whitespace between tags and trimming
-                    return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-                } catch {
-                    return s.trim().replace(/\s+/g, ' ');
-                }
-            };
-
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
                  if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) correctCount++;
             } 
@@ -254,6 +242,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 try {
                     const ansObj = JSON.parse(studentAnswer);
                     const allCorrect = q.trueFalseRows?.every((row: { answer: boolean }, idx: number) => {
+                        if (ansObj[idx] === undefined) return false;
                         return ansObj[idx] === row.answer;
                     });
                     if (allCorrect) correctCount++;
@@ -263,7 +252,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 try {
                     const ansObj = JSON.parse(studentAnswer);
                     const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
-                        return ansObj[idx] === pair.right;
+                        if (ansObj[idx] === undefined) return false;
+                        return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
                     });
                     if (allCorrect) correctCount++;
                 } catch { /* ignore */ }
@@ -278,117 +268,141 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
                 <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-full h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
                     {/* Header Modal */}
-                    <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-4 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-sm">
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                    <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-3 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-sm">
+                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div className="flex items-center gap-3 w-full lg:w-auto">
+                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-none shrink-0">
                                     <SignalIcon className="w-5 h-5"/>
                                 </div>
-                                <div>
-                                    <h2 className="text-lg font-black text-slate-800 dark:text-white tracking-tight">Live Monitoring</h2>
-                                    <div className="flex items-center gap-3 mt-0.5">
-                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
+                                <div className="flex-1">
+                                    <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight">Live Monitoring</h2>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />
-                                        {isRefreshing && <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">Sync...</span>}
+                                        {isRefreshing && <span className="text-[9px] sm:text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">Sync...</span>}
                                     </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {!isReadOnly && (
-                                    <button onClick={() => setIsGuideModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-2 shadow-sm border border-blue-100 dark:border-blue-800">
-                                        <BookOpenIcon className="w-4 h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
-                                    </button>
-                                )}
-                                {!isReadOnly && (
-                                    <button onClick={() => setIsJoinQrModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800">
-                                        <QrCodeIcon className="w-4 h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
-                                    </button>
-                                )}
-                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
-                                    <button onClick={() => setIsShareModalOpen(true)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800">
-                                        <ShareIcon className="w-4 h-4"/> <span className="hidden sm:inline">Stream</span>
-                                    </button>
-                                )}
-                                {!isReadOnly && displayExam.config.examMode !== 'PR' && (
-                                    <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-2 sm:px-4 sm:py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800">
-                                        <PlusCircleIcon className="w-4 h-4"/> <span className="hidden sm:inline">Waktu</span>
-                                    </button>
-                                )}
-                                <button onClick={onClose} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all border border-transparent hover:border-rose-100 dark:hover:border-rose-800">
-                                    <XMarkIcon className="w-5 h-5"/>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        {/* Status Counters & Bulk Actions */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-slate-50 dark:border-slate-700/50">
-                            <div className="flex items-center gap-6">
-                                {displayExam.config.examMode !== 'PR' && (
-                                    <div className="flex items-center gap-2" title="Locked (Terkunci)">
-                                        <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold border border-rose-200 dark:border-rose-800">
-                                            {lockedCount}
-                                        </div>
-                                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Locked</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2" title="Online (Sedang Mengerjakan)">
-                                    <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
-                                        {onlineCount}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Online</span>
-                                </div>
-                                <div className="flex items-center gap-2" title="Selesai">
-                                    <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold border border-slate-300 dark:border-slate-500">
-                                        {completedCount}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Selesai</span>
                                 </div>
                             </div>
                             
-                            {!isReadOnly && (
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end">
+                                {/* Filter Locked */}
+                                {displayExam.config.examMode !== 'PR' && (
+                                    <button 
+                                        onClick={() => setStatusFilter(statusFilter === 'LOCKED' ? 'ALL' : 'LOCKED')}
+                                        className={`p-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm ${statusFilter === 'LOCKED' ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                        title="Siswa Terkunci"
+                                    >
+                                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold border ${statusFilter === 'LOCKED' ? 'bg-rose-200 dark:bg-rose-800 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-600' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'}`}>
+                                            {lockedCount}
+                                        </div>
+                                        <span className="hidden sm:inline">Terkunci</span>
+                                    </button>
+                                )}
+                                
+                                {/* Filter Online */}
                                 <button 
-                                    onClick={handleFinishAllExams} 
-                                    className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all border shadow-sm active:scale-95 flex items-center gap-2 ${
-                                        onlineCount + lockedCount > 0 
-                                            ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                            : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-                                    }`}
+                                    onClick={() => setStatusFilter(statusFilter === 'ONLINE' ? 'ALL' : 'ONLINE')}
+                                    className={`p-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm ${statusFilter === 'ONLINE' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    title="Siswa Online"
                                 >
-                                    {onlineCount + lockedCount > 0 ? (
-                                        <>
-                                            <XMarkIcon className="w-3.5 h-3.5" /> Hentikan Ujian
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircleIcon className="w-3.5 h-3.5" /> Selesaikan Ujian
-                                        </>
-                                    )}
+                                    <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold border ${statusFilter === 'ONLINE' ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-600' : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'}`}>
+                                        {onlineCount}
+                                    </div>
+                                    <span className="hidden sm:inline">Online</span>
                                 </button>
-                            )}
+                                
+                                {/* Filter Finished */}
+                                <button 
+                                    onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? 'ALL' : 'COMPLETED')}
+                                    className={`p-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm ${statusFilter === 'COMPLETED' ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border-slate-400 dark:border-slate-500' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    title="Siswa Selesai"
+                                >
+                                    <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold border ${statusFilter === 'COMPLETED' ? 'bg-slate-300 dark:bg-slate-600 text-slate-800 dark:text-slate-200 border-slate-400 dark:border-slate-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>
+                                        {completedCount}
+                                    </div>
+                                    <span className="hidden sm:inline">Selesai</span>
+                                </button>
+
+                                {/* Hentikan Ujian */}
+                                {!isReadOnly && (
+                                    <button 
+                                        onClick={handleFinishAllExams} 
+                                        className={`p-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm active:scale-95 ${
+                                            onlineCount + lockedCount > 0 
+                                                ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                                : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                                        }`}
+                                        title={onlineCount + lockedCount > 0 ? "Hentikan Ujian" : "Selesaikan Ujian"}
+                                    >
+                                        {onlineCount + lockedCount > 0 ? (
+                                            <>
+                                                <XMarkIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Hentikan Ujian</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Selesaikan Ujian</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Cara Pakai */}
+                                {!isReadOnly && (
+                                    <button onClick={() => setIsGuideModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-blue-100 dark:border-blue-800" title="Cara Pakai">
+                                        <BookOpenIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
+                                    </button>
+                                )}
+
+                                {/* Akses Siswa */}
+                                {!isReadOnly && (
+                                    <button onClick={() => setIsJoinQrModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800" title="Akses Siswa">
+                                        <QrCodeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
+                                    </button>
+                                )}
+
+                                {/* Stream */}
+                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
+                                    <button onClick={() => setIsShareModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800" title="Stream">
+                                        <ShareIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Stream</span>
+                                    </button>
+                                )}
+
+                                {/* Tambah Waktu */}
+                                {!isReadOnly && displayExam.config.examMode !== 'PR' && (
+                                    <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-1.5 sm:px-3 sm:py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800" title="Tambah Waktu">
+                                        <PlusCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Waktu</span>
+                                    </button>
+                                )}
+
+                                {/* Tutup */}
+                                <button onClick={onClose} className="p-1.5 sm:p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-all border border-transparent hover:border-rose-100 dark:hover:border-rose-800" title="Tutup">
+                                    <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
+                                </button>
+                            </div>
                         </div>
 
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
-                                    <div className={`w-2 h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                    {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-50 dark:border-slate-700/50">
+                            <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-600">
+                                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isLargeScale ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                {isLargeScale ? 'Normal Mode' : 'Realtime Mode'}
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Sekolah:</span>
+                                    <select value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} className="px-2 py-1 sm:px-3 sm:py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
+                                        <option value="ALL">SEMUA SEKOLAH</option>
+                                        {Array.from(new Set(localResults.map(r => r.student.schoolName).filter(Boolean))).map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Sekolah:</span>
-                                        <select value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
-                                            <option value="ALL">SEMUA SEKOLAH</option>
-                                            {Array.from(new Set(localResults.map(r => r.student.schoolName).filter(Boolean))).map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Filter Kelas:</span>
-                                        <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
-                                            <option value="ALL">SEMUA KELAS</option>
-                                            {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">Kelas:</span>
+                                    <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="px-2 py-1 sm:px-3 sm:py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all cursor-pointer shadow-sm">
+                                        <option value="ALL">SEMUA KELAS</option>
+                                        {Array.from(new Set(localResults.map(r => r.student.class))).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
                                 </div>
                             </div>
+                        </div>
                     </div>
 
                     {/* Content Area */}
@@ -896,20 +910,25 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         try {
             const data = await storageService.getResults(displayExam.code, undefined);
             
-            // SORTING LOGIC: Sort by Class, then by Absent Number (from ID)
+            // SORTING LOGIC: Sort by School, then Class, then by Absent Number (from ID)
             const sortedData = data.sort((a, b) => {
+                // 1. Nama Sekolah
+                const schoolA = a.student.schoolName || '';
+                const schoolB = b.student.schoolName || '';
+                const schoolCompare = schoolA.localeCompare(schoolB, undefined, { sensitivity: 'base' });
+                if (schoolCompare !== 0) return schoolCompare;
+
+                // 2. Kelas
                 const classA = a.student.class || '';
                 const classB = b.student.class || '';
                 // Compare class alphanumerically (e.g. 1A, 1B, 2, 10)
                 const c = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: 'base' });
                 if (c !== 0) return c;
 
-                // Extract numeric absent number from ID (last part)
-                const getAbs = (id: string) => {
-                    const parts = id.split('-');
-                    return parseInt(parts[parts.length-1]) || 0;
-                }
-                return getAbs(a.student.studentId) - getAbs(b.student.studentId);
+                // 3. Nomor Absen
+                const absA = parseInt(a.student.absentNumber) || 0;
+                const absB = parseInt(b.student.absentNumber) || 0;
+                return absA - absB;
             });
 
             setResults(sortedData);
