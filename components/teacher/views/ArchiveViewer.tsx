@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
-import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance } from '../examUtils';
+import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch, normalize } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
     CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon 
@@ -116,29 +116,7 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
     );
 };
 
-const normalize = (str: string, qType: string) => {
-    const s = String(str || '');
-    if (qType === 'FILL_IN_THE_BLANK') {
-        return s.replace(/<[^>]*>?/gm, '').trim().toLowerCase().replace(/\s+/g, ' ');
-    }
-    try {
-        const div = document.createElement('div');
-        div.innerHTML = s;
-        
-        // Remove math-visual wrappers to compare actual content
-        div.querySelectorAll('.math-visual').forEach(el => {
-            while (el.firstChild) {
-                el.parentNode?.insertBefore(el.firstChild, el);
-            }
-            el.parentNode?.removeChild(el);
-        });
 
-        // Standardize HTML by removing whitespace between tags and trimming
-        return div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
-    } catch {
-        return s.trim().replace(/\s+/g, ' ');
-    }
-};
 
 const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) => {
     // 1. Check for manual grade override first
@@ -150,16 +128,13 @@ const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) 
     const ans = studentAnswers[q.id];
     if (!ans) return 'EMPTY';
 
-    const studentAns = normalize(String(ans), q.questionType);
-    const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
-
     if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-        return studentAns === correctAns ? 'CORRECT' : 'WRONG';
+        return isAnswerMatch(String(ans), String(q.correctAnswer || ''), q.questionType) ? 'CORRECT' : 'WRONG';
     } 
     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-        const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
-        const cSet = new Set(parseList(String(q.correctAnswer || '')).map(a => normalize(a, q.questionType)));
-        if (sSet.size === cSet.size && [...sSet].every(x => cSet.has(x))) return 'CORRECT';
+        const sList = parseList(String(ans));
+        const cList = parseList(String(q.correctAnswer || ''));
+        if (sList.length === cList.length && sList.every(s => cList.some(c => isAnswerMatch(s, c, q.questionType)))) return 'CORRECT';
         return 'WRONG';
     }
     else if (q.questionType === 'TRUE_FALSE') {
@@ -177,7 +152,7 @@ const checkAnswerStatus = (q: Question, studentAnswers: Record<string, string>) 
             const ansObj = JSON.parse(ans);
             const allCorrect = q.matchingPairs?.every((pair, idx) => {
                 if (ansObj[idx] === undefined) return false;
-                return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                return isAnswerMatch(ansObj[idx], pair.right, q.questionType);
             });
             return allCorrect ? 'CORRECT' : 'WRONG';
         } catch { return 'WRONG'; }
@@ -297,8 +272,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             const parsed = JSON.parse(newAnswers[qId]);
                             if (typeof parsed === 'object' && !Array.isArray(parsed)) {
                                 const originalStr = newAnswers[qId];
-                                const sortedObj: Record<number, any> = {};
-                                Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = parsed[k]);
+                                const sortedObj: Record<number, string | boolean | number> = {};
+                                Object.keys(parsed).map(Number).sort((a, b) => a - b).forEach(k => sortedObj[k] = (parsed as Record<number, string | boolean | number>)[k]);
                                 const newStr = JSON.stringify(sortedObj);
                                 if (originalStr !== newStr) {
                                     newAnswers[qId] = newStr;
@@ -1214,9 +1189,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             )}
                                             
                                             <div className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{isAnswerMatch(q.correctAnswer, opt, q.questionType) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => {
-                                                const isSelected = parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType));
+                                                const isSelected = parseList(q.correctAnswer || '').some(a => isAnswerMatch(a, opt, q.questionType));
                                                 return <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{isSelected && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>
                                             })}
                                             {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
@@ -1956,10 +1931,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     // FIX: Sum counts of all answers that match this option (normalized)
                                                     const count = Object.entries(data.distribution).reduce((acc, [ans, c]) => {
                                                         if (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                                            const sSet = new Set(parseList(ans).map(a => normalize(a, originalQ.questionType)));
-                                                            return sSet.has(normalize(opt, originalQ.questionType)) ? acc + (c as number) : acc;
+                                                            const sList = parseList(ans);
+                                                            return sList.some(a => isAnswerMatch(a, opt, originalQ.questionType)) ? acc + (c as number) : acc;
                                                         }
-                                                        return normalize(ans, originalQ?.questionType || '') === normalize(opt, originalQ?.questionType || '') ? acc + (c as number) : acc;
+                                                        return isAnswerMatch(ans, opt, originalQ?.questionType || 'MULTIPLE_CHOICE') ? acc + (c as number) : acc;
                                                     }, 0);
                                                     
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
@@ -2013,13 +1988,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     const parsed = parseList(ans);
                                                                     parsed.sort((a, b) => (originalQ.options || []).indexOf(a) - (originalQ.options || []).indexOf(b));
                                                                     displayAns = parsed.join(', ');
-                                                                    const sSet = new Set(parsed.map(a => normalize(a, originalQ.questionType)));
-                                                                    const cSet = new Set(parseList(originalQ.correctAnswer || '').map(a => normalize(a, originalQ.questionType)));
-                                                                    isCorrect = sSet.size === cSet.size && [...sSet].every(x => cSet.has(x));
+                                                                    const cList = parseList(originalQ.correctAnswer || '');
+                                                                    isCorrect = parsed.length === cList.length && parsed.every(s => cList.some(c => isAnswerMatch(s, c, originalQ.questionType)));
                                                                 } else {
-                                                                    const normAns = normalize(ans, originalQ?.questionType || '');
-                                                                    const normKey = normalize(originalQ?.correctAnswer || '', originalQ?.questionType || '');
-                                                                    isCorrect = normAns === normKey;
+                                                                    isCorrect = isAnswerMatch(ans, originalQ?.correctAnswer || '', originalQ?.questionType || 'MULTIPLE_CHOICE');
                                                                 }
                                                             } catch { /* ignore */ }
 
@@ -2067,15 +2039,15 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <div className="prose prose-sm max-w-none text-slate-800 print-question-text" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
                                             
                                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
-                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                     <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
                                                     <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
-                                                    {normalize(q.correctAnswer || '', q.questionType) === normalize(opt, q.questionType) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
+                                                    {isAnswerMatch(q.correctAnswer, opt, q.questionType) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
                                                 </div>
                                             ))}
                                             
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => {
-                                                const isSelected = parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType));
+                                                const isSelected = parseList(q.correctAnswer || '').some(a => isAnswerMatch(a, opt, q.questionType));
                                                 return (
                                                     <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${isSelected ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                         <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
