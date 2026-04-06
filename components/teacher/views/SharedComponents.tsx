@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
 import { ChartBarIcon, CheckCircleIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
-import { parseList, normalize } from '../examUtils';
+import { parseList, normalize, isAnswerMatch } from '../examUtils';
 
 // --- SHARED COMPONENTS ---
 
@@ -220,7 +220,7 @@ export const QuestionAnalysisItem: React.FC<{
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                                                 {q.options.map((opt, i) => {
-                                                    const isChecked = normalize(tempKey, q.questionType) === normalize(opt, q.questionType);
+                                                    const isChecked = isAnswerMatch(tempKey, opt, q.questionType);
                                                     return (
                                                         <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                                                             <input 
@@ -240,8 +240,7 @@ export const QuestionAnalysisItem: React.FC<{
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                                                 {q.options.map((opt, i) => {
                                                     const currentKeys = parseList(tempKey);
-                                                    const normalizedOpt = normalize(opt, q.questionType);
-                                                    const isChecked = currentKeys.some(k => normalize(k, q.questionType) === normalizedOpt);
+                                                    const isChecked = currentKeys.some(k => isAnswerMatch(k, opt, q.questionType));
                                                     return (
                                                         <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                                                             <input 
@@ -250,7 +249,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 checked={isChecked} 
                                                                 onChange={(e) => {
                                                                     const currentlyCheckedOptions = (q.options || []).filter(o => 
-                                                                        currentKeys.some(k => normalize(k, q.questionType) === normalize(o, q.questionType))
+                                                                        currentKeys.some(k => isAnswerMatch(k, o, q.questionType))
                                                                     );
                                                                     let newKeys;
                                                                     if (e.target.checked) {
@@ -373,16 +372,16 @@ export const QuestionAnalysisItem: React.FC<{
                                     // FIX: Sum counts of all answers that match this option (normalized)
                                     const count = Object.entries(distribution.counts).reduce((acc, [ans, c]) => {
                                         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                            const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
-                                            return sSet.has(normalize(opt, q.questionType)) ? acc + c : acc;
+                                            const sList = parseList(ans);
+                                            return sList.some(a => isAnswerMatch(a, opt, q.questionType)) ? acc + c : acc;
                                         }
-                                        return normalize(ans, q.questionType) === normalize(opt, q.questionType) ? acc + c : acc;
+                                        return isAnswerMatch(ans, opt, q.questionType) ? acc + c : acc;
                                     }, 0);
                                     
                                     const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
                                     const isCorrect = q.questionType === 'COMPLEX_MULTIPLE_CHOICE' 
-                                        ? parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType))
-                                        : normalize(opt, q.questionType) === normalize(q.correctAnswer || '', q.questionType);
+                                        ? parseList(q.correctAnswer || '').some(a => isAnswerMatch(a, opt, q.questionType))
+                                        : isAnswerMatch(q.correctAnswer || '', opt, q.questionType);
                                     
                                     return (
                                         <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800' : count > 0 ? 'bg-slate-50 dark:bg-slate-700/50' : ''}`}>
