@@ -9,7 +9,7 @@ import {
     StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
     ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon, ChartBarIcon
 } from '../Icons';
-import { compressImage, parseList, sanitizeHtml, normalize, isAnswerMatch } from './examUtils';
+import { compressImage, parseList, sanitizeHtml, isAnswerMatch } from './examUtils';
 import { EXAM_TYPES } from './constants';
 import { generateQuestions } from '../services/gemini';
 import { ChartRenderer } from '../ChartRenderer';

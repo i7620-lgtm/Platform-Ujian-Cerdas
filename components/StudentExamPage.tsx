@@ -731,7 +731,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         return (
                                                             <div key={i} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                                                                 <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content">
-                                                                    <div dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div>
+                                                                    <div className="option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div>
                                                                 </div>
                                                                 <div className="flex gap-3">
                                                                     <button 
@@ -777,7 +777,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                             return (
                                                                 <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                                                                     <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
-                                                                        <div dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
+                                                                        <div className="option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
                                                                     </div>
                                                                     
                                                                     {/* Mobile Connector */}

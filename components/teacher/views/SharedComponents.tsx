@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Exam, Question, Result } from '../../../types';
 import { ChartBarIcon, CheckCircleIcon, ChevronUpIcon, ChevronDownIcon } from '../../Icons';
-import { parseList, normalize } from '../examUtils';
+import { parseList, normalize, isAnswerMatch } from '../examUtils';
 
 // --- SHARED COMPONENTS ---
 
@@ -170,7 +170,7 @@ export const QuestionAnalysisItem: React.FC<{
                     </div>
                 )}
                 
-                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium option-content" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
 
                 <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
                     <div 
@@ -220,7 +220,7 @@ export const QuestionAnalysisItem: React.FC<{
                                         {q.questionType === 'MULTIPLE_CHOICE' && q.options ? (
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                                                 {q.options.map((opt, i) => {
-                                                    const isChecked = normalize(tempKey, q.questionType) === normalize(opt, q.questionType);
+                                                    const isChecked = isAnswerMatch(tempKey, opt, q.questionType);
                                                     return (
                                                         <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                                                             <input 
@@ -231,7 +231,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 onChange={(e) => setTempKey(e.target.value)}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                                                             />
-                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                         </label>
                                                     );
                                                 })}
@@ -240,8 +240,7 @@ export const QuestionAnalysisItem: React.FC<{
                                             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                                                 {q.options.map((opt, i) => {
                                                     const currentKeys = parseList(tempKey);
-                                                    const normalizedOpt = normalize(opt, q.questionType);
-                                                    const isChecked = currentKeys.some(k => normalize(k, q.questionType) === normalizedOpt);
+                                                    const isChecked = currentKeys.some(k => isAnswerMatch(k, opt, q.questionType));
                                                     return (
                                                         <label key={i} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30 dark:border-emerald-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
                                                             <input 
@@ -250,7 +249,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 checked={isChecked} 
                                                                 onChange={(e) => {
                                                                     const currentlyCheckedOptions = (q.options || []).filter(o => 
-                                                                        currentKeys.some(k => normalize(k, q.questionType) === normalize(o, q.questionType))
+                                                                        currentKeys.some(k => isAnswerMatch(k, o, q.questionType))
                                                                     );
                                                                     let newKeys;
                                                                     if (e.target.checked) {
@@ -263,7 +262,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 }}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
                                                             />
-                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                         </label>
                                                     );
                                                 })}
@@ -275,7 +274,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                         const rows = JSON.parse(tempKey);
                                                         return rows.map((row: { text: string; answer: boolean }, i: number) => (
                                                             <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
+                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
                                                                 <div className="flex gap-2 shrink-0">
                                                                     <button 
                                                                         onClick={(e) => {
@@ -313,7 +312,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                         return pairs.map((pair: { left: string; right: string }, i: number) => (
                                                             <div key={i} className="flex flex-col gap-1 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
                                                                 <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Pasangan {i+1}</div>
-                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700" dangerouslySetInnerHTML={{__html: pair.left}}></div>
+                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700 option-content" dangerouslySetInnerHTML={{__html: pair.left}}></div>
                                                                 <input 
                                                                     type="text" 
                                                                     value={pair.right} 
@@ -373,16 +372,16 @@ export const QuestionAnalysisItem: React.FC<{
                                     // FIX: Sum counts of all answers that match this option (normalized)
                                     const count = Object.entries(distribution.counts).reduce((acc, [ans, c]) => {
                                         if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
-                                            const sSet = new Set(parseList(ans).map(a => normalize(a, q.questionType)));
-                                            return sSet.has(normalize(opt, q.questionType)) ? acc + c : acc;
+                                            const sList = parseList(ans);
+                                            return sList.some(a => isAnswerMatch(a, opt, q.questionType)) ? acc + c : acc;
                                         }
-                                        return normalize(ans, q.questionType) === normalize(opt, q.questionType) ? acc + c : acc;
+                                        return isAnswerMatch(ans, opt, q.questionType) ? acc + c : acc;
                                     }, 0);
                                     
                                     const percentage = distribution.totalStudents > 0 ? Math.round((count / distribution.totalStudents) * 100) : 0;
                                     const isCorrect = q.questionType === 'COMPLEX_MULTIPLE_CHOICE' 
-                                        ? parseList(q.correctAnswer || '').map(a => normalize(a, q.questionType)).includes(normalize(opt, q.questionType))
-                                        : normalize(opt, q.questionType) === normalize(q.correctAnswer || '', q.questionType);
+                                        ? parseList(q.correctAnswer || '').some(a => isAnswerMatch(a, opt, q.questionType))
+                                        : isAnswerMatch(q.correctAnswer || '', opt, q.questionType);
                                     
                                     return (
                                         <div key={i} className={`relative flex items-center justify-between p-2 rounded-lg text-xs ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800' : count > 0 ? 'bg-slate-50 dark:bg-slate-700/50' : ''}`}>

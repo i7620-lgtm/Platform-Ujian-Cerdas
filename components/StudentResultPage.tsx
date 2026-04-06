@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import type { Result, Exam } from '../types';
 import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
 import { storageService } from '../services/storage';
-import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize } from './teacher/examUtils';
+import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize, isAnswerMatch } from './teacher/examUtils';
 import { QRCodeCanvas } from 'qrcode.react';
 import { ChartRenderer } from './ChartRenderer';
 import type { ChartData } from '../types';
@@ -128,9 +128,6 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                 emptyCount++;
                 return;
             }
-
-            const studentAns = normalize(String(ans), q.questionType);
-            const correctAns = normalize(String(q.correctAnswer || ''), q.questionType);
             let isCorrect = false;
 
             // Check if teacher has manually graded this question
@@ -138,7 +135,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
             if (result.answers[manualGradeKey]) {
                 isCorrect = result.answers[manualGradeKey] === 'CORRECT';
             } else if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                isCorrect = studentAns === correctAns;
+                isCorrect = isAnswerMatch(q.correctAnswer, ans, q.questionType);
             } 
             else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                 const sSet = new Set(parseList(String(ans)).map(a => normalize(a, q.questionType)));
@@ -159,7 +156,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                     const ansObj = JSON.parse(ans);
                     isCorrect = q.matchingPairs?.every((pair, idx) => {
                         if (ansObj[idx] === undefined) return false;
-                        return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                        return isAnswerMatch(pair.right, ansObj[idx], q.questionType);
                     }) ?? false;
                 } catch { /* ignore */ }
             }
@@ -455,14 +452,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                 const correctAns = q.correctAnswer || '-';
                                                 
                                                 let isCorrect = false;
-                                                const normalizedStudent = normalize(studentAns, q.questionType);
-                                                const normalizedCorrect = normalize(correctAns, q.questionType);
 
                                                 let displayStudentAns = studentAns;
                                                 let displayCorrectAns = correctAns;
 
                                                 if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-                                                    isCorrect = normalizedStudent === normalizedCorrect;
+                                                    isCorrect = isAnswerMatch(correctAns, studentAns, q.questionType);
                                                 } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                                                     const sSet = new Set(parseList(studentAns).map(a => normalize(a, q.questionType)));
                                                     const cSet = new Set(parseList(correctAns).map(a => normalize(a, q.questionType)));
@@ -485,7 +480,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                              displayCorrectAns = q.trueFalseRows?.map((r) => `• ${r.text.replace(/<[^>]*>/g, '')}: <strong>${r.answer ? 'Benar' : 'Salah'}</strong>`).join('<br/>') || correctAns;
                                                          } else {
                                                              const ansObj = JSON.parse(studentAns);
-                                                             isCorrect = q.matchingPairs?.every((pair, i) => ansObj[i] === pair.right) ?? false;
+                                                             isCorrect = q.matchingPairs?.every((pair, i) => isAnswerMatch(pair.right, ansObj[i], q.questionType)) ?? false;
                                                              displayStudentAns = q.matchingPairs?.map((p, i) => `• ${p.left} → <strong>${ansObj[i] || '-'}</strong>`).join('<br/>') || studentAns;
                                                              displayCorrectAns = q.matchingPairs?.map((p) => `• ${p.left} → <strong>${p.right}</strong>`).join('<br/>') || correctAns;
                                                          }

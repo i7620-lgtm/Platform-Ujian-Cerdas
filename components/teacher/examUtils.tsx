@@ -193,15 +193,33 @@ export const stripPrefix = (str: string) => str.replace(/^[A-E1-5][.)]\s*/i, '')
 
 export const isAnswerMatch = (ans: string | undefined | null, opt: string | undefined | null, type: QuestionType): boolean => {
     if (!ans || !opt) return false;
+    
+    // Direct match is fastest
     if (ans === opt) return true;
     
+    // Normalize both for comparison
     const normAns = normalize(ans, type);
     const normOpt = normalize(opt, type);
-    if (normAns === normOpt) return true;
     
+    if (normAns === normOpt && normAns.length > 0) return true;
+    
+    // Check if they match after stripping prefixes (A., B., etc.)
     const strippedAns = stripPrefix(normAns);
     const strippedOpt = stripPrefix(normOpt);
+    
+    // If both are non-empty and match after stripping prefix
     if (strippedAns === strippedOpt && strippedAns.length > 0) return true;
+    
+    // Special case for image-only answers: if both contain the same image src
+    if (normAns.includes('<img') && normOpt.includes('<img')) {
+        const getSrc = (html: string) => {
+            const match = html.match(/src="([^"]+)"/);
+            return match ? match[1] : null;
+        };
+        const srcAns = getSrc(normAns);
+        const srcOpt = getSrc(normOpt);
+        if (srcAns && srcAns === srcOpt) return true;
+    }
     
     return false;
 };
@@ -342,8 +360,29 @@ export const normalize = (str: string, qType: string) => {
             }
         });
 
+        // Standardize images: remove unnecessary attributes that might differ
+        div.querySelectorAll('img').forEach(img => {
+            // Keep only essential attributes for comparison
+            const src = img.getAttribute('src');
+            const alt = img.getAttribute('alt');
+            
+            // Clear all attributes
+            while (img.attributes.length > 0) {
+                img.removeAttribute(img.attributes[0].name);
+            }
+            
+            // Restore essential ones
+            if (src) img.setAttribute('src', src);
+            if (alt) img.setAttribute('alt', alt);
+        });
+
         // Standardize HTML by removing whitespace between tags and collapsing spaces
-        let html = div.innerHTML.replace(/>\s+</g, '><').trim().replace(/\s+/g, ' ');
+        // Also replace non-breaking spaces with regular spaces for comparison
+        let html = div.innerHTML
+            .replace(/&nbsp;|\u00A0/g, ' ')
+            .replace(/>\s+</g, '><')
+            .replace(/\s+/g, ' ')
+            .trim();
         
         // Strip wrapping <p> tags if they are the only ones (common from markdownToHtml)
         if (html.startsWith('<p>') && html.endsWith('</p>') && (html.match(/<p>/g) || []).length === 1) {
@@ -1160,7 +1199,7 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
 
         let isCorrect = false;
         if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'FILL_IN_THE_BLANK') {
-             if (q.correctAnswer && normalize(studentAnswer, q.questionType) === normalize(q.correctAnswer, q.questionType)) isCorrect = true;
+             if (q.correctAnswer && isAnswerMatch(q.correctAnswer, studentAnswer, q.questionType)) isCorrect = true;
         } 
         else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
              const studentSet = new Set(parseList(studentAnswer).map(a => normalize(a, q.questionType)));
@@ -1184,7 +1223,7 @@ export const calculateExamScore = (exam: Exam, answers: Record<string, string>) 
                 const ansObj = JSON.parse(studentAnswer);
                 const allCorrect = q.matchingPairs?.every((pair: { right: string }, idx: number) => {
                     if (ansObj[idx] === undefined) return false;
-                    return normalize(ansObj[idx], q.questionType) === normalize(pair.right, q.questionType);
+                    return isAnswerMatch(pair.right, ansObj[idx], q.questionType);
                 });
                 if (allCorrect) isCorrect = true;
             } catch { /* ignore */ }
