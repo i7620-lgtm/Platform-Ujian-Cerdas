@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
-import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch, normalize } from '../examUtils';
+import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
     CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon 
@@ -1940,8 +1940,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                     const pct = totalStudents > 0 ? Math.round((count/totalStudents)*100) : 0;
                                                     
                                                     const isCorrect = 
-                                                        (originalQ?.questionType === 'MULTIPLE_CHOICE' && opt === originalQ.correctAnswer) ||
-                                                        (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && originalQ.correctAnswer?.includes(opt));
+                                                        (originalQ?.questionType === 'MULTIPLE_CHOICE' && isAnswerMatch(originalQ.correctAnswer, opt, originalQ.questionType)) ||
+                                                        (originalQ?.questionType === 'COMPLEX_MULTIPLE_CHOICE' && parseList(originalQ.correctAnswer).some(ans => isAnswerMatch(ans, opt, originalQ.questionType)));
                                                     
                                                     return (
                                                         <div key={i} className={`flex items-center justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'border-slate-100 text-slate-600'}`}>
