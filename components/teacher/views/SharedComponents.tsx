@@ -170,7 +170,7 @@ export const QuestionAnalysisItem: React.FC<{
                     </div>
                 )}
                 
-                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
+                <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 font-medium option-content" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
 
                 <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
                     <div 
@@ -231,7 +231,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 onChange={(e) => setTempKey(e.target.value)}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                                                             />
-                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                         </label>
                                                     );
                                                 })}
@@ -263,7 +263,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                                 }}
                                                                 className="text-emerald-600 focus:ring-emerald-500 w-4 h-4 rounded"
                                                             />
-                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                            <div className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                         </label>
                                                     );
                                                 })}
@@ -275,7 +275,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                         const rows = JSON.parse(tempKey);
                                                         return rows.map((row: { text: string; answer: boolean }, i: number) => (
                                                             <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
+                                                                <div className="text-xs flex-1 mr-4 text-slate-700 dark:text-slate-300 option-content [&_p]:inline [&_img]:max-h-10 [&_img]:inline-block" dangerouslySetInnerHTML={{__html: row.text}}></div>
                                                                 <div className="flex gap-2 shrink-0">
                                                                     <button 
                                                                         onClick={(e) => {
@@ -313,7 +313,7 @@ export const QuestionAnalysisItem: React.FC<{
                                                         return pairs.map((pair: { left: string; right: string }, i: number) => (
                                                             <div key={i} className="flex flex-col gap-1 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
                                                                 <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Pasangan {i+1}</div>
-                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700" dangerouslySetInnerHTML={{__html: pair.left}}></div>
+                                                                <div className="text-xs text-slate-700 dark:text-slate-300 mb-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700 option-content" dangerouslySetInnerHTML={{__html: pair.left}}></div>
                                                                 <input 
                                                                     type="text" 
                                                                     value={pair.right} 
