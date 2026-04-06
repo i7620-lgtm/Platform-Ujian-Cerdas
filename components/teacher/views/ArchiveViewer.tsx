@@ -1189,13 +1189,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             )}
                                             
                                             <div className="prose prose-sm max-w-none text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: q.questionText }}></div>
-                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{isAnswerMatch(q.correctAnswer, opt, q.questionType) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
+                                            {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1 option-content" dangerouslySetInnerHTML={{ __html: opt }}></div>{isAnswerMatch(q.correctAnswer, opt, q.questionType) && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>)}
                                             {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => {
                                                 const isSelected = parseList(q.correctAnswer || '').some(a => isAnswerMatch(a, opt, q.questionType));
-                                                return <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>{isSelected && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>
+                                                return <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 font-bold text-emerald-800 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}><span className="font-bold">{String.fromCharCode(65 + i)}.</span><div className="flex-1 option-content" dangerouslySetInnerHTML={{ __html: opt }}></div>{isSelected && <CheckCircleIcon className="w-5 h-5 text-emerald-500 ml-auto shrink-0"/>}</div>
                                             })}
-                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
-                                            {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 text-sm"><div className="flex-1 font-medium dark:text-slate-200">{p.left}</div><div className="text-slate-300 dark:text-slate-500">→</div><div className="flex-1 font-bold dark:text-slate-200">{p.right}</div></div>)}</div>}
+                                            {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto custom-scrollbar"><table className="w-full text-sm min-w-[500px]"><thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-left">Pernyataan</th><th className="p-2 font-bold text-slate-600 dark:text-slate-300 text-center w-32">Jawaban</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{q.trueFalseRows.map((r, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800"><td className="p-2 dark:text-slate-200"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 option-content" dangerouslySetInnerHTML={{ __html: r.text }}></div></td><td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20':'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'}`}>{r.answer ? 'Benar':'Salah'}</td></tr>)}</tbody></table></div>}
+                                            {q.questionType === 'MATCHING' && q.matchingPairs && <div className="space-y-2">{q.matchingPairs.map((p,i) => <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 text-sm"><div className="flex-1 font-medium dark:text-slate-200 option-content" dangerouslySetInnerHTML={{ __html: p.left }}></div><div className="text-slate-300 dark:text-slate-500">→</div><div className="flex-1 font-bold dark:text-slate-200 option-content" dangerouslySetInnerHTML={{ __html: p.right }}></div></div>)}</div>}
                                             {(q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK') && q.correctAnswer && <div className="mt-4 pt-3 border-t dark:border-slate-700"><p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Kunci Jawaban</p><div className="mt-1 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm prose prose-sm max-w-none dark:text-slate-200" dangerouslySetInnerHTML={{__html: q.correctAnswer}}></div></div>}
                                         </div>
                                     </div>
@@ -1948,7 +1948,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             <div className="flex gap-2 items-start w-full overflow-hidden">
                                                                 <span className="w-4 font-bold shrink-0">{label}.</span>
                                                                 {/* FIX: Removed truncate, added image styling */}
-                                                                <div className="min-w-0 [&_p]:inline [&_br]:hidden [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
+                                                                <div className="min-w-0 option-content [&_p]:inline [&_br]:hidden [&_img]:max-h-20 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: opt}}></div>
                                                             </div>
                                                             <span className="shrink-0 ml-2"><b>{count}</b> ({pct}%)</span>
                                                         </div>
@@ -1998,7 +1998,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             return (
                                                                 <div key={i} className={`flex items-start justify-between px-2 py-1 rounded border ${isCorrect ? 'print-bg-green font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                                                                     {/* FIX: Removed truncate, added image styling */}
-                                                                    <div className="flex-1 mr-2 min-w-0 [&_p]:inline [&_br]:hidden [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: displayAns}}></div>
+                                                                    <div className="flex-1 mr-2 min-w-0 option-content [&_p]:inline [&_br]:hidden [&_img]:max-h-10 [&_img]:w-auto [&_img]:inline-block" dangerouslySetInnerHTML={{__html: displayAns}}></div>
                                                                     <span className="shrink-0 font-bold">{count} ({pct}%)</span>
                                                                 </div>
                                                             )
@@ -2041,7 +2041,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             {q.questionType === 'MULTIPLE_CHOICE' && q.options && q.options.map((opt, i) => (
                                                 <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${isAnswerMatch(q.correctAnswer, opt, q.questionType) ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                     <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
-                                                    <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                    <div className="flex-1 option-content" dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                     {isAnswerMatch(q.correctAnswer, opt, q.questionType) && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
                                                 </div>
                                             ))}
@@ -2051,7 +2051,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 return (
                                                     <div key={i} className={`flex items-start gap-3 p-2 rounded-lg border text-xs ${isSelected ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800 print-bg-green' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                         <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
-                                                        <div className="flex-1" dangerouslySetInnerHTML={{ __html: opt }}></div>
+                                                        <div className="flex-1 option-content" dangerouslySetInnerHTML={{ __html: opt }}></div>
                                                         {isSelected && <CheckCircleIcon className="w-4 h-4 text-emerald-600 ml-auto shrink-0"/>}
                                                     </div>
                                                 );
@@ -2069,7 +2069,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         <tbody className="divide-y divide-slate-100">
                                                             {q.trueFalseRows.map((r, i) => (
                                                                 <tr key={i} className="bg-white">
-                                                                    <td className="p-2"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0" dangerouslySetInnerHTML={{ __html: r.text }}></div></td>
+                                                                    <td className="p-2"><div className="[&_*]:!bg-transparent [&_*]:!text-inherit [&_*]:!p-0 [&_*]:!m-0 option-content" dangerouslySetInnerHTML={{ __html: r.text }}></div></td>
                                                                     <td className={`p-2 text-center font-bold ${r.answer ? 'text-emerald-700 bg-emerald-50 print-bg-green':'text-rose-700 bg-rose-50 print-bg-red'}`}>{r.answer ? 'Benar':'Salah'}</td>
                                                                 </tr>
                                                             ))}
@@ -2082,9 +2082,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 <div className="space-y-1">
                                                     {q.matchingPairs.map((p,i) => (
                                                         <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-                                                            <div className="flex-1 font-medium">{p.left}</div>
+                                                            <div className="flex-1 font-medium option-content" dangerouslySetInnerHTML={{ __html: p.left }}></div>
                                                             <div className="text-slate-400">→</div>
-                                                            <div className="flex-1 font-bold text-emerald-700">{p.right}</div>
+                                                            <div className="flex-1 font-bold text-emerald-700 option-content" dangerouslySetInnerHTML={{ __html: p.right }}></div>
                                                         </div>
                                                     ))}
                                                 </div>
