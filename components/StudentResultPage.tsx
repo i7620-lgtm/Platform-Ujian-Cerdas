@@ -23,7 +23,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
             <>
                 <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
                 <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <div className="h-[250px] w-full">
+                    <div className="w-full">
                         <ChartRenderer data={chartData} />
                     </div>
                 </div>
@@ -45,7 +45,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
                     <div dangerouslySetInnerHTML={{ __html: part }}></div>
                     {index < parts.length - 1 && (
                         <div className="my-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <div className="h-[250px] w-full">
+                            <div className="w-full">
                                 <ChartRenderer data={chartData} />
                             </div>
                         </div>
