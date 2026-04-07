@@ -20,6 +20,7 @@ export interface ChartData {
     backgroundColor?: string[];
     borderColor?: string[];
   }[];
+  showTooltip?: boolean;
 }
 
 export interface Question {
@@ -162,6 +163,7 @@ export interface ExamSummary {
     exam_subject: string;
     exam_code: string;
     exam_type?: string; // Added for Analisis Daerah
+    class_level?: string; // Added for Analisis Daerah
     exam_date: string;
     total_participants: number;
     average_score: number;
