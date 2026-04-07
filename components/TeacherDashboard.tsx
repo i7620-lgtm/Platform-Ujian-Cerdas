@@ -564,7 +564,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             </div>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1">
                                 <span className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-slate-500 truncate max-w-[150px] sm:max-w-none">{teacherProfile.fullName}</span>
-                                <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 truncate max-w-[120px] sm:max-w-none">{teacherProfile.school}</span>
+                                <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 break-words">{teacherProfile.school}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
