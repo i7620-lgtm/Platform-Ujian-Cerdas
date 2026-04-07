@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react'; 
+import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
     CheckCircleIcon, 
@@ -551,10 +551,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40 transition-colors duration-300">
                 <div className="w-full max-w-full mx-auto px-4 md:px-6">
                     <div className="py-3 md:py-5 flex justify-between items-center">
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard Guru</h1>
-                                <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+                        <div className="min-w-0 flex-1 mr-4">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">Dashboard Guru</h1>
+                                <span className={`shrink-0 text-[8px] sm:text-[10px] font-black uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border ${
                                     accountType === 'super_admin' ? 'bg-slate-800 text-white border-slate-900' :
                                     accountType === 'admin_sekolah' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-800' :
                                     'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800'
@@ -562,66 +562,66 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                     {accountType.replace('_', ' ')}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{teacherProfile.fullName}</span>
-                                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800">{teacherProfile.school}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1">
+                                <span className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-slate-500 truncate max-w-[150px] sm:max-w-none">{teacherProfile.fullName}</span>
+                                <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 break-words">{teacherProfile.school}</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                             <button 
                                 onClick={() => setIsMainGuideModalOpen(true)}
-                                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-2 text-xs font-bold"
+                                className="p-1.5 sm:p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center gap-2 text-xs font-bold"
                                 title="Cara Penggunaan"
                             >
-                                <QuestionMarkCircleIcon className="w-5 h-5" />
+                                <QuestionMarkCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <span className="hidden sm:inline">Panduan</span>
                             </button>
                             <button 
                                 onClick={toggleTheme} 
-                                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
+                                className="p-1.5 sm:p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
                                 title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
                             >
-                                {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+                                {isDarkMode ? <SunIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <MoonIcon className="w-4 h-4 sm:w-5 sm:h-5" />}
                             </button>
-                            <button onClick={onLogout} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors uppercase tracking-widest">
-                                <LogoutIcon className="w-5 h-5"/> Keluar
+                            <button onClick={onLogout} className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs font-black text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors uppercase tracking-widest" title="Keluar">
+                                <LogoutIcon className="w-4 h-4 sm:w-5 sm:h-5"/> <span className="hidden sm:inline">Keluar</span>
                             </button>
                         </div>
                     </div>
-                    <nav className="flex gap-4 sm:gap-8 overflow-x-auto whitespace-nowrap custom-scrollbar pb-1 px-1">
-                         <button onClick={() => setView('UPLOAD')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <PencilIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Buat Ujian</span>
+                    <nav className="flex w-full items-center justify-between sm:justify-center gap-1 sm:gap-4 md:gap-6 overflow-x-auto custom-scrollbar pb-1 px-1">
+                         <button onClick={() => setView('UPLOAD')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <PencilIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Buat</span>
                          </button>
-                         <button onClick={() => setView('DRAFTS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <FileTextIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Draf</span>
+                         <button onClick={() => setView('DRAFTS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <FileTextIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Draf</span>
                          </button>
-                         <button onClick={() => setView('ONGOING')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <PlayIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Berlangsung</span>
+                         <button onClick={() => setView('ONGOING')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Berlangsung</span>
                          </button>
-                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <CalendarDaysIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Terjadwal</span>
+                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Mendatang</span>
                          </button>
-                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <CheckCircleIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Selesai</span>
+                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Selesai</span>
                          </button>
-                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                            <BookOpenIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">Buka Arsip</span>
+                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                            <BookOpenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span>Arsip</span>
                          </button>
                          {accountType === 'super_admin' && (
                             <>
-                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                                    <UserIcon className="w-5 h-5" />
-                                    <span className="hidden sm:inline">Kelola Pengguna</span>
+                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                                    <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <span>Kelola</span>
                                 </button>
-                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 sm:pb-4 px-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all border-b-2 ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-300 dark:text-slate-600 border-transparent hover:text-slate-50 dark:hover:text-slate-400'}`}>
-                                    <ChartBarIcon className="w-5 h-5" />
-                                    <span className="hidden sm:inline">Analisis Daerah</span>
+                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                                    <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <span>Analisis</span>
                                 </button>
                             </>
                          )}

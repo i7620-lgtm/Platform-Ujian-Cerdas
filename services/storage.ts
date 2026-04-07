@@ -1,4 +1,4 @@
-
+ 
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
@@ -1189,13 +1189,14 @@ class StorageService {
       // PRESERVE MANUAL EDITS: Fetch existing summary first
       const { data: existing } = await supabase
           .from('exam_summaries')
-          .select('region, exam_type')
+          .select('region, exam_type, class_level')
           .eq('exam_code', exam.code)
           .maybeSingle();
 
       if (existing) {
           if (existing.region) summary.region = existing.region;
           if (existing.exam_type) summary.exam_type = existing.exam_type;
+          if (existing.class_level) summary.class_level = existing.class_level;
       }
 
       // 5. Insert Summary into SQL (Transaction Step 2)
@@ -1241,7 +1242,7 @@ class StorageService {
       // PRESERVE MANUAL EDITS: Fetch existing summary first
       const { data: existing } = await supabase
           .from('exam_summaries')
-          .select('region, exam_type')
+          .select('region, exam_type, class_level')
           .eq('exam_code', exam.code)
           .maybeSingle();
 
@@ -1264,6 +1265,7 @@ class StorageService {
       if (existing) {
           if (existing.region) summary.region = existing.region;
           if (existing.exam_type) summary.exam_type = existing.exam_type;
+          if (existing.class_level) summary.class_level = existing.class_level;
       }
       
       // Hapus data lama jika ada (berdasarkan kode ujian) untuk menghindari duplikasi
@@ -1335,6 +1337,7 @@ class StorageService {
           exam_subject: exam.config.subject,
           exam_code: exam.code,
           exam_type: exam.config.examType, // Added exam_type
+          class_level: [exam.config.classLevel, ...(exam.config.targetClasses || [])].filter(Boolean).join(', '), // Added class_level and targetClasses
           exam_date: exam.config.date,
           total_participants: total,
           average_score: parseFloat(avg.toFixed(2)),
@@ -1374,13 +1377,16 @@ class StorageService {
       return topAns;
   }
 
-  async getAnalyticsData(filters?: { region?: string, subject?: string }): Promise<ExamSummary[]> {
+  async getAnalyticsData(filters?: { region?: string, subject?: string, school?: string, classLevel?: string, examType?: string }): Promise<ExamSummary[]> {
       // SECURITY: Verify Admin Access
       await this._verifyRole(['super_admin', 'admin_sekolah']);
 
       let query = supabase.from('exam_summaries').select('*');
-      if (filters?.region) query = query.ilike('school_name', `%${filters.region}%`); // Simple proxy for region
-      if (filters?.subject) query = query.eq('exam_subject', filters.subject);
+      if (filters?.region) query = query.ilike('region', `%${filters.region}%`);
+      if (filters?.school) query = query.or(`school_name.ilike.%${filters.school}%,class_level.ilike.%${filters.school}%`);
+      if (filters?.subject) query = query.ilike('exam_subject', `%${filters.subject}%`);
+      if (filters?.classLevel) query = query.ilike('class_level', `%${filters.classLevel}%`);
+      if (filters?.examType) query = query.ilike('exam_type', `%${filters.examType}%`);
       
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) return [];
@@ -1396,10 +1402,14 @@ class StorageService {
   }
 
   // --- PROMPT GENERATOR (NO AI CALL) ---
-  generateAnalysisPrompt(summaries: ExamSummary[]): string {
+  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string): string {
       // Pre-process data to save tokens
       const simpleData = summaries.map(s => ({
           school: s.school_name,
+          region: s.region,
+          class: s.class_level,
+          subject: s.exam_subject,
+          exam_type: s.exam_type,
           avg: s.average_score,
           participants: s.total_participants,
           weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 50).length,
@@ -1409,6 +1419,8 @@ class StorageService {
               .slice(0, 3)
       }));
 
+      const defaultTask = `Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.`;
+
       return `
         You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
         
@@ -1416,7 +1428,7 @@ class StorageService {
         ${JSON.stringify(simpleData, null, 2)}
 
         TASK:
-        Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.
+        ${customPrompt || defaultTask}
         
         OUTPUT FORMAT:
         - Use standard Markdown (MD) for all formatting.
@@ -1448,13 +1460,13 @@ class StorageService {
         TONE:
         - Professional, analytical, yet accessible to education policymakers.
         - Use Indonesian language (Bahasa Indonesia).
-      `;
+      `.trim();
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
-  async generateAIAnalysis(summaries: ExamSummary[]): Promise<string> {
+  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string): Promise<string> {
       try {
-          const prompt = this.generateAnalysisPrompt(summaries);
+          const prompt = this.generateAnalysisPrompt(summaries, customPrompt);
           
           // Use the new SDK method
           const ai = getAI();

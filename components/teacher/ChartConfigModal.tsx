@@ -24,6 +24,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   const [datasets, setDatasets] = useState<{ label: string; data: number[] }[]>([
     { label: 'Data 1', data: [10, 20, 30] }
   ]);
+  const [showTooltip, setShowTooltip] = useState<boolean>(true);
 
   useEffect(() => {
     if (initialData) {
@@ -32,6 +33,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       setTitle(initialData.title || '');
       setLabels(initialData.labels);
       setDatasets(initialData.datasets.map(d => ({ label: d.label, data: d.data })));
+      setShowTooltip(initialData.showTooltip !== false);
     }
   }, [initialData, isOpen]);
 
@@ -70,7 +72,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       type,
       title,
       labels,
-      datasets
+      datasets,
+      showTooltip
     });
     onClose();
   };
@@ -109,6 +112,19 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                 <option value="pie">Diagram Lingkaran (Pie)</option>
               </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="showTooltip"
+              checked={showTooltip}
+              onChange={(e) => setShowTooltip(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+              Tampilkan Tooltip (Kotak Info saat disentuh/hover)
+            </label>
           </div>
 
           <div className="space-y-4">
