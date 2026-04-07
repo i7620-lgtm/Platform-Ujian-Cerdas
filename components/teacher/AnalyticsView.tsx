@@ -16,23 +16,26 @@ const AnalyticsView: React.FC = () => {
     const [summaries, setSummaries] = useState<ExamSummary[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [filterRegion, setFilterRegion] = useState('');
+    const [filterSchool, setFilterSchool] = useState('');
+    const [filterClass, setFilterClass] = useState('');
     const [filterSubject, setFilterSubject] = useState('');
+    const [filterExamType, setFilterExamType] = useState('');
+    const [customPrompt, setCustomPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [aiResult, setAiResult] = useState<string | null>(null);
 
     const [editingSummary, setEditingSummary] = useState<ExamSummary | null>(null);
     const [editForm, setEditForm] = useState<Partial<ExamSummary>>({});
 
-    const fetchData = useCallback(async (region: string, subject: string) => {
+    const fetchData = useCallback(async (region: string, school: string, classLevel: string, subject: string, examType: string) => {
         setIsLoading(true);
-        const data = await storageService.getAnalyticsData({ region, subject });
+        const data = await storageService.getAnalyticsData({ region, school, classLevel, subject, examType });
         setSummaries(data);
         setIsLoading(false);
     }, []);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        fetchData('', '');
+        fetchData('', '', '', '', '');
     }, [fetchData]);
 
     const toggleSelect = (id: string) => {
@@ -69,6 +72,7 @@ const AnalyticsView: React.FC = () => {
         setEditForm({
             school_name: summary.school_name,
             region: summary.region,
+            class_level: summary.class_level,
             exam_subject: summary.exam_subject,
             exam_type: summary.exam_type,
             total_participants: summary.total_participants,
@@ -94,7 +98,7 @@ const AnalyticsView: React.FC = () => {
         const selectedData = summaries.filter(s => selectedIds.has(s.id));
         if (selectedData.length === 0) return;
         
-        const prompt = storageService.generateAnalysisPrompt(selectedData);
+        const prompt = storageService.generateAnalysisPrompt(selectedData, customPrompt);
         setPromptResult(prompt);
     };
 
@@ -141,11 +145,23 @@ const AnalyticsView: React.FC = () => {
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Analisis performa sekolah dan generate laporan berbasis AI.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 justify-end">
                     <input 
-                        placeholder="Filter Wilayah/Sekolah..." 
+                        placeholder="Filter Daerah..." 
                         value={filterRegion} 
                         onChange={e => setFilterRegion(e.target.value)}
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                    />
+                    <input 
+                        placeholder="Filter Sekolah..." 
+                        value={filterSchool} 
+                        onChange={e => setFilterSchool(e.target.value)}
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                    />
+                    <input 
+                        placeholder="Filter Kelas..." 
+                        value={filterClass} 
+                        onChange={e => setFilterClass(e.target.value)}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <input 
@@ -154,7 +170,13 @@ const AnalyticsView: React.FC = () => {
                         onChange={e => setFilterSubject(e.target.value)}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
-                    <button onClick={() => fetchData(filterRegion, filterSubject)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
+                    <input 
+                        placeholder="Filter Jenis Ujian..." 
+                        value={filterExamType} 
+                        onChange={e => setFilterExamType(e.target.value)}
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                    />
+                    <button onClick={() => fetchData(filterRegion, filterSchool, filterClass, filterSubject, filterExamType)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
                 </div>
             </div>
 
@@ -167,6 +189,7 @@ const AnalyticsView: React.FC = () => {
                             </th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Daerah</th>
+                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Mapel</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kode Soal</th>
                             <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Jenis Evaluasi</th>
@@ -177,11 +200,12 @@ const AnalyticsView: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                        {isLoading ? <tr><td colSpan={9} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
+                        {isLoading ? <tr><td colSpan={10} className="p-8 text-center">Loading...</td></tr> : summaries.map(s => (
                             <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                 <td className="px-6 py-4"><input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} className="rounded text-indigo-600 focus:ring-indigo-500"/></td>
                                 <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{s.school_name}</td>
                                 <td className="px-6 py-4 text-sm">{s.region || '-'}</td>
+                                <td className="px-6 py-4 text-sm">{s.class_level || '-'}</td>
                                 <td className="px-6 py-4 text-sm">{s.exam_subject}</td>
                                 <td className="px-6 py-4 text-sm font-mono text-slate-500">{s.exam_code}</td>
                                 <td className="px-6 py-4 text-sm">
@@ -216,15 +240,49 @@ const AnalyticsView: React.FC = () => {
                 </table>
             </div>
 
-            <div className="sticky bottom-6 flex justify-center">
-                <button 
-                    onClick={handleGeneratePrompt} 
-                    disabled={selectedIds.size === 0}
-                    className={`px-8 py-4 rounded-2xl font-bold shadow-xl flex items-center gap-3 transition-all transform active:scale-95 ${selectedIds.size > 0 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                >
-                    <SparklesIcon className="w-5 h-5"/>
-                    <span>{`Buat Prompt Analisis (${selectedIds.size} Sekolah)`}</span>
-                </button>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 space-y-4">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Instruksi Khusus untuk AI (Opsional)</label>
+                    <textarea 
+                        className="w-full p-4 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-900 dark:border-slate-700 dark:text-white resize-none"
+                        rows={3}
+                        placeholder="Contoh: Fokuskan analisis pada kemampuan literasi numerasi dan berikan rekomendasi program pelatihan guru yang spesifik..."
+                        value={customPrompt}
+                        onChange={e => setCustomPrompt(e.target.value)}
+                    />
+                </div>
+                <div className="flex justify-center gap-4">
+                    <button 
+                        onClick={handleGeneratePrompt} 
+                        disabled={selectedIds.size === 0}
+                        className={`px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 transition-all transform active:scale-95 ${selectedIds.size > 0 ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        <span>{`Lihat Prompt (${selectedIds.size})`}</span>
+                    </button>
+                    <button 
+                        onClick={async () => {
+                            const selectedData = summaries.filter(s => selectedIds.has(s.id));
+                            if (selectedData.length === 0) return;
+                            setIsLoading(true);
+                            try {
+                                const result = await storageService.generateAIAnalysis(selectedData, customPrompt);
+                                setAiResult(result);
+                            } catch (e) {
+                                alert("Gagal menganalisis: " + e);
+                            } finally {
+                                setIsLoading(false);
+                            }
+                        }} 
+                        disabled={selectedIds.size === 0 || isLoading}
+                        className={`px-8 py-3 rounded-xl font-bold shadow-xl flex items-center gap-3 transition-all transform active:scale-95 ${selectedIds.size > 0 && !isLoading ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
+                    >
+                        <SparklesIcon className="w-5 h-5"/>
+                        <span>{isLoading ? 'Menganalisis...' : `Analisis Otomatis dengan AI (${selectedIds.size})`}</span>
+                    </button>
+                </div>
             </div>
 
             {promptResult && (
@@ -292,6 +350,14 @@ const AnalyticsView: React.FC = () => {
                                     className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                     value={editForm.region || ''}
                                     onChange={e => setEditForm({...editForm, region: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Kelas</label>
+                                <input 
+                                    className="w-full p-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={editForm.class_level || ''}
+                                    onChange={e => setEditForm({...editForm, class_level: e.target.value})}
                                 />
                             </div>
                             <div>
