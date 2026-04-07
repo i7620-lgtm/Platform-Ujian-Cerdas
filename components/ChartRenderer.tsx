@@ -1,4 +1,4 @@
- 
+
 import React from 'react';
 import {
   BarChart,
@@ -23,6 +23,30 @@ interface ChartRendererProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: { color: string; name: string; value: number | string }[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-xl z-50">
+        <p className="font-bold text-slate-700 dark:text-slate-200 mb-2">{label}</p>
+        {payload.map((entry: { color: string; name: string; value: number | string }, index: number) => (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-slate-600 dark:text-slate-400">{entry.name}:</span>
+            <span className="font-semibold text-slate-800 dark:text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
 
@@ -39,12 +63,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     switch (type) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
               <Legend />
               {datasets.map((dataset, index) => (
                 <Bar
@@ -58,12 +88,17 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         );
       case 'line':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
               <Legend />
               {datasets.map((dataset, index) => (
                 <Line
@@ -83,8 +118,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           value: datasets[0].data[index]
         }));
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 5 }}>
               <Pie
                 data={pieData}
                 cx="50%"
@@ -99,7 +134,12 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -111,7 +151,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-[350px] flex flex-col">
       {title && <h3 className="text-center font-bold mb-4 text-gray-700 dark:text-slate-200">{title}</h3>}
       <div className="flex-1 min-h-0">
         {renderChart()}
