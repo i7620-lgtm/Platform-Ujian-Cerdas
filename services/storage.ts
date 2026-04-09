@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
@@ -1622,6 +1622,9 @@ class StorageService {
             }
         }
 
+        const answers = (row.answers as Record<string, string>) || {};
+        const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+
         return {
             id: row.id as number, // Primary Key
             student: { 
@@ -1632,10 +1635,11 @@ class StorageService {
                 absentNumber: absentNumber 
             },
             examCode: row.exam_code as string, 
-            answers: (row.answers as Record<string, string>) || {}, // CRITICAL FIX: Fallback to empty object if null
+            answers: answers, // CRITICAL FIX: Fallback to empty object if null
             score: row.score as number, 
             correctAnswers: row.correct_answers as number,
             totalQuestions: row.total_questions as number, 
+            completionTime: completionTime,
             status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
             timestamp: new Date(row.updated_at as string).getTime(), 
@@ -1928,11 +1932,14 @@ class StorageService {
           }
       }
       
+      const answers = data.answers || {};
+      const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+      
       return {
         id: data.id, // Include Primary Key
         student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber },
-        examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
+        examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
+        totalQuestions: data.total_questions, completionTime: completionTime, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
       };
   }
