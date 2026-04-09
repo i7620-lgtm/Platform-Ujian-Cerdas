@@ -212,7 +212,7 @@ const App: React.FC = () => {
         const newRes = await storageService.submitExamResult({
           student,
           examCode,
-          answers: {},
+          answers: { _startTime: Date.now().toString() },
           score: 0,
           totalQuestions: exam.questions.length,
           correctAnswers: 0,
