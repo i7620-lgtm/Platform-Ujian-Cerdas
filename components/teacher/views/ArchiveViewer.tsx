@@ -5,7 +5,7 @@ import { storageService } from '../../../services/storage';
 import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
-    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon 
+    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon, ClockIcon 
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
 import * as XLSX from 'xlsx';
@@ -525,7 +525,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         });
 
         // 2. Rekap Siswa Sheet
-        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Asal Sekolah", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Mulai", "Waktu Selesai", "Durasi (Detik)"];
+        const rekapHeader = ["No", "Nama Siswa", "NISN/ID", "Kelas", "Asal Sekolah", "Nilai Akhir", "Benar", "Salah", "Kosong", "Status", "Waktu Mulai", "Waktu Selesai", "Durasi"];
         
         // Add question columns
         const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
@@ -624,7 +624,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 r.status || "-",
                 startTimeStr,
                 endTimeStr,
-                r.completionTime ? String(r.completionTime) : "-"
+                r.completionTime ? `${Math.floor(r.completionTime / 60)}m ${r.completionTime % 60}s` : "-"
             ];
 
             // Add answers
@@ -1084,6 +1084,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const averageScore = realStudentCount > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
     const highestScore = realStudentCount > 0 ? Math.max(...results.map(r => r.score)) : 0;
     const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
+    const validCompletionTimes = results.filter(r => r.completionTime).map(r => r.completionTime as number);
+    const averageCompletionTime = validCompletionTimes.length > 0 ? Math.round(validCompletionTimes.reduce((acc, val) => acc + val, 0) / validCompletionTimes.length) : 0;
+    const formatDuration = (seconds: number) => seconds > 0 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : '-';
 
     return (
         <div className="w-full max-w-full mx-auto space-y-6">
@@ -1253,6 +1256,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sekolah / Kelas</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Nilai</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">B/S/K</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Waktu</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Aktivitas</th>
                                 </tr>
                             </thead>
@@ -1265,7 +1269,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <React.Fragment key={school}>
                                             {selectedSchool === 'ALL' && (
                                                 <tr className="bg-slate-50/80 dark:bg-slate-700/50">
-                                                    <td colSpan={5} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
+                                                    <td colSpan={6} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
                                                         Sekolah: {school} ({schoolResults.length} Siswa)
                                                     </td>
                                                 </tr>
@@ -1299,6 +1303,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
                                                             <span className="text-emerald-600 dark:text-emerald-400" title="Benar">{correct}</span> / <span className="text-rose-600 dark:text-rose-400" title="Salah">{wrong}</span> / <span className="text-slate-400 dark:text-slate-500" title="Kosong">{empty}</span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                            {r.completionTime ? `${Math.floor(r.completionTime / 60)}m ${r.completionTime % 60}s` : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
@@ -1351,11 +1358,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
                 {activeTab === 'ANALYSIS' && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                              <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
                              <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
                              <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                              <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
+                             <StatWidget label="Rata-rata Waktu" value={formatDuration(averageCompletionTime)} color="bg-purple-50" icon={ClockIcon} />
                         </div>
                         {(categoryStats.length > 0 || levelStats.length > 0 || questionTypeStats.length > 0) && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
