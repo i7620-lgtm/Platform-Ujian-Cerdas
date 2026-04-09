@@ -150,6 +150,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         isSubmittingRef.current = true;
 
         try {
+            if (status === 'completed' || status === 'force_closed') {
+                const startTimeStr = answersRef.current['_startTime'];
+                if (startTimeStr) {
+                    const startTime = parseInt(startTimeStr);
+                    const durationInSeconds = Math.floor((Date.now() - startTime) / 1000);
+                    answersRef.current['_duration'] = durationInSeconds.toString();
+                }
+            }
+
             const grading = calculateExamScore(activeExam, answersRef.current);
             await onSubmit(
                 answersRef.current,
@@ -393,7 +402,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         const mode = activeExam.config.examMode || 'UJIAN';
         
         // Waktu mulai pengerjaan aktual oleh siswa
-        const actualStartTime = initialData?.timestamp || Date.now();
+        const storedStartTime = initialData?.answers?._startTime ? parseInt(initialData.answers._startTime) : null;
+        const actualStartTime = storedStartTime || initialData?.timestamp || Date.now();
         const timeLimitMs = mode === 'PR' ? 0 : (activeExam.config.timeLimit || 0) * 60 * 1000;
         
         // Cek batas akhir ujian (endDate & endTime)
@@ -435,7 +445,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         }
 
         setDeadline(calculatedDeadline);
-    }, [activeExam.config, student.class, initialData?.timestamp]);
+    }, [activeExam.config, student.class, initialData?.timestamp, initialData?.answers?._startTime]);
 
     const [timeLeft, setTimeLeft] = useState(0);
     useEffect(() => {

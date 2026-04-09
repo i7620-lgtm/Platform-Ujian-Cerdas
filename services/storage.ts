@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
@@ -677,7 +677,16 @@ class StorageService {
   // --- AUTH METHODS ---
   async getCurrentUser(): Promise<TeacherProfile | null> {
       const auth = supabase.auth;
-      const { data: { session } } = await auth.getSession();
+      const { data: { session }, error: sessionError } = await auth.getSession();
+      
+      if (sessionError) {
+          if (sessionError.message.includes('Refresh Token Not Found') || sessionError.message.includes('Invalid Refresh Token')) {
+              // Clear invalid session data to prevent repeated errors
+              await auth.signOut().catch(() => {});
+          }
+          return null;
+      }
+      
       if (!session?.user) return null;
 
       const { data: profile, error } = await supabase
@@ -1187,13 +1196,13 @@ class StorageService {
       }
 
       // PRESERVE MANUAL EDITS: Fetch existing summary first
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
           .from('exam_summaries')
           .select('region, exam_type, class_level')
           .eq('exam_code', exam.code)
           .maybeSingle();
 
-      if (existing) {
+      if (existing && !existingError) {
           if (existing.region) summary.region = existing.region;
           if (existing.exam_type) summary.exam_type = existing.exam_type;
           if (existing.class_level) summary.class_level = existing.class_level;
@@ -1201,7 +1210,23 @@ class StorageService {
 
       // 5. Insert Summary into SQL (Transaction Step 2)
       // If this fails, we abort.
-      const { error: summaryError } = await supabase.from('exam_summaries').insert(summary);
+      let summaryError = null;
+      const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
+      
+      if (initialError) {
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find')) {
+              console.warn("Schema cache error, retrying without new columns...");
+              const fallbackSummary = { ...summary };
+              delete fallbackSummary.region;
+              delete fallbackSummary.exam_type;
+              delete fallbackSummary.class_level;
+              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummary);
+              summaryError = fallbackError;
+          } else {
+              summaryError = initialError;
+          }
+      }
+
       if (summaryError) {
           console.error("Summary Insert Failed:", summaryError);
           throw new Error("Gagal menyimpan ringkasan statistik. Arsip dibatalkan.");
@@ -1240,7 +1265,7 @@ class StorageService {
 
   async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
       // PRESERVE MANUAL EDITS: Fetch existing summary first
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
           .from('exam_summaries')
           .select('region, exam_type, class_level')
           .eq('exam_code', exam.code)
@@ -1262,7 +1287,7 @@ class StorageService {
       }
 
       // Restore manual edits if available
-      if (existing) {
+      if (existing && !existingError) {
           if (existing.region) summary.region = existing.region;
           if (existing.exam_type) summary.exam_type = existing.exam_type;
           if (existing.class_level) summary.class_level = existing.class_level;
@@ -1280,11 +1305,26 @@ class StorageService {
       }
 
       // Simpan ke tabel exam_summaries
-      const { error } = await supabase.from('exam_summaries').insert(summary);
+      let summaryError = null;
+      const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
       
-      if (error) {
-          console.error("Legacy Stats Insert Failed:", error);
-          throw new Error("Gagal menyimpan statistik ke database: " + error.message);
+      if (initialError) {
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find')) {
+              console.warn("Schema cache error in legacy archive, retrying without new columns...");
+              const fallbackSummary = { ...summary };
+              delete fallbackSummary.region;
+              delete fallbackSummary.exam_type;
+              delete fallbackSummary.class_level;
+              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummary);
+              summaryError = fallbackError;
+          } else {
+              summaryError = initialError;
+          }
+      }
+
+      if (summaryError) {
+          console.error("Legacy Stats Insert Failed:", summaryError);
+          throw new Error("Gagal menyimpan statistik ke database: " + summaryError.message);
       }
   }
 
@@ -1622,6 +1662,9 @@ class StorageService {
             }
         }
 
+        const answers = (row.answers as Record<string, string>) || {};
+        const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+
         return {
             id: row.id as number, // Primary Key
             student: { 
@@ -1632,10 +1675,11 @@ class StorageService {
                 absentNumber: absentNumber 
             },
             examCode: row.exam_code as string, 
-            answers: (row.answers as Record<string, string>) || {}, // CRITICAL FIX: Fallback to empty object if null
+            answers: answers, // CRITICAL FIX: Fallback to empty object if null
             score: row.score as number, 
             correctAnswers: row.correct_answers as number,
             totalQuestions: row.total_questions as number, 
+            completionTime: completionTime,
             status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
             timestamp: new Date(row.updated_at as string).getTime(), 
@@ -1928,11 +1972,14 @@ class StorageService {
           }
       }
       
+      const answers = data.answers || {};
+      const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+      
       return {
         id: data.id, // Include Primary Key
         student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber },
-        examCode: data.exam_code, answers: data.answers || {}, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, status: data.status, activityLog: data.activity_log,
+        examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
+        totalQuestions: data.total_questions, completionTime: completionTime, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
       };
   }
@@ -2311,15 +2358,41 @@ class StorageService {
       await this._verifyRole(['super_admin']);
 
       // Try updating by exam_code which is the semantic key
+      let updateError = null;
+      let updateData = null;
+      
       const { data, error } = await supabase
           .from('exam_summaries')
           .update(updates)
           .eq('exam_code', examCode)
           .select();
+          
+      if (error) {
+          if (error.code === 'PGRST204' || error.message?.includes('Could not find')) {
+              console.warn("Schema cache error in updateAnalyticsData, retrying without new columns...");
+              const fallbackUpdates = { ...updates };
+              delete fallbackUpdates.region;
+              delete fallbackUpdates.exam_type;
+              delete fallbackUpdates.class_level;
+              
+              const { data: fallbackData, error: fallbackError } = await supabase
+                  .from('exam_summaries')
+                  .update(fallbackUpdates)
+                  .eq('exam_code', examCode)
+                  .select();
+                  
+              updateData = fallbackData;
+              updateError = fallbackError;
+          } else {
+              updateError = error;
+          }
+      } else {
+          updateData = data;
+      }
 
-      if (error) throw error;
+      if (updateError) throw updateError;
       
-      if (!data || data.length === 0) {
+      if (!updateData || updateData.length === 0) {
           // Fallback: Try by ID if exam_code update returned nothing (though unlikely if exam_code is correct)
           // This handles cases where maybe exam_code is mutated? (Should not happen)
            throw new Error("Gagal memperbarui data. Data tidak ditemukan atau akun Super Admin Anda tidak memiliki izin RLS (Row Level Security) untuk mengedit data milik pengguna lain. Silakan hubungi teknisi untuk menambahkan kebijakan RLS.");
