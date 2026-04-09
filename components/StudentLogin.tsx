@@ -436,10 +436,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             studentData.studentId = remoteResult.student.studentId;
 
             // Jika nama cocok tapi statusnya sedang berlangsung atau terkunci
-            if (!hasLocalData && (remoteResult.status === 'in_progress' || remoteResult.status === 'force_closed')) {
+            if (remoteResult.status === 'force_closed') {
                 setIsLocked(true);
                 setIsLoading(false);
                 return;
+            } else if (remoteResult.status === 'in_progress' && !hasLocalData) {
+                // Jika 'kunci akses jika melanggar' (continueWithPermission) aktif, maka pindah device/hilang local data dianggap pelanggaran dan dikunci.
+                // Jika tidak aktif, izinkan masuk kembali tanpa token.
+                if (examConfig && examConfig.continueWithPermission) {
+                    setIsLocked(true);
+                    setIsLoading(false);
+                    return;
+                }
             }
         }
 
