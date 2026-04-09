@@ -609,12 +609,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 </button>
                                                                 {(r.status === 'in_progress' || r.status === 'force_closed') && displayExam.config.examMode !== 'PR' && (
                                                                     <div className="flex gap-2">
-                                                                        <button 
-                                                                            onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
-                                                                            className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
-                                                                        >
-                                                                            Buat Token
-                                                                        </button>
+                                                                        {(r.status === 'force_closed' || displayExam.config.continueWithPermission) && (
+                                                                            <button 
+                                                                                onClick={() => handleGenerateToken(r.student.studentId, r.student.fullName)} 
+                                                                                className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95 whitespace-nowrap"
+                                                                            >
+                                                                                Buat Token
+                                                                            </button>
+                                                                        )}
                                                                         <button 
                                                                             onClick={() => handleFinishStudentExam(r.student.studentId, r.student.fullName)} 
                                                                             className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95 whitespace-nowrap"
@@ -829,7 +831,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
                                     <div className="w-full">
                                         <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-base">Tindakan Khusus (Membuka Blokir)</h4>
-                                        <p className="mb-3">Jika siswa terdeteksi melakukan kecurangan (misal: keluar tab terlalu sering), sistem akan memblokir ujian mereka secara otomatis dan statusnya menjadi <strong>Locked</strong>.</p>
+                                        <p className="mb-3">Jika siswa dihentikan paksa oleh pengawas atau terdeteksi melakukan kecurangan (jika fitur <strong>Kunci Akses</strong> aktif), sistem akan memblokir ujian mereka dan statusnya menjadi <strong>Locked</strong>.</p>
                                         
                                         <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col sm:flex-row items-center gap-4 justify-center">
                                             <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4">
@@ -1097,6 +1099,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const averageScore = totalStudents > 0 ? Math.round(calculatedResults.reduce((acc, s) => acc + s, 0) / totalStudents) : 0;
     const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
+    const validCompletionTimes = results.filter(r => r.completionTime).map(r => r.completionTime as number);
+    const averageCompletionTime = validCompletionTimes.length > 0 ? Math.round(validCompletionTimes.reduce((acc, val) => acc + val, 0) / validCompletionTimes.length) : 0;
+    const formatDuration = (seconds: number) => seconds > 0 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : '-';
 
     const uniqueClasses = useMemo(() => {
         const classes = new Set(results.map(r => r.student.class));
@@ -1217,11 +1222,12 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     ) : (
                         activeTab === 'ANALYSIS' ? (
                             <div className="space-y-8">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                     <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
                                     <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
                                     <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                                     <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
+                                    <StatWidget label="Rata-rata Waktu" value={formatDuration(averageCompletionTime)} color="bg-purple-50" icon={ClockIcon} />
                                 </div>
 
                                 {/* NEW: Category & Level Statistics */}
@@ -1338,6 +1344,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kelas</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Nilai</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">B/S/K</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Waktu</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Aktivitas</th>
                                             {displayExam.config.trackLocation && displayExam.config.examMode !== 'PR' && (
                                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Lokasi</th>
@@ -1373,6 +1380,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
                                                             <span className="text-emerald-600 dark:text-emerald-400" title="Benar">{correct}</span> / <span className="text-rose-600 dark:text-rose-400" title="Salah">{wrong}</span> / <span className="text-slate-400 dark:text-slate-500" title="Kosong">{empty}</span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                            {r.completionTime ? `${Math.floor(r.completionTime / 60)}m ${r.completionTime % 60}s` : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
