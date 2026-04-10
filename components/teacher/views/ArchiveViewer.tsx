@@ -185,8 +185,9 @@ const getCalculatedStats = (r: Result, exam: Exam) => {
     const total = scorableQuestions.length;
     const wrong = total - correct - empty;
     const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+    const duration = r.completionTime || 0;
     
-    return { correct, wrong, empty, score };
+    return { correct, wrong, empty, score, duration };
 };
 
 interface ArchiveMetadata {
@@ -684,7 +685,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         });
 
         // 4. Analisis Kelas Sheet
-        const analisisKelasHeader = ["Kelas", "Jumlah Siswa", "Rata-rata Nilai", "Nilai Tertinggi", "Nilai Terendah", "Lulus (>=75)", "Tidak Lulus (<75)"];
+        const analisisKelasHeader = ["Kelas", "Jumlah Siswa", "Rata-rata Nilai", "Rata-rata Waktu", "Nilai Tertinggi", "Nilai Terendah", "Lulus (>=75)", "Tidak Lulus (<75)"];
         const analisisKelasData = [analisisKelasHeader];
 
         const classes = Array.from(new Set(results.map(r => r.student.class))).sort();
@@ -692,7 +693,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             const classResults = results.filter(r => r.student.class === cls);
             const count = classResults.length;
             const scores = classResults.map(r => getCalculatedStats(r, exam).score);
+            const times = classResults.map(r => getCalculatedStats(r, exam).duration).filter(t => t > 0);
             const avg = count > 0 ? Math.round(scores.reduce((a,b) => a+b, 0) / count) : 0;
+            const avgTime = times.length > 0 ? Math.round(times.reduce((a,b) => a+b, 0) / times.length) : 0;
             const max = count > 0 ? Math.max(...scores) : 0;
             const min = count > 0 ? Math.min(...scores) : 0;
             const pass = scores.filter(s => s >= 75).length;
@@ -702,6 +705,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 cls,
                 String(count),
                 String(avg),
+                formatDuration(avgTime),
                 String(max),
                 String(min),
                 String(pass),
@@ -1516,10 +1520,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">1. Laporan Umum</h3>
                     
                     {/* Stat Grid */}
-                    <div className="grid grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-5 gap-4 mb-4">
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata</p>
                             <p className="text-lg font-black">{averageScore}</p>
+                        </div>
+                        <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata Waktu</p>
+                            <p className="text-lg font-black text-purple-700">{formatDuration(averageCompletionTime)}</p>
                         </div>
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
                             <p className="text-[9px] font-bold text-slate-500 uppercase">Tertinggi</p>
@@ -1676,6 +1684,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
                                 const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
                                 const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
+                                const classTimes = classResults.map(r => getCalculatedStats(r, exam).duration).filter(t => t > 0);
+                                const classAvgTime = classTimes.length > 0 ? Math.round(classTimes.reduce((a, b) => a + b, 0) / classTimes.length) : 0;
 
                                 return (
                                     <div key={`${schoolName}-${className}`} className="mb-12">
@@ -1689,10 +1699,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">A. Analisis Kelas {className} ({schoolName})</h4>
                                                 
                                                 {/* Stat Grid */}
-                                                <div className="grid grid-cols-4 gap-4 text-center mb-6">
+                                                <div className="grid grid-cols-5 gap-4 text-center mb-6">
                                                     <div className="p-2 bg-slate-50 rounded border border-slate-200">
                                                         <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
                                                         <span className="font-black text-lg text-slate-800">{classAvg}</span>
+                                                    </div>
+                                                    <div className="p-2 bg-purple-50 rounded border border-purple-100">
+                                                        <span className="block text-purple-600 uppercase text-[9px] font-bold">Rata-rata Waktu</span>
+                                                        <span className="font-black text-lg text-purple-700">{formatDuration(classAvgTime)}</span>
                                                     </div>
                                                     <div className="p-2 bg-emerald-50 rounded border border-emerald-100">
                                                         <span className="block text-emerald-600 uppercase text-[9px] font-bold">Tertinggi</span>
@@ -1798,18 +1812,20 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                 <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
                                                                 <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
                                                                 <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
+                                                                <th className="border border-slate-300 p-1 text-center w-16">Waktu</th>
                                                                 <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {classResults.map((r, index) => {
-                                                                const { score } = getCalculatedStats(r, exam);
+                                                                const { score, duration } = getCalculatedStats(r, exam);
                                                                 return (
                                                                     <tr key={r.student.studentId} className="avoid-break">
                                                                         <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
                                                                         <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
                                                                         <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
                                                                         <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
+                                                                        <td className="border border-slate-300 p-1 text-center font-mono">{formatDuration(duration)}</td>
                                                                         <td className="border border-slate-300 p-1">
                                                                             <div className="flex flex-wrap gap-0.5">
                                                                                 {exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => {
