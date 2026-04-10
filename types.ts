@@ -1,175 +1,341 @@
 
-export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export interface QuizConfig {
-  count: number;
-  type: string;
-  subject: string;
-  difficulty: string;
-  blueprint: string;
-  includeImages: boolean;
+@layer base {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-export interface ChartData {
-  type: 'bar' | 'line' | 'pie';
-  title?: string;
-  labels: string[];
-  datasets: {
-    label: string;
-    data: number[];
-    backgroundColor?: string[];
-    borderColor?: string[];
-  }[];
-  showTooltip?: boolean;
-}
-
-export interface Question {
-  id: string;
-  questionText: string;
-  questionType: QuestionType;
-  options?: string[];
-  correctAnswer?: string; 
-  imageUrl?: string; 
-  audioUrl?: string; // URL Audio
-  optionImages?: (string | null)[];
-  chartData?: ChartData; 
-  optionCharts?: (ChartData | null)[];
-  correctAnswerChart?: ChartData;
+@layer components {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #E2E8F0;
+    border-radius: 10px;
+  }
   
-  // Metadata Baru
-  category?: string; // e.g., "Teks Prosedur", "Aljabar"
-  level?: string;    // e.g., "1", "HOTS", "LOTS"
-  scoreWeight?: number; // Bobot Nilai (Default: 1)
-  kisiKisi?: string; // NEW: Kisi-kisi materi per soal
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .math-visual {
+    display: inline-block;
+    vertical-align: middle;
+  }
 
-  matchingPairs?: {
-    left: string;
-    right: string; 
-    leftChart?: ChartData;
-    rightChart?: ChartData;
-  }[];
+  /* --- Unified Table Styles for Editor & Viewers (Fixes Dark Mode Headers) --- */
+  
+  /* Target both the Editor (.wysiwyg-content) and Tailwind Typography (.prose) */
+  .wysiwyg-content table, 
+  .prose table { 
+    width: 100%; 
+    border-collapse: separate; 
+    border-spacing: 0;
+    margin: 1.5rem 0; 
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+  } 
 
-  trueFalseRows?: {
-    text: string;
-    answer: boolean; 
-    chartData?: ChartData;
-  }[];
+  /* Cell Borders & Spacing */
+  .wysiwyg-content th, .wysiwyg-content td,
+  .prose th, .prose td { 
+    border-bottom: 1px solid #e2e8f0; 
+    border-right: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem; 
+    min-width: 60px; 
+    color: inherit; 
+    font-size: 0.875rem;
+  } 
+
+  .wysiwyg-content tr:last-child td,
+  .prose tr:last-child td {
+    border-bottom: none;
+  }
+
+  .wysiwyg-content th:last-child, .wysiwyg-content td:last-child,
+  .prose th:last-child, .prose td:last-child {
+    border-right: none;
+  }
+
+  /* Dark Mode Borders */
+  .dark .wysiwyg-content table,
+  .dark .prose table {
+    border-color: #334155;
+  }
+
+  .dark .wysiwyg-content th, .dark .wysiwyg-content td,
+  .dark .prose th, .dark .prose td { 
+    border-color: #334155; 
+  } 
+
+  /* Header Styling (Light Mode) */
+  .wysiwyg-content th,
+  .prose th, .prose thead th { 
+    background-color: #f8fafc; 
+    font-weight: 700; 
+    text-align: left; 
+    color: #475569;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  } 
+
+  /* Zebra Striping */
+  .wysiwyg-content tr:nth-child(even) td,
+  .prose tr:nth-child(even) td {
+    background-color: #fcfdfe;
+  }
+  .dark .wysiwyg-content tr:nth-child(even) td,
+  .dark .prose tr:nth-child(even) td {
+    background-color: rgba(30, 41, 59, 0.3);
+  }
+
+  /* Header Styling (Dark Mode) - CRITICAL FIX */
+  .dark .wysiwyg-content th,
+  .dark .prose th, .dark .prose thead th { 
+    background-color: #1e293b !important; /* Slate 800 */
+    color: #f1f5f9 !important; /* Slate 100 */
+    border-color: #334155;
+  } 
+
+  /* Body Cell Styling (Dark Mode) */
+  .dark .wysiwyg-content td,
+  .dark .prose td { 
+    background-color: transparent; 
+    color: #f1f5f9; 
+  }
+
+  /* Wysiwyg Specific Lists & Quotes (Replicating Editor Styles Globally) */
+  .wysiwyg-content:empty:before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; } 
+  .dark .wysiwyg-content:empty:before { color: #64748b; } 
+  .wysiwyg-content ul { list-style-type: disc; padding-left: 1.5rem; } 
+  .wysiwyg-content ol { list-style-type: decimal; padding-left: 1.5rem; } 
+  .wysiwyg-content blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #64748b; font-style: italic; } 
+  .dark .wysiwyg-content blockquote { border-color: #475569; color: #94a3b8; } 
+  .dark .wysiwyg-content { color: #f1f5f9; }
+  /* Force darker text in light mode for better contrast and to fix "gray" appearance */
+  .wysiwyg-content { color: #0f172a; } /* Slate 900 (almost black) */
+
+  /* Fix Image Alignment: Ensure images respect parent text-align (e.g. Center, Right) */
+  .wysiwyg-content img, 
+  .prose img {
+    display: inline-block;
+  }
+
+  /* Ensure images, tables, and diagrams inside options don't overflow */
+  .option-content img,
+  .option-content svg,
+  .option-content canvas,
+  .wysiwyg-content img,
+  .wysiwyg-content svg,
+  .wysiwyg-content canvas,
+  .prose img,
+  .prose svg,
+  .prose canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5rem auto;
+    border-radius: 0.75rem;
+  }
+  
+  .option-content table,
+  .wysiwyg-content table,
+  .prose table {
+    max-width: 100%;
+    display: table; /* Reset to table for better layout when possible */
+    width: 100%;
+  }
+
+  /* Wrap tables in a scrollable container if they are too wide */
+  /* Since we can't easily add a wrapper div via CSS, we'll use a trick or just keep display: block for responsiveness if needed */
+  /* Actually, display: block on table is the standard way to make it scrollable without a wrapper in CSS-only solutions */
+  @media (max-width: 640px) {
+    .option-content table,
+    .wysiwyg-content table,
+    .prose table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* --- Aggressive Dark Mode Text Visibility Fixes --- */
+  
+  /* 1. For Options: Force ALL content to inherit color. This is safe as options are usually simple text. */
+  .dark .option-content, 
+  .dark .option-content * {
+      color: inherit !important;
+      background-color: transparent !important;
+  }
+
+  /* 2. For General Content (Prose/Editor): Target text containers to strip black colors, but respect structure */
+  .dark .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre),
+  .dark .prose :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre) {
+      color: inherit !important;
+      background-color: transparent !important;
+  }
+
+  /* 3. Catch-all for explicit black styles that might be on other elements */
+  .dark .wysiwyg-content *[style*="color: black"], 
+  .dark .wysiwyg-content *[style*="color: rgb(0, 0, 0)"], 
+  .dark .wysiwyg-content *[style*="color: #000000"],
+  .dark .wysiwyg-content *[style*="color:rgb(0,0,0)"],
+  .dark .prose *[style*="color: black"], 
+  .dark .prose *[style*="color: rgb(0, 0, 0)"], 
+  .dark .prose *[style*="color: #000000"],
+  .dark .prose *[style*="color:rgb(0,0,0)"] {
+      color: inherit !important;
+  }
+
+  /* --- Aggressive Light Mode Text Visibility Fixes --- */
+  /* Prevent dark mode artifacts (black background, white text) from breaking light mode */
+  
+  /* 1. Force transparent background */
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre):not(mark),
+  .prose :is(span, p, div, font, b, i, u, strong, em, h1, h2, h3, h4, h5, h6, li, blockquote, pre):not(mark) {
+      background-color: transparent !important;
+  }
+
+  /* 2. Reset white text to inherit (black/slate) */
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: white"],
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: #ffffff"],
+  .wysiwyg-content :is(span, p, div, font, b, i, u, strong, em)[style*="color: rgb(255, 255, 255)"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: white"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: #ffffff"],
+  .prose :is(span, p, div, font, b, i, u, strong, em)[style*="color: rgb(255, 255, 255)"] {
+      color: inherit !important;
+  }
+
+  /* --- Text Normalization (Smarter Approach) --- */
+  
+  /* 1. Reset Font Size & Line Height for generic containers to inherit from parent */
+  .prose :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]), 
+  .wysiwyg-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content :is(p, div, li):not([class*="text-"]):not([class*="katex"]):not([class*="math"]):not(.aksara-bali):not([style*="Noto Sans Balinese"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+
+  /* 2. Only reset spans/fonts that have NO class (likely copy-paste junk) */
+  /* This avoids hitting KaTeX spans which usually have classes like 'mord', 'katex-html', etc. */
+  .prose :is(span, font):not([class]):not([style*="Noto Sans Balinese"]), 
+  .wysiwyg-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font):not([class]):not([style*="Noto Sans Balinese"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+  
+  /* 3. Also reset elements with inline font-size styles, but ONLY if they are not math related */
+  /* We use a specific selector to avoid breaking math */
+  .prose :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]),
+  .option-content :is(span, font)[style*="font-size"]:not([class]):not([style*="Noto Sans Balinese"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+
+  /* 4. Aggressive fallback for modern browsers: target ANY element with inline font-size, line-height, or font-family that is NOT inside a math block or aksara bali */
+  .prose *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .prose *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .prose *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .wysiwyg-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="font-size"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="line-height"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(.aksara-bali):not([style*="Noto Sans Balinese"]),
+  .option-content *[style*="font-family"]:not(.katex):not(.katex *):not(.math-visual):not(.math-visual *):not(sup):not(sub):not(code):not(pre):not(.aksara-bali):not([style*="Noto Sans Balinese"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-family: inherit !important;
+  }
+
+  /* 5. Ensure Aksara Bali elements always use the correct font */
+  .aksara-bali, [style*="Noto Sans Balinese"] {
+      font-family: 'Noto Sans Balinese', sans-serif !important;
+  }
+  
+  /* Exceptions for Superscript/Subscript */
+  
+  /* Viewer (Prose) - Pretty styling that doesn't affect line height */
+  .prose sup, .prose sub { 
+      font-size: 75%; 
+      line-height: 0; 
+      vertical-align: baseline;
+      position: relative;
+  }
+  .prose sup { top: -0.5em; }
+  .prose sub { bottom: -0.25em; }
+
+  /* Editor (Wysiwyg) - Native styling for robust editing behavior */
+  /* We use standard vertical-align to ensure the browser's cursor logic works as expected */
+  .wysiwyg-content sup, .wysiwyg-content sub { 
+      font-size: 75%; 
+      line-height: normal; 
+      position: static;
+  }
+  .wysiwyg-content sup { vertical-align: super; top: auto; }
+  .wysiwyg-content sub { vertical-align: sub; bottom: auto; }
+
+  /* --- Answer Key Specific Reset --- */
+  /* This class forces text to be small and clean, but protects Math */
+  .answer-key-reset {
+      font-size: 0.75rem; /* text-xs */
+      line-height: 1.5;
+  }
+  /* Reset unstyled/unclassed elements */
+  .answer-key-reset :is(p, div, li, span, font, b, i, u, strong, em):not([class]):not([style]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      background-color: transparent !important;
+      color: inherit !important;
+      margin: 0 !important;
+      padding: 0 !important;
+  }
+  
+  /* Target elements with inline FONT-SIZE styles that are NOT math related */
+  .answer-key-reset :is(p, div, li, span, font)[style*="font-size"]:not([class*="katex"]):not([class*="math"]) {
+      font-size: inherit !important;
+      line-height: inherit !important;
+  }
+  
+  /* Target elements with inline COLOR/BG styles that are NOT math related */
+  .answer-key-reset :is(p, div, li, span, font)[style*="color"]:not([class*="katex"]):not([class*="math"]),
+  .answer-key-reset :is(p, div, li, span, font)[style*="background"]:not([class*="katex"]):not([class*="math"]) {
+      background-color: transparent !important;
+      color: inherit !important;
+  }
 }
 
-export interface ExamConfig {
-  examMode: 'PR' | 'UJIAN'; // NEW: Mode PR atau Ujian
-  startDate?: string; // NEW: Tanggal mulai (hanya untuk Ujian)
-  endDate?: string; // NEW: Tanggal selesai (untuk PR dan Ujian)
-  useBankSoal?: boolean; // NEW: Gunakan sistem bank soal
-  bankSoalCount?: number; // NEW: Jumlah soal yang ditampilkan dari bank
-  bankSoalProportions?: {
-    mudah: number; // Persentase soal mudah
-    sedang: number; // Persentase soal sedang
-    sulit: number; // Persentase soal sulit
-  };
-  timeLimit: number; // in minutes
-  date: string; // (Deprecated, use startDate/endDate)
-  startTime: string; // HH:mm (Deprecated, use startDate/endDate)
-  endTime?: string; // HH:mm (NEW: End time for the exam)
-  allowRetakes: boolean;
-  detectBehavior: boolean;
-  autoSubmitInactive: boolean;
-  autoSaveInterval: number; // in seconds
-  shuffleQuestions: boolean;
-  shuffleAnswers: boolean;
-  continueWithPermission: boolean;
-  showResultToStudent: boolean;
-  showCorrectAnswer: boolean;
-  enablePublicStream: boolean;
-  disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
-  trackLocation: boolean;
-  isFinished?: boolean; // NEW: Untuk menghentikan ujian secara paksa
-  subject: string;
-  classLevel: string;
-  targetClasses?: string[]; 
-  examType: string;
-  description: string;
-  manualParticipantCount?: number; // Added for manual override in archives
-  collaborators?: Collaborator[]; // Moved here for JSONB persistence
-  kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
+/* --- Recharts Dark Mode Fixes --- */
+.dark .recharts-text {
+  fill: #cbd5e1;
 }
-
-export interface Exam {
-  code: string;
-  authorId?: string; 
-  authorName?: string; // Added to store creator's real name
-  authorSchool?: string; 
-  questions: Question[];
-  config: ExamConfig;
-  isSynced?: boolean; 
-  createdAt?: string; 
-  status?: 'DRAFT' | 'PUBLISHED'; 
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: #334155;
 }
-
-export interface Collaborator {
-    token: string;
-    label: string; // e.g. "Pak Budi"
-    role: 'editor' | 'viewer';
-    createdAt: number;
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
 }
-
-export interface Student {
-  fullName: string;
-  class: string;
-  absentNumber: string; 
-  studentId: string; 
-  schoolName?: string;
-  resultId?: number; // Added to track DB Primary Key
+.dark .recharts-tooltip-item {
+  color: #f1f5f9 !important;
 }
-
-export type ResultStatus = 'in_progress' | 'completed' | 'force_closed' | 'pending_grading';
-
-export interface Result {
-    id?: number; // Primary Key from DB
-    student: Student;
-    examCode: string;
-    answers: Record<string, string>;
-    score: number;
-    totalQuestions: number;
-    correctAnswers: number;
-    completionTime?: number; 
-    activityLog?: string[];
-    status?: ResultStatus;
-    isSynced?: boolean; 
-    timestamp?: number;
-    location?: { lat: number; lng: number } | string;
-}
-
-export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru' | 'collaborator';
-
-export interface TeacherProfile {
-    id: string; 
-    fullName: string;
-    accountType: AccountType;
-    school: string;
-    regency?: string; // Added for Kabupaten/Kota
-    avatarUrl?: string;
-    email?: string; // Added for user management display
-}
-
-export interface UserProfile extends TeacherProfile {
-    email: string;
-    createdAt?: string;
-}
-
-export interface ExamSummary {
-    id: string;
-    school_name: string;
-    exam_subject: string;
-    exam_code: string;
-    exam_type?: string; // Added for Analisis Daerah
-    class_level?: string; // Added for Analisis Daerah
-    exam_date: string;
-    total_participants: number;
-    average_score: number;
-    highest_score: number;
-    lowest_score: number;
-    passing_rate: number;
-    question_stats: Record<string, unknown>[]; // JSONB Statistical Snapshot
-    region?: string;
+.dark .recharts-legend-item-text {
+  color: #cbd5e1 !important;
 }
