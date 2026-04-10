@@ -148,10 +148,10 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
-  const [fullName, setFullName] = useState(() => { try { return localStorage.getItem('saved_student_fullname') || ''; } catch { return ''; } });
-  const [schoolName, setSchoolName] = useState(() => { try { return localStorage.getItem('saved_student_school') || ''; } catch { return ''; } });
-  const [studentClass, setStudentClass] = useState(() => { try { return localStorage.getItem('saved_student_class') || ''; } catch { return ''; } });
-  const [absentNumber, setAbsentNumber] = useState(() => { try { return localStorage.getItem('saved_student_absent') || ''; } catch { return ''; } });
+  const [fullName, setFullName] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [studentClass, setStudentClass] = useState('');
+  const [absentNumber, setAbsentNumber] = useState('');
   
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -178,11 +178,24 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
       });
   }, [availableClasses, schoolName]);
 
-  // Auto-fetch config when code changes to determine if dropdown should be used
+  // Auto-fetch config and load scoped student data when code changes
   useEffect(() => {
     const checkConfig = async () => {
-        if (examCode.length === 6) {
-            const config = await storageService.getExamConfig(examCode.toUpperCase().trim());
+        const cleanCode = examCode.toUpperCase().trim();
+        if (cleanCode.length === 6) {
+            // Load scoped student data for this specific exam code
+            try {
+                const scopedData = localStorage.getItem(`student_pref_${cleanCode}`);
+                if (scopedData) {
+                    const parsed = JSON.parse(scopedData);
+                    if (parsed.fullName) setFullName(parsed.fullName);
+                    if (parsed.schoolName) setSchoolName(parsed.schoolName);
+                    if (parsed.studentClass) setStudentClass(parsed.studentClass);
+                    if (parsed.absentNumber) setAbsentNumber(parsed.absentNumber);
+                }
+            } catch { /* ignore */ }
+
+            const config = await storageService.getExamConfig(cleanCode);
             if (config && config.targetClasses && config.targetClasses.length > 0) {
                 setAvailableClasses(config.targetClasses);
                 // FIX: Reset kelas jika nilai saat ini tidak ada dalam daftar target
@@ -365,8 +378,18 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
     setError('');
 
-    // Save preference (original text for display)
+    // Save preference scoped by exam code to prevent data leakage between different exams
     try {
+        const prefData = {
+            fullName: fullName.trim(),
+            schoolName: schoolName.trim(),
+            studentClass: studentClass.trim(),
+            absentNumber: absentNumber.trim()
+        };
+        localStorage.setItem(`student_pref_${cleanExamCode}`, JSON.stringify(prefData));
+        
+        // Also keep global for backward compatibility or general fallback if needed, 
+        // but scoped takes priority in loading.
         localStorage.setItem('saved_student_fullname', fullName.trim());
         localStorage.setItem('saved_student_school', schoolName.trim());
         localStorage.setItem('saved_student_class', studentClass.trim());

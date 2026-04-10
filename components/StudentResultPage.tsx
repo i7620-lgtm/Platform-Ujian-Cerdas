@@ -22,10 +22,8 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
         return (
             <>
                 <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
-                <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <div className="w-full">
-                        <ChartRenderer data={chartData} />
-                    </div>
+                <div className="mb-4">
+                    <ChartRenderer data={chartData} />
                 </div>
             </>
         );
@@ -44,10 +42,8 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
                 <React.Fragment key={index}>
                     <div dangerouslySetInnerHTML={{ __html: part }}></div>
                     {index < parts.length - 1 && (
-                        <div className="my-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <div className="w-full">
-                                <ChartRenderer data={chartData} />
-                            </div>
+                        <div className="my-4">
+                            <ChartRenderer data={chartData} />
                         </div>
                     )}
                 </React.Fragment>
@@ -334,7 +330,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]">
                                         <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[8px] uppercase tracking-tighter">Nama Sekolah</p>
-                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate leading-tight">{exam.authorSchool || result.student.schoolName || '-'}</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate leading-tight">{result.student.schoolName || exam.authorSchool || '-'}</p>
                                         </div>
                                         <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[8px] uppercase tracking-tighter">Nama Siswa</p>
@@ -510,12 +506,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
-                                                                <div className={`text-right font-black option-content [&_p]:inline ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(displayStudentAns)}}></div>
+                                                                <div className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(displayStudentAns)}}></div>
                                                             </div>
                                                             {!isCorrect && (
                                                                 <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                                                                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Kunci Jawaban:</span> 
-                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content [&_p]:inline" dangerouslySetInnerHTML={{__html: sanitizeHtml(displayCorrectAns)}}></div>
+                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content flex-1 min-w-0 [&_p]:inline" dangerouslySetInnerHTML={{__html: sanitizeHtml(displayCorrectAns)}}></div>
                                                                 </div>
                                                             )}
                                                         </div>
