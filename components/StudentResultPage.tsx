@@ -506,12 +506,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                                         <div className="text-xs space-y-2 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Jawaban Kamu:</span> 
-                                                                <div className={`text-right font-black option-content [&_p]:inline ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(displayStudentAns)}}></div>
+                                                                <div className={`text-right font-black option-content flex-1 min-w-0 [&_p]:inline ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} dangerouslySetInnerHTML={{__html: sanitizeHtml(displayStudentAns)}}></div>
                                                             </div>
                                                             {!isCorrect && (
                                                                 <div className="flex justify-between items-start border-t border-slate-50 dark:border-slate-800 pt-2 mt-2 gap-2">
                                                                     <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">Kunci Jawaban:</span> 
-                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content [&_p]:inline" dangerouslySetInnerHTML={{__html: sanitizeHtml(displayCorrectAns)}}></div>
+                                                                    <div className="text-right font-black text-slate-700 dark:text-slate-300 option-content flex-1 min-w-0 [&_p]:inline" dangerouslySetInnerHTML={{__html: sanitizeHtml(displayCorrectAns)}}></div>
                                                                 </div>
                                                             )}
                                                         </div>
