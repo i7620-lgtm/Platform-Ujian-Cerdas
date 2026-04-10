@@ -720,7 +720,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         return (
                                                             <button key={i} onClick={() => handleAnswerChange(q.id, opt)} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <span className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold shrink-0 mt-0.5 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800'}`}>{String.fromCharCode(65 + i)}</span>
-                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
+                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                             </button>
                                                         );
                                                     })}
@@ -739,7 +739,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                                 handleAnswerChange(q.id, JSON.stringify(newAns)); 
                                                             }} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${isSelected ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center border mt-0.5 shrink-0 ${isSelected ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>{isSelected && <CheckIcon className="w-4 h-4 text-white" />}</div>
-                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
+                                                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}></div>
                                                             </button>
                                                         );
                                                     })}
@@ -755,7 +755,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                                                         
                                                         return (
                                                             <div key={i} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                                                <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content">
+                                                                <div className="mb-4 font-medium text-slate-700 dark:text-slate-300 option-content min-w-0">
                                                                     <div className="option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(row.text) }}></div>
                                                                 </div>
                                                                 <div className="flex gap-3">
@@ -801,8 +801,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
                                                             return (
                                                                 <div key={i} className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                                                    <div className="flex-1 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
-                                                                        <div className="option-content" dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
+                                                                    <div className="flex-1 min-w-0 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center option-content">
+                                                                        <div className="option-content w-full" dangerouslySetInnerHTML={{ __html: optimizeHtml(pair.left) }}></div>
                                                                     </div>
                                                                     
                                                                     {/* Mobile Connector */}
