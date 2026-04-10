@@ -66,21 +66,21 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
                 interval={0}
                 angle={-45}
                 textAnchor="end"
-                height={60}
+                height={100}
               />
               <YAxis 
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: '#64748b' }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
               />
@@ -88,8 +88,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 <Tooltip 
                   content={<CustomTooltip />} 
                   cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                  wrapperStyle={{ zIndex: 1000 }}
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  offset={20}
                 />
               )}
               <Legend 
@@ -103,7 +104,6 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
                   radius={[4, 4, 0, 0]}
-                  barSize={40}
                 />
               ))}
             </BarChart>
@@ -114,29 +114,30 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
                 interval={0}
                 angle={-45}
                 textAnchor="end"
-                height={60}
+                height={100}
               />
               <YAxis 
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: '#64748b' }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />}
-                  wrapperStyle={{ zIndex: 1000 }}
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  offset={20}
                 />
               )}
               <Legend 
@@ -186,8 +187,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />}
-                  wrapperStyle={{ zIndex: 1000 }}
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                  offset={20}
                 />
               )}
               <Legend verticalAlign="bottom" height={36}/>
@@ -201,7 +203,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[400px] flex flex-col bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+    <div className="w-full h-[500px] flex flex-col bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
       {title && <h3 className="text-center font-black mb-6 text-slate-800 dark:text-white tracking-tight text-lg">{title}</h3>}
       <div className="flex-1 min-h-0 relative">
         {renderChart()}
