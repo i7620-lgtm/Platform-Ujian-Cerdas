@@ -36,8 +36,7 @@
   
   /* Target both the Editor (.wysiwyg-content), Tailwind Typography (.prose), and Options (.option-content) */
   .wysiwyg-content table, 
-  .prose table,
-  .option-content table { 
+  .prose table { 
     width: 100%; 
     border-collapse: separate; 
     border-spacing: 0;
@@ -48,16 +47,39 @@
     table-layout: auto;
   } 
 
+  /* Specific styles for tables inside options to prevent overflow and look better */
+  .option-content table {
+    width: 100%; 
+    border-collapse: separate; 
+    border-spacing: 0;
+    margin: 0.5rem 0; 
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+    table-layout: fixed; /* Force table to fit container and wrap text */
+  }
+
   /* Cell Borders & Spacing */
   .wysiwyg-content th, .wysiwyg-content td,
-  .prose th, .prose td,
-  .option-content th, .option-content td { 
+  .prose th, .prose td { 
     border-bottom: 1px solid #e2e8f0; 
     border-right: 1px solid #e2e8f0;
     padding: 0.5rem; 
     color: inherit; 
     font-size: 0.875rem;
     word-break: break-word;
+  } 
+
+  .option-content th, .option-content td { 
+    border-bottom: 1px solid #e2e8f0; 
+    border-right: 1px solid #e2e8f0;
+    padding: 0.375rem; /* Smaller padding */
+    color: inherit; 
+    font-size: 0.75rem; /* Smaller font size */
+    white-space: normal; /* Force text wrapping */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   } 
 
   .wysiwyg-content tr:last-child td,
@@ -161,11 +183,16 @@
     border-radius: 0.75rem;
   }
   
-  .option-content table,
   .wysiwyg-content table,
   .prose table {
     max-width: 100%;
     display: table; /* Reset to table for better layout when possible */
+    width: 100%;
+  }
+
+  .option-content table {
+    max-width: 100%;
+    display: table;
     width: 100%;
   }
 
