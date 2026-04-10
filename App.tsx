@@ -110,6 +110,17 @@ const App: React.FC = () => {
                     
                     // Update localStorage so next login uses the updated data
                     try {
+                        const examCode = currentExam?.code;
+                        if (examCode) {
+                            const prefData = {
+                                fullName: newStudentName.trim(),
+                                schoolName: schoolName.trim(),
+                                studentClass: className.trim(),
+                                absentNumber: absentNumber.trim()
+                            };
+                            localStorage.setItem(`student_pref_${examCode}`, JSON.stringify(prefData));
+                        }
+
                         localStorage.setItem('saved_student_fullname', newStudentName.trim());
                         localStorage.setItem('saved_student_class', className.trim());
                         localStorage.setItem('saved_student_absent', absentNumber.trim());
