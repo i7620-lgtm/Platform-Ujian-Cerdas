@@ -1089,8 +1089,9 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         const total = scorableQuestions.length;
         const wrong = total - correct - empty;
         const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+        const duration = r.completionTime || 0;
         
-        return { correct, wrong, empty, score };
+        return { correct, wrong, empty, score, duration };
     };
 
     // Calculate Global Stats
