@@ -1088,9 +1088,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const averageScore = realStudentCount > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
     const highestScore = realStudentCount > 0 ? Math.max(...results.map(r => r.score)) : 0;
     const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
-    const validCompletionTimes = results.filter(r => r.completionTime).map(r => r.completionTime as number);
+    const validCompletionTimes = results.filter(r => r.completionTime !== undefined && r.completionTime !== null).map(r => r.completionTime as number);
     const averageCompletionTime = validCompletionTimes.length > 0 ? Math.round(validCompletionTimes.reduce((acc, val) => acc + val, 0) / validCompletionTimes.length) : 0;
-    const formatDuration = (seconds: number) => seconds > 0 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : '-';
+    const formatDuration = (seconds: number | undefined | null) => {
+        if (seconds === undefined || seconds === null) return '-';
+        const s = Math.round(seconds);
+        return `${Math.floor(s / 60)}m ${s % 60}s`;
+    };
 
     return (
         <div className="w-full max-w-full mx-auto space-y-6">
@@ -1113,8 +1117,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     .print-question-text, .print-question-text * { font-size: 9pt !important; line-height: 1.4 !important; color: #0f172a !important; background-color: transparent !important; }
                     .print-question-text img { max-width: 100% !important; height: auto !important; }
                     .no-print, .print\\:hidden { display: none !important; }
-                    .page-break { page-break-before: always; }
-                    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+                    .page-break { break-before: page; }
+                    .break-before-page { break-before: page; }
+                    .break-after-avoid { break-after: avoid; }
+                    .avoid-break { break-inside: avoid; }
+                    .avoid-break-inside { break-inside: avoid; }
                     .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
                 }
             `}</style>
@@ -1363,7 +1370,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 {activeTab === 'ANALYSIS' && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                             <StatWidget label="Rata-rata" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
+                             <StatWidget label="Rata-rata Nilai" value={averageScore} color="bg-indigo-50" icon={ChartBarIcon} />
                              <StatWidget label="Tertinggi" value={highestScore} color="bg-emerald-50" icon={CheckCircleIcon} />
                              <StatWidget label="Terendah" value={lowestScore} color="bg-rose-50" icon={XMarkIcon} />
                              <StatWidget label="Partisipan" value={totalStudents} color="bg-blue-50" icon={UserIcon} />
@@ -1432,8 +1439,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Sekolah</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata Waktu</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata Nilai</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rata-rata Waktu</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Min / Max</th>
                                         {archiveData.exam.config.kkm && <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Ketuntasan (KKM {archiveData.exam.config.kkm})</th>}
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Detail Performa Soal</th>
@@ -1520,13 +1527,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 </div>
 
                 {/* 1. LAPORAN UMUM */}
-                <div className="mb-8 avoid-break">
+                <div className="mb-8 avoid-break-inside">
                     <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">1. Laporan Umum</h3>
                     
                     {/* Stat Grid */}
                     <div className="grid grid-cols-5 gap-4 mb-4">
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase">Rata-rata Nilai</p>
                             <p className="text-lg font-black">{averageScore}</p>
                         </div>
                         <div className="border border-slate-300 p-3 rounded text-center bg-slate-50">
@@ -1556,7 +1563,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     <tr>
                                         <th className="border border-slate-300 p-1 text-left">Nama Sekolah</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Siswa</th>
-                                        <th className="border border-slate-300 p-1 text-center w-16">Rerata</th>
+                                        <th className="border border-slate-300 p-1 text-center w-16">Rerata Nilai</th>
                                         <th className="border border-slate-300 p-1 text-center w-20">Rerata Waktu</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Max</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Min</th>
@@ -1664,43 +1671,43 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     </div>
                 </div>
 
-                <div className="page-break"></div>
 
                 {/* 2. LAPORAN PER SEKOLAH & KELAS */}
-                {uniqueSchools.map((schoolName, schoolIdx) => {
-                    const schoolClasses = Array.from(new Set(
-                        sortedResults
-                            .filter(r => (r.student.schoolName || 'Tanpa Sekolah') === schoolName)
-                            .map(r => r.student.class)
-                    )).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+                {
+                    uniqueSchools.map((schoolName, schoolIdx) => {
+                        const schoolClasses = Array.from(new Set(
+                            sortedResults
+                                .filter(r => (r.student.schoolName || 'Tanpa Sekolah') === schoolName)
+                                .map(r => r.student.class)
+                        )).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-                    return (
-                        <div key={schoolName}>
-                            <div className="page-break"></div>
-                            <div className="bg-slate-900 text-white p-4 mb-6 rounded-lg flex justify-between items-center">
-                                <h2 className="text-xl font-black uppercase tracking-widest">SEKOLAH: {schoolName}</h2>
-                                <span className="text-xs font-bold opacity-70">Bagian {schoolIdx + 2}</span>
-                            </div>
+                        return (
+                            <div key={schoolName} className="break-before-page">
+                                <div className="bg-slate-900 text-white p-4 mb-4 rounded-lg flex justify-between items-center break-after-avoid">
+                                    <h2 className="text-xl font-black uppercase tracking-widest">SEKOLAH: {schoolName}</h2>
+                                    <span className="text-xs font-bold opacity-70">Bagian {schoolIdx + 2}</span>
+                                </div>
 
-                            {schoolClasses.map((className, classIdx) => {
-                                const classResults = sortedResults.filter(r => 
-                                    (r.student.schoolName || 'Tanpa Sekolah') === schoolName && 
-                                    r.student.class === className
-                                );
-                                const classTotal = classResults.length;
-                                const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
-                                const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
-                                const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
-                                const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
-                                const classTimes = classResults.map(r => getCalculatedStats(r, exam).duration).filter(t => t > 0);
-                                const classAvgTime = classTimes.length > 0 ? Math.round(classTimes.reduce((a, b) => a + b, 0) / classTimes.length) : 0;
+                                {schoolClasses.map((className, classIdx) => {
+                                        const classResults = sortedResults.filter(r => 
+                                            (r.student.schoolName || 'Tanpa Sekolah') === schoolName && 
+                                            r.student.class === className
+                                        );
+                                        const classTotal = classResults.length;
+                                        const classScores = classResults.map(r => getCalculatedStats(r, exam).score);
+                                        const classAvg = classTotal > 0 ? Math.round(classScores.reduce((a, b) => a + b, 0) / classTotal) : 0;
+                                        const classMax = classTotal > 0 ? Math.max(...classScores) : 0;
+                                        const classMin = classTotal > 0 ? Math.min(...classScores) : 0;
+                                        const classTimes = classResults.map(r => getCalculatedStats(r, exam).duration).filter(t => t > 0);
+                                        const classAvgTime = classTimes.length > 0 ? Math.round(classTimes.reduce((a, b) => a + b, 0) / classTimes.length) : 0;
 
-                                return (
-                                    <div key={`${schoolName}-${className}`} className="mb-12">
-                                        <div className="mb-8 avoid-break">
-                                            <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">
-                                                {schoolIdx + 2}.{classIdx + 1}. Laporan Kelas {className}
-                                            </h3>
+                                        return (
+                                            <div key={`${schoolName}-${className}`} className="mb-8">
+                                                <div className="mb-4">
+                                                    <div className="avoid-break">
+                                                        <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2 break-after-avoid">
+                                                            {schoolIdx + 2}.{classIdx + 1}. Laporan Kelas {className}
+                                                        </h3>
                                             
                                             {/* A. ANALISIS KELAS */}
                                             <div className="mb-4 bg-white border border-slate-300 rounded p-4">
@@ -1709,7 +1716,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 {/* Stat Grid */}
                                                 <div className="grid grid-cols-5 gap-4 text-center mb-6">
                                                     <div className="p-2 bg-slate-50 rounded border border-slate-200">
-                                                        <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata</span>
+                                                        <span className="block text-slate-500 uppercase text-[9px] font-bold">Rata-rata Nilai</span>
                                                         <span className="font-black text-lg text-slate-800">{classAvg}</span>
                                                     </div>
                                                     <div className="p-2 bg-purple-50 rounded border border-purple-100">
@@ -1729,8 +1736,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                         <span className="font-black text-lg text-blue-700">{classTotal}</span>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* Detailed Stats Grid (Category, Level, Type) */}
+                                            {/* A. ANALISIS KELAS - Detailed Tables */}
+                                            <div className="mb-4 bg-white border border-slate-300 rounded p-4 avoid-break">
+                                                <p className="text-[10px] font-bold uppercase mb-3 text-slate-500">Detail Penguasaan Materi, Level, dan Jenis Soal</p>
                                                 {(() => {
                                                     // Calculate stats specific to this class
                                                     const { categoryStats: classCatStats, levelStats: classLevelStats } = calculateAggregateStats(exam, classResults);
@@ -1810,7 +1820,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             </div>
 
                                             {/* B. REKAPITULASI HASIL KELAS */}
-                                            <div className="mb-4">
+                                            <div className="mb-4 avoid-break">
                                                 <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">B. Rekapitulasi Hasil Kelas {className}</h4>
                                                 <div className="overflow-x-auto custom-scrollbar">
                                                     <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
@@ -1857,7 +1867,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             </div>
 
                                             {/* C. ANALISIS INDIVIDU KELAS */}
-                                            <div className="mb-4">
+                                            <div className="mb-4 avoid-break">
                                                 <h4 className="font-bold text-xs uppercase mb-2 text-slate-600">C. Analisis Individu Kelas {className}</h4>
                                                 <div className="overflow-x-auto custom-scrollbar">
                                                     <table className="w-full border-collapse border border-slate-300 text-[9px] min-w-[600px]">
@@ -1905,17 +1915,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="page-break"></div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    );
-                })}
-
+                                </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })
+                }
                 {/* 3. ANALISIS BUTIR SOAL */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2">3. Analisis Butir Soal</h3>
+                <div className="mb-4 break-before-page">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-2 border-l-4 border-slate-800 pl-2 break-after-avoid">3. Analisis Butir Soal</h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                         {questionAnalysisData.map((data, idx) => {
@@ -2042,11 +2052,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         })}
                     </div>
                 </div>
-                <div className="page-break"></div>
 
                 {/* 4. BANK SOAL & KUNCI JAWABAN */}
-                <div className="mb-4">
-                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2">4. Bank Soal & Kunci Jawaban</h3>
+                <div className="mb-4 break-before-page">
+                    <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2 break-after-avoid">4. Bank Soal & Kunci Jawaban</h3>
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
                             const questionNumber = exam.questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
