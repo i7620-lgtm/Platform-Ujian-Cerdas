@@ -1818,7 +1818,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             <tr className="bg-slate-100">
                                                                 <th className="border border-slate-300 p-1 text-center w-8">No</th>
                                                                 <th className="border border-slate-300 p-1 text-left w-40 whitespace-nowrap">Nama Siswa</th>
-                                                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
                                                                 <th className="border border-slate-300 p-1 text-center w-10">Nilai</th>
                                                                 <th className="border border-slate-300 p-1 text-center w-16">Waktu</th>
                                                                 <th className="border border-slate-300 p-1 text-left">Rincian Jawaban (Hijau: Benar, Merah: Salah, Abu: Kosong)</th>
@@ -1831,7 +1830,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     <tr key={r.student.studentId} className="avoid-break">
                                                                         <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
                                                                         <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                                        <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
                                                                         <td className="border border-slate-300 p-1 text-center font-bold text-sm">{score}</td>
                                                                         <td className="border border-slate-300 p-1 text-center font-mono">{formatDuration(duration)}</td>
                                                                         <td className="border border-slate-300 p-1">
@@ -1867,7 +1865,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             <tr className="bg-slate-100">
                                                                 <th className="border border-slate-300 p-1 text-center w-8">No</th>
                                                                 <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Nama Siswa</th>
-                                                                <th className="border border-slate-300 p-1 text-left w-32 whitespace-nowrap">Asal Sekolah</th>
                                                                 <th className="border border-slate-300 p-1 text-left">Analisis Kategori (Penguasaan)</th>
                                                                 <th className="border border-slate-300 p-1 text-left w-48">Rekomendasi Tindakan</th>
                                                             </tr>
@@ -1879,7 +1876,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                                     <tr key={r.student.studentId} className="avoid-break">
                                                                         <td className="border border-slate-300 p-1 text-center">{index + 1}</td>
                                                                         <td className="border border-slate-300 p-1 font-bold whitespace-nowrap">{r.student.fullName}</td>
-                                                                        <td className="border border-slate-300 p-1 whitespace-nowrap">{r.student.schoolName || '-'}</td>
                                                                         <td className="border border-slate-300 p-1">
                                                                             <div className="flex flex-wrap gap-2">
                                                                                 {analysis.stats.map(stat => {
