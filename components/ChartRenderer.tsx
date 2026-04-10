@@ -66,28 +66,32 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 10, right: 10, left: -15, bottom: 80 }}
+              margin={{ top: 20, right: 20, left: 0, bottom: 60 }}
+              barCategoryGap="15%"
             >
-              <CartesianGrid strokeDasharray="5 5" vertical={true} stroke="#cbd5e1" opacity={0.6} />
+              <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 13, fill: '#475569', fontWeight: 700 }}
-                axisLine={{ stroke: '#94a3b8', strokeWidth: 2 }}
-                tickLine={{ stroke: '#94a3b8' }}
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
                 interval={0}
                 angle={-45}
                 textAnchor="end"
-                height={80}
+                height={70}
+                tickMargin={5}
               />
               <YAxis 
-                tick={{ fontSize: 13, fill: '#475569', fontWeight: 700 }}
-                axisLine={{ stroke: '#94a3b8', strokeWidth: 2 }}
-                tickLine={{ stroke: '#94a3b8' }}
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                tickMargin={5}
+                width={45}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />} 
-                  cursor={{ fill: 'rgba(0,0,0,0.03)' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
                   allowEscapeViewBox={{ x: false, y: true }}
                   offset={20}
@@ -96,15 +100,14 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '40px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Bar
                   key={dataset.label}
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
-                  barSize={60}
-                  radius={[8, 8, 0, 0]}
+                  maxBarSize={80}
                 />
               ))}
             </BarChart>
@@ -115,23 +118,26 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 10, right: 10, left: -15, bottom: 80 }}
+              margin={{ top: 20, right: 20, left: 0, bottom: 60 }}
             >
-              <CartesianGrid strokeDasharray="5 5" vertical={true} stroke="#cbd5e1" opacity={0.6} />
+              <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 13, fill: '#475569', fontWeight: 700 }}
-                axisLine={{ stroke: '#94a3b8', strokeWidth: 2 }}
-                tickLine={{ stroke: '#94a3b8' }}
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
                 interval={0}
                 angle={-45}
                 textAnchor="end"
-                height={80}
+                height={70}
+                tickMargin={5}
               />
               <YAxis 
-                tick={{ fontSize: 13, fill: '#475569', fontWeight: 700 }}
-                axisLine={{ stroke: '#94a3b8', strokeWidth: 2 }}
-                tickLine={{ stroke: '#94a3b8' }}
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                tickMargin={5}
+                width={45}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
@@ -144,7 +150,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '40px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Line
@@ -152,9 +158,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   type="monotone"
                   dataKey={dataset.label}
                   stroke={dataset.borderColor?.[0] || COLORS[index % COLORS.length]}
-                  strokeWidth={6}
-                  dot={{ r: 8, strokeWidth: 4, fill: '#fff' }}
-                  activeDot={{ r: 10, strokeWidth: 0 }}
+                  strokeWidth={4}
+                  dot={{ r: 6, strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 0 }}
                 />
               ))}
             </LineChart>
@@ -204,8 +210,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[620px] flex flex-col bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
-      {title && <h3 className="text-center font-black mb-10 text-slate-800 dark:text-white tracking-tight text-2xl">{title}</h3>}
+    <div className="w-full h-[500px] sm:h-[600px] flex flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
+      {title && <h3 className="text-center font-bold mb-6 sm:mb-8 text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl">{title}</h3>}
       <div className="flex-1 min-h-0 relative">
         {renderChart()}
       </div>
