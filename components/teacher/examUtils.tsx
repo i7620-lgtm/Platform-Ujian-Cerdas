@@ -1340,6 +1340,19 @@ export const sanitizeHtml = (html: string): string => {
             el.removeAttribute('bgcolor');
         }
     });
+
+    // Wrap tables in a responsive container to prevent overflow
+    doc.body.querySelectorAll('table').forEach(table => {
+        // Check if it's already wrapped
+        if (table.parentElement && table.parentElement.classList.contains('overflow-x-auto')) {
+            return;
+        }
+        const wrapper = doc.createElement('div');
+        wrapper.className = 'w-full overflow-x-auto custom-scrollbar';
+        table.parentNode?.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+    });
+
     return doc.body.innerHTML;
 };
 
