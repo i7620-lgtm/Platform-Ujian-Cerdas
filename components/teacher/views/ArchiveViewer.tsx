@@ -1433,6 +1433,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Kelas</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Partisipan</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Rerata Waktu</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Min / Max</th>
                                         {archiveData.exam.config.kkm && <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase text-center">Ketuntasan (KKM {archiveData.exam.config.kkm})</th>}
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">Detail Performa Soal</th>
@@ -1447,7 +1448,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             <React.Fragment key={school}>
                                                 {selectedSchool === 'ALL' && (
                                                     <tr className="bg-slate-50/80 dark:bg-slate-700/50">
-                                                        <td colSpan={7} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
+                                                        <td colSpan={8} className="px-6 py-2 text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-700">
                                                             Sekolah: {school}
                                                         </td>
                                                     </tr>
@@ -1461,6 +1462,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                             <span className={`px-2 py-1 rounded font-bold text-xs ${c.averageScore >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
                                                                 {c.averageScore}
                                                             </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
+                                                            {formatDuration(c.averageTime)}
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
                                                             {c.lowestScore} - {c.highestScore}
@@ -1553,6 +1557,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         <th className="border border-slate-300 p-1 text-left">Nama Sekolah</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Siswa</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Rerata</th>
+                                        <th className="border border-slate-300 p-1 text-center w-20">Rerata Waktu</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Max</th>
                                         <th className="border border-slate-300 p-1 text-center w-16">Min</th>
                                     </tr>
@@ -1562,7 +1567,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                         const schoolResults = archiveData.results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === school);
                                         if (schoolResults.length === 0) return null;
                                         const scores = schoolResults.map(r => getCalculatedStats(r, exam).score);
+                                        const times = schoolResults.map(r => getCalculatedStats(r, exam).duration).filter(t => t > 0);
                                         const avg = Math.round(scores.reduce((a, b) => a + b, 0) / schoolResults.length);
+                                        const avgTime = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
                                         const max = Math.max(...scores);
                                         const min = Math.min(...scores);
                                         return (
@@ -1570,6 +1577,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                                 <td className="border border-slate-300 p-1 font-bold">{school}</td>
                                                 <td className="border border-slate-300 p-1 text-center">{schoolResults.length}</td>
                                                 <td className="border border-slate-300 p-1 text-center font-bold">{avg}</td>
+                                                <td className="border border-slate-300 p-1 text-center font-mono text-purple-700">{formatDuration(avgTime)}</td>
                                                 <td className="border border-slate-300 p-1 text-center text-emerald-700">{max}</td>
                                                 <td className="border border-slate-300 p-1 text-center text-rose-700">{min}</td>
                                             </tr>
