@@ -66,44 +66,41 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+              margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }}
+                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 700 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
                 interval={0}
-                angle={-45}
-                textAnchor="end"
-                height={100}
               />
               <YAxis 
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 700 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />} 
-                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.02)' }}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
                   allowEscapeViewBox={{ x: false, y: true }}
                   offset={20}
                 />
               )}
               <Legend 
-                verticalAlign="top" 
-                align="right" 
-                wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }}
+                verticalAlign="bottom" 
+                align="center" 
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Bar
                   key={dataset.label}
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
-                  radius={[4, 4, 0, 0]}
+                  barSize={45}
                 />
               ))}
             </BarChart>
@@ -114,21 +111,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+              margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }}
+                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 700 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
                 interval={0}
-                angle={-45}
-                textAnchor="end"
-                height={100}
               />
               <YAxis 
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 700 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={false}
               />
@@ -141,9 +135,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 />
               )}
               <Legend 
-                verticalAlign="top" 
-                align="right" 
-                wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }}
+                verticalAlign="bottom" 
+                align="center" 
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Line
@@ -151,9 +145,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   type="monotone"
                   dataKey={dataset.label}
                   stroke={dataset.borderColor?.[0] || COLORS[index % COLORS.length]}
-                  strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
-                  activeDot={{ r: 6, strokeWidth: 0 }}
+                  strokeWidth={4}
+                  dot={{ r: 6, strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 0 }}
                 />
               ))}
             </LineChart>
@@ -203,8 +197,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[500px] flex flex-col bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-      {title && <h3 className="text-center font-black mb-6 text-slate-800 dark:text-white tracking-tight text-lg">{title}</h3>}
+    <div className="w-full h-[480px] flex flex-col bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
+      {title && <h3 className="text-center font-black mb-10 text-slate-800 dark:text-white tracking-tight text-2xl">{title}</h3>}
       <div className="flex-1 min-h-0 relative">
         {renderChart()}
       </div>
