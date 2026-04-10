@@ -32,10 +32,10 @@ interface CustomTooltipProps {
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white/95 backdrop-blur-md dark:bg-slate-800/95 p-4 border-2 border-indigo-100 dark:border-indigo-900/50 shadow-2xl rounded-2xl z-[100] min-w-[150px]">
-        <p className="font-black text-slate-800 dark:text-slate-100 mb-2 border-b border-slate-100 dark:border-slate-700 pb-2">{label}</p>
+      <div className="bg-white/95 backdrop-blur-md dark:bg-slate-800/95 p-4 border-2 border-indigo-100 dark:border-indigo-900/50 shadow-2xl rounded-2xl z-[100] min-w-[200px] mx-auto transform -translate-x-1/2 left-1/2 relative">
+        <p className="font-black text-slate-800 dark:text-slate-100 mb-2 border-b border-slate-100 dark:border-slate-700 pb-2 text-center">{label}</p>
         {payload.map((entry: { color: string; name: string; value: number | string }, index: number) => (
-          <div key={index} className="flex items-center gap-3 text-sm mt-2">
+          <div key={index} className="flex items-center justify-center gap-3 text-sm mt-2">
             <div className="w-4 h-4 rounded-md shadow-sm" style={{ backgroundColor: entry.color }} />
             <span className="text-slate-600 dark:text-slate-400 font-medium">{entry.name}:</span>
             <span className="font-black text-indigo-600 dark:text-indigo-400 text-base">{entry.value}</span>
@@ -93,8 +93,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   content={<CustomTooltip />} 
                   cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
-                  allowEscapeViewBox={{ x: true, y: true }}
-                  offset={30}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
               <Legend 
@@ -144,8 +144,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   content={<CustomTooltip />}
                   cursor={{ stroke: 'rgba(99, 102, 241, 0.2)', strokeWidth: 2 }}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
-                  allowEscapeViewBox={{ x: true, y: true }}
-                  offset={30}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
               <Legend 
@@ -196,8 +196,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 <Tooltip 
                   content={<CustomTooltip />}
                   wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
-                  allowEscapeViewBox={{ x: false, y: true }}
-                  offset={20}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
               <Legend verticalAlign="bottom" height={36}/>
