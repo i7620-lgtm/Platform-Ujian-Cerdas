@@ -136,6 +136,7 @@ export interface ClassAnalysis {
     className: string;
     studentCount: number;
     averageScore: number;
+    averageTime: number;
     highestScore: number;
     lowestScore: number;
     passCount: number;
@@ -159,7 +160,9 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
         const [schoolName, className] = key.split('|');
         const studentCount = classResults.length;
         const scores = classResults.map(r => r.score);
+        const times = classResults.map(r => r.completionTime || 0).filter(t => t > 0);
         const averageScore = studentCount > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / studentCount) : 0;
+        const averageTime = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
         const highestScore = studentCount > 0 ? Math.max(...scores) : 0;
         const lowestScore = studentCount > 0 ? Math.min(...scores) : 0;
         
@@ -175,6 +178,7 @@ export const analyzeClassPerformance = (exam: Exam, results: Result[]): ClassAna
             className,
             studentCount,
             averageScore,
+            averageTime,
             highestScore,
             lowestScore,
             passCount,
