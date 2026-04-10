@@ -64,23 +64,46 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
       case 'bar':
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
+            <BarChart 
+              data={chartData} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={false}
+                interval={0}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={false}
+              />
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />} 
-                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                  allowEscapeViewBox={{ x: false, y: false }}
+                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                  wrapperStyle={{ zIndex: 1000 }}
+                  allowEscapeViewBox={{ x: true, y: true }}
                 />
               )}
-              <Legend />
+              <Legend 
+                verticalAlign="top" 
+                align="right" 
+                wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }}
+              />
               {datasets.map((dataset, index) => (
                 <Bar
                   key={dataset.label}
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
+                  radius={[4, 4, 0, 0]}
+                  barSize={40}
                 />
               ))}
             </BarChart>
@@ -89,23 +112,47 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
       case 'line':
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
+            <LineChart 
+              data={chartData} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={false}
+                interval={0}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={false}
+              />
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />}
-                  allowEscapeViewBox={{ x: false, y: false }}
+                  wrapperStyle={{ zIndex: 1000 }}
+                  allowEscapeViewBox={{ x: true, y: true }}
                 />
               )}
-              <Legend />
+              <Legend 
+                verticalAlign="top" 
+                align="right" 
+                wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }}
+              />
               {datasets.map((dataset, index) => (
                 <Line
                   key={dataset.label}
                   type="monotone"
                   dataKey={dataset.label}
                   stroke={dataset.borderColor?.[0] || COLORS[index % COLORS.length]}
+                  strokeWidth={3}
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
                 />
               ))}
             </LineChart>
@@ -119,28 +166,31 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         }));
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 5 }}>
+            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
+                labelLine={true}
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
+                outerRadius={100}
+                innerRadius={60}
+                paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
               >
                 {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                 ))}
               </Pie>
               {data.showTooltip !== false && (
                 <Tooltip 
                   content={<CustomTooltip />}
-                  allowEscapeViewBox={{ x: false, y: false }}
+                  wrapperStyle={{ zIndex: 1000 }}
+                  allowEscapeViewBox={{ x: true, y: true }}
                 />
               )}
-              <Legend />
+              <Legend verticalAlign="bottom" height={36}/>
             </PieChart>
           </ResponsiveContainer>
         );
@@ -151,9 +201,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[350px] flex flex-col">
-      {title && <h3 className="text-center font-bold mb-4 text-gray-700 dark:text-slate-200">{title}</h3>}
-      <div className="flex-1 min-h-0">
+    <div className="w-full h-[400px] flex flex-col bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+      {title && <h3 className="text-center font-black mb-6 text-slate-800 dark:text-white tracking-tight text-lg">{title}</h3>}
+      <div className="flex-1 min-h-0 relative">
         {renderChart()}
       </div>
     </div>
