@@ -1,4 +1,4 @@
- 
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -38,20 +38,41 @@
   .wysiwyg-content table, 
   .prose table { 
     width: 100%; 
-    border-collapse: collapse; 
-    margin: 0.5rem 0; 
+    border-collapse: separate; 
+    border-spacing: 0;
+    margin: 1.5rem 0; 
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
   } 
 
   /* Cell Borders & Spacing */
   .wysiwyg-content th, .wysiwyg-content td,
   .prose th, .prose td { 
-    border: 1px solid #cbd5e1; 
-    padding: 0.5rem; 
-    min-width: 30px; 
+    border-bottom: 1px solid #e2e8f0; 
+    border-right: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem; 
+    min-width: 60px; 
     color: inherit; 
+    font-size: 0.875rem;
   } 
 
+  .wysiwyg-content tr:last-child td,
+  .prose tr:last-child td {
+    border-bottom: none;
+  }
+
+  .wysiwyg-content th:last-child, .wysiwyg-content td:last-child,
+  .prose th:last-child, .prose td:last-child {
+    border-right: none;
+  }
+
   /* Dark Mode Borders */
+  .dark .wysiwyg-content table,
+  .dark .prose table {
+    border-color: #334155;
+  }
+
   .dark .wysiwyg-content th, .dark .wysiwyg-content td,
   .dark .prose th, .dark .prose td { 
     border-color: #334155; 
@@ -61,9 +82,23 @@
   .wysiwyg-content th,
   .prose th, .prose thead th { 
     background-color: #f8fafc; 
-    font-weight: bold; 
+    font-weight: 700; 
     text-align: left; 
+    color: #475569;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
   } 
+
+  /* Zebra Striping */
+  .wysiwyg-content tr:nth-child(even) td,
+  .prose tr:nth-child(even) td {
+    background-color: #fcfdfe;
+  }
+  .dark .wysiwyg-content tr:nth-child(even) td,
+  .dark .prose tr:nth-child(even) td {
+    background-color: rgba(30, 41, 59, 0.3);
+  }
 
   /* Header Styling (Dark Mode) - CRITICAL FIX */
   .dark .wysiwyg-content th,
@@ -95,6 +130,44 @@
   .wysiwyg-content img, 
   .prose img {
     display: inline-block;
+  }
+
+  /* Ensure images, tables, and diagrams inside options don't overflow */
+  .option-content img,
+  .option-content svg,
+  .option-content canvas,
+  .wysiwyg-content img,
+  .wysiwyg-content svg,
+  .wysiwyg-content canvas,
+  .prose img,
+  .prose svg,
+  .prose canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5rem auto;
+    border-radius: 0.75rem;
+  }
+  
+  .option-content table,
+  .wysiwyg-content table,
+  .prose table {
+    max-width: 100%;
+    display: table; /* Reset to table for better layout when possible */
+    width: 100%;
+  }
+
+  /* Wrap tables in a scrollable container if they are too wide */
+  /* Since we can't easily add a wrapper div via CSS, we'll use a trick or just keep display: block for responsiveness if needed */
+  /* Actually, display: block on table is the standard way to make it scrollable without a wrapper in CSS-only solutions */
+  @media (max-width: 640px) {
+    .option-content table,
+    .wysiwyg-content table,
+    .prose table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
   }
 
   /* --- Aggressive Dark Mode Text Visibility Fixes --- */
