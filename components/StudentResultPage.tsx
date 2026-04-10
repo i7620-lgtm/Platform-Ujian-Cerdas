@@ -330,7 +330,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]">
                                         <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[8px] uppercase tracking-tighter">Nama Sekolah</p>
-                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate leading-tight">{exam.authorSchool || result.student.schoolName || '-'}</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate leading-tight">{result.student.schoolName || exam.authorSchool || '-'}</p>
                                         </div>
                                         <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[8px] uppercase tracking-tighter">Nama Siswa</p>
