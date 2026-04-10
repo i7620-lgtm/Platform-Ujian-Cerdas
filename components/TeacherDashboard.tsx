@@ -589,39 +589,39 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
                     </div>
                     <nav className="flex w-full items-center justify-between sm:justify-center gap-1 sm:gap-4 md:gap-6 overflow-x-auto custom-scrollbar pb-1 px-1">
-                         <button onClick={() => setView('UPLOAD')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('UPLOAD')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'UPLOAD' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <PencilIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Buat</span>
+                            <span className="hidden sm:inline">Buat</span>
                          </button>
-                         <button onClick={() => setView('DRAFTS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('DRAFTS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'DRAFTS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <FileTextIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Draf</span>
+                            <span className="hidden sm:inline">Draf</span>
                          </button>
-                         <button onClick={() => setView('ONGOING')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('ONGOING')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'ONGOING' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Berlangsung</span>
+                            <span className="hidden sm:inline">Berlangsung</span>
                          </button>
-                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('UPCOMING_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'UPCOMING_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Mendatang</span>
+                            <span className="hidden sm:inline">Mendatang</span>
                          </button>
-                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('FINISHED_EXAMS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'FINISHED_EXAMS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Selesai</span>
+                            <span className="hidden sm:inline">Selesai</span>
                          </button>
-                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                         <button onClick={() => setView('ARCHIVE_VIEWER')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'ARCHIVE_VIEWER' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                             <BookOpenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                            <span>Arsip</span>
+                            <span className="hidden sm:inline">Arsip</span>
                          </button>
                          {accountType === 'super_admin' && (
                             <>
-                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                                <button onClick={() => setView('ADMIN_USERS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'ADMIN_USERS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                                     <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                    <span>Kelola</span>
+                                    <span className="hidden sm:inline">Kelola</span>
                                 </button>
-                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[60px] sm:min-w-[80px] ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
                                     <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                    <span>Analisis</span>
+                                    <span className="hidden sm:inline">Analisis</span>
                                 </button>
                             </>
                          )}
