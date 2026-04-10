@@ -66,7 +66,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 10, right: 20, left: -10, bottom: 80 }}
+              margin={{ top: 10, right: 10, left: -15, bottom: 80 }}
             >
               <CartesianGrid strokeDasharray="5 5" vertical={true} stroke="#cbd5e1" opacity={0.6} />
               <XAxis 
@@ -103,8 +103,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   key={dataset.label}
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
-                  barSize={50}
-                  radius={[6, 6, 0, 0]}
+                  barSize={60}
+                  radius={[8, 8, 0, 0]}
                 />
               ))}
             </BarChart>
@@ -115,7 +115,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 10, right: 20, left: -10, bottom: 80 }}
+              margin={{ top: 10, right: 10, left: -15, bottom: 80 }}
             >
               <CartesianGrid strokeDasharray="5 5" vertical={true} stroke="#cbd5e1" opacity={0.6} />
               <XAxis 
@@ -152,9 +152,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   type="monotone"
                   dataKey={dataset.label}
                   stroke={dataset.borderColor?.[0] || COLORS[index % COLORS.length]}
-                  strokeWidth={5}
-                  dot={{ r: 7, strokeWidth: 3, fill: '#fff' }}
-                  activeDot={{ r: 9, strokeWidth: 0 }}
+                  strokeWidth={6}
+                  dot={{ r: 8, strokeWidth: 4, fill: '#fff' }}
+                  activeDot={{ r: 10, strokeWidth: 0 }}
                 />
               ))}
             </LineChart>
@@ -168,15 +168,15 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         }));
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
                 labelLine={true}
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={100}
-                innerRadius={60}
+                outerRadius={160}
+                innerRadius={100}
                 paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
@@ -204,7 +204,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[580px] flex flex-col bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
+    <div className="w-full h-[620px] flex flex-col bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
       {title && <h3 className="text-center font-black mb-10 text-slate-800 dark:text-white tracking-tight text-2xl">{title}</h3>}
       <div className="flex-1 min-h-0 relative">
         {renderChart()}
