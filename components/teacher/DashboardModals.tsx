@@ -347,28 +347,24 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 )}
 
                                 {/* Cara Pakai */}
-                                {!isReadOnly && (
-                                    <button onClick={() => setIsGuideModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-blue-100 dark:border-blue-800" title="Cara Pakai">
-                                        <BookOpenIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
-                                    </button>
-                                )}
+                                <button onClick={() => setIsGuideModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-blue-100 dark:border-blue-800" title="Cara Pakai">
+                                    <BookOpenIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
+                                </button>
 
                                 {/* Akses Siswa */}
-                                {!isReadOnly && (
-                                    <button onClick={() => setIsJoinQrModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800" title="Akses Siswa">
-                                        <QrCodeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
-                                    </button>
-                                )}
+                                <button onClick={() => setIsJoinQrModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-emerald-100 dark:border-emerald-800" title="Akses Siswa">
+                                    <QrCodeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Akses Siswa</span>
+                                </button>
 
                                 {/* Stream */}
-                                {!isReadOnly && displayExam.config.enablePublicStream && !isLargeScale && (
+                                {displayExam.config.enablePublicStream && !isLargeScale && (
                                     <button onClick={() => setIsShareModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800" title="Stream">
                                         <ShareIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Stream</span>
                                     </button>
                                 )}
 
                                 {/* Tambah Waktu */}
-                                {!isReadOnly && displayExam.config.examMode !== 'PR' && (
+                                {displayExam.config.examMode !== 'PR' && (
                                     <button onClick={() => setIsAddTimeOpen(!isAddTimeOpen)} className="p-1.5 sm:px-3 sm:py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-indigo-100 dark:border-indigo-800" title="Tambah Waktu">
                                         <PlusCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Waktu</span>
                                     </button>
@@ -407,7 +403,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-auto bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 relative">
-                        {isAddTimeOpen && !isReadOnly && (
+                        {isAddTimeOpen && (
                             <div className="mb-6 p-5 bg-indigo-600 dark:bg-indigo-700 rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-indigo-900/50 text-white animate-slide-in-up flex items-center justify-between sticky top-0 z-30 mx-1">
                                 <div>
                                     <h4 className="font-black text-sm uppercase tracking-wide">Tambah Waktu</h4>
@@ -579,8 +575,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </td>
                                                     )}
                                                     <td className="px-5 py-3 text-right">
-                                                        {!isReadOnly && (
-                                                            <div className="flex justify-end gap-2">
+                                                        <div className="flex justify-end gap-2">
                                                                 <button 
                                                                     onClick={() => {
                                                                         const parts = r.student.studentId.split('-');
@@ -639,8 +634,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        )}
-                                                    </td>
+                                                        </td>
                                                 </tr>
                                             ); 
                                         }) : (
