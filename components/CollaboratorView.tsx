@@ -4,6 +4,7 @@ import { ExamEditor } from './teacher/ExamEditor';
 import { OngoingExamModal } from './teacher/DashboardModals';
 import { storageService } from '../services/storage';
 import { LogoIcon, MoonIcon, SunIcon, LogoutIcon } from './Icons';
+import { sanitizeHtml } from './teacher/examUtils';
 
 interface CollaboratorViewProps {
     exam: Exam;
@@ -21,8 +22,44 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, 
     const handleSave = async () => {
         try {
             if (token) {
+                const sanitizedQuestions = questions.map(q => {
+                    let sanitizedCorrectAnswer = q.correctAnswer;
+                    if (q.correctAnswer) {
+                        if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                            try {
+                                const parsed = JSON.parse(q.correctAnswer);
+                                if (Array.isArray(parsed)) {
+                                    sanitizedCorrectAnswer = JSON.stringify(parsed.map(opt => sanitizeHtml(opt)));
+                                } else {
+                                    sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                                }
+                            } catch {
+                                sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                            }
+                        } else {
+                            sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
+                        }
+                    }
+                    
+                    return {
+                        ...q,
+                        questionText: sanitizeHtml(q.questionText),
+                        options: q.options ? q.options.map(opt => sanitizeHtml(opt)) : undefined,
+                        correctAnswer: sanitizedCorrectAnswer,
+                        trueFalseRows: q.trueFalseRows ? q.trueFalseRows.map(row => ({
+                            ...row,
+                            text: sanitizeHtml(row.text)
+                        })) : undefined,
+                        matchingPairs: q.matchingPairs ? q.matchingPairs.map(pair => ({
+                            ...pair,
+                            left: sanitizeHtml(pair.left),
+                            right: sanitizeHtml(pair.right)
+                        })) : undefined
+                    };
+                });
+
                 // Use specialized collaborator save
-                await storageService.saveCollaboratorExam({ ...exam, questions, config }, token);
+                await storageService.saveCollaboratorExam({ ...exam, questions: sanitizedQuestions, config }, token);
             } else {
                  throw new Error("Token kolaborator hilang. Silakan refresh halaman.");
             }
@@ -40,7 +77,7 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({ exam, role, 
                 <OngoingExamModal 
                     exam={exam}
                     onClose={onExit}
-                    isReadOnly={false}
+                    isReadOnly={true}
                     teacherProfile={{ fullName: 'Collaborator', school: exam.authorSchool || '-', id: 'collab', accountType: 'collaborator' }}
                 />
             </div>
