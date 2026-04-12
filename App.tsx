@@ -8,7 +8,7 @@ import { OngoingExamModal } from './components/teacher/DashboardModals';
 import type { Exam, Student, Result, TeacherProfile, ResultStatus } from './types';
 import { LogoIcon, NoWifiIcon, UserIcon, ArrowLeftIcon, SunIcon, MoonIcon, QrCodeIcon, BookOpenIcon } from './components/Icons';
 import { storageService } from './services/storage';
-import { InvitationModal } from './components/InvitationModal';
+import { InvitationModal } from './components/teacher/InvitationModal';
 import { ProfileCompletionModal } from './components/teacher/ProfileCompletionModal';
 import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
@@ -232,6 +232,7 @@ const App: React.FC = () => {
         });
         // Capture the new ID
         studentWithId = { ...student, resultId: newRes.id as number };
+        setResumedResult(newRes as unknown as Result);
       }
       
       setCurrentExam(exam);
