@@ -351,7 +351,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                                         <div className="col-span-2">
                                             <p className="text-slate-400 dark:text-slate-500 text-[8px] uppercase tracking-tighter">Waktu Pengerjaan</p>
                                             <p className="font-bold text-slate-700 dark:text-slate-200 uppercase truncate leading-tight">
-                                                {result.completionTime ? `${Math.floor(result.completionTime / 60)} menit ${result.completionTime % 60} detik` : '-'}
+                                                {result.completionTime !== undefined && result.completionTime !== null ? `${Math.floor(result.completionTime / 60)} menit ${result.completionTime % 60} detik` : '-'}
                                             </p>
                                         </div>
                                     </div>
