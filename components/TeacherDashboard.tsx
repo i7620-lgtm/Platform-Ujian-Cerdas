@@ -21,7 +21,7 @@ import { CreationView, OngoingExamsView, UpcomingExamsView, FinishedExamsView, D
 import { OngoingExamModal, FinishedExamModal } from './teacher/DashboardModals';
 import { TutorialPage } from './TutorialPage';
 import { storageService } from '../services/storage';
-import { InvitationModal } from './InvitationModal';
+import { InvitationModal } from './teacher/InvitationModal';
 
 // Lazy Load Admin Views for Super Admin
 const AnalyticsView = React.lazy(() => import('./teacher/AnalyticsView'));
