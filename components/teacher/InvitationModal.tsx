@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from './Icons';
-import type { Exam, Question } from '../types';
+import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from '../Icons';
+import type { Exam, Question } from '../../types';
 
 interface InvitationModalProps {
     isOpen: boolean;

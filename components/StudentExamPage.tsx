@@ -323,6 +323,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             }
                         }
                     });
+                    if (!loadedAnswers['_startTime']) {
+                        loadedAnswers['_startTime'] = Date.now().toString();
+                    }
                     setAnswers(loadedAnswers);
                     answersRef.current = loadedAnswers;
                     if (localData.logs) logRef.current = localData.logs;
@@ -354,6 +357,13 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                             }
                         }
                     });
+                    if (!loadedAnswers['_startTime']) {
+                        loadedAnswers['_startTime'] = Date.now().toString();
+                    }
+                    setAnswers(loadedAnswers);
+                    answersRef.current = loadedAnswers;
+                } else {
+                    const loadedAnswers = { _startTime: Date.now().toString() };
                     setAnswers(loadedAnswers);
                     answersRef.current = loadedAnswers;
                 }

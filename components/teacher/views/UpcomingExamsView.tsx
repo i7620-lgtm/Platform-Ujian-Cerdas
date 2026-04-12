@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Exam } from '../../../types';
 import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon, DocumentDuplicateIcon, EyeIcon } from '../../Icons';
 import { MetaBadge } from './SharedComponents';
-import { InvitationModal } from '../../InvitationModal';
+import { InvitationModal } from '../InvitationModal';
 import { CollaboratorModal } from '../CollaboratorModal';
 
 interface UpcomingExamsViewProps {

@@ -452,6 +452,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     </div>
                                                 </th>
                                             )}
+                                            <th className="px-5 py-4 text-center w-32">
+                                                <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                                    <ClockIcon className="w-3.5 h-3.5 sm:hidden" />
+                                                    <span className="hidden sm:inline">Waktu</span>
+                                                </div>
+                                            </th>
                                             {!isLargeScale && (
                                                 <th className="px-5 py-4 text-center w-40">
                                                     <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -537,6 +543,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             </span>
                                                         </td>
                                                     )}
+                                                    <td className="px-5 py-3 text-center">
+                                                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-600">
+                                                            {r.status === 'completed' && r.completionTime !== undefined && r.completionTime !== null 
+                                                                ? `${Math.floor(r.completionTime / 60)}m ${r.completionTime % 60}s` 
+                                                                : '-'}
+                                                        </span>
+                                                    </td>
                                                     {!isLargeScale && (
                                                         <td className="px-5 py-3">
                                                             <div className="flex flex-col items-center gap-1.5 w-full max-w-[100px] mx-auto">
@@ -1100,9 +1113,13 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
     const averageScore = totalStudents > 0 ? Math.round(calculatedResults.reduce((acc, s) => acc + s, 0) / totalStudents) : 0;
     const highestScore = totalStudents > 0 ? Math.max(...calculatedResults) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...calculatedResults) : 0;
-    const validCompletionTimes = results.filter(r => r.completionTime).map(r => r.completionTime as number);
+    const validCompletionTimes = results.filter(r => r.completionTime !== undefined && r.completionTime !== null).map(r => r.completionTime as number);
     const averageCompletionTime = validCompletionTimes.length > 0 ? Math.round(validCompletionTimes.reduce((acc, val) => acc + val, 0) / validCompletionTimes.length) : 0;
-    const formatDuration = (seconds: number) => seconds > 0 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : '-';
+    const formatDuration = (seconds: number | undefined | null) => {
+        if (seconds === undefined || seconds === null) return '-';
+        const s = Math.round(seconds);
+        return `${Math.floor(s / 60)}m ${s % 60}s`;
+    };
 
     const uniqueClasses = useMemo(() => {
         const classes = new Set(results.map(r => r.student.class));
@@ -1383,7 +1400,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                                                             <span className="text-emerald-600 dark:text-emerald-400" title="Benar">{correct}</span> / <span className="text-rose-600 dark:text-rose-400" title="Salah">{wrong}</span> / <span className="text-slate-400 dark:text-slate-500" title="Kosong">{empty}</span>
                                                         </td>
                                                         <td className="px-6 py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
-                                                            {r.completionTime ? `${Math.floor(r.completionTime / 60)}m ${r.completionTime % 60}s` : '-'}
+                                                            {formatDuration(r.completionTime)}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {r.activityLog && r.activityLog.length > 0 ? (
