@@ -54,6 +54,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     useEffect(() => {
         if (!displayExam) return;
         
+        if (displayExam.config.disableRealtime) return;
+
         const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, () => { fetchLatest(true); })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
@@ -85,7 +87,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             supabase.removeChannel(resultChannel);
             supabase.removeChannel(configChannel);
         };
-    }, [displayExam?.code, selectedClass, selectedSchool, displayExam, fetchLatest]);
+    }, [displayExam?.code, selectedClass, selectedSchool, displayExam?.config.disableRealtime, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
