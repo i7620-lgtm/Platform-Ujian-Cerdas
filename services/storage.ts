@@ -1,5 +1,6 @@
 
 import { supabase } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
@@ -1234,7 +1235,8 @@ class StorageService {
       
       if (initialError) {
           // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
-          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || (initialError as any).status === 400) {
+          const status = (initialError as { status?: number }).status;
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || status === 400) {
               console.warn("Schema cache error or missing columns, retrying without new columns...");
               const fallbackSummary = { ...summary };
               delete fallbackSummary.region;
@@ -1342,7 +1344,8 @@ class StorageService {
       
       if (initialError) {
           // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
-          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || (initialError as any).status === 400) {
+          const status = (initialError as { status?: number }).status;
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || status === 400) {
               console.warn("Schema cache error in legacy archive, retrying without new columns...");
               const fallbackSummary = { ...summary };
               delete fallbackSummary.region;
@@ -2134,8 +2137,8 @@ class StorageService {
       }
   }
 
-  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number) {
-      const channel = supabase.channel(`exam-room-${examCode}`);
+  async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number, existingChannel?: RealtimeChannel | null) {
+      const channel = existingChannel || supabase.channel(`exam-room-${examCode}`);
       await channel.send({ type: 'broadcast', event: 'student_progress', payload: { studentId, answeredCount, totalQuestions, timestamp: Date.now() } });
   }
   
