@@ -1649,17 +1649,7 @@ class StorageService {
        if (files && files.length > 0) {
             await supabase.storage.from('soal').remove(files.map(f => `${code}/${f.name}`));
        }
-  }  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
-    let query = supabase.from('results').select('*');
-    if (examCode) query = query.eq('exam_code', examCode);
-    
-    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
-    query = query.order('updated_at', { ascending: false });
-    
-    const { data, error } = await query;
-    if (error) return [];
-    
-    let results = data.map((row: Record<string, unknown>) => {
+  }  mapRowToResult(row: Record<string, unknown>): Result {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
         let dbSchoolName = '';
@@ -1708,7 +1698,8 @@ class StorageService {
                 fullName: studentName, 
                 class: dbClassName, 
                 schoolName: dbSchoolName,
-                absentNumber: absentNumber 
+                absentNumber: absentNumber,
+                resultId: row.id as number
             },
             examCode: row.exam_code as string, 
             answers: answers, // CRITICAL FIX: Fallback to empty object if null
@@ -1721,7 +1712,19 @@ class StorageService {
             timestamp: new Date(row.updated_at as string).getTime(), 
             location: row.location as { lat: number; lng: number } | undefined
         };
-    });
+  }
+
+  async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
+    let query = supabase.from('results').select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location');
+    if (examCode) query = query.eq('exam_code', examCode);
+    
+    // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
+    query = query.order('updated_at', { ascending: false });
+    
+    const { data, error } = await query;
+    if (error) return [];
+    
+    let results = data.map((row: Record<string, unknown>) => this.mapRowToResult(row));
 
     if (className && className !== 'ALL') {
         results = results.filter(r => r.student.class === className);
@@ -2039,6 +2042,9 @@ class StorageService {
           .eq('student_id', studentId);
       if (error) throw error;
 
+      const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      if (examData?.config?.disableRealtime) return;
+
       // Broadcast to specific student to force submit immediately
       const channel = supabase.channel(`exam-room-${examCode}`);
       await channel.subscribe(async (status) => {
@@ -2077,6 +2083,8 @@ class StorageService {
       }
 
       // 3. Broadcast to all students to force submit immediately
+      if (data?.config?.disableRealtime) return;
+      
       const channel = supabase.channel(`exam-room-${examCode}`);
       await channel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
@@ -2138,8 +2146,16 @@ class StorageService {
   }
 
   async sendProgressUpdate(examCode: string, studentId: string, answeredCount: number, totalQuestions: number, existingChannel?: RealtimeChannel | null) {
-      const channel = existingChannel || supabase.channel(`exam-room-${examCode}`);
-      await channel.send({ type: 'broadcast', event: 'student_progress', payload: { studentId, answeredCount, totalQuestions, timestamp: Date.now() } });
+      if (!existingChannel) return;
+      try {
+          await existingChannel.send({ 
+              type: 'broadcast', 
+              event: 'student_progress', 
+              payload: { studentId, answeredCount, totalQuestions, timestamp: Date.now() } 
+          });
+      } catch (e) {
+          console.warn("Failed to send progress update over realtime", e);
+      }
   }
   
   async syncData() { this.processQueue(); }

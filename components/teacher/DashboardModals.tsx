@@ -50,17 +50,34 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     useEffect(() => {
         fetchLatest();
-        const intervalId = setInterval(() => { fetchLatest(true); }, 5000);
-        return () => clearInterval(intervalId);
+        // Removed setInterval to prevent excessive polling and save Egress.
+        // We now rely entirely on Realtime (postgres_changes) for updates.
     }, [displayExam?.code, selectedClass, selectedSchool, teacherProfile, fetchLatest]);
 
     useEffect(() => {
         if (!displayExam) return;
         
-        if (displayExam.config.disableRealtime) return;
+        // Removed 'if (displayExam.config.disableRealtime) return;' 
+        // The teacher MUST always connect to Realtime to receive updates without polling.
 
         const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, () => { fetchLatest(true); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, (payload) => { 
+                if (payload.eventType === 'DELETE') {
+                    setLocalResults(prev => prev.filter(r => r.id !== payload.old.id));
+                } else if (payload.new) {
+                    const updatedResult = storageService.mapRowToResult(payload.new as Record<string, unknown>);
+                    setLocalResults(prev => {
+                        const idx = prev.findIndex(r => r.id === updatedResult.id);
+                        if (idx >= 0) {
+                            const newResults = [...prev];
+                            newResults[idx] = updatedResult;
+                            return newResults;
+                        } else {
+                            return [updatedResult, ...prev];
+                        }
+                    });
+                }
+            })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
                 const { studentId, answeredCount, totalQuestions, timestamp } = payload.payload; 
                 broadcastProgressRef.current[studentId] = { answered: answeredCount, total: totalQuestions, timestamp }; 

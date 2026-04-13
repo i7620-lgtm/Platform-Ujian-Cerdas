@@ -197,7 +197,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
         let resultChannel: ReturnType<typeof supabase.channel> | null = null;
-        if (!exam.config.disableRealtime) {
+        // HARD BLOCK: Ensure Realtime is ONLY enabled if disableRealtime is explicitly false.
+        // This prevents students in "Normal Mode" from consuming Realtime Concurrent Peak Connections.
+        const isRealtimeEnabled = exam.config.disableRealtime === false;
+        
+        if (isRealtimeEnabled) {
             const channelName = `exam-room-${exam.code}`;
             channel = supabase.channel(channelName)
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
@@ -233,7 +237,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
-        if (!exam.config.disableRealtime) {
+        // HARD BLOCK: Ensure Realtime is ONLY enabled if disableRealtime is explicitly false.
+        const isRealtimeEnabled = exam.config.disableRealtime === false;
+        
+        if (isRealtimeEnabled) {
             channel = supabase.channel(`exam-config-${exam.code}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${exam.code}` }, (payload) => {
                         const newConfig = payload.new.config;
@@ -246,31 +253,62 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 ).subscribe();
         }
 
-        const pollInterval = setInterval(async () => {
-            if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-            try {
-                const { data } = await supabase.from('exams').select('config').eq('code', exam.code).single();
-                if (data && data.config) {
-                    setActiveExam(prev => {
-                        if (prev.config.timeLimit !== data.config.timeLimit) {
-                            return { ...prev, config: data.config };
-                        }
-                        return { ...prev, config: data.config };
-                    });
-                }
-                
-                // Also poll result status in case realtime is disabled or missed
-                if (student.resultId && student.class !== 'PREVIEW') {
-                    const { data: resultData } = await supabase.from('results').select('status').eq('id', student.resultId).single();
-                    if (resultData && (resultData.status === 'completed' || resultData.status === 'force_closed') && !isSubmittingRef.current) {
-                        alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
-                        handleSubmit(true, resultData.status);
-                    }
-                }
-            } catch { /* ignore */ }
-        }, 15000);
+        let pollTimeout: NodeJS.Timeout;
+        let isPolling = true;
 
-        return () => { if (channel) supabase.removeChannel(channel); clearInterval(pollInterval); };
+        const pollData = async () => {
+            if (!isPolling) return;
+            if (typeof navigator !== 'undefined' && navigator.onLine !== false) {
+                try {
+                    // Select extreme for exams
+                    const { data } = await supabase.from('exams').select('status, config, unlock_token').eq('code', exam.code).single();
+                    if (data) {
+                        if (data.status === 'closed' && !isSubmittingRef.current) {
+                            alert("Ujian telah ditutup oleh Guru.");
+                            handleSubmit(true, 'force_closed');
+                            return;
+                        }
+                        if (data.config) {
+                            setActiveExam(prev => {
+                                if (prev.config.timeLimit !== data.config.timeLimit) {
+                                    return { ...prev, config: data.config };
+                                }
+                                return { ...prev, config: data.config };
+                            });
+                        }
+                    }
+                    
+                    // Select extreme for results
+                    if (student.resultId && student.class !== 'PREVIEW') {
+                        const { data: resultData } = await supabase.from('results').select('status, student_id').eq('id', student.resultId).single();
+                        if (resultData && (resultData.status === 'completed' || resultData.status === 'force_closed') && !isSubmittingRef.current) {
+                            alert("Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.");
+                            handleSubmit(true, resultData.status);
+                            return;
+                        }
+                    }
+                } catch { /* ignore */ }
+            }
+
+            // Calculate next interval based on time left
+            let nextInterval = 60000; // 1 minute default
+            if (timeLeftRef.current !== undefined && timeLeftRef.current <= 300) { // 5 minutes = 300 seconds
+                nextInterval = 15000; // 15 seconds
+            }
+            
+            if (isPolling) {
+                pollTimeout = setTimeout(pollData, nextInterval);
+            }
+        };
+
+        // Start polling
+        pollTimeout = setTimeout(pollData, 60000);
+
+        return () => { 
+            isPolling = false;
+            if (channel) supabase.removeChannel(channel); 
+            clearTimeout(pollTimeout); 
+        };
     }, [exam.code, exam.config.disableRealtime, student.resultId, student.class, handleSubmit]);
 
     const isLoadedRef = useRef(false);
@@ -499,6 +537,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     }, [deadline, handleSubmit, student.class]);
 
     const broadcastProgress = useCallback(() => {
+        // HARD BLOCK: If realtime is disabled, we don't even attempt to call the service.
+        if (activeExam.config.disableRealtime) return;
+        
         const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
         storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ, examRoomChannelRef.current).catch(()=>{});
