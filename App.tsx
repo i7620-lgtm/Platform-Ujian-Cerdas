@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
-import { StudentLogin } from './components/StudentLogin'; 
+import { StudentLogin } from './components/StudentLogin';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { ResultNotFoundPage } from './components/ResultNotFoundPage';
@@ -93,7 +93,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if ((view === 'STUDENT_EXAM' || view === 'STUDENT_RESULT') && currentStudent && currentStudent.resultId && currentStudent.class !== 'PREVIEW') {
+    if ((view === 'STUDENT_EXAM' || view === 'STUDENT_RESULT') && currentStudent && currentStudent.resultId && currentStudent.class !== 'PREVIEW' && currentExam && !currentExam.config.disableRealtime) {
       const channel = supabase.channel(`student-result-${currentStudent.resultId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'results', filter: `id=eq.${currentStudent.resultId}` }, async (payload) => {
             const newStudentName = payload.new.student_name;
@@ -102,8 +102,7 @@ const App: React.FC = () => {
             
             if (newStudentName && newClassName && newStudentId) {
                 const [schoolName, className] = newClassName.includes('::') ? newClassName.split('::') : ['', newClassName];
-                const absentMatch = newStudentId.match(/%([^%]+)$/);
-                const absentNumber = absentMatch ? absentMatch[1] : '';
+                const absentNumber = newStudentId.match(/%([^%]+)$/)?.[1] || '';
 
                 setCurrentStudent(prev => {
                     if (!prev) return null;
@@ -157,7 +156,7 @@ const App: React.FC = () => {
         .subscribe();
       return () => { supabase.removeChannel(channel); };
     }
-  }, [view, currentStudent, currentExam?.code]);
+  }, [view, currentStudent, currentExam?.code, currentExam?.config.disableRealtime]);
 
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
