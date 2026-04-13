@@ -4,6 +4,7 @@ import type { Exam, Student, Result, Question, ResultStatus } from '../types';
 import { ClockIcon, CheckCircleIcon, PencilIcon, ChevronDownIcon, CheckIcon, ChevronUpIcon, LockClosedIcon, SunIcon, MoonIcon, ShieldCheckIcon, MapPinIcon, ArrowsRightLeftIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { parseList, sanitizeHtml, calculateExamScore } from './teacher/examUtils';
 import { AudioPlayer } from './AudioPlayer';
 import { ChartRenderer } from './ChartRenderer';
@@ -104,6 +105,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const isSubmittingRef = useRef(false);
     const timeLeftRef = useRef(0);
     const lastBroadcastTimeRef = useRef<number>(0);
+    const examRoomChannelRef = useRef<RealtimeChannel | null>(null);
     
     // Monitoring Status
     const isMonitoring = activeExam.config.detectBehavior && activeExam.config.examMode !== 'PR';
@@ -196,7 +198,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         let channel: ReturnType<typeof supabase.channel> | null = null;
         let resultChannel: ReturnType<typeof supabase.channel> | null = null;
         if (!exam.config.disableRealtime) {
-            channel = supabase.channel(`exam-room-${exam.code}`)
+            const channelName = `exam-room-${exam.code}`;
+            channel = supabase.channel(channelName)
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
                     // If studentId is provided in payload, only submit if it matches current student
                     if (payload.payload?.studentId && payload.payload.studentId !== student.studentId) return;
@@ -207,6 +210,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                     }
                 })
                 .subscribe();
+            
+            examRoomChannelRef.current = channel;
 
             if (student.resultId) {
                 resultChannel = supabase.channel(`student-result-${student.resultId}`)
@@ -496,7 +501,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
     const broadcastProgress = useCallback(() => {
         const totalQ = activeExam.questions.filter(q => q.questionType !== 'INFO').length;
         const answeredQ = activeExam.questions.filter(q => q.questionType !== 'INFO' && isAnswered(q, answersRef.current)).length;
-        storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ).catch(()=>{});
+        storageService.sendProgressUpdate(activeExam.code, student.studentId, answeredQ, totalQ, examRoomChannelRef.current).catch(()=>{});
     }, [activeExam, student.studentId]);
 
     const handleAnswerChange = useCallback((qId: string, val: string) => {
