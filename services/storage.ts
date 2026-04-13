@@ -1715,7 +1715,7 @@ class StorageService {
   }
 
   async getResults(examCode?: string, className?: string, schoolName?: string): Promise<Result[]> {
-    let query = supabase.from('results').select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, created_at, student, location');
+    let query = supabase.from('results').select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location');
     if (examCode) query = query.eq('exam_code', examCode);
     
     // SORTING IS CRITICAL FOR LIVE VIEW: Updated/Joined recently first
