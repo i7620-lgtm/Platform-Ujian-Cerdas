@@ -1196,11 +1196,30 @@ class StorageService {
       }
 
       // PRESERVE MANUAL EDITS: Fetch existing summary first
-      const { data: existing, error: existingError } = await supabase
-          .from('exam_summaries')
-          .select('region, exam_type, class_level')
-          .eq('exam_code', exam.code)
-          .maybeSingle();
+      let existing = null;
+      let existingError = null;
+      try {
+          const result = await supabase
+              .from('exam_summaries')
+              .select('region, exam_type, class_level')
+              .eq('exam_code', exam.code)
+              .maybeSingle();
+          existing = result.data;
+          existingError = result.error;
+          
+          if (existingError) {
+              console.warn("Could not fetch extended summary columns, likely missing in DB:", existingError.message);
+              // Fallback to basic select to see if record exists at all
+              const { data: basic } = await supabase
+                  .from('exam_summaries')
+                  .select('id')
+                  .eq('exam_code', exam.code)
+                  .maybeSingle();
+              if (basic) existing = basic;
+          }
+      } catch (e) {
+          console.warn("Failed to fetch existing summary:", e);
+      }
 
       if (existing && !existingError) {
           if (existing.region) summary.region = existing.region;
@@ -1214,8 +1233,9 @@ class StorageService {
       const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
       
       if (initialError) {
-          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find')) {
-              console.warn("Schema cache error, retrying without new columns...");
+          // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || (initialError as any).status === 400) {
+              console.warn("Schema cache error or missing columns, retrying without new columns...");
               const fallbackSummary = { ...summary };
               delete fallbackSummary.region;
               delete fallbackSummary.exam_type;
@@ -1265,11 +1285,23 @@ class StorageService {
 
   async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
       // PRESERVE MANUAL EDITS: Fetch existing summary first
-      const { data: existing, error: existingError } = await supabase
-          .from('exam_summaries')
-          .select('region, exam_type, class_level')
-          .eq('exam_code', exam.code)
-          .maybeSingle();
+      let existing = null;
+      let existingError = null;
+      try {
+          const result = await supabase
+              .from('exam_summaries')
+              .select('region, exam_type, class_level')
+              .eq('exam_code', exam.code)
+              .maybeSingle();
+          existing = result.data;
+          existingError = result.error;
+
+          if (existingError) {
+              console.warn("Could not fetch extended summary columns in legacy archive:", existingError.message);
+          }
+      } catch (e) {
+          console.warn("Failed to fetch existing summary in legacy archive:", e);
+      }
 
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
       const summary = this.calculateExamStatistics(exam, results);
@@ -1309,7 +1341,8 @@ class StorageService {
       const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
       
       if (initialError) {
-          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find')) {
+          // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
+          if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || (initialError as any).status === 400) {
               console.warn("Schema cache error in legacy archive, retrying without new columns...");
               const fallbackSummary = { ...summary };
               delete fallbackSummary.region;
