@@ -3,6 +3,7 @@ import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
 import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize } from './examUtils';
 
@@ -27,6 +28,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
+    const resultChannelRef = useRef<RealtimeChannel | null>(null);
+    const configChannelRef = useRef<RealtimeChannel | null>(null);
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
@@ -72,6 +75,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 }); 
             })
             .subscribe();
+        
+        resultChannelRef.current = resultChannel;
 
         const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
@@ -82,12 +87,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 }
             )
             .subscribe();
+        
+        configChannelRef.current = configChannel;
 
         return () => { 
             supabase.removeChannel(resultChannel);
             supabase.removeChannel(configChannel);
         };
-    }, [displayExam?.code, selectedClass, selectedSchool, displayExam?.config.disableRealtime, fetchLatest]);
+    }, [displayExam, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
