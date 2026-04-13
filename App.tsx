@@ -156,7 +156,7 @@ const App: React.FC = () => {
         .subscribe();
       return () => { supabase.removeChannel(channel); };
     }
-  }, [view, currentStudent, currentExam?.code, currentExam?.config.disableRealtime]);
+  }, [view, currentStudent, currentExam]);
 
   const handleStudentLoginSuccess = useCallback(async (examCode: string, student: Student, isPreview: boolean = false) => {
     setIsSyncing(true);
