@@ -147,6 +147,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
   const [registeredData, setRegisteredData] = useState<any[]>([]);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [pendingStudentData, setPendingStudentData] = useState<{cleanExamCode: string, studentData: Student} | null>(null);
 
   // UI State
   const [examCode, setExamCode] = useState(initialCode || '');
@@ -513,8 +514,8 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             }
         }
 
-        // Jika lolos validasi atau data baru, lanjutkan login
-        onLoginSuccess(cleanExamCode, studentData);
+        // Jika lolos validasi atau data baru, tampilkan modal konfirmasi
+        setPendingStudentData({ cleanExamCode, studentData });
 
     } catch (e) {
         console.error("Session check error", e);
@@ -904,6 +905,61 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                 }} 
                 onClose={() => setIsQrScannerOpen(false)} 
             />
+        )}
+
+        {pendingStudentData && (
+            <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md relative animate-slide-in-up border border-white dark:border-slate-700">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 mb-4">
+                        <UserIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">Konfirmasi Data Diri</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Pastikan data di bawah ini adalah benar milik Anda sebelum memulai ujian.</p>
+                    
+                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 space-y-4 mb-6">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Nama Sekolah</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{pendingStudentData.studentData.schoolName || '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Nama Siswa</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{pendingStudentData.studentData.fullName}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Kelas</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{pendingStudentData.studentData.class}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">No. Absen</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{pendingStudentData.studentData.absentNumber}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => {
+                                setPendingStudentData(null);
+                                setIsLoading(false);
+                            }} 
+                            className="flex-1 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors uppercase tracking-wide"
+                        >
+                            Bukan, Kembali
+                        </button>
+                        <button 
+                            onClick={() => {
+                                onLoginSuccess(pendingStudentData.cleanExamCode, pendingStudentData.studentData);
+                                setPendingStudentData(null);
+                            }} 
+                            className="flex-[1.5] py-3 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all uppercase tracking-wide flex items-center justify-center gap-2"
+                        >
+                            <CheckCircleIcon className="w-4 h-4" />
+                            Ya, Data Sudah Benar
+                        </button>
+                    </div>
+                </div>
+            </div>
         )}
     </div>
   );
