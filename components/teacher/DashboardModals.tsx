@@ -54,22 +54,37 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     }, [displayExam?.code, selectedClass, selectedSchool, teacherProfile, fetchLatest]);
 
     useEffect(() => {
-        if (!displayExam) return;
+        if (!displayExam?.code) return;
+        
+        const examCode = displayExam.code;
         
         // The teacher MUST always connect to Realtime to receive updates without polling.
         // We use a single channel for all monitoring needs to minimize connections.
-        const monitorChannel = supabase.channel(`exam-monitor-${displayExam.code}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, (payload) => { 
+        const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'results'
+            }, (payload) => { 
+                // Filter manually in JS to avoid issues with REPLICA IDENTITY and server-side filters
+                const isRelevant = (payload.new && payload.new.exam_code === examCode) || 
+                                  (payload.old && payload.old.exam_code === examCode);
+                
+                if (!isRelevant) return;
+
+                console.log("Realtime result change (filtered):", payload.eventType, payload.new?.id || payload.old?.id);
                 if (payload.eventType === 'DELETE') {
                     setLocalResults(prev => prev.filter(r => r.id !== payload.old.id));
                 } else {
-                    // When a result is inserted or updated, we fetch the latest data to ensure 
-                    // we have the full record (Realtime payloads can be partial).
-                    // We use a silent fetch to avoid flickering the loading state.
                     fetchLatest(true);
                 }
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'exams', 
+                filter: `code=eq.${examCode}` 
+            }, (payload) => {
                 const newConfig = payload.new.config;
                 if (newConfig) {
                     setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
@@ -89,16 +104,20 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 }); 
             })
             .on('broadcast', { event: 'student_submitted' }, () => {
+                console.log("Realtime broadcast: student_submitted");
                 fetchLatest(true);
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`Realtime channel status for ${examCode}:`, status);
+            });
         
         resultChannelRef.current = monitorChannel;
 
         return () => { 
+            console.log(`Cleaning up realtime channel for ${examCode}`);
             supabase.removeChannel(monitorChannel);
         };
-    }, [displayExam, fetchLatest]);
+    }, [displayExam?.code, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
