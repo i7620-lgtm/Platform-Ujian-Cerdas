@@ -29,7 +29,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
     const resultChannelRef = useRef<RealtimeChannel | null>(null);
-    const configChannelRef = useRef<RealtimeChannel | null>(null);
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
@@ -57,25 +56,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     useEffect(() => {
         if (!displayExam) return;
         
-        // Removed 'if (displayExam.config.disableRealtime) return;' 
         // The teacher MUST always connect to Realtime to receive updates without polling.
-
-        const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
+        // We use a single channel for all monitoring needs to minimize connections.
+        const monitorChannel = supabase.channel(`exam-monitor-${displayExam.code}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, (payload) => { 
                 if (payload.eventType === 'DELETE') {
                     setLocalResults(prev => prev.filter(r => r.id !== payload.old.id));
-                } else if (payload.new) {
-                    const updatedResult = storageService.mapRowToResult(payload.new as Record<string, unknown>);
-                    setLocalResults(prev => {
-                        const idx = prev.findIndex(r => r.id === updatedResult.id);
-                        if (idx >= 0) {
-                            const newResults = [...prev];
-                            newResults[idx] = updatedResult;
-                            return newResults;
-                        } else {
-                            return [updatedResult, ...prev];
-                        }
-                    });
+                } else {
+                    // When a result is inserted or updated, we fetch the latest data to ensure 
+                    // we have the full record (Realtime payloads can be partial).
+                    // We use a silent fetch to avoid flickering the loading state.
+                    fetchLatest(true);
+                }
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
+                const newConfig = payload.new.config;
+                if (newConfig) {
+                    setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
                 }
             })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
@@ -92,30 +89,16 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 }); 
             })
             .on('broadcast', { event: 'student_submitted' }, () => {
-                // Fetch latest data when a student submits their exam
                 fetchLatest(true);
             })
             .subscribe();
         
-        resultChannelRef.current = resultChannel;
-
-        const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
-                     const newConfig = payload.new.config;
-                     if (newConfig) {
-                         setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
-                     }
-                }
-            )
-            .subscribe();
-        
-        configChannelRef.current = configChannel;
+        resultChannelRef.current = monitorChannel;
 
         return () => { 
-            supabase.removeChannel(resultChannel);
-            supabase.removeChannel(configChannel);
+            supabase.removeChannel(monitorChannel);
         };
-    }, [displayExam?.code, fetchLatest]);
+    }, [displayExam, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
