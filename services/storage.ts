@@ -1846,6 +1846,8 @@ class StorageService {
 
         if (error) throw error;
         
+        const completionTime = resultPayload.answers['_duration'] ? parseInt(resultPayload.answers['_duration']) : undefined;
+        
         return { 
             ...resultPayload, 
             id: data?.id,
@@ -1853,6 +1855,7 @@ class StorageService {
             score: calculatedScore,
             correctAnswers: calculatedCorrect,
             totalQuestions: calculatedTotal,
+            completionTime: completionTime,
             isSynced: true 
         };
     } catch (error) {
