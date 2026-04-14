@@ -780,7 +780,6 @@ const RegisterSchoolModal: React.FC<{
                                             <tr>
                                                 <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-16 text-center">No</th>
                                                 <th className="p-3 font-bold text-slate-600 dark:text-slate-300">Nama Lengkap</th>
-                                                <th className="p-3 font-bold text-slate-600 dark:text-slate-300 w-32 text-center">No. Absen</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -788,7 +787,6 @@ const RegisterSchoolModal: React.FC<{
                                                 <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                                                     <td className="p-3 text-center text-slate-500 dark:text-slate-400">{idx + 1}</td>
                                                     <td className="p-3 font-medium text-slate-700 dark:text-slate-300">{s.fullName}</td>
-                                                    <td className="p-3 text-center text-slate-500 dark:text-slate-400">{s.absentNumber}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
