@@ -50,10 +50,53 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     useEffect(() => {
         fetchLatest();
         
-        // Polling fallback every 15 seconds to ensure data updates even if Realtime misses an event.
-        // This is safe for the teacher's dashboard as it's only 1 user polling.
-        const pollInterval = setInterval(() => {
-            fetchLatest(true);
+        // Polling fallback every 15 seconds (Extreme Select / Lightweight)
+        // Only fetches essential columns to save Egress bandwidth.
+        const pollInterval = setInterval(async () => {
+            if (!displayExam?.code) return;
+            try {
+                const { data, error } = await supabase
+                    .from('results')
+                    .select('id, status, score, correct_answers, updated_at')
+                    .eq('exam_code', displayExam.code);
+                
+                if (error || !data) return;
+
+                setLocalResults(prev => {
+                    let needsFullFetch = false;
+                    const next = [...prev];
+                    
+                    data.forEach(serverRec => {
+                        const idx = next.findIndex(r => r.id === serverRec.id);
+                        if (idx >= 0) {
+                            const localRec = next[idx];
+                            // If status changed to completed/force_closed, we need full data (answers, etc)
+                            if (localRec.status !== serverRec.status && (serverRec.status === 'completed' || serverRec.status === 'force_closed')) {
+                                needsFullFetch = true;
+                            }
+                            
+                            next[idx] = {
+                                ...localRec,
+                                status: serverRec.status as any,
+                                score: serverRec.score || 0,
+                                correctAnswers: serverRec.correct_answers || 0,
+                                timestamp: new Date(serverRec.updated_at).getTime()
+                            };
+                        } else {
+                            // New student joined, need full data
+                            needsFullFetch = true;
+                        }
+                    });
+                    
+                    if (needsFullFetch) {
+                        fetchLatest(true);
+                    }
+                    
+                    return next;
+                });
+            } catch (e) {
+                console.error("Lightweight polling error", e);
+            }
         }, 15000);
 
         return () => clearInterval(pollInterval);
