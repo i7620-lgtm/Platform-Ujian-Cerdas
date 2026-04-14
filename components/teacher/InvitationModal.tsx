@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { supabase } from '../../lib/supabase';
 import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from '../Icons';
 import type { Exam, Question } from '../../types';
 
@@ -605,6 +606,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 onClose={() => setShowRegisterModal(false)}
                 schoolName={schoolName}
                 examType={exam?.config.examType}
+                exam={exam}
             />
         </>
     );
@@ -615,13 +617,86 @@ const RegisterSchoolModal: React.FC<{
     onClose: () => void; 
     schoolName?: string; 
     examType?: string;
-}> = ({ isOpen, onClose, schoolName, examType }) => {
+    exam?: Exam | null;
+}> = ({ isOpen, onClose, schoolName, examType, exam }) => {
     const [students, setStudents] = useState<any[]>([]);
     const [parsedSchoolName, setParsedSchoolName] = useState<string>('');
     const [parsedClasses, setParsedClasses] = useState<string[]>([]);
     const [selectedClass, setSelectedClass] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
+
+    const handleRegister = async () => {
+        if (!exam || !parsedSchoolName) return;
+        setIsSubmitting(true);
+
+        try {
+            let dataToInsert = [];
+
+            if (students.length > 0) {
+                dataToInsert = students.map(s => ({
+                    exam_code: exam.code,
+                    school_name: s.schoolName || parsedSchoolName,
+                    class_name: s.className,
+                    student_name: s.fullName,
+                    absent_number: s.absentNumber || null,
+                    is_active: false
+                }));
+            } else if (parsedClasses.length > 0) {
+                dataToInsert = parsedClasses.map(c => ({
+                    exam_code: exam.code,
+                    school_name: parsedSchoolName,
+                    class_name: c,
+                    student_name: null,
+                    absent_number: null,
+                    is_active: false
+                }));
+            } else {
+                dataToInsert = [{
+                    exam_code: exam.code,
+                    school_name: parsedSchoolName,
+                    class_name: null,
+                    student_name: null,
+                    absent_number: null,
+                    is_active: false
+                }];
+            }
+
+            const { error } = await supabase
+                .from('registered_students')
+                .insert(dataToInsert);
+
+            if (error) throw error;
+
+            if (parsedClasses.length > 0) {
+                const currentTargetClasses = exam.config.targetClasses || [];
+                const newClasses = parsedClasses.map(c => `${parsedSchoolName} - ${c}`);
+                
+                const updatedClasses = Array.from(new Set([...currentTargetClasses, ...newClasses]));
+                
+                if (updatedClasses.length !== currentTargetClasses.length) {
+                    await supabase
+                        .from('exams')
+                        .update({ 
+                            config: {
+                                ...exam.config,
+                                targetClasses: updatedClasses
+                            }
+                        })
+                        .eq('code', exam.code);
+                }
+            }
+
+            alert('Pendaftaran sekolah berhasil!');
+            onClose();
+        } catch (error: any) {
+            console.error('Error registering school:', error);
+            alert(`Gagal mendaftar: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const handleDownloadFormat = () => {
         const wsData = [
@@ -814,14 +889,18 @@ const RegisterSchoolModal: React.FC<{
 
                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
                     <button 
-                        onClick={() => {
-                            alert('Pendaftaran sekolah berhasil!');
-                            onClose();
-                        }}
-                        disabled={!parsedSchoolName}
-                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-md transition-all active:scale-95"
+                        onClick={handleRegister}
+                        disabled={!parsedSchoolName || isSubmitting}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-md transition-all active:scale-95 flex items-center gap-2"
                     >
-                        Setuju untuk mengikuti {examType || 'Ujian'}
+                        {isSubmitting ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                Menyimpan...
+                            </>
+                        ) : (
+                            `Setuju untuk mengikuti ${examType || 'Ujian'}`
+                        )}
                     </button>
                 </div>
             </div>
