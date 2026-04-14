@@ -460,21 +460,6 @@ const App: React.FC = () => {
         location, 
         timestamp: Date.now()
     });
-
-    // Broadcast submission to teacher (Temporary channel for broadcast only)
-    const submitChannel = supabase.channel(`exam-monitor-${currentExam.code}`);
-    submitChannel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-            await submitChannel.send({
-                type: 'broadcast',
-                event: 'student_submitted',
-                payload: { studentId: currentStudent.studentId, status }
-            });
-            setTimeout(() => {
-                supabase.removeChannel(submitChannel);
-            }, 2000);
-        }
-    });
     
     if (status === 'completed' || status === 'force_closed') {
         // RE-FETCH EXAM: Ensure we have the full exam with answers if showResultToStudent is true
