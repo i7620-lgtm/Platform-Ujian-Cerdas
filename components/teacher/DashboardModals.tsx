@@ -49,8 +49,14 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     useEffect(() => {
         fetchLatest();
-        // Removed setInterval to prevent excessive polling and save Egress.
-        // We now rely entirely on Realtime (postgres_changes) for updates.
+        
+        // Polling fallback every 15 seconds to ensure data updates even if Realtime misses an event.
+        // This is safe for the teacher's dashboard as it's only 1 user polling.
+        const pollInterval = setInterval(() => {
+            fetchLatest(true);
+        }, 15000);
+
+        return () => clearInterval(pollInterval);
     }, [displayExam?.code, selectedClass, selectedSchool, teacherProfile, fetchLatest]);
 
     useEffect(() => {
@@ -67,14 +73,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 table: 'results'
             }, (payload) => { 
                 // Filter manually in JS to avoid issues with REPLICA IDENTITY and server-side filters
-                const isRelevant = (payload.new && payload.new.exam_code === examCode) || 
-                                  (payload.old && payload.old.exam_code === examCode);
+                const newData = payload.new as { exam_code?: string; id?: number };
+                const oldData = payload.old as { exam_code?: string; id?: number };
+                
+                const isRelevant = (newData && newData.exam_code === examCode) || 
+                                  (oldData && oldData.exam_code === examCode);
                 
                 if (!isRelevant) return;
 
-                console.log("Realtime result change (filtered):", payload.eventType, payload.new?.id || payload.old?.id);
+                console.log("Realtime result change (filtered):", payload.eventType, newData?.id || oldData?.id);
                 if (payload.eventType === 'DELETE') {
-                    setLocalResults(prev => prev.filter(r => r.id !== payload.old.id));
+                    setLocalResults(prev => prev.filter(r => r.id !== oldData?.id));
                 } else {
                     fetchLatest(true);
                 }
@@ -85,9 +94,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 table: 'exams', 
                 filter: `code=eq.${examCode}` 
             }, (payload) => {
-                const newConfig = payload.new.config;
+                const newConfig = (payload.new as { config?: Record<string, unknown> }).config;
                 if (newConfig) {
-                    setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
+                    setDisplayExam(prev => prev ? ({ ...prev, config: newConfig as unknown as Exam['config'] }) : null);
                 }
             })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
