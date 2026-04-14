@@ -29,7 +29,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
     const resultChannelRef = useRef<RealtimeChannel | null>(null);
-    const configChannelRef = useRef<RealtimeChannel | null>(null);
 
     useEffect(() => { setDisplayExam(exam); }, [exam]);
 
@@ -50,32 +49,100 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
     useEffect(() => {
         fetchLatest();
-        // Removed setInterval to prevent excessive polling and save Egress.
-        // We now rely entirely on Realtime (postgres_changes) for updates.
+        
+        // Polling fallback every 15 seconds (Extreme Select / Lightweight)
+        // Only fetches essential columns to save Egress bandwidth.
+        const pollInterval = setInterval(async () => {
+            if (!displayExam?.code) return;
+            try {
+                const { data, error } = await supabase
+                    .from('results')
+                    .select('id, status, score, correct_answers, updated_at')
+                    .eq('exam_code', displayExam.code);
+                
+                if (error || !data) return;
+
+                setLocalResults(prev => {
+                    let needsFullFetch = false;
+                    const next = [...prev];
+                    
+                    data.forEach(serverRec => {
+                        const idx = next.findIndex(r => r.id === serverRec.id);
+                        if (idx >= 0) {
+                            const localRec = next[idx];
+                            // If status changed to completed/force_closed, we need full data (answers, etc)
+                            if (localRec.status !== serverRec.status && (serverRec.status === 'completed' || serverRec.status === 'force_closed')) {
+                                needsFullFetch = true;
+                            }
+                            
+                            next[idx] = {
+                                ...localRec,
+                                status: serverRec.status as any,
+                                score: serverRec.score || 0,
+                                correctAnswers: serverRec.correct_answers || 0,
+                                timestamp: new Date(serverRec.updated_at).getTime(),
+                                // Preserve existing answers and completion time if they exist
+                                answers: localRec.answers || {},
+                                completionTime: localRec.completionTime
+                            };
+                        } else {
+                            // New student joined, need full data
+                            needsFullFetch = true;
+                        }
+                    });
+                    
+                    if (needsFullFetch) {
+                        fetchLatest(true);
+                    }
+                    
+                    return next;
+                });
+            } catch (e) {
+                console.error("Lightweight polling error", e);
+            }
+        }, 15000);
+
+        return () => clearInterval(pollInterval);
     }, [displayExam?.code, selectedClass, selectedSchool, teacherProfile, fetchLatest]);
 
     useEffect(() => {
-        if (!displayExam) return;
+        if (!displayExam?.code) return;
         
-        // Removed 'if (displayExam.config.disableRealtime) return;' 
+        const examCode = displayExam.code;
+        
         // The teacher MUST always connect to Realtime to receive updates without polling.
+        // We use a single channel for all monitoring needs to minimize connections.
+        const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'results'
+            }, (payload) => { 
+                // Filter manually in JS to avoid issues with REPLICA IDENTITY and server-side filters
+                const newData = payload.new as { exam_code?: string; id?: number };
+                const oldData = payload.old as { exam_code?: string; id?: number };
+                
+                const isRelevant = (newData && newData.exam_code === examCode) || 
+                                  (oldData && oldData.exam_code === examCode);
+                
+                if (!isRelevant) return;
 
-        const resultChannel = supabase.channel(`exam-room-${displayExam.code}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'results', filter: `exam_code=eq.${displayExam.code}` }, (payload) => { 
+                console.log("Realtime result change (filtered):", payload.eventType, newData?.id || oldData?.id);
                 if (payload.eventType === 'DELETE') {
-                    setLocalResults(prev => prev.filter(r => r.id !== payload.old.id));
-                } else if (payload.new) {
-                    const updatedResult = storageService.mapRowToResult(payload.new as Record<string, unknown>);
-                    setLocalResults(prev => {
-                        const idx = prev.findIndex(r => r.id === updatedResult.id);
-                        if (idx >= 0) {
-                            const newResults = [...prev];
-                            newResults[idx] = updatedResult;
-                            return newResults;
-                        } else {
-                            return [updatedResult, ...prev];
-                        }
-                    });
+                    setLocalResults(prev => prev.filter(r => r.id !== oldData?.id));
+                } else {
+                    fetchLatest(true);
+                }
+            })
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'exams', 
+                filter: `code=eq.${examCode}` 
+            }, (payload) => {
+                const newConfig = (payload.new as { config?: Record<string, unknown> }).config;
+                if (newConfig) {
+                    setDisplayExam(prev => prev ? ({ ...prev, config: newConfig as unknown as Exam['config'] }) : null);
                 }
             })
             .on('broadcast', { event: 'student_progress' }, (payload) => { 
@@ -91,27 +158,21 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     return prev; 
                 }); 
             })
-            .subscribe();
+            .on('broadcast', { event: 'student_submitted' }, () => {
+                console.log("Realtime broadcast: student_submitted");
+                fetchLatest(true);
+            })
+            .subscribe((status) => {
+                console.log(`Realtime channel status for ${examCode}:`, status);
+            });
         
-        resultChannelRef.current = resultChannel;
-
-        const configChannel = supabase.channel(`exam-config-monitor-${displayExam.code}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exams', filter: `code=eq.${displayExam.code}` }, (payload) => {
-                     const newConfig = payload.new.config;
-                     if (newConfig) {
-                         setDisplayExam(prev => prev ? ({ ...prev, config: newConfig }) : null);
-                     }
-                }
-            )
-            .subscribe();
-        
-        configChannelRef.current = configChannel;
+        resultChannelRef.current = monitorChannel;
 
         return () => { 
-            supabase.removeChannel(resultChannel);
-            supabase.removeChannel(configChannel);
+            console.log(`Cleaning up realtime channel for ${examCode}`);
+            supabase.removeChannel(monitorChannel);
         };
-    }, [displayExam, fetchLatest]);
+    }, [displayExam?.code, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {

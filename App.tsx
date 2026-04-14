@@ -93,7 +93,11 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if ((view === 'STUDENT_EXAM' || view === 'STUDENT_RESULT') && currentStudent && currentStudent.resultId && currentStudent.class !== 'PREVIEW' && currentExam && !currentExam.config.disableRealtime) {
+    // HARD BLOCK: Ensure Realtime is ONLY enabled if disableRealtime is explicitly false.
+    // This prevents students in "Normal Mode" from consuming Realtime Concurrent Peak Connections.
+    const isRealtimeEnabled = currentExam?.config?.disableRealtime === false;
+    
+    if ((view === 'STUDENT_EXAM' || view === 'STUDENT_RESULT') && currentStudent && currentStudent.resultId && currentStudent.class !== 'PREVIEW' && currentExam && isRealtimeEnabled) {
       const channel = supabase.channel(`student-result-${currentStudent.resultId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'results', filter: `id=eq.${currentStudent.resultId}` }, async (payload) => {
             const newStudentName = payload.new.student_name;

@@ -185,6 +185,15 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                 userLocation,
                 grading
             );
+            
+            if (examRoomChannelRef.current) {
+                examRoomChannelRef.current.send({
+                    type: 'broadcast',
+                    event: 'student_submitted',
+                    payload: { studentId: student.studentId, status }
+                }).catch(() => {});
+            }
+            
             await storageService.clearLocalProgress(STORAGE_KEY);
         } catch (error) {
             console.error('Submit error:', error);
