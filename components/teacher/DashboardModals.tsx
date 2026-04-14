@@ -91,6 +91,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     return prev; 
                 }); 
             })
+            .on('broadcast', { event: 'student_submitted' }, () => {
+                // Fetch latest data when a student submits their exam
+                fetchLatest(true);
+            })
             .subscribe();
         
         resultChannelRef.current = resultChannel;
@@ -111,7 +115,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             supabase.removeChannel(resultChannel);
             supabase.removeChannel(configChannel);
         };
-    }, [displayExam, fetchLatest]);
+    }, [displayExam?.code, fetchLatest]);
 
     // Lógica pengurutan: Sekolah -> Kelas -> Absen (Kecil ke Besar)
     const sortedResults = useMemo(() => {
