@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeftIcon, UserIcon, QrCodeIcon, CheckCircleIcon, LockClosedIcon, SunIcon, MoonIcon, ChevronDownIcon, XMarkIcon } from './Icons';
 import type { Student } from '../types';
 import { storageService } from '../services/storage';
+import { supabase } from '../lib/supabase';
 
 interface StudentLoginProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -144,6 +145,7 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const [isLoading, setIsLoading] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+  const [registeredData, setRegisteredData] = useState<any[]>([]);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   // UI State
@@ -162,21 +164,35 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
   const { limit: absentLimit } = parseClassConfig(studentClass);
 
   const availableSchools = useMemo(() => {
+      if (registeredData.length > 0) {
+          return Array.from(new Set(registeredData.map(r => r.school_name).filter(Boolean)));
+      }
       const schools = new Set<string>();
       availableClasses.forEach(c => {
           const parsed = parseClassConfig(c);
           if (parsed.schoolName) schools.add(parsed.schoolName);
       });
       return Array.from(schools);
-  }, [availableClasses]);
+  }, [availableClasses, registeredData]);
 
   const filteredClasses = useMemo(() => {
+      if (registeredData.length > 0) {
+          if (!schoolName) return [];
+          return Array.from(new Set(registeredData.filter(r => r.school_name === schoolName).map(r => r.class_name).filter(Boolean)));
+      }
       if (!schoolName) return availableClasses;
       return availableClasses.filter(c => {
           const parsed = parseClassConfig(c);
           return !parsed.schoolName || parsed.schoolName === schoolName;
       });
-  }, [availableClasses, schoolName]);
+  }, [availableClasses, schoolName, registeredData]);
+
+  const filteredStudents = useMemo(() => {
+      if (registeredData.length > 0 && schoolName && studentClass) {
+          return registeredData.filter(r => r.school_name === schoolName && r.class_name === studentClass && r.student_name);
+      }
+      return [];
+  }, [registeredData, schoolName, studentClass]);
 
   // Auto-fetch config and load scoped student data when code changes
   useEffect(() => {
@@ -196,6 +212,24 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             } catch { /* ignore */ }
 
             const config = await storageService.getExamConfig(cleanCode);
+            
+            const { data: regData } = await supabase
+                .from('registered_students')
+                .select('*')
+                .eq('exam_code', cleanCode);
+            
+            if (regData && regData.length > 0) {
+                setRegisteredData(regData);
+                const schools = Array.from(new Set(regData.map(r => r.school_name).filter(Boolean)));
+                if (schools.length === 1) {
+                    setSchoolName(schools[0]);
+                } else if (schools.length > 1) {
+                    setSchoolName(prev => schools.includes(prev) ? prev : '');
+                }
+            } else {
+                setRegisteredData([]);
+            }
+
             if (config && config.targetClasses && config.targetClasses.length > 0) {
                 setAvailableClasses(config.targetClasses);
                 // FIX: Reset kelas jika nilai saat ini tidak ada dalam daftar target
@@ -204,22 +238,25 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     return prev;
                 });
                 
-                // Auto-fill schoolName if all target classes have the same school name
-                const schools = new Set<string>();
-                config.targetClasses.forEach(c => {
-                    const parsed = parseClassConfig(c);
-                    if (parsed.schoolName) schools.add(parsed.schoolName);
-                });
-                if (schools.size === 1) {
-                    setSchoolName(Array.from(schools)[0]);
-                } else if (schools.size > 1) {
-                    setSchoolName(prev => schools.has(prev) ? prev : '');
+                if (!regData || regData.length === 0) {
+                    // Auto-fill schoolName if all target classes have the same school name
+                    const schools = new Set<string>();
+                    config.targetClasses.forEach(c => {
+                        const parsed = parseClassConfig(c);
+                        if (parsed.schoolName) schools.add(parsed.schoolName);
+                    });
+                    if (schools.size === 1) {
+                        setSchoolName(Array.from(schools)[0]);
+                    } else if (schools.size > 1) {
+                        setSchoolName(prev => schools.has(prev) ? prev : '');
+                    }
                 }
             } else {
                 setAvailableClasses([]);
             }
         } else {
             setAvailableClasses([]);
+            setRegisteredData([]);
         }
     };
     checkConfig();
@@ -264,28 +301,30 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
     if (cleanExamCode.length === 6) {
         try {
             examConfig = await storageService.getExamConfig(cleanExamCode);
-            if (examConfig && examConfig.targetClasses && examConfig.targetClasses.length > 0) {
-                const schools = new Set<string>();
-                examConfig.targetClasses.forEach(c => {
-                    const parsed = parseClassConfig(c);
-                    if (parsed.schoolName) schools.add(parsed.schoolName);
-                });
-                
-                if (schools.size > 0 && !schools.has(schoolName.trim())) {
-                    setError('Asal Sekolah tidak valid. Harap pilih dari daftar sekolah yang tersedia.');
-                    setSchoolName('');
-                    setIsLoading(false);
-                    return;
-                }
+            
+            const validSchools = registeredData.length > 0 
+                ? Array.from(new Set(registeredData.map(r => r.school_name).filter(Boolean)))
+                : (examConfig?.targetClasses ? Array.from(new Set(examConfig.targetClasses.map(c => parseClassConfig(c).schoolName).filter(Boolean))) : []);
+            
+            if (validSchools.length > 0 && !validSchools.includes(schoolName.trim())) {
+                setError('Asal Sekolah tidak valid. Harap pilih dari daftar sekolah yang tersedia.');
+                setSchoolName('');
+                setIsLoading(false);
+                return;
+            }
 
-                if (!examConfig.targetClasses.includes(studentClass.trim())) {
-                    setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
-                    setAvailableClasses(examConfig.targetClasses);
-                    setStudentClass(''); 
-                    setIsLoading(false);
-                    return;
-                }
-                
+            const validClasses = registeredData.length > 0 
+                ? Array.from(new Set(registeredData.map(r => r.class_name).filter(Boolean)))
+                : examConfig?.targetClasses;
+            
+            if (validClasses && validClasses.length > 0 && !validClasses.includes(studentClass.trim())) {
+                setError('Kelas tidak valid. Harap pilih dari daftar kelas yang tersedia.');
+                setStudentClass(''); 
+                setIsLoading(false);
+                return;
+            }
+            
+            if (!registeredData.length) {
                 const { limit } = parseClassConfig(studentClass.trim());
                 if (limit && limit > 0) {
                     const num = parseInt(absentNumber, 10);
@@ -644,17 +683,45 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                         <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'name' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                             <div className="px-4 pt-2">
                                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Nama Lengkap</label>
-                                <input
-                                    ref={nameInputRef}
-                                    type="text"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    onFocus={() => setIsFocused('name')}
-                                    onBlur={() => setIsFocused(null)}
-                                    className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
-                                    placeholder="Ketik nama anda..."
-                                    required
-                                />
+                                {filteredStudents.length > 0 ? (
+                                    <div className="relative group">
+                                        <select
+                                            value={fullName}
+                                            onChange={(e) => {
+                                                const selectedName = e.target.value;
+                                                setFullName(selectedName);
+                                                const student = filteredStudents.find(s => s.student_name === selectedName);
+                                                if (student && student.absent_number) {
+                                                    setAbsentNumber(student.absent_number);
+                                                }
+                                            }}
+                                            onFocus={() => setIsFocused('name')}
+                                            onBlur={() => setIsFocused(null)}
+                                            className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                                            required
+                                        >
+                                            <option value="" disabled className="dark:bg-slate-900">Pilih Nama...</option>
+                                            {filteredStudents.map(s => (
+                                                <option key={s.id} value={s.student_name} className="dark:bg-slate-900">{s.student_name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
+                                            <ChevronDownIcon className="w-4 h-4"/>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <input
+                                        ref={nameInputRef}
+                                        type="text"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        onFocus={() => setIsFocused('name')}
+                                        onBlur={() => setIsFocused(null)}
+                                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                                        placeholder="Ketik nama anda..."
+                                        required
+                                    />
+                                )}
                             </div>
                         </div>
 
@@ -663,13 +730,15 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Kelas</label>
                                     
-                                    {availableClasses.length > 0 ? (
+                                    {availableClasses.length > 0 || registeredData.length > 0 ? (
                                         <div className="relative group">
                                             <select 
                                                 value={studentClass} 
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     setStudentClass(val);
+                                                    setFullName(''); // Reset name when class changes
+                                                    setAbsentNumber(''); // Reset absent when class changes
                                                     const parsed = parseClassConfig(val);
                                                     if (parsed.schoolName && !schoolName) {
                                                         setSchoolName(parsed.schoolName);
@@ -710,7 +779,15 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                              <div className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === 'absent' ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20' : 'border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'}`}>
                                 <div className="px-4 pt-2">
                                     <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">No. Absen</label>
-                                    {absentLimit && absentLimit > 0 ? (
+                                    {filteredStudents.length > 0 ? (
+                                        <input
+                                            type="text"
+                                            value={absentNumber}
+                                            readOnly
+                                            className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none text-center cursor-not-allowed opacity-70"
+                                            placeholder="-"
+                                        />
+                                    ) : absentLimit && absentLimit > 0 ? (
                                         <div className="relative group">
                                             <select
                                                 value={absentNumber}
