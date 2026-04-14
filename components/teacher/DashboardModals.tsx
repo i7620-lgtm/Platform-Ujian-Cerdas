@@ -80,7 +80,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 status: serverRec.status as any,
                                 score: serverRec.score || 0,
                                 correctAnswers: serverRec.correct_answers || 0,
-                                timestamp: new Date(serverRec.updated_at).getTime()
+                                timestamp: new Date(serverRec.updated_at).getTime(),
+                                // Preserve existing answers and completion time if they exist
+                                answers: localRec.answers || {},
+                                completionTime: localRec.completionTime
                             };
                         } else {
                             // New student joined, need full data
