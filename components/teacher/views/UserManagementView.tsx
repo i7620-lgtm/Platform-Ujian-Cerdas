@@ -9,6 +9,7 @@ export const UserManagementView: React.FC = () => {
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
     const [newRole, setNewRole] = useState<AccountType>('guru');
     const [newSchool, setNewSchool] = useState('');
+    const [isPremium, setIsPremium] = useState<boolean>(false);
 
     useEffect(() => {
         fetchUsers();
@@ -31,12 +32,13 @@ export const UserManagementView: React.FC = () => {
         setEditingUser(user);
         setNewRole(user.accountType);
         setNewSchool(user.school);
+        setIsPremium(user.isPremium || false);
     };
 
     const handleSaveUser = async () => {
         if (!editingUser) return;
         try {
-            await storageService.updateUserRole(editingUser.id, newRole, newSchool);
+            await storageService.updateUserRole(editingUser.id, newRole, newSchool, isPremium);
             setEditingUser(null);
             fetchUsers();
             alert("Pengguna berhasil diperbarui.");
@@ -53,8 +55,8 @@ export const UserManagementView: React.FC = () => {
                 <div><h2 className="text-2xl font-bold text-neutral dark:text-white">Kelola Pengguna</h2><p className="text-sm text-gray-500 dark:text-slate-400">Manajemen akses dan penempatan sekolah.</p></div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left min-w-[800px]">
                     <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                         <tr>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Nama / Email</th>
@@ -114,6 +116,19 @@ export const UserManagementView: React.FC = () => {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1">Sekolah</label>
                                 <input type="text" value={newSchool} onChange={(e) => setNewSchool(e.target.value)} className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-100 outline-none text-slate-800 dark:text-slate-200" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">Tipe Akun (Akses Fitur AI & Realtime)</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="premium_tier" checked={!isPremium} onChange={() => setIsPremium(false)} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300" />
+                                        <span className="text-sm text-slate-700 dark:text-slate-300">Freemium (Biasa)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="premium_tier" checked={isPremium} onChange={() => setIsPremium(true)} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300" />
+                                        <span className="text-sm font-bold text-amber-600 dark:text-amber-400">Premium</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <div className="flex gap-3 mt-6 justify-end">
