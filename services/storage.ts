@@ -1462,7 +1462,7 @@ class StorageService {
       return topAns;
   }
 
-  async getAnalyticsData(filters?: { region?: string, subject?: string, school?: string, classLevel?: string, examType?: string }): Promise<ExamSummary[]> {
+  async getAnalyticsData(filters?: { region?: string, subject?: string, school?: string, classLevel?: string, examType?: string, date?: string }): Promise<ExamSummary[]> {
       // SECURITY: Verify Admin Access
       await this._verifyRole(['super_admin', 'admin_sekolah']);
 
@@ -1472,6 +1472,7 @@ class StorageService {
       if (filters?.subject) query = query.ilike('exam_subject', `%${filters.subject}%`);
       if (filters?.classLevel) query = query.ilike('class_level', `%${filters.classLevel}%`);
       if (filters?.examType) query = query.ilike('exam_type', `%${filters.examType}%`);
+      if (filters?.date) query = query.ilike('exam_date', `%${filters.date}%`);
       
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) return [];
