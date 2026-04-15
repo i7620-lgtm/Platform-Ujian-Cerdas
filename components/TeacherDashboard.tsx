@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';  
+import React, { useState, useEffect, Suspense } from 'react'; 
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
     CheckCircleIcon, 
@@ -632,9 +632,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <main className="w-full max-w-full mx-auto p-4 md:p-10">
                 {view === 'UPLOAD' && (
                     <>
-                        <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} />
+                        <CreationView key={resetKey} onQuestionsGenerated={handleQuestionsGenerated} isPremium={teacherProfile.isPremium || false} />
                         {(questions.length > 0 || manualMode || editingExam) && (
-                            <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={!!editingExam && editingExam.status !== 'DRAFT'} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => { setEditingExam(null); setManualMode(false); setQuestions([]); setResetKey(k => k+1); }} generatedCode={generatedCode} onReset={resetForm} />
+                            <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={!!editingExam && editingExam.status !== 'DRAFT'} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => { setEditingExam(null); setManualMode(false); setQuestions([]); setResetKey(k => k+1); }} generatedCode={generatedCode} onReset={resetForm} isPremium={teacherProfile.isPremium || false} />
                         )}
                     </>
                 )}
@@ -668,6 +668,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     exam={selectedOngoingExam} 
                     teacherProfile={teacherProfile}
                     onClose={() => setSelectedOngoingExam(null)} 
+                    isPremium={teacherProfile.isPremium || false}
                 />
             )}
             
@@ -687,7 +688,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <button onClick={()=>setIsEditModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-700 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 transition-colors"><XMarkIcon className="w-6 h-6"/></button>
                         </div>
                         <div className="p-4 md:p-8 overflow-y-auto overflow-x-hidden flex-1 bg-slate-50/30 dark:bg-slate-900/50">
-                            <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} />
+                            <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} isPremium={teacherProfile.isPremium || false} />
                         </div>
                     </div>
                 </div>

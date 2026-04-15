@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'; 
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon } from '../Icons';
+import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -8,9 +8,9 @@ import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardView
 import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize } from './examUtils';
 
 // --- OngoingExamModal ---
-interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; isReadOnly?: boolean; }
+interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; isReadOnly?: boolean; isPremium?: boolean; }
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => { 
-    const { exam, onClose, teacherProfile, isReadOnly } = props;
+    const { exam, onClose, teacherProfile, isReadOnly, isPremium } = props;
     
     const [displayExam, setDisplayExam] = useState<Exam | null>(exam);
     const [selectedClass, setSelectedClass] = useState<string>('ALL'); 
@@ -110,6 +110,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         
         const examCode = displayExam.code;
         
+        // If not premium, disable realtime and rely only on polling
+        if (!isPremium) {
+            console.log("Realtime disabled for freemium user. Relying on polling.");
+            return;
+        }
+
         // The teacher MUST always connect to Realtime to receive updates without polling.
         // We use a single channel for all monitoring needs to minimize connections.
         const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
@@ -362,7 +368,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     <SignalIcon className="w-5 h-5"/>
                                 </div>
                                 <div className="flex-1">
-                                    <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight">Live Monitoring</h2>
+                                    <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight flex items-center gap-2">Live Monitoring {!isPremium && <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1"><SparklesIcon className="w-3 h-3"/> Freemium (Polling)</span>}</h2>
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />

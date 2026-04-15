@@ -692,7 +692,7 @@ class StorageService {
 
       const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, school, role, regency')
+          .select('*')
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -721,7 +721,8 @@ class StorageService {
               accountType: newProfile.role as AccountType,
               school: newProfile.school,
               regency: newProfile.regency,
-              email: session.user.email
+              email: session.user.email,
+              isPremium: newProfile.is_premium
           };
       }
 
@@ -731,7 +732,8 @@ class StorageService {
           accountType: profile.role as AccountType,
           school: profile.school,
           regency: profile.regency,
-          email: session.user.email
+          email: session.user.email,
+          isPremium: profile.is_premium
       };
   }
 
@@ -768,7 +770,8 @@ class StorageService {
           accountType: 'guru',
           school: school,
           regency: regency,
-          email: email
+          email: email,
+          isPremium: false
       };
   }
 
@@ -818,17 +821,23 @@ class StorageService {
           fullName: p.full_name as string,
           accountType: p.role as AccountType,
           school: p.school as string,
-          email: '-' 
+          email: '-',
+          isPremium: p.is_premium as boolean | undefined
       }));
   }
 
-  async updateUserRole(userId: string, newRole: AccountType, newSchool: string): Promise<void> {
+  async updateUserRole(userId: string, newRole: AccountType, newSchool: string, isPremium?: boolean): Promise<void> {
       // SECURITY: Verify Super Admin
       await this._verifyRole(['super_admin']);
 
+      const updateData: any = { role: newRole, school: newSchool };
+      if (isPremium !== undefined) {
+          updateData.is_premium = isPremium;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole, school: newSchool })
+        .update(updateData)
         .eq('id', userId);
       
       if (error) throw error;

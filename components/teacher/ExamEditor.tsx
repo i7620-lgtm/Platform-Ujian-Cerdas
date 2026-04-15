@@ -27,6 +27,7 @@ interface ExamEditorProps {
     onCancel: () => void;
     generatedCode: string;
     onReset: () => void;
+    isPremium?: boolean;
 }
 
 const SUBJECTS = [
@@ -489,7 +490,7 @@ interface ChartTarget {
 }
 
 export const ExamEditor: React.FC<ExamEditorProps> = ({ 
-    questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset 
+    questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset, isPremium 
 }) => {
     const [classTagInput, setClassTagInput] = useState('');
 
@@ -763,10 +764,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                              <>
                                                  <button 
                                                      type="button" 
-                                                     onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
-                                                     disabled={isGeneratingId === q.id}
-                                                     className="flex items-center gap-1 p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm disabled:opacity-50" 
-                                                     title="Buat dengan AI"
+                                                     onClick={(e) => { e.stopPropagation(); isPremium && handleGenerateSingleQuestion(q); }} 
+                                                     disabled={isGeneratingId === q.id || !isPremium}
+                                                     className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 ${!isPremium ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-700 cursor-not-allowed' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-200 dark:border-amber-800'}`} 
+                                                     title={isPremium ? "Buat dengan AI" : "Fitur Premium"}
                                                  >
                                                      {isGeneratingId === q.id ? (
                                                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -1242,8 +1243,8 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     </div>
 
                                     <div 
-                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200'}`}
+                                        onClick={() => isPremium && setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
+                                        className={`p-4 rounded-xl border-2 transition-all relative ${!isPremium ? 'opacity-70 cursor-not-allowed bg-gray-50 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700' : !config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 cursor-pointer' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200 cursor-pointer'}`}
                                     >
                                         <div className="flex items-center gap-2 mb-1">
                                             <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
@@ -1251,7 +1252,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
-                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Realtime</span>
+                                                <span className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">Mode Realtime {!isPremium && <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1"><SparklesIcon className="w-3 h-3"/> Premium</span>}</span>
                                             </div>
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">

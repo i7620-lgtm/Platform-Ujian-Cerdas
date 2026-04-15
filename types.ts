@@ -150,6 +150,7 @@ export interface TeacherProfile {
     regency?: string; // Added for Kabupaten/Kota
     avatarUrl?: string;
     email?: string; // Added for user management display
+    isPremium?: boolean; // Added for Premium Tier
 }
 
 export interface UserProfile extends TeacherProfile {
