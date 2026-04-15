@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react'; 
+import React, { useState, useEffect, Suspense } from 'react';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
     CheckCircleIcon, 
@@ -311,8 +311,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     // ARCHIVE & EXCEL LOGIC (Refactored to use Transaction Safe Service)
     const handleArchiveExam = async (exam: Exam) => {
-        if (exam.authorId !== teacherProfile.id) {
-            alert("Akses Ditolak: Hanya guru pembuat soal asli yang dapat melakukan finalisasi dan arsip ke penyimpanan cloud.");
+        // Allow author, collaborator, legacy exams (no authorId), or admins
+        const isAuthor = !exam.authorId || exam.authorId === teacherProfile.id;
+        const isCollaborator = exam.config.collaborators?.some(c => c.role === 'editor' || c.role === 'viewer') || false;
+        const isAdmin = teacherProfile.accountType === 'super_admin' || teacherProfile.accountType === 'admin_sekolah';
+        
+        if (!isAuthor && !isCollaborator && !isAdmin) {
+            alert("Akses Ditolak: Hanya guru pembuat soal asli atau kolaborator yang dapat melakukan finalisasi dan arsip ke penyimpanan cloud.");
             return;
         }
 
