@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; 
 import type { Question, QuizConfig } from '../../../types';
 import { parsePdfAndAutoCrop, convertPdfToImages } from '../examUtils';
 import { generateQuestions } from '../../services/gemini';
