@@ -1,6 +1,6 @@
  
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChartBarIcon, ArrowPathIcon, TrashIcon, PencilIcon } from '../Icons';
+import { ChartBarIcon, ArrowPathIcon, TrashIcon, PencilIcon, MagnifyingGlassIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import type { ExamSummary } from '../../types';
 import { EXAM_TYPES } from './constants';
@@ -20,6 +20,7 @@ const AnalyticsView: React.FC = () => {
     const [filterClass, setFilterClass] = useState('');
     const [filterSubject, setFilterSubject] = useState('');
     const [filterExamType, setFilterExamType] = useState('');
+    const [filterDate, setFilterDate] = useState('');
     const [customPrompt, setCustomPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [aiResult, setAiResult] = useState<string | null>(null);
@@ -27,16 +28,26 @@ const AnalyticsView: React.FC = () => {
     const [editingSummary, setEditingSummary] = useState<ExamSummary | null>(null);
     const [editForm, setEditForm] = useState<Partial<ExamSummary>>({});
 
-    const fetchData = useCallback(async (region: string, school: string, classLevel: string, subject: string, examType: string) => {
+    const fetchData = useCallback(async (region: string, school: string, classLevel: string, subject: string, examType: string, date: string) => {
         setIsLoading(true);
-        const data = await storageService.getAnalyticsData({ region, school, classLevel, subject, examType });
+        const data = await storageService.getAnalyticsData({ region, school, classLevel, subject, examType, date });
         setSummaries(data);
         setIsLoading(false);
     }, []);
 
     useEffect(() => {
-        fetchData('', '', '', '', '');
+        fetchData('', '', '', '', '', '');
     }, [fetchData]);
+
+    const handleSearch = () => {
+        fetchData(filterRegion, filterSchool, filterClass, filterSubject, filterExamType, filterDate);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
 
     const toggleSelect = (id: string) => {
         const newSet = new Set(selectedIds);
@@ -150,33 +161,58 @@ const AnalyticsView: React.FC = () => {
                         placeholder="Filter Daerah..." 
                         value={filterRegion} 
                         onChange={e => setFilterRegion(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <input 
                         placeholder="Filter Sekolah..." 
                         value={filterSchool} 
                         onChange={e => setFilterSchool(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <input 
                         placeholder="Filter Kelas..." 
                         value={filterClass} 
                         onChange={e => setFilterClass(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <input 
                         placeholder="Filter Mapel..." 
                         value={filterSubject} 
                         onChange={e => setFilterSubject(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
                     <input 
                         placeholder="Filter Jenis Ujian..." 
                         value={filterExamType} 
                         onChange={e => setFilterExamType(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     />
-                    <button onClick={() => fetchData(filterRegion, filterSchool, filterClass, filterSubject, filterExamType)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200"><ArrowPathIcon className="w-5 h-5 text-slate-600"/></button>
+                    <input 
+                        placeholder="Filter Tanggal (YYYY-MM-DD)..." 
+                        value={filterDate} 
+                        onChange={e => setFilterDate(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                    />
+                    <button onClick={handleSearch} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors">
+                        <MagnifyingGlassIcon className="w-4 h-4"/> Cari
+                    </button>
+                    <button onClick={() => {
+                        setFilterRegion('');
+                        setFilterSchool('');
+                        setFilterClass('');
+                        setFilterSubject('');
+                        setFilterExamType('');
+                        setFilterDate('');
+                        fetchData('', '', '', '', '', '');
+                    }} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200 transition-colors" title="Reset Filter">
+                        <ArrowPathIcon className="w-5 h-5 text-slate-600 dark:text-slate-300"/>
+                    </button>
                 </div>
             </div>
 
