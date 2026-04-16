@@ -25,7 +25,7 @@ export const FinishedExamsView: React.FC<FinishedExamsProps> = ({ exams, onSelec
                             <div className="flex items-start gap-4 flex-1 min-w-0">
                                 <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shrink-0"><CheckCircleIcon className="w-6 h-6 text-gray-400 dark:text-slate-500 group-hover:text-green-500 dark:group-hover:text-green-400 transition-colors" /></div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral dark:text-white truncate">{exam.config.subject || exam.code}</h3><span className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded shrink-0">{exam.code}</span></div>
+                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-lg text-neutral dark:text-white truncate">{exam.config.subject || exam.code}</h3><span className="text-xs font-code slashed-zero text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded shrink-0">{exam.code}</span></div>
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
                                         <MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />
