@@ -301,7 +301,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
                         <div className="w-full flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
                             <div className="flex-1 px-2 overflow-hidden text-left">
-                                <p className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 truncate">{joinUrl}</p>
+                                <p className="text-[10px] font-code slashed-zero font-bold text-indigo-600 dark:text-indigo-400 truncate">{joinUrl}</p>
                             </div>
                             <button 
                                 onClick={() => { navigator.clipboard.writeText(joinUrl); alert('Tautan berhasil disalin!'); }}
@@ -450,7 +450,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                             {/* Access Code Section (Moved Here) */}
                             <div className="mt-4 sm:mt-6 flex flex-col items-center gap-1 w-full px-4 no-print">
                                  <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode Akses</span>
-                                 <span className="font-mono text-xl sm:text-2xl font-black text-slate-800 dark:text-white bg-white dark:bg-slate-900 px-4 py-1.5 rounded-xl tracking-[0.2em] border-2 border-slate-100 dark:border-slate-700 select-all shadow-sm w-full text-center">
+                                 <span className="font-code slashed-zero text-xl sm:text-2xl font-black text-slate-800 dark:text-white bg-white dark:bg-slate-900 px-4 py-1.5 rounded-xl tracking-[0.2em] border-2 border-slate-100 dark:border-slate-700 select-all shadow-sm w-full text-center">
                                     {exam?.code || '------'}
                                  </span>
                             </div>
@@ -463,7 +463,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                                         <input 
                                             readOnly 
                                             value={joinUrl} 
-                                            className="w-full bg-transparent text-[10px] text-slate-600 dark:text-slate-300 font-mono outline-none px-2 truncate"
+                                            className="w-full bg-transparent text-[10px] text-slate-600 dark:text-slate-300 font-code slashed-zero outline-none px-2 truncate"
                                             onClick={(e) => e.currentTarget.select()}
                                         />
                                         <button 
