@@ -423,7 +423,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 <div className="flex-1">
                                     <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight flex items-center gap-2">Live Monitoring</h2>
                                     <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
+                                        <span className="text-[9px] sm:text-[10px] font-code slashed-zero font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">{displayExam.code}</span>
                                         <RemainingTime exam={displayExam} />
                                         {isRefreshing && <span className="text-[9px] sm:text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">Sync...</span>}
                                     </div>
@@ -1344,7 +1344,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-slate-800 sticky top-0 z-10 gap-4">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Analisis Hasil Ujian</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{displayExam.config.subject} • {displayExam.code}{displayExam.authorSchool ? ` • ${displayExam.authorSchool}` : ''}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{displayExam.config.subject} • <span className="font-code slashed-zero">{displayExam.code}</span>{displayExam.authorSchool ? ` • ${displayExam.authorSchool}` : ''}</p>
                     </div>
                     <div className="flex gap-2">
                         <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-xl flex">

@@ -1191,9 +1191,10 @@ class StorageService {
       const jsonString = JSON.stringify(archivePayload, null, 2);
 
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
-      const summary = this.calculateExamStatistics(fatExam, examResults);
+      const summaries = this.calculateExamStatistics(fatExam, examResults);
       
       // FETCH AUTHOR REGION (Default if not manually edited)
+      let authorRegion = '';
       if (exam.authorId) {
           const { data: profile } = await supabase
               .from('profiles')
@@ -1201,57 +1202,53 @@ class StorageService {
               .eq('id', exam.authorId)
               .maybeSingle();
           if (profile?.regency) {
-              summary.region = profile.regency;
+              authorRegion = profile.regency;
           }
       }
 
-      // PRESERVE MANUAL EDITS: Fetch existing summary first
-      let existing = null;
-      let existingError = null;
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      let existingList: any[] = [];
       try {
           const result = await supabase
               .from('exam_summaries')
-              .select('region, exam_type, class_level')
-              .eq('exam_code', exam.code)
-              .maybeSingle();
-          existing = result.data;
-          existingError = result.error;
-          
-          if (existingError) {
-              console.warn("Could not fetch extended summary columns, likely missing in DB:", existingError.message);
-              // Fallback to basic select to see if record exists at all
-              const { data: basic } = await supabase
-                  .from('exam_summaries')
-                  .select('id')
-                  .eq('exam_code', exam.code)
-                  .maybeSingle();
-              if (basic) existing = basic;
-          }
+              .select('region, exam_type, class_level, school_name')
+              .eq('exam_code', exam.code);
+          existingList = result.data || [];
       } catch (e) {
           console.warn("Failed to fetch existing summary:", e);
       }
 
-      if (existing && !existingError) {
-          if (existing.region) summary.region = existing.region;
-          if (existing.exam_type) summary.exam_type = existing.exam_type;
-          if (existing.class_level) summary.class_level = existing.class_level;
-      }
+      summaries.forEach(summary => {
+          if (authorRegion) summary.region = authorRegion;
+          const existing = existingList.find(e => e.school_name === summary.school_name) || existingList[0];
+          if (existing) {
+              if (existing.region) summary.region = existing.region;
+              if (existing.exam_type) summary.exam_type = existing.exam_type;
+              // if (existing.class_level) summary.class_level = existing.class_level;
+          }
+      });
 
-      // 5. Insert Summary into SQL (Transaction Step 2)
+      // Delete old summaries for this exam to avoid duplicates
+      await supabase.from('exam_summaries').delete().eq('exam_code', exam.code);
+
+      // 5. Insert Summaries into SQL (Transaction Step 2)
       // If this fails, we abort.
       let summaryError = null;
-      const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
+      const { error: initialError } = await supabase.from('exam_summaries').insert(summaries);
       
       if (initialError) {
           // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
           const status = (initialError as { status?: number }).status;
           if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || status === 400) {
               console.warn("Schema cache error or missing columns, retrying without new columns...");
-              const fallbackSummary = { ...summary };
-              delete fallbackSummary.region;
-              delete fallbackSummary.exam_type;
-              delete fallbackSummary.class_level;
-              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummary);
+              const fallbackSummaries = summaries.map(s => {
+                  const fallback = { ...s };
+                  delete fallback.region;
+                  delete fallback.exam_type;
+                  delete fallback.class_level;
+                  return fallback;
+              });
+              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
               summaryError = fallbackError;
           } else {
               summaryError = initialError;
@@ -1295,29 +1292,11 @@ class StorageService {
   }
 
   async registerLegacyArchive(exam: Exam, results: Result[]): Promise<void> {
-      // PRESERVE MANUAL EDITS: Fetch existing summary first
-      let existing = null;
-      let existingError = null;
-      try {
-          const result = await supabase
-              .from('exam_summaries')
-              .select('region, exam_type, class_level')
-              .eq('exam_code', exam.code)
-              .maybeSingle();
-          existing = result.data;
-          existingError = result.error;
-
-          if (existingError) {
-              console.warn("Could not fetch extended summary columns in legacy archive:", existingError.message);
-          }
-      } catch (e) {
-          console.warn("Failed to fetch existing summary in legacy archive:", e);
-      }
-
       // Hitung statistik menggunakan logika yang sama dengan proses arsip otomatis
-      const summary = this.calculateExamStatistics(exam, results);
+      const summaries = this.calculateExamStatistics(exam, results);
 
       // FETCH AUTHOR REGION (Default if not manually edited)
+      let authorRegion = '';
       if (exam.authorId) {
           const { data: profile } = await supabase
               .from('profiles')
@@ -1325,16 +1304,32 @@ class StorageService {
               .eq('id', exam.authorId)
               .maybeSingle();
           if (profile?.regency) {
-              summary.region = profile.regency;
+              authorRegion = profile.regency;
           }
       }
 
-      // Restore manual edits if available
-      if (existing && !existingError) {
-          if (existing.region) summary.region = existing.region;
-          if (existing.exam_type) summary.exam_type = existing.exam_type;
-          if (existing.class_level) summary.class_level = existing.class_level;
+      // PRESERVE MANUAL EDITS: Fetch existing summaries first
+      let existingList: any[] = [];
+      try {
+          const result = await supabase
+              .from('exam_summaries')
+              .select('region, exam_type, class_level, school_name')
+              .eq('exam_code', exam.code);
+          existingList = result.data || [];
+      } catch (e) {
+          console.warn("Failed to fetch existing summary in legacy archive:", e);
       }
+
+      // Restore manual edits if available
+      summaries.forEach(summary => {
+          if (authorRegion) summary.region = authorRegion;
+          const existing = existingList.find(e => e.school_name === summary.school_name) || existingList[0];
+          if (existing) {
+              if (existing.region) summary.region = existing.region;
+              if (existing.exam_type) summary.exam_type = existing.exam_type;
+              // if (existing.class_level) summary.class_level = existing.class_level;
+          }
+      });
       
       // Hapus data lama jika ada (berdasarkan kode ujian) untuk menghindari duplikasi
       // Ini memenuhi permintaan: "aplikasi dapat mengganti data lama menjadi data baru"
@@ -1349,18 +1344,21 @@ class StorageService {
 
       // Simpan ke tabel exam_summaries
       let summaryError = null;
-      const { error: initialError } = await supabase.from('exam_summaries').insert(summary);
+      const { error: initialError } = await supabase.from('exam_summaries').insert(summaries);
       
       if (initialError) {
           // Handle 400 Bad Request or PGRST204 (Schema Cache Stale)
           const status = (initialError as { status?: number }).status;
           if (initialError.code === 'PGRST204' || initialError.message?.includes('Could not find') || initialError.message?.includes('column') || status === 400) {
               console.warn("Schema cache error in legacy archive, retrying without new columns...");
-              const fallbackSummary = { ...summary };
-              delete fallbackSummary.region;
-              delete fallbackSummary.exam_type;
-              delete fallbackSummary.class_level;
-              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummary);
+              const fallbackSummaries = summaries.map(s => {
+                  const fallback = { ...s };
+                  delete fallback.region;
+                  delete fallback.exam_type;
+                  delete fallback.class_level;
+                  return fallback;
+              });
+              const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
               summaryError = fallbackError;
           } else {
               summaryError = initialError;
@@ -1373,65 +1371,95 @@ class StorageService {
       }
   }
 
-  private calculateExamStatistics(exam: Exam, results: Result[]): Partial<ExamSummary> {
-      const scores = results.map(r => Number(r.score));
-      const total = scores.length;
+  private calculateExamStatistics(exam: Exam, results: Result[]): Partial<ExamSummary>[] {
+      // Group results by school
+      const schoolGroups: Record<string, Result[]> = {};
       
-      // Basic Stats
-      const avg = total > 0 ? scores.reduce((a, b) => a + b, 0) / total : 0;
-      const max = total > 0 ? Math.max(...scores) : 0;
-      const min = total > 0 ? Math.min(...scores) : 0;
-      const passing = scores.filter(s => s >= 75).length; // Assuming KKM 75
-      const passingRate = total > 0 ? (passing / total) * 100 : 0;
+      results.forEach(r => {
+          // Fallback to exam.authorSchool if student.schoolName is missing
+          const school = r.student.schoolName || exam.authorSchool || 'Unknown School';
+          if (!schoolGroups[school]) {
+              schoolGroups[school] = [];
+          }
+          schoolGroups[school].push(r);
+      });
 
-      // Question Stats Snapshot (JSONB)
-      const questionStats: Record<string, unknown>[] = exam.questions
-          .filter(q => q.questionType !== 'INFO')
-          .map(q => {
-              let correctCount = 0;
-              const answerDist: Record<string, number> = {};
-              
-              results.forEach(r => {
-                  const ans = r.answers[q.id];
-                  const manualGradeKey = `_grade_${q.id}`;
+      // If no results, still create one summary for the author's school
+      if (results.length === 0) {
+          const defaultSchool = exam.authorSchool || 'Unknown School';
+          schoolGroups[defaultSchool] = [];
+      }
+
+      const summaries: Partial<ExamSummary>[] = [];
+
+      for (const [schoolName, schoolResults] of Object.entries(schoolGroups)) {
+          const scores = schoolResults.map(r => Number(r.score));
+          const total = scores.length;
+          
+          // Basic Stats
+          const avg = total > 0 ? scores.reduce((a, b) => a + b, 0) / total : 0;
+          const max = total > 0 ? Math.max(...scores) : 0;
+          const min = total > 0 ? Math.min(...scores) : 0;
+          const passing = scores.filter(s => s >= 75).length; // Assuming KKM 75
+          const passingRate = total > 0 ? (passing / total) * 100 : 0;
+
+          // Question Stats Snapshot (JSONB)
+          const questionStats: Record<string, unknown>[] = exam.questions
+              .filter(q => q.questionType !== 'INFO')
+              .map(q => {
+                  let correctCount = 0;
+                  const answerDist: Record<string, number> = {};
                   
-                  // Check manual grade first
-                  if (r.answers[manualGradeKey]) {
-                      if (r.answers[manualGradeKey] === 'CORRECT') correctCount++;
-                  } else if (this.isAnswerCorrect(q, ans)) {
-                      correctCount++;
-                  }
-                  
-                  // Track distraction
-                  if (ans) {
-                      const strAns = typeof ans === 'string' ? ans : JSON.stringify(ans);
-                      answerDist[strAns] = (answerDist[strAns] || 0) + 1;
-                  }
+                  schoolResults.forEach(r => {
+                      const ans = r.answers[q.id];
+                      const manualGradeKey = `_grade_${q.id}`;
+                      
+                      // Check manual grade first
+                      if (r.answers[manualGradeKey]) {
+                          if (r.answers[manualGradeKey] === 'CORRECT') correctCount++;
+                      } else if (this.isAnswerCorrect(q, ans)) {
+                          correctCount++;
+                      }
+                      
+                      // Track distraction
+                      if (ans) {
+                          const strAns = typeof ans === 'string' ? ans : JSON.stringify(ans);
+                          answerDist[strAns] = (answerDist[strAns] || 0) + 1;
+                      }
+                  });
+
+                  return {
+                      id: q.id,
+                      type: q.questionType,
+                      correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
+                      top_wrong_answer: this.getTopWrongAnswer(answerDist, q)
+                  };
               });
 
-              return {
-                  id: q.id,
-                  type: q.questionType,
-                  correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
-                  top_wrong_answer: this.getTopWrongAnswer(answerDist, q)
-              };
-          });
+          // Determine class_level for this specific school if possible
+          const uniqueClasses = Array.from(new Set(schoolResults.map(r => r.student.class).filter(Boolean)));
+          const classLevelStr = uniqueClasses.length > 0 
+              ? uniqueClasses.join(', ') 
+              : [exam.config.classLevel, ...(exam.config.targetClasses || [])].filter(Boolean).join(', ');
 
-      return {
-          school_name: exam.authorSchool || 'Unknown School',
-          exam_subject: exam.config.subject,
-          exam_code: exam.code,
-          exam_type: exam.config.examType, // Added exam_type
-          class_level: [exam.config.classLevel, ...(exam.config.targetClasses || [])].filter(Boolean).join(', '), // Added class_level and targetClasses
-          exam_date: exam.config.date,
-          total_participants: total,
-          average_score: parseFloat(avg.toFixed(2)),
-          highest_score: max,
-          lowest_score: min,
-          passing_rate: parseFloat(passingRate.toFixed(2)),
-          question_stats: questionStats,
-          region: '' // Region usually comes from profile, handled in UI or DB default
-      };
+          summaries.push({
+              school_name: schoolName,
+              exam_subject: exam.config.subject,
+              exam_code: exam.code,
+              exam_type: exam.config.examType, 
+              class_level: classLevelStr, 
+              exam_date: exam.config.date,
+              total_participants: total,
+              average_score: parseFloat(avg.toFixed(2)),
+              highest_score: max,
+              lowest_score: min,
+              passing_rate: parseFloat(passingRate.toFixed(2)),
+              question_stats: questionStats,
+              region: '' 
+          });
+      }
+
+      return summaries;
   }
 
   private isAnswerCorrect(q: Question, ans: unknown): boolean {
@@ -1505,7 +1533,7 @@ class StorageService {
               .slice(0, 3)
       }));
 
-      const defaultTask = `Generate a comprehensive "Best Practices & Competency Gap Analysis" report for the Regional Education Department.`;
+      const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
       return `
         You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
@@ -1517,34 +1545,29 @@ class StorageService {
         ${customPrompt || defaultTask}
         
         OUTPUT FORMAT:
-        - Use standard Markdown (MD) for all formatting.
-        - DO NOT use HTML tags (no <div>, <table>, etc.).
-        - Use Markdown tables for structured data.
-        - Use ASCII charts or simple text-based visualizations if needed (e.g., [||||||||||] 80%).
+        - Use standard Markdown (MD).
+        - DO NOT use HTML tags.
+        - Jika terdapat lebih dari 1 sekolah, buat sub-bagian terpisah (Heading 2) untuk SETIAP sekolah.
         
         STRUCTURE:
 
-        1. EXECUTIVE SUMMARY:
-           - Provide a high-level overview of regional performance.
-           - Highlight top 3 key findings (positive & negative).
+        1. RINGKASAN EKSEKUTIF:
+           - Berikan ringkasan performa secara keseluruhan.
+           - Highlight temuan utama.
 
-        2. COMPETENCY MASTERY (Text-Based Chart):
-           - List schools and their scores using a text-based bar chart format.
-           - Example:
-             School A: [==========] 100%
-             School B: [=====     ] 50%
-
-        3. DEEP DIVE ANALYSIS (Qualitative & Competency-Based):
-           - **Identify Systemic Weaknesses:** Analyze questions/topics that failed across most schools. What specific competency (e.g., Numeracy, Logic, Recall) is likely missing?
-           - **Analyze Disparities:** Compare high-performing vs low-performing schools. Is the gap wide? What does this suggest about resource distribution or teacher quality?
-           - **Avoid Assumptions:** Do NOT guess teaching methods (e.g., "PBL", "Inquiry"). Focus strictly on *what* was tested and *how* students performed.
-
-        4. STRATEGIC RECOMMENDATIONS (Markdown Table):
-           - Create a Markdown Table with columns: "Fokus Masalah", "Kompetensi Target", "Rekomendasi Program Dinas/MGMP".
-           - Suggest concrete actions like "Workshop Bedah SKL untuk Materi X" or "Penguatan Literasi Numerasi Dasar".
+        2. ANALISIS PER SEKOLAH (Wajib dipisah per sekolah jika > 1 sekolah):
+           - Untuk SETIAP sekolah, sebutkan nama sekolahnya, lalu berikan:
+             * Rata-rata nilai dan tingkat ketuntasan.
+             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions).
+             * Karakteristik kelas atau pola jawaban.
+           - Gunakan ASCII diagram (contoh: [||||||||||] 80%) jika relevan.
+           
+        3. PERBANDINGAN DAN REKOMENDASI:
+           - Jika ada >1 sekolah, bandingkan secara singkat perbedaan/kesenjangan performa.
+           - Berikan rekomendasi konkrit dan spesifik untuk perbaikan pembelajaran untuk masing-masing masalah yang diidentifikasi.
 
         TONE:
-        - Professional, analytical, yet accessible to education policymakers.
+        - Professional, analytical, yet accessible to teachers and policymakers.
         - Use Indonesian language (Bahasa Indonesia).
       `.trim();
   }
