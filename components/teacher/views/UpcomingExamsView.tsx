@@ -49,7 +49,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
                                         <h3 className="font-bold text-lg text-neutral dark:text-white">{exam.config.subject || "Tanpa Judul"}</h3>
-                                        <span className="text-xs font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">{exam.code}</span>
+                                        <span className="text-xs font-code slashed-zero text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">{exam.code}</span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" />
