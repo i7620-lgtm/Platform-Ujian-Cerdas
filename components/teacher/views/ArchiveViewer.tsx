@@ -870,14 +870,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
     const questionAnalysisData = useMemo(() => {
         if (!archiveData) return [];
-        const { exam, results } = archiveData;
-        const totalStudents = results.length;
+        const { exam } = archiveData;
+        const totalStudents = filteredResults.length;
 
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount: number = 0;
             const answerCounts: Record<string, number> = {};
             
-            results.forEach(r => {
+            filteredResults.forEach(r => {
                 const ans = r.answers[q.id];
                 const status = checkAnswerStatus(q, r.answers);
 
@@ -900,16 +900,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 options: q.questionType === 'MULTIPLE_CHOICE' ? q.options : undefined
             };
         });
-    }, [archiveData]);
+    }, [archiveData, filteredResults]);
 
     const questionStats = useMemo(() => {
         if (!archiveData) return [];
-        const { exam, results } = archiveData;
-        const totalStudents = results.length;
+        const { exam } = archiveData;
+        const totalStudents = filteredResults.length;
 
         return exam.questions.filter(q => q.questionType !== 'INFO').map(q => {
             let correctCount = 0;
-            results.forEach(r => {
+            filteredResults.forEach(r => {
                 if (checkAnswerStatus(q, r.answers) === 'CORRECT') {
                     correctCount = correctCount + 1;
                 }
@@ -919,26 +919,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 correctRate: totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0
             };
         });
-    }, [archiveData]);
+    }, [archiveData, filteredResults]);
 
     const { categoryStats, levelStats } = useMemo(() => {
         if (!archiveData) return { categoryStats: [], levelStats: [] };
-        return calculateAggregateStats(archiveData.exam, archiveData.results);
-    }, [archiveData]);
+        return calculateAggregateStats(archiveData.exam, filteredResults);
+    }, [archiveData, filteredResults]);
 
     const classAnalysisData = useMemo(() => {
         if (!archiveData) return [];
-        let results = archiveData.results;
-        if (selectedSchool !== 'ALL') {
-            results = results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool);
-        }
-        return analyzeClassPerformance(archiveData.exam, results);
-    }, [archiveData, selectedSchool]);
+        return analyzeClassPerformance(archiveData.exam, filteredResults);
+    }, [archiveData, filteredResults]);
 
     const questionTypeStats = useMemo(() => {
         if (!archiveData) return [];
-        return analyzeQuestionTypePerformance(archiveData.exam, archiveData.results);
-    }, [archiveData]);
+        return analyzeQuestionTypePerformance(archiveData.exam, filteredResults);
+    }, [archiveData, filteredResults]);
 
     const generalRecommendation = useMemo(() => {
         if (!archiveData) return '';
@@ -956,12 +952,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         }
 
         // Jika semua kategori Hijau (>= 80%)
-        const { results } = archiveData;
-        const totalStudents = results.length;
-        const averageScore = totalStudents > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
+        const totalStudents = filteredResults.length;
+        const averageScore = totalStudents > 0 ? Math.round(filteredResults.reduce((acc, r) => acc + r.score, 0) / totalStudents) : 0;
 
         return `HASIL ISTIMEWA (Rata-rata ${averageScore}%). Seluruh kompetensi dasar telah dikuasai dengan baik. Siswa siap diberikan materi PENGAYAAN atau tantangan soal tingkat lanjut (HOTS).`;
-    }, [archiveData, categoryStats]);
+    }, [archiveData, categoryStats, filteredResults]);
 
     if (!archiveData) {
         return (
@@ -1083,12 +1078,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     }
     
     const { exam, results } = archiveData;
-    const totalStudents = exam.config.manualParticipantCount || results.length;
-    const realStudentCount = results.length;
-    const averageScore = realStudentCount > 0 ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
-    const highestScore = realStudentCount > 0 ? Math.max(...results.map(r => r.score)) : 0;
-    const lowestScore = realStudentCount > 0 ? Math.min(...results.map(r => r.score)) : 0;
-    const validCompletionTimes = results.filter(r => r.completionTime !== undefined && r.completionTime !== null).map(r => r.completionTime as number);
+    const totalStudents = (selectedSchool === 'ALL' && selectedClass === 'ALL' && exam.config.manualParticipantCount) ? exam.config.manualParticipantCount : filteredResults.length;
+    const realStudentCount = filteredResults.length;
+    const averageScore = realStudentCount > 0 ? Math.round(filteredResults.reduce((acc, r) => acc + r.score, 0) / realStudentCount) : 0;
+    const highestScore = realStudentCount > 0 ? Math.max(...filteredResults.map(r => r.score)) : 0;
+    const lowestScore = realStudentCount > 0 ? Math.min(...filteredResults.map(r => r.score)) : 0;
+    const validCompletionTimes = filteredResults.filter(r => r.completionTime !== undefined && r.completionTime !== null).map(r => r.completionTime as number);
     const averageCompletionTime = validCompletionTimes.length > 0 ? Math.round(validCompletionTimes.reduce((acc, val) => acc + val, 0) / validCompletionTimes.length) : 0;
     const formatDuration = (seconds: number | undefined | null) => {
         if (seconds === undefined || seconds === null) return '-';
@@ -1150,7 +1145,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             {sourceType === 'LOCAL' && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase border border-gray-200">Local File</span>}
                             {sourceType === 'CLOUD' && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase border border-blue-100">Cloud Storage</span>}
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-mono">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}{exam.authorSchool ? ` • ${exam.authorSchool}` : ''}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-code slashed-zero">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}{exam.authorSchool ? ` • ${exam.authorSchool}` : ''}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto xl:justify-end">
                         <button onClick={resetView} className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
@@ -1184,6 +1179,46 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
             {/* INTERACTIVE CONTENT (HIDDEN ON PRINT) */}
             <div className="animate-fade-in print:hidden">
+                {activeTab !== 'DETAIL' && (uniqueSchools.length > 1 || uniqueClasses.length > 1) && (
+                    <div className="mb-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-4">
+                            {uniqueSchools.length > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-500 uppercase">Sekolah:</span>
+                                    <select 
+                                        value={selectedSchool} 
+                                        onChange={(e) => { setSelectedSchool(e.target.value); setSelectedClass('ALL'); }}
+                                        className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                    >
+                                        <option value="ALL">Semua Sekolah ({archiveData.results.length})</option>
+                                        {uniqueSchools.map(s => (
+                                            <option key={s} value={s}>{s} ({archiveData.results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === s).length})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            {uniqueClasses.length > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-500 uppercase">Kelas:</span>
+                                    <select 
+                                        value={selectedClass} 
+                                        onChange={(e) => setSelectedClass(e.target.value)}
+                                        className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                    >
+                                        <option value="ALL">Semua Kelas ({sortedResults.filter(r => selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool).length})</option>
+                                        {uniqueClasses.map(c => (
+                                            <option key={c} value={c}>{c} ({sortedResults.filter(r => r.student.class === c && (selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool)).length})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-xs font-bold text-slate-400">
+                            Menampilkan {filteredResults.length} Siswa
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'DETAIL' && (
                     <div className="space-y-4">
                         {exam.questions.map((q, index) => {
@@ -1220,45 +1255,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 )}
                 {activeTab === 'STUDENTS' && (
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-                        {(uniqueSchools.length > 1 || uniqueClasses.length > 1) && (
-                            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-700/30">
-                                <div className="flex flex-wrap items-center gap-4">
-                                    {uniqueSchools.length > 1 && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">Sekolah:</span>
-                                            <select 
-                                                value={selectedSchool} 
-                                                onChange={(e) => { setSelectedSchool(e.target.value); setSelectedClass('ALL'); }}
-                                                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                                            >
-                                                <option value="ALL">Semua Sekolah ({archiveData.results.length})</option>
-                                                {uniqueSchools.map(s => (
-                                                    <option key={s} value={s}>{s} ({archiveData.results.filter(r => (r.student.schoolName || 'Tanpa Sekolah') === s).length})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-                                    {uniqueClasses.length > 1 && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">Kelas:</span>
-                                            <select 
-                                                value={selectedClass} 
-                                                onChange={(e) => setSelectedClass(e.target.value)}
-                                                className="text-xs font-bold p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                                            >
-                                                <option value="ALL">Semua Kelas ({sortedResults.filter(r => selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool).length})</option>
-                                                {uniqueClasses.map(c => (
-                                                    <option key={c} value={c}>{c} ({sortedResults.filter(r => r.student.class === c && (selectedSchool === 'ALL' || (r.student.schoolName || 'Tanpa Sekolah') === selectedSchool)).length})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-xs font-bold text-slate-400">
-                                    Menampilkan {filteredResults.length} Siswa
-                                </div>
-                            </div>
-                        )}
                         <div className="overflow-x-auto custom-scrollbar">
                             <table className="w-full text-left min-w-[800px]">
                                 <thead className="bg-slate-50/50 dark:bg-slate-700/50">
@@ -1419,7 +1415,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </div>
                             </div>
                         )}
-                        <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={results} />; })}</div></div>
+                        <div><h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/> Analisis Butir Soal</h3><div className="grid grid-cols-1 gap-4">{exam.questions.filter(q => q.questionType !== 'INFO').map((q, idx) => { const stats = questionStats.find(s => s.id === q.id) || { correctRate: 0 }; return <QuestionAnalysisItem key={q.id} q={q} index={idx} stats={stats} examResults={filteredResults} />; })}</div></div>
                     </div>
                 )}
                 {activeTab === 'CLASS_ANALYSIS' && (
@@ -1516,7 +1512,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                     <h1 className="text-2xl font-black uppercase tracking-tight">{exam.config.subject}</h1>
                     <div className="flex justify-between items-end mt-2">
                         <div className="text-xs font-bold text-slate-600">
-                            <p>KODE UJIAN: <span className="font-mono text-slate-900 text-sm bg-slate-100 px-1">{exam.code}</span></p>
+                            <p>KODE UJIAN: <span className="font-code slashed-zero text-slate-900 text-sm bg-slate-100 px-1">{exam.code}</span></p>
                             <p>TANGGAL: {new Date(exam.config.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                             <p>SEKOLAH: {exam.authorSchool || '-'}</p>
                         </div>
