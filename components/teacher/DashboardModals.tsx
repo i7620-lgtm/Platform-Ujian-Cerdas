@@ -63,7 +63,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 if (error || !data) return;
 
                 setLocalResults(prev => {
-                    let needsFullFetch = false;
+                    const idsToFetch: number[] = [];
                     const next = [...prev];
                     
                     data.forEach(serverRec => {
@@ -72,7 +72,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             const localRec = next[idx];
                             // If status changed to completed/force_closed, we need full data (answers, etc)
                             if (localRec.status !== serverRec.status && (serverRec.status === 'completed' || serverRec.status === 'force_closed')) {
-                                needsFullFetch = true;
+                                idsToFetch.push(serverRec.id);
                             }
                             
                             next[idx] = {
@@ -87,12 +87,28 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             };
                         } else {
                             // New student joined, need full data
-                            needsFullFetch = true;
+                            idsToFetch.push(serverRec.id);
                         }
                     });
                     
-                    if (needsFullFetch) {
-                        fetchLatest(true);
+                    if (idsToFetch.length > 0) {
+                        supabase.from('results')
+                            .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location')
+                            .in('id', idsToFetch)
+                            .then(({ data: specificData }) => {
+                                if (specificData) {
+                                    setLocalResults(current => {
+                                        const updated = [...current];
+                                        specificData.forEach(row => {
+                                            const mapped = storageService.mapRowToResult(row);
+                                            const i = updated.findIndex(r => r.id === mapped.id);
+                                            if (i >= 0) updated[i] = mapped;
+                                            else updated.push(mapped);
+                                        });
+                                        return updated;
+                                    });
+                                }
+                            });
                     }
                     
                     return next;
@@ -110,13 +126,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         
         const examCode = displayExam.code;
         
-        // If not premium, disable realtime and rely only on polling
-        if (!isPremium) {
-            console.log("Realtime disabled for freemium user. Relying on polling.");
+        // If not premium or if exam is in Normal Mode (disableRealtime = true), disable realtime and rely only on polling
+        if (!isPremium || displayExam.config.disableRealtime) {
+            console.log("Realtime disabled (freemium user or Normal Mode). Relying on polling.");
             return;
         }
 
-        // The teacher MUST always connect to Realtime to receive updates without polling.
+        // The teacher MUST connect to Realtime to receive updates without polling (if Realtime is enabled).
         // We use a single channel for all monitoring needs to minimize connections.
         const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
             .on('postgres_changes', { 
@@ -136,8 +152,23 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 console.log("Realtime result change (filtered):", payload.eventType, newData?.id || oldData?.id);
                 if (payload.eventType === 'DELETE') {
                     setLocalResults(prev => prev.filter(r => r.id !== oldData?.id));
-                } else {
-                    fetchLatest(true);
+                } else if (newData?.id) {
+                    supabase.from('results')
+                        .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location')
+                        .eq('id', newData.id)
+                        .single()
+                        .then(({ data: specificData }) => {
+                            if (specificData) {
+                                setLocalResults(current => {
+                                    const updated = [...current];
+                                    const mapped = storageService.mapRowToResult(specificData);
+                                    const i = updated.findIndex(r => r.id === mapped.id);
+                                    if (i >= 0) updated[i] = mapped;
+                                    else updated.push(mapped);
+                                    return updated;
+                                });
+                            }
+                        });
                 }
             })
             .on('postgres_changes', { 
@@ -164,9 +195,31 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     return prev; 
                 }); 
             })
-            .on('broadcast', { event: 'student_submitted' }, () => {
+            .on('broadcast', { event: 'student_submitted' }, (payload) => {
                 console.log("Realtime broadcast: student_submitted");
-                fetchLatest(true);
+                const studentId = payload.payload?.studentId;
+                if (studentId) {
+                    supabase.from('results')
+                        .select('id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location')
+                        .eq('exam_code', examCode)
+                        .eq('student_id', studentId)
+                        .order('updated_at', { ascending: false })
+                        .limit(1)
+                        .then(({ data: specificData }) => {
+                            if (specificData && specificData.length > 0) {
+                                setLocalResults(current => {
+                                    const updated = [...current];
+                                    const mapped = storageService.mapRowToResult(specificData[0]);
+                                    const i = updated.findIndex(r => r.id === mapped.id);
+                                    if (i >= 0) updated[i] = mapped;
+                                    else updated.push(mapped);
+                                    return updated;
+                                });
+                            }
+                        });
+                } else {
+                    fetchLatest(true);
+                }
             })
             .subscribe((status) => {
                 console.log(`Realtime channel status for ${examCode}:`, status);
