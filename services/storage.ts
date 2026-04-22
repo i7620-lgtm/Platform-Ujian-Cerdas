@@ -2,7 +2,7 @@
 import { supabase } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
-import { compressImage, calculateExamScore, cleanupQuestionContent } from '../components/teacher/examUtils';
+import { compressImage, calculateExamScore } from '../components/teacher/examUtils';
 import { GoogleGenAI } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
@@ -172,41 +172,6 @@ const initDB = (): Promise<IDBDatabase> => {
 class StorageService {
     private syncQueue: Result[] = [];
     private isProcessingQueue = false;
-
-    private sanitizeHtmlString(html: string): string {
-        if (!html || typeof html !== 'string') return html;
-        try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-
-            const allElements = doc.querySelectorAll('*');
-            for (let i = 0; i < allElements.length; i++) {
-                const el = allElements[i];
-                const styleAttr = el.getAttribute('style');
-                if (styleAttr && styleAttr.includes('--tw-')) {
-                    const newStyle = styleAttr.split(';')
-                        .map(style => style.trim())
-                        .filter(style => style && !style.startsWith('--tw-'))
-                        .join('; ');
-                    
-                    if (newStyle) {
-                        el.setAttribute('style', newStyle);
-                    } else {
-                        el.removeAttribute('style');
-                    }
-                }
-                
-                if (el.classList.contains('chart-placeholder')) {
-                    el.removeAttribute('style');
-                    el.innerHTML = '<span class="chart-placeholder-text">📊 Diagram</span>';
-                }
-            }
-
-            return doc.body.innerHTML;
-        } catch {
-            return html;
-        }
-    }
 
     private stripAnswersFromQuestion(q: Question): Question {
         const sanitizedQ = { ...q } as Question;
@@ -494,10 +459,9 @@ class StorageService {
 
         // Helper to process HTML content (images/audio)
         const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-            const sanitizedHtml = this.sanitizeHtmlString(html);
-            if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
+            if (!html || (!html.includes('data:image') && !html.includes('data:audio'))) return html;
             const parser = new DOMParser();
-            const doc = parser.parseFromString(sanitizedHtml, 'text/html');
+            const doc = parser.parseFromString(html, 'text/html');
             
             const images = doc.getElementsByTagName('img');
             for (let i = 0; i < images.length; i++) {
@@ -508,7 +472,7 @@ class StorageService {
                         const blob = base64ToBlob(src);
                         const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
                         const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
-                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                         if (data) {
                             const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                             img.setAttribute('src', publicUrlData.publicUrl);
@@ -521,33 +485,15 @@ class StorageService {
             return doc.body.innerHTML;
         };
 
-        const processedQuestions = exam.questions.map(q => {
-            let qCopy = JSON.parse(JSON.stringify(q));
-            if (typeof cleanupQuestionContent === 'function') {
-                qCopy = cleanupQuestionContent(qCopy);
-            }
-            return qCopy;
-        });
+        const processedQuestions = JSON.parse(JSON.stringify(exam.questions));
         
         for (const q of processedQuestions) {
-            if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
             // Process HTML content
             q.questionText = await processHtmlString(q.questionText, q.id);
-            
             if (q.options) {
                 for (let i = 0; i < q.options.length; i++) {
-                    if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
                     q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
                 }
-            }
-            if (q.trueFalseRows) {
-                q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
-            }
-            if (q.matchingPairs) {
-                q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
-            }
-            if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
             }
 
             // Handle Explicit Image Upload (imageUrl)
@@ -557,7 +503,7 @@ class StorageService {
                     const mime = q.imageUrl.substring(5, q.imageUrl.indexOf(';'));
                     const ext = mime.split('/')[1] || 'png';
                     const filename = `${exam.code}/${q.id}_img_${Date.now()}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                         q.imageUrl = publicUrlData.publicUrl;
@@ -572,7 +518,7 @@ class StorageService {
                     const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
                     const ext = mime.split('/')[1] || 'mp3';
                     const filename = `${exam.code}/${q.id}_audio_${Date.now()}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                         q.audioUrl = publicUrlData.publicUrl;
@@ -1019,13 +965,7 @@ class StorageService {
   }
 
   async saveExam(exam: Exam): Promise<void> {
-    const processedQuestions = exam.questions.map(q => {
-        let qCopy = JSON.parse(JSON.stringify(q));
-        if (typeof cleanupQuestionContent === 'function') {
-            qCopy = cleanupQuestionContent(qCopy);
-        }
-        return qCopy;
-    });
+    const processedQuestions = JSON.parse(JSON.stringify(exam.questions));
     const BUCKET_NAME = 'soal';
     const examCode = exam.code;
 
@@ -1051,10 +991,9 @@ class StorageService {
     }
 
     const processHtmlString = async (html: string, contextId: string): Promise<string> => {
-        const sanitizedHtml = this.sanitizeHtmlString(html);
-        if (!sanitizedHtml || (!sanitizedHtml.includes('data:image') && !sanitizedHtml.includes('data:audio'))) return sanitizedHtml;
+        if (!html || (!html.includes('data:image') && !html.includes('data:audio'))) return html;
         const parser = new DOMParser();
-        const doc = parser.parseFromString(sanitizedHtml, 'text/html');
+        const doc = parser.parseFromString(html, 'text/html');
         
         const images = doc.getElementsByTagName('img');
         for (let i = 0; i < images.length; i++) {
@@ -1065,7 +1004,7 @@ class StorageService {
                     const blob = base64ToBlob(src);
                     const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
                     const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                         img.setAttribute('src', publicUrlData.publicUrl);
@@ -1084,7 +1023,7 @@ class StorageService {
                     const blob = base64ToBlob(src);
                     const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
                     const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                     if (data) {
                         const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                         audio.setAttribute('src', publicUrlData.publicUrl);
@@ -1098,38 +1037,11 @@ class StorageService {
     };
 
     for (const q of processedQuestions) {
-        if (q.questionText) q.questionText = this.sanitizeHtmlString(q.questionText);
         q.questionText = await processHtmlString(q.questionText, q.id);
-        
         if (q.options) {
             for (let i = 0; i < q.options.length; i++) {
-                if (q.options[i]) q.options[i] = this.sanitizeHtmlString(q.options[i]);
                 q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
             }
-        }
-        if (q.trueFalseRows) {
-            q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
-        }
-        if (q.matchingPairs) {
-            q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
-        }
-        if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-            q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
-        }
-
-        // Handle Explicit Image Upload (imageUrl)
-        if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
-            try {
-                const blob = base64ToBlob(q.imageUrl);
-                const mime = q.imageUrl.substring(5, q.imageUrl.indexOf(';'));
-                const ext = mime.split('/')[1] || 'png';
-                const filename = `${examCode}/${q.id}_img_${Date.now()}.${ext}`;
-                const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                if (data) {
-                    const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                    q.imageUrl = publicUrlData.publicUrl;
-                }
-            } catch (e) { console.error("Upload image failed", e); }
         }
 
         // Handle Audio Upload
@@ -1140,7 +1052,7 @@ class StorageService {
                 const ext = mime.split('/')[1] || 'mp3';
                 const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
                 
-                const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+                const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true });
                 if (data) {
                     const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
                     q.audioUrl = publicUrlData.publicUrl;
@@ -2370,7 +2282,7 @@ class StorageService {
       
       const { data, error } = await supabase.storage
           .from('archives')
-          .upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+          .upload(filename, blob, { upsert: true });
           
       if (error) throw error;
       return data?.path || filename;
