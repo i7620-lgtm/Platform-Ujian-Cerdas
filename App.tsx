@@ -65,6 +65,43 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Global Math Hydration Effect
+  useEffect(() => {
+    const renderMath = (el: Element) => {
+      const latex = el.getAttribute('data-latex');
+      // Render if latex is present and element is empty, or explicitly needs render
+      if (latex && el.innerHTML.trim() === '') {
+        const w = window as any;
+        if (w.katex) {
+            try {
+                const displayMode = (el as HTMLElement).style.display === 'block';
+                el.innerHTML = w.katex.renderToString(latex, { throwOnError: false, displayMode });
+            } catch(e) { }
+        }
+      }
+    };
+
+    // Initial check
+    document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
+
+    // Observe changes for dynamic rendering
+    const observer = new MutationObserver((mutations) => {
+      let shouldRender = false;
+      for (const m of mutations) {
+        if (m.addedNodes.length > 0) {
+            shouldRender = true;
+            break;
+        }
+      }
+      if (shouldRender) {
+        document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   const toggleTheme = () => setDarkMode(!darkMode);
 
   const isProfileComplete = (profile: TeacherProfile) => {
