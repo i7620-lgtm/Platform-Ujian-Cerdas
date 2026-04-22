@@ -69,7 +69,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const renderMath = (el: Element) => {
       const latex = el.getAttribute('data-latex');
-      // Render if latex is present and element is empty, or explicitly needs render
       if (latex && el.innerHTML.trim() === '') {
         const w = window as any;
         if (w.katex) {
@@ -81,8 +80,22 @@ const App: React.FC = () => {
       }
     };
 
-    // Initial check
-    document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
+    // Hydrate everything
+    const hydrateAll = () => {
+        document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
+    };
+
+    // Initial check (maybe katex is already here)
+    hydrateAll();
+
+    // Polling mechanism to wait for window.katex to load
+    const katexInterval = setInterval(() => {
+        const w = window as any;
+        if (w.katex) {
+            clearInterval(katexInterval);
+            hydrateAll(); // Guarantee we render existing equations
+        }
+    }, 500);
 
     // Observe changes for dynamic rendering
     const observer = new MutationObserver((mutations) => {
@@ -94,12 +107,16 @@ const App: React.FC = () => {
         }
       }
       if (shouldRender) {
-        document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
+        hydrateAll();
       }
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    
+    return () => {
+        observer.disconnect();
+        clearInterval(katexInterval);
+    };
   }, []);
 
   const toggleTheme = () => setDarkMode(!darkMode);
