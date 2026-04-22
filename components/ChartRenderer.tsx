@@ -66,7 +66,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -10, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
               barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
@@ -76,9 +76,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
                 tickLine={{ stroke: '#64748b' }}
                 interval={0}
-                angle={-45}
+                angle={-35}
                 textAnchor="end"
-                height={60}
+                height={70}
                 tickMargin={5}
               />
               <YAxis 
@@ -100,7 +100,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '10px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Bar
@@ -118,7 +118,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -10, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
@@ -127,9 +127,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
                 tickLine={{ stroke: '#64748b' }}
                 interval={0}
-                angle={-45}
+                angle={-35}
                 textAnchor="end"
-                height={60}
+                height={70}
                 tickMargin={5}
               />
               <YAxis 
@@ -151,7 +151,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '10px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Line
