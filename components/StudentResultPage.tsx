@@ -22,7 +22,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
         return (
             <>
                 <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 leading-relaxed prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitized }}></div>
-                <div className="mb-4 h-64 sm:h-80 w-full max-w-3xl mx-auto">
+                <div className="mb-4 w-full max-w-3xl mx-auto">
                     <ChartRenderer data={chartData} />
                 </div>
             </>
@@ -42,7 +42,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
                 <React.Fragment key={index}>
                     <div dangerouslySetInnerHTML={{ __html: part }}></div>
                     {index < parts.length - 1 && (
-                        <div className="my-4 h-64 sm:h-80 w-full max-w-3xl mx-auto">
+                        <div className="my-4 w-full max-w-3xl mx-auto">
                             <ChartRenderer data={chartData} />
                         </div>
                     )}
