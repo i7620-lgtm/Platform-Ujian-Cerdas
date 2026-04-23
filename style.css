@@ -353,7 +353,8 @@
     display: block !important;
     width: 100%;
     max-width: 600px;
-    height: 350px;
+    height: auto !important;
+    min-height: 350px;
     padding: 10px;
     background: #f8fafc;
     border: 2px dashed #cbd5e1;
