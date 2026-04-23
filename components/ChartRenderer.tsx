@@ -59,6 +59,33 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     return entry;
   });
 
+  // Calculate Y-axis ticks based on max data value
+  const yTicks = React.useMemo(() => {
+    let max = 0;
+    datasets.forEach(d => {
+      d.data.forEach(v => {
+        if (typeof v === 'number' && v > max) max = v;
+      });
+    });
+    
+    // Fallback if no numeric max found
+    if (max === 0) return undefined;
+
+    let interval = 5;
+    if (max > 50 && max <= 100) interval = 10;
+    else if (max > 100 && max <= 500) interval = 50;
+    else if (max > 500) interval = 100;
+
+    const ticks = [];
+    const maxTick = Math.ceil(max / interval) * interval;
+    for (let i = 0; i <= maxTick; i += interval) {
+      ticks.push(i);
+    }
+    return ticks;
+  }, [datasets]);
+
+  const yDomain = yTicks && yTicks.length > 0 ? [0, yTicks[yTicks.length - 1]] : undefined;
+
   const renderChart = () => {
     switch (type) {
       case 'bar':
@@ -87,6 +114,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 tickLine={{ stroke: '#64748b' }}
                 tickMargin={5}
                 width={45}
+                ticks={yTicks}
+                domain={yDomain}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
@@ -138,6 +167,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 tickLine={{ stroke: '#64748b' }}
                 tickMargin={5}
                 width={45}
+                ticks={yTicks}
+                domain={yDomain}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
