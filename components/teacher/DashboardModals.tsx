@@ -25,6 +25,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
     const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, schoolName?: string, class: string, absentNumber: string } | null>(null);
+    const [onlineStudents, setOnlineStudents] = useState<Record<string, boolean>>({});
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -134,7 +135,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
         // The teacher MUST connect to Realtime to receive updates without polling (if Realtime is enabled).
         // We use a single channel for all monitoring needs to minimize connections.
-        const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
+        const monitorChannel = supabase.channel(`exam-room-${examCode}`)
+            .on('presence', { event: 'sync' }, () => {
+                const newState = monitorChannel.presenceState();
+                const onlineMap: Record<string, boolean> = {};
+                for (const key of Object.keys(newState)) {
+                    onlineMap[key] = true;
+                }
+                setOnlineStudents(onlineMap);
+            })
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
@@ -650,7 +659,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 {r.student.fullName.charAt(0)}
                                                             </div>
                                                             <div>
-                                                                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
+                                                                    {r.status === 'in_progress' && !displayExam?.config.disableRealtime && (
+                                                                        <div 
+                                                                            className={`w-2 h-2 rounded-full ${onlineStudents[r.student.studentId] ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-300 dark:bg-slate-600'}`} 
+                                                                            title={onlineStudents[r.student.studentId] ? "Online" : "Offline / Terputus"}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                                 <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono tracking-wide">#{r.student.absentNumber}</div>
                                                                 {r.student.schoolName && (
                                                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
