@@ -212,7 +212,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         
         if (isRealtimeEnabled) {
             const channelName = `exam-room-${exam.code}`;
-            channel = supabase.channel(channelName)
+            channel = supabase.channel(channelName, {
+                config: { presence: { key: student.studentId } }
+            })
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
                     // If studentId is provided in payload, only submit if it matches current student
                     if (payload.payload?.studentId && payload.payload.studentId !== student.studentId) return;
@@ -222,7 +224,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         handleSubmit(true, 'completed');
                     }
                 })
-                .subscribe();
+                .subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel?.track({ studentId: student.studentId, onlineAt: new Date().toISOString() }).catch(() => {});
+                    }
+                });
             
             examRoomChannelRef.current = channel;
 
