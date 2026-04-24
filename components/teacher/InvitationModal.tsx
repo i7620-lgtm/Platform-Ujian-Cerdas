@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../lib/supabase';
 import { XMarkIcon, PrinterIcon, LogoIcon, ClockIcon, UserIcon, QrCodeIcon, DocumentDuplicateIcon, ShareIcon, BookOpenIcon } from '../Icons';
@@ -28,7 +29,7 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
         }
     };
 
-    return (
+    return createPortal(
         <div className="kisi-kisi-modal-root fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             {/* Screen UI - Hidden on Print */}
             <div className="screen-only-ui bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
@@ -209,7 +210,8 @@ const KisiKisiModal: React.FC<{ isOpen: boolean; onClose: () => void; questions:
                     }
                 }
             `}</style>
-        </div>
+        </div>,
+        document.body
     );
 };
 
@@ -271,7 +273,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
     // --- MODE 1: BAGIKAN APP (COMPACT CARD) ---
     if (!exam) {
-        return (
+        return createPortal(
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in font-sans">
                 <div className="relative bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-3xl shadow-2xl overflow-hidden border border-white/20 dark:border-slate-700 animate-slide-in-up flex flex-col max-h-[90vh]">
                     {/* Compact Decorative Header */}
@@ -322,7 +324,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     }
 
@@ -400,7 +403,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         }
     };
 
-    return (
+    return createPortal(
         <>
             <div className="invitation-modal-root fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-6 bg-slate-900/70 backdrop-blur-md animate-fade-in font-sans overflow-hidden">
                 {!showKisiKisi && (
@@ -608,7 +611,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 examType={exam?.config.examType}
                 exam={exam}
             />
-        </>
+        </>,
+        document.body
     );
 };
 
@@ -795,7 +799,7 @@ const RegisterSchoolModal: React.FC<{
     const classesToDisplay = parsedClasses.length > 0 ? parsedClasses : Array.from(new Set(students.map(s => s.className)));
     const filteredStudents = students.filter(s => s.className === selectedClass);
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
@@ -904,6 +908,7 @@ const RegisterSchoolModal: React.FC<{
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
