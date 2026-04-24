@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'; 
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon } from '../Icons';
 import { storageService } from '../../services/storage';
@@ -537,6 +537,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         } catch (e) {
                                                             console.error("Failed to load background image to pdf", e);
                                                         }
+                                                    } else {
+                                                        // Draw default border
+                                                        pdf.setDrawColor(200, 200, 200);
+                                                        pdf.setLineWidth(4);
+                                                        pdf.rect(10, 10, cw - 20, ch - 20);
+                                                        pdf.setLineWidth(1);
+                                                        pdf.rect(12, 12, cw - 24, ch - 24);
                                                     }
 
                                                     // student name
