@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
     CheckCircleIcon, 
@@ -685,7 +686,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 />
             )}
             
-            {isEditModalOpen && editingExam && (
+            {isEditModalOpen && editingExam && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col border border-white dark:border-slate-700">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 rounded-t-3xl">
@@ -696,7 +697,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <ExamEditor questions={questions} setQuestions={setQuestions} config={config} setConfig={setConfig} isEditing={true} onSave={() => handleSaveExam('PUBLISHED')} onSaveDraft={() => handleSaveExam('DRAFT')} onCancel={() => setIsEditModalOpen(false)} generatedCode={''} onReset={()=>{}} isPremium={teacherProfile.isPremium || false} />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Personal Invitation Modal */}
