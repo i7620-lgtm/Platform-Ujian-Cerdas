@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { UserIcon, CheckCircleIcon } from '../Icons';
 import type { TeacherProfile } from '../../types';
 import { storageService } from '../../services/storage';
@@ -41,7 +42,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ 
         }
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
             <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white dark:border-slate-800 animate-gentle-slide">
                 <div className="p-8 sm:p-10">
@@ -112,6 +113,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ 
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

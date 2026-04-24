@@ -1534,3 +1534,65 @@ export const markdownToHtml = (markdown: string): string => {
 
     return html.trim();
 };
+
+export const minifyExamHtml = (html: string | undefined | null): string => {
+    if (!html) return html || '';
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // 1. Minify KaTeX/Math content
+        doc.querySelectorAll('.math-visual[data-latex]').forEach(el => {
+            el.innerHTML = ''; 
+        });
+
+        // 2. Clean Chart Placeholders
+        doc.querySelectorAll('.chart-placeholder').forEach(el => {
+            el.removeAttribute('style');
+            el.innerHTML = '📊 Diagram';
+        });
+
+        // 3. Remove Tailwind CSS variables from inline styles
+        doc.querySelectorAll('*').forEach(el => {
+            if (el instanceof HTMLElement) {
+                const style = el.style;
+                const propsToRemove: string[] = [];
+                for (let i = 0; i < style.length; i++) {
+                    const prop = style[i];
+                    if (prop && prop.startsWith('--tw-')) {
+                        propsToRemove.push(prop);
+                    }
+                }
+                propsToRemove.forEach(prop => style.removeProperty(prop));
+
+                if (el.getAttribute('style') === '') {
+                    el.removeAttribute('style');
+                }
+            }
+        });
+
+        return doc.body.innerHTML;
+    } catch {
+        return html; // Fallback if parsing fails
+    }
+};
+
+export const cleanupQuestionContent = (q: any): any => {
+    const qClean = { ...q };
+    if (qClean.questionText) qClean.questionText = minifyExamHtml(qClean.questionText);
+    if (qClean.correctAnswer) qClean.correctAnswer = minifyExamHtml(qClean.correctAnswer);
+    if (qClean.options && Array.isArray(qClean.options)) {
+        qClean.options = qClean.options.map((opt: string) => minifyExamHtml(opt));
+    }
+    if (qClean.trueFalseRows && Array.isArray(qClean.trueFalseRows)) {
+        qClean.trueFalseRows = qClean.trueFalseRows.map((row: any) => ({ ...row, text: minifyExamHtml(row.text) }));
+    }
+    if (qClean.matchingPairs && Array.isArray(qClean.matchingPairs)) {
+        qClean.matchingPairs = qClean.matchingPairs.map((pair: any) => ({ 
+            ...pair, 
+            left: minifyExamHtml(pair.left), 
+            right: minifyExamHtml(pair.right) 
+        }));
+    }
+    return qClean;
+};

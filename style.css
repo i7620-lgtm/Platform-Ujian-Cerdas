@@ -11,7 +11,8 @@
 
 @layer components {
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
+    width: 12px;
+    height: 12px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
@@ -37,26 +38,26 @@
   /* Target both the Editor (.wysiwyg-content), Tailwind Typography (.prose), and Options (.option-content) */
   .wysiwyg-content table, 
   .prose table { 
-    width: 100%; 
+    width: 100% !important; 
     border-collapse: separate; 
     border-spacing: 0;
     margin: 1rem 0; 
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     overflow: hidden;
-    table-layout: auto;
+    table-layout: auto !important;
   } 
 
   /* Specific styles for tables inside options to prevent overflow and look better */
   .option-content table {
-    width: 100%; 
+    width: 100% !important; 
     border-collapse: separate; 
     border-spacing: 0;
     margin: 0.5rem 0; 
     border: 1px solid #e2e8f0;
     border-radius: 6px;
     overflow: hidden;
-    table-layout: fixed; /* Force table to fit container and wrap text */
+    table-layout: fixed !important; /* Force table to fit container and wrap text */
   }
 
   /* Cell Borders & Spacing */
@@ -344,6 +345,40 @@
       background-color: transparent !important;
       color: inherit !important;
   }
+  /* --- CSS from exam Utils added here --- */
+  .chart-placeholder {
+    display: none !important;
+  }
+  
+  .wysiwyg-content .chart-placeholder {
+    display: block !important;
+    width: 100%;
+    max-width: 600px;
+    height: auto !important;
+    min-height: 350px;
+    padding: 10px;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    margin: 10px auto;
+    color: #475569;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .dark .wysiwyg-content .chart-placeholder {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .wysiwyg-content .chart-placeholder-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+  }
+
 }
 
 /* --- Recharts Dark Mode Fixes --- */

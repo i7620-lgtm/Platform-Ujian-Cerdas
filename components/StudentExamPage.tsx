@@ -24,7 +24,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
         return (
             <>
                 <div dangerouslySetInnerHTML={{ __html: optimized }}></div>
-                <div className="mb-8">
+                <div className="mb-8 w-full max-w-3xl mx-auto">
                     <ChartRenderer data={chartData} />
                 </div>
             </>
@@ -44,7 +44,7 @@ const renderQuestionTextWithChart = (html: string, chartData: ChartData | undefi
                 <React.Fragment key={index}>
                     <div dangerouslySetInnerHTML={{ __html: part }}></div>
                     {index < parts.length - 1 && (
-                        <div className="my-6">
+                        <div className="my-6 w-full max-w-3xl mx-auto">
                             <ChartRenderer data={chartData} />
                         </div>
                     )}
@@ -212,7 +212,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         
         if (isRealtimeEnabled) {
             const channelName = `exam-room-${exam.code}`;
-            channel = supabase.channel(channelName)
+            channel = supabase.channel(channelName, {
+                config: { presence: { key: student.studentId } }
+            })
                 .on('broadcast', { event: 'force_submit_exam' }, (payload) => {
                     // If studentId is provided in payload, only submit if it matches current student
                     if (payload.payload?.studentId && payload.payload.studentId !== student.studentId) return;
@@ -222,7 +224,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
                         handleSubmit(true, 'completed');
                     }
                 })
-                .subscribe();
+                .subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel?.track({ studentId: student.studentId, onlineAt: new Date().toISOString() }).catch(() => {});
+                    }
+                });
             
             examRoomChannelRef.current = channel;
 

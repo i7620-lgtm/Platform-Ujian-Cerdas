@@ -59,6 +59,33 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     return entry;
   });
 
+  // Calculate Y-axis ticks based on max data value
+  const yTicks = React.useMemo(() => {
+    let max = 0;
+    datasets.forEach(d => {
+      d.data.forEach(v => {
+        if (typeof v === 'number' && v > max) max = v;
+      });
+    });
+    
+    // Fallback if no numeric max found
+    if (max === 0) return undefined;
+
+    let interval = 5;
+    if (max > 50 && max <= 100) interval = 10;
+    else if (max > 100 && max <= 500) interval = 50;
+    else if (max > 500) interval = 100;
+
+    const ticks = [];
+    const maxTick = Math.ceil(max / interval) * interval;
+    for (let i = 0; i <= maxTick; i += interval) {
+      ticks.push(i);
+    }
+    return ticks;
+  }, [datasets]);
+
+  const yDomain = yTicks && yTicks.length > 0 ? [0, yTicks[yTicks.length - 1]] : undefined;
+
   const renderChart = () => {
     switch (type) {
       case 'bar':
@@ -66,7 +93,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -10, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
               barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
@@ -76,9 +103,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
                 tickLine={{ stroke: '#64748b' }}
                 interval={0}
-                angle={-45}
+                angle={-35}
                 textAnchor="end"
-                height={60}
+                height={70}
                 tickMargin={5}
               />
               <YAxis 
@@ -87,6 +114,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 tickLine={{ stroke: '#64748b' }}
                 tickMargin={5}
                 width={45}
+                ticks={yTicks}
+                domain={yDomain}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
@@ -100,7 +129,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '10px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Bar
@@ -118,7 +147,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -10, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
@@ -127,9 +156,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
                 tickLine={{ stroke: '#64748b' }}
                 interval={0}
-                angle={-45}
+                angle={-35}
                 textAnchor="end"
-                height={60}
+                height={70}
                 tickMargin={5}
               />
               <YAxis 
@@ -138,6 +167,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 tickLine={{ stroke: '#64748b' }}
                 tickMargin={5}
                 width={45}
+                ticks={yTicks}
+                domain={yDomain}
               />
               {data.showTooltip !== false && (
                 <Tooltip 
@@ -151,7 +182,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '10px', fontSize: '14px', fontWeight: 'bold' }}
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Line

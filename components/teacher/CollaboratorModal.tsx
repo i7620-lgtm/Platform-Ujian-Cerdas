@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Exam, Collaborator } from '../../types';
 import { storageService } from '../../services/storage';
 import { XMarkIcon, LinkIcon, DocumentDuplicateIcon, ArrowPathIcon, ShieldCheckIcon, PencilIcon, TrashIcon } from '../Icons';
@@ -160,7 +161,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
         );
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl border border-white dark:border-slate-700 overflow-hidden flex flex-col animate-slide-in-up max-h-[90vh]">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 shrink-0">
@@ -178,6 +179,7 @@ export const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ exam, onCl
                     {renderRow('editor', editorCollaborator)}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

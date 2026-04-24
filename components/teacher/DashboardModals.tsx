@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon } from '../Icons';
 import { storageService } from '../../services/storage';
@@ -25,6 +26,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
     const [generatedTokenData, setGeneratedTokenData] = useState<{name: string, token: string} | null>(null);
     const [editingStudent, setEditingStudent] = useState<{ id: number, studentId: string, fullName: string, schoolName?: string, class: string, absentNumber: string } | null>(null);
+    const [onlineStudents, setOnlineStudents] = useState<Record<string, boolean>>({});
 
     const processingIdsRef = useRef<Set<string>>(new Set());
     const broadcastProgressRef = useRef<Record<string, { answered: number, total: number, timestamp: number }>>({});
@@ -134,7 +136,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
         // The teacher MUST connect to Realtime to receive updates without polling (if Realtime is enabled).
         // We use a single channel for all monitoring needs to minimize connections.
-        const monitorChannel = supabase.channel(`exam-monitor-${examCode}`)
+        const monitorChannel = supabase.channel(`exam-room-${examCode}`)
+            .on('presence', { event: 'sync' }, () => {
+                const newState = monitorChannel.presenceState();
+                const onlineMap: Record<string, boolean> = {};
+                for (const key of Object.keys(newState)) {
+                    onlineMap[key] = true;
+                }
+                setOnlineStudents(onlineMap);
+            })
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
@@ -409,7 +419,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         return scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
     };
 
-    return (
+    return createPortal(
         <>
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
                 <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-full h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
@@ -489,6 +499,184 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                 <CheckCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Selesaikan Ujian</span>
                                             </>
                                         )}
+                                    </button>
+                                )}
+
+                                {/* Sertifikat */}
+                                {displayExam.config.certificateSettings?.enabled && (
+                                    <button 
+                                        onClick={async () => {
+                                            const completedStudents = localResults.filter(r => r.status === 'completed' || r.status === 'force_closed');
+                                            if (completedStudents.length === 0) {
+                                                alert("Belum ada siswa yang selesai.");
+                                                return;
+                                            }
+                                            
+                                            // Provide an indication this might take a bit
+                                            alert(`Mempersiapkan ${completedStudents.length} sertifikat. Harap tunggu...`);
+
+                                            try {
+                                                const { jsPDF } = await import('jspdf');
+                                                const pdf = new jsPDF({
+                                                    orientation: 'landscape',
+                                                    unit: 'mm',
+                                                    format: 'a4'
+                                                });
+
+                                                const config = displayExam.config.certificateSettings!;
+                                                const cw = 297, ch = 210; // A4 landscape dimensions in mm
+
+                                                for (let i = 0; i < completedStudents.length; i++) {
+                                                    const r = completedStudents[i];
+                                                    if (i > 0) pdf.addPage();
+                                                    
+                                                    // Add Background if given
+                                                    if (config.backgroundUrl) {
+                                                        // if URL is base64
+                                                        try {
+                                                            pdf.addImage(config.backgroundUrl, 'JPEG', 0, 0, cw, ch);
+                                                        } catch (e) {
+                                                            console.error("Failed to load background image to pdf", e);
+                                                        }
+                                                    } else {
+                                                        // Modern Certificate Default Template
+                                                        
+                                                        // Background
+                                                        pdf.setFillColor(248, 250, 252); // slate-50
+                                                        pdf.rect(0, 0, cw, ch, 'F');
+                                                        
+                                                        // Outer Border
+                                                        pdf.setDrawColor(49, 46, 129); // indigo-900
+                                                        pdf.setLineWidth(4);
+                                                        pdf.rect(10, 10, cw - 20, ch - 20);
+
+                                                        // Inner Border
+                                                        pdf.setDrawColor(165, 180, 252); // indigo-300
+                                                        pdf.setLineWidth(1);
+                                                        pdf.rect(14, 14, cw - 28, ch - 28);
+
+                                                        // Top Left Geometry
+                                                        pdf.setFillColor(79, 70, 229); // indigo-600
+                                                        pdf.triangle(10, 10, 90, 10, 10, 30, 'F');
+                                                        
+                                                        // Bottom Right Geometry
+                                                        pdf.setFillColor(49, 46, 129); // indigo-900
+                                                        pdf.triangle(cw - 10, ch - 10, cw - 120, ch - 10, cw - 10, ch - 35, 'F');
+                                                        
+                                                        // Header text
+                                                        pdf.setTextColor(49, 46, 129); // indigo-900
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(16);
+                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 40, { align: 'center', charSpace: 2 });
+                                                        
+                                                        pdf.setTextColor(100, 116, 139); // slate-500
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(10);
+                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 47, { align: 'center', charSpace: 1 });
+                                                        
+                                                        // Line separator
+                                                        pdf.setDrawColor(199, 210, 254); // indigo-200
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.line(cw * 0.25, 55, cw * 0.75, 55);
+
+                                                        pdf.setTextColor(55, 48, 163); // indigo-800
+                                                        pdf.setFontSize(32);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 65, { align: 'center', charSpace: 1 });
+
+                                                        pdf.setTextColor(71, 85, 105); // slate-600
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 88, { align: 'center' });
+                                                        
+                                                        pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
+
+                                                        // Motivation/Context Text
+                                                        const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+                                                        const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi pada ${docDate}.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
+                                                        
+                                                        pdf.setFont("times", "italic");
+                                                        pdf.setFontSize(10);
+                                                        pdf.text(promoText, cw / 2, 148, { align: 'center', lineHeightFactor: 1.5 });
+
+                                                        // Signature Line (Centered)
+                                                        pdf.setTextColor(51, 65, 85); // slate-700
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(11);
+                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 38, { align: 'center' });
+                                                        
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(1);
+                                                        pdf.line(cw / 2 - 50, ch - 24, cw / 2 + 10, ch - 24);
+                                                        
+                                                        pdf.setTextColor(30, 41, 59); // slate-800
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(10);
+                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 18, { align: 'center' });
+                                                        
+                                                        pdf.setTextColor(100, 116, 139); // slate-500
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(8);
+                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 13, { align: 'center' });
+
+                                                        // Fake Barcode (Right Side)
+                                                        const bcx = cw / 2 + 40;
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.roundedRect(bcx, ch - 48, 28, 28, 2, 2, 'FD');
+                                                        
+                                                        pdf.setFillColor(15, 23, 42); // slate-900
+                                                        // draw a pseudo QR code pattern
+                                                        pdf.rect(bcx + 4, ch - 48 + 4, 20, 20, 'F');
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
+                                                        pdf.setFillColor(15, 23, 42);
+                                                        pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
+                                                        pdf.setFontSize(6);
+                                                        pdf.setFont("courier", "normal");
+                                                        pdf.setTextColor(148, 163, 184); // slate-400
+                                                        pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
+                                                    }
+
+                                                    // student name
+                                                    if (config.positions.studentName.visible) {
+                                                        const p = config.positions.studentName;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(p.fontSize); 
+                                                        pdf.text(r.student.fullName, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+
+                                                    // score
+                                                    if (config.positions.score.visible) {
+                                                        const p = config.positions.score;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(p.fontSize); 
+                                                        pdf.text(`${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+
+                                                    // exam
+                                                    if (config.positions.examName.visible) {
+                                                        const p = config.positions.examName;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(p.fontSize); 
+                                                        pdf.text(displayExam.config.subject || displayExam.code, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+                                                }
+
+                                                pdf.save(`Sertifikat_${displayExam.code}.pdf`);
+                                            } catch (e) {
+                                                console.error("Gagal mencetak PDF", e);
+                                                alert("Terjadi kesalahan saat memproses PDF.");
+                                            }
+                                        }}
+                                        className="p-1.5 sm:px-3 sm:py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-amber-100 dark:border-amber-800"
+                                        title="Unduh Sertifikat"
+                                    >
+                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span>
                                     </button>
                                 )}
 
@@ -650,7 +838,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                                 {r.student.fullName.charAt(0)}
                                                             </div>
                                                             <div>
-                                                                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{r.student.fullName}</div>
+                                                                    {r.status === 'in_progress' && !displayExam?.config.disableRealtime && (
+                                                                        <div 
+                                                                            className={`w-2 h-2 rounded-full ${onlineStudents[r.student.studentId] ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-300 dark:bg-slate-600'}`} 
+                                                                            title={onlineStudents[r.student.studentId] ? "Online" : "Offline / Terputus"}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                                 <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono tracking-wide">#{r.student.absentNumber}</div>
                                                                 {r.student.schoolName && (
                                                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">{r.student.schoolName}</div>
@@ -1030,7 +1226,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     </div>
                 </div>
             )}
-        </>
+        </>,
+        document.body
     );
 };
 
@@ -1338,7 +1535,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         }
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl w-full max-w-full h-[85vh] flex flex-col overflow-hidden border border-white dark:border-slate-700 relative">
                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-slate-800 sticky top-0 z-10 gap-4">
@@ -1663,7 +1860,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

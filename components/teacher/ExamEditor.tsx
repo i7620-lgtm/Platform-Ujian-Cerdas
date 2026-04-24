@@ -16,6 +16,8 @@ import { ChartRenderer } from '../ChartRenderer';
 import { ChartConfigModal } from './ChartConfigModal';
 
 // --- TIPE DATA & KONSTANTA ---
+import { CertificateEditorModal } from './CertificateEditorModal';
+
 interface ExamEditorProps {
     questions: Question[];
     setQuestions: React.Dispatch<React.SetStateAction<Question[]>>;
@@ -536,6 +538,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
     const [editingChartTarget, setEditingChartTarget] = useState<ChartTarget | null>(null);
     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
     const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
+    const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false); 
     const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); 
     const [insertIndex, setInsertIndex] = useState<number | null>(null);
     const [isGeneratingId, setIsGeneratingId] = useState<string | null>(null);
@@ -1220,6 +1223,23 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                     <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
                                 )}
                              </div>
+                             
+                             <div className="mt-4 flex flex-wrap items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm relative overflow-hidden group gap-4">
+                                 <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-200/40 via-transparent to-transparent z-0 group-hover:from-amber-200/60 transition-colors"></div>
+                                 <div className="flex items-start sm:items-center gap-3 z-10 flex-1 min-w-[200px]">
+                                     <SparklesIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                     <div>
+                                         <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200">Sertifikat Kelulusan Otomatis</h5>
+                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-full sm:max-w-xs leading-relaxed mt-0.5">Berikan e-Certificate otomatis untuk siswa. Bisa diunduh secara massal di Dasbor Guru.</p>
+                                     </div>
+                                 </div>
+                                 <button 
+                                     onClick={() => setIsCertificateModalOpen(true)}
+                                     className="z-10 px-4 py-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                                 >
+                                     {config.certificateSettings?.enabled ? 'Ubah Desain' : 'Buat Sertifikat'}
+                                 </button>
+                             </div>
 
                              <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
@@ -1376,6 +1396,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                     })()}
                 />
             )}
+
+            <CertificateEditorModal 
+                isOpen={isCertificateModalOpen}
+                onClose={() => setIsCertificateModalOpen(false)}
+                settings={config.certificateSettings}
+                onSave={(newSettings) => setConfig(prev => ({ ...prev, certificateSettings: newSettings }))}
+                examNamePlaceholder={config.subject || undefined}
+            />
         </div>
     );
 };
