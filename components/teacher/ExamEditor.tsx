@@ -1402,6 +1402,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 onClose={() => setIsCertificateModalOpen(false)}
                 settings={config.certificateSettings}
                 onSave={(newSettings) => setConfig(prev => ({ ...prev, certificateSettings: newSettings }))}
+                examNamePlaceholder={config.subject || undefined}
             />
         </div>
     );
