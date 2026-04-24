@@ -542,8 +542,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setDrawColor(200, 200, 200);
                                                         pdf.setLineWidth(4);
                                                         pdf.rect(10, 10, cw - 20, ch - 20);
-                                                        pdf.setLineWidth(1);
-                                                        pdf.rect(12, 12, cw - 24, ch - 24);
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.rect(15, 15, cw - 30, ch - 30);
+                                                        
+                                                        // Watermark
+                                                        pdf.setTextColor(240, 240, 240);
+                                                        pdf.setFontSize(80);
+                                                        pdf.text("SERTIFIKAT", cw / 2, ch / 2, { align: 'center', angle: -20 });
                                                     }
 
                                                     // student name
