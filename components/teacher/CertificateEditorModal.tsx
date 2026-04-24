@@ -27,9 +27,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 52, fontSize: 54, color: '#1e3a8a', visible: true },
-      score: { x: 50, y: 64, fontSize: 20, color: '#b45309', visible: true },
-      examName: { x: 50, y: 72, fontSize: 16, color: '#475569', visible: true }
+      studentName: { x: 50, y: 46, fontSize: 50, color: '#1e3a8a', visible: true },
+      score: { x: 50, y: 56, fontSize: 24, color: '#ef4444', visible: true },
+      examName: { x: 50, y: 38, fontSize: 18, color: '#475569', visible: true }
     }
   });
 
@@ -250,37 +250,53 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
               >
                 {!current.backgroundUrl && (
                   <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none p-4">
-                    <div className="w-full h-full border-[6px] border-blue-900 relative bg-white">
-                      <div className="absolute inset-[4px] border-[1px] border-amber-600"></div>
+                    <div className="w-full h-full border-[6px] border-indigo-900 relative bg-slate-50">
+                      <div className="absolute inset-[4px] border-[1px] border-indigo-300"></div>
                       
-                      {/* Decorative corners */}
-                      <div className="absolute top-[8px] left-[8px] w-6 h-6 border-t-[3px] border-l-[3px] border-amber-500"></div>
-                      <div className="absolute top-[8px] right-[8px] w-6 h-6 border-t-[3px] border-r-[3px] border-amber-500"></div>
-                      <div className="absolute bottom-[8px] left-[8px] w-6 h-6 border-b-[3px] border-l-[3px] border-amber-500"></div>
-                      <div className="absolute bottom-[8px] right-[8px] w-6 h-6 border-b-[3px] border-r-[3px] border-amber-500"></div>
+                      {/* Modern Decorative elements */}
+                      <div className="absolute top-0 left-0 w-[30%] h-[8%] bg-indigo-600 rounded-br-full opacity-80" style={{ clipPath: 'polygon(0 0, 100% 0, 70% 100%, 0 100%)' }}></div>
+                      <div className="absolute bottom-0 right-0 w-[40%] h-[12%] bg-indigo-900 rounded-tl-full opacity-90" style={{ clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)' }}></div>
                       
                       {/* Header */}
-                      <div className="mt-[2%] flex flex-col items-center">
-                        <h2 className="text-[1.2cqw] font-serif font-bold text-slate-800 tracking-wide">PEMERINTAH KOTA / KABUPATEN</h2>
-                        <h3 className="text-[1cqw] font-serif text-slate-700 tracking-wide mt-0.5">DINAS PENDIDIKAN KEPEMUDAAN DAN OLAHRAGA</h3>
-                        <h1 className="text-[1.5cqw] font-serif font-bold text-slate-900 mt-1 uppercase">NAMA SEKOLAH DASAR / MENENGAH</h1>
-                        <div className="w-[80%] h-[1px] bg-slate-800 mt-[2%]"></div>
+                      <div className="mt-[4%] flex flex-col items-center relative z-10">
+                        <div className="flex items-center gap-2 mb-1">
+                          <SparklesIcon className="w-[1.8cqw] h-[1.8cqw] text-indigo-600" />
+                          <h2 className="text-[1.4cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
+                        </div>
+                        <h3 className="text-[0.9cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
                         
-                        <h1 className="text-[3.5cqw] font-serif font-bold text-amber-700 mt-[4%] tracking-widest drop-shadow-sm uppercase" style={{ textShadow: '1px 1px 0px rgba(0,0,0,0.1)' }}>PIAGAM PENGHARGAAN</h1>
-                        <p className="text-[1.2cqw] font-serif italic text-slate-600 mt-[2%]">dengan bangga diberikan kepada:</p>
+                        <div className="w-[60%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[3%]"></div>
+                        
+                        <h1 className="text-[3cqw] font-bold text-indigo-800 mt-[3%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
+                        <p className="text-[1.1cqw] font-medium text-slate-600 mt-[3%]">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
+                      </div>
+
+                      {/* Motivation Text */}
+                      <div className="absolute top-[62%] w-full px-[15%] text-center">
+                        <p className="text-[1cqw] italic text-slate-600 leading-relaxed">
+                          "Telah berpartisipasi dan berhasil menyelesaikan evaluasi dengan komitmen penuh pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Pendidikan adalah senjata paling mematikan di dunia, karena dengan pendidikan, Anda dapat mengubah dunia."
+                        </p>
                       </div>
                       
-                      {/* Signatures */}
-                      <div className="absolute bottom-[8%] w-full flex justify-between px-[15%]">
-                        <div className="text-center">
-                          <p className="text-[1cqw] font-serif text-slate-800">Kepala Sekolah</p>
-                          <div className="mt-[4cqw] w-[15cqw] border-b-[1px] border-slate-800"></div>
-                          <p className="text-[0.8cqw] mt-1 text-slate-600">NIP.</p>
+                      {/* Signatures & Barcode */}
+                      <div className="absolute bottom-[8%] w-full flex items-end justify-between px-[12%]">
+                        <div className="w-[12cqw] h-[12cqw] bg-white border border-slate-200 shadow-sm p-[1cqw] rounded-lg flex flex-col items-center justify-center">
+                           <div className="w-full h-full bg-slate-900 grid grid-cols-5 grid-rows-5 gap-[1px] p-[2px]">
+                              {/* Fake Barcode Pattern */}
+                              <div className="bg-white col-span-2 row-span-2"></div><div className="bg-slate-900"></div><div className="bg-white col-span-2 row-span-2"></div>
+                              <div className="bg-white"></div><div className="bg-slate-900"></div><div className="bg-white"></div>
+                              <div className="bg-slate-900 col-span-3"></div><div className="bg-white"></div><div className="bg-slate-900"></div>
+                              <div className="bg-white col-span-2 row-span-2"></div><div className="bg-white"></div><div className="bg-slate-900 col-span-2 row-span-2"></div>
+                              <div className="bg-slate-900"></div><div className="bg-white"></div>
+                           </div>
+                           <span className="text-[0.6cqw] font-mono text-slate-400 mt-1">VERIFY-0X98A</span>
                         </div>
+
                         <div className="text-center">
-                          <p className="text-[1cqw] font-serif text-slate-800">Guru Pengajar</p>
-                          <div className="mt-[4cqw] w-[15cqw] border-b-[1px] border-slate-800"></div>
-                          <p className="text-[0.8cqw] mt-1 text-slate-600">NIP.</p>
+                          <p className="text-[1.1cqw] font-medium text-slate-700">Instansi Penyelenggara</p>
+                          <div className="mt-[4cqw] w-[18cqw] border-b-2 border-slate-300"></div>
+                          <p className="text-[1cqw] mt-1.5 font-bold text-slate-800">Administrator / Guru</p>
+                          <p className="text-[0.8cqw] text-slate-500">Platform Ujian Cerdas</p>
                         </div>
                       </div>
                     </div>
