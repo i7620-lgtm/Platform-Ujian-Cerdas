@@ -28,9 +28,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 48, fontSize: 50, color: '#1e3a8a', visible: true },
+      studentName: { x: 50, y: 50, fontSize: 50, color: '#1e3a8a', visible: true },
       score: { x: 50, y: 64, fontSize: 28, color: '#ef4444', visible: true },
-      examName: { x: 50, y: 34, fontSize: 18, color: '#475569', visible: true }
+      examName: { x: 50, y: 36, fontSize: 18, color: '#475569', visible: true }
     }
   });
 
@@ -259,20 +259,20 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       <div className="absolute bottom-0 right-0 w-[40%] h-[12%] bg-indigo-900 rounded-tl-full opacity-90" style={{ clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)' }}></div>
                       
                       {/* Header */}
-                      <div className="mt-[2%] flex flex-col items-center relative z-10">
+                      <div className="mt-[5%] flex flex-col items-center relative z-10">
                         <div className="flex items-center gap-2 mb-1">
                           <AcademicCapIcon className="w-[1.8cqw] h-[1.8cqw] text-indigo-600" />
                           <h2 className="text-[1.4cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
                         </div>
                         <h3 className="text-[0.9cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
                         
-                        <div className="w-[60%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[2%]"></div>
+                        <div className="w-[50%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[2%]"></div>
                         
                         <h1 className="text-[3cqw] font-bold text-indigo-800 mt-[2%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
                       </div>
                       
                       {/* Subtitles & Descriptions */}
-                      <div className="absolute top-[40%] w-full text-center z-10">
+                      <div className="absolute top-[42%] w-full text-center z-10">
                          <p className="text-[1.1cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
                       </div>
                       
@@ -281,7 +281,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       </div>
 
                       {/* Motivation Text */}
-                      <div className="absolute top-[68%] w-full px-[15%] text-center z-10">
+                      <div className="absolute top-[72%] w-full px-[15%] text-center z-10">
                         <p className="text-[0.9cqw] italic text-slate-600 leading-relaxed font-serif">
                           "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
                         </p>
