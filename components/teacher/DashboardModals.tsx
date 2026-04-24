@@ -581,58 +581,61 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setTextColor(55, 48, 163); // indigo-800
                                                         pdf.setFontSize(32);
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 70, { align: 'center', charSpace: 1 });
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 58, { align: 'center', charSpace: 1 });
 
                                                         pdf.setTextColor(71, 85, 105); // slate-600
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(12);
-                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 85, { align: 'center' });
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 86, { align: 'center' });
+                                                        
+                                                        pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
 
                                                         // Motivation/Context Text
                                                         const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-                                                        const promoText = `"Telah berpartisipasi dan berhasil menyelesaikan evaluasi dengan komitmen penuh pada ${docDate}.\nPendidikan adalah senjata paling mematikan di dunia, karena dengan pendidikan,\nAnda dapat mengubah dunia."`;
+                                                        const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi pada ${docDate}.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
                                                         
-                                                        pdf.setFont("helvetica", "italic");
+                                                        pdf.setFont("times", "italic");
                                                         pdf.setFontSize(10);
-                                                        pdf.text(promoText, cw / 2, 145, { align: 'center', lineHeightFactor: 1.5 });
+                                                        pdf.text(promoText, cw / 2, 142, { align: 'center', lineHeightFactor: 1.5 });
 
-                                                        // Fake Barcode Placeholder
-                                                        pdf.setFillColor(255, 255, 255);
-                                                        pdf.setDrawColor(203, 213, 225); // slate-300
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.roundedRect(cw * 0.12, ch - 50, 30, 30, 2, 2, 'FD');
-                                                        
-                                                        pdf.setFillColor(15, 23, 42); // slate-900
-                                                        // draw a pseudo QR code pattern
-                                                        pdf.rect(cw * 0.12 + 5, ch - 50 + 5, 20, 20, 'F');
-                                                        pdf.setFillColor(255, 255, 255);
-                                                        pdf.rect(cw * 0.12 + 7, ch - 50 + 7, 16, 16, 'F');
-                                                        pdf.setFillColor(15, 23, 42);
-                                                        pdf.rect(cw * 0.12 + 10, ch - 50 + 10, 10, 10, 'F');
-                                                        pdf.setFontSize(6);
-                                                        pdf.setFont("courier", "normal");
-                                                        pdf.setTextColor(148, 163, 184); // slate-400
-                                                        pdf.text("VERIFY-0X98A", cw * 0.12 + 15, ch - 50 + 29, { align: 'center' });
-
-                                                        // Signature Line
+                                                        // Signature Line (Centered)
                                                         pdf.setTextColor(51, 65, 85); // slate-700
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(11);
-                                                        pdf.text("Instansi Penyelenggara", cw * 0.8, ch - 42, { align: 'center' });
+                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 42, { align: 'center' });
                                                         
                                                         pdf.setDrawColor(203, 213, 225); // slate-300
                                                         pdf.setLineWidth(1);
-                                                        pdf.line(cw * 0.70, ch - 26, cw * 0.90, ch - 26);
+                                                        pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
                                                         
                                                         pdf.setTextColor(30, 41, 59); // slate-800
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(10);
-                                                        pdf.text("Administrator / Guru", cw * 0.8, ch - 20, { align: 'center' });
+                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(8);
-                                                        pdf.text("Platform Ujian Cerdas", cw * 0.8, ch - 15, { align: 'center' });
+                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 15, { align: 'center' });
+
+                                                        // Fake Barcode (Right Side)
+                                                        const bcx = cw / 2 + 40;
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.roundedRect(bcx, ch - 50, 30, 30, 2, 2, 'FD');
+                                                        
+                                                        pdf.setFillColor(15, 23, 42); // slate-900
+                                                        // draw a pseudo QR code pattern
+                                                        pdf.rect(bcx + 5, ch - 50 + 5, 20, 20, 'F');
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.rect(bcx + 7, ch - 50 + 7, 16, 16, 'F');
+                                                        pdf.setFillColor(15, 23, 42);
+                                                        pdf.rect(bcx + 10, ch - 50 + 10, 10, 10, 'F');
+                                                        pdf.setFontSize(6);
+                                                        pdf.setFont("courier", "normal");
+                                                        pdf.setTextColor(148, 163, 184); // slate-400
+                                                        pdf.text("VERIFY-0X98A", bcx + 15, ch - 50 + 29, { align: 'center' });
                                                     }
 
                                                     // student name
@@ -650,7 +653,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setTextColor(p.color);
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(p.fontSize); 
-                                                        pdf.text(`Nilai: ${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                        pdf.text(`${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
 
                                                     // exam
