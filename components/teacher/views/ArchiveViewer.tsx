@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
 import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch } from '../examUtils';
@@ -53,7 +54,7 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
         onClose();
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 dark:border-slate-700">
                 <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center">
@@ -112,7 +113,8 @@ const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () 
                     <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all">Simpan Perubahan</button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
