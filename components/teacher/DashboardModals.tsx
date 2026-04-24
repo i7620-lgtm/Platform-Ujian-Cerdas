@@ -544,49 +544,76 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setFillColor(255, 255, 255);
                                                         pdf.rect(0, 0, cw, ch, 'F');
                                                         
-                                                        // Outer Border
-                                                        pdf.setDrawColor(30, 41, 59); // slate-800
-                                                        pdf.setLineWidth(1);
-                                                        pdf.rect(10, 10, cw - 20, ch - 20);
-                                                        
-                                                        // Inner Border
-                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        // Outer Border (Blue)
+                                                        pdf.setDrawColor(30, 58, 138); // blue-900
                                                         pdf.setLineWidth(4);
-                                                        pdf.rect(16, 16, cw - 32, ch - 32);
+                                                        pdf.rect(10, 10, cw - 20, ch - 20);
 
-                                                        // Top Left Geometry
-                                                        pdf.setFillColor(15, 23, 42); // slate-900
-                                                        pdf.triangle(0, 0, 70, 0, 0, 70, 'F');
-                                                        pdf.setFillColor(37, 99, 235); // blue-600
-                                                        pdf.triangle(0, 0, 40, 0, 0, 40, 'F');
-
-                                                        // Bottom Right Geometry
-                                                        pdf.setFillColor(15, 23, 42); // slate-900
-                                                        pdf.triangle(cw, ch, cw - 70, ch, cw, ch - 70, 'F');
-                                                        pdf.setFillColor(37, 99, 235); // blue-600
-                                                        pdf.triangle(cw, ch, cw - 40, ch, cw, ch - 40, 'F');
-                                                        
-                                                        // Static Text
-                                                        pdf.setTextColor(15, 23, 42);
-                                                        pdf.setFont("times", "bold");
-                                                        pdf.setFontSize(36);
-                                                        pdf.text("SERTIFIKAT PENGHARGAAN", cw / 2, ch * 0.30, { align: 'center' });
-                                                        
-                                                        pdf.setTextColor(100, 116, 139);
-                                                        pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(14);
-                                                        pdf.text("DIBERIKAN KEPADA", cw / 2, ch * 0.35, { align: 'center', charSpace: 2 });
-                                                        
-                                                        pdf.text("Atas pencapaian dan kelulusannya pada ujian:", cw / 2, ch * 0.65, { align: 'center' });
-
-                                                        // Signature Line
-                                                        pdf.setDrawColor(30, 41, 59);
+                                                        // Inner Border (Amber)
+                                                        pdf.setDrawColor(217, 119, 6); // amber-600
                                                         pdf.setLineWidth(1);
-                                                        pdf.line(cw - 80, ch - 30, cw - 20, ch - 30);
+                                                        pdf.rect(14, 14, cw - 28, ch - 28);
+
+                                                        // Decorative corners (Amber)
+                                                        pdf.setDrawColor(245, 158, 11); // amber-500
+                                                        pdf.setLineWidth(2);
+                                                        const s = 15; // padding to inner border corner
+                                                        const l = 20; // length of corner arm
+                                                        // Top Left
+                                                        pdf.line(s, s, s + l, s);
+                                                        pdf.line(s, s, s, s + l);
+                                                        // Top Right
+                                                        pdf.line(cw - s, s, cw - s - l, s);
+                                                        pdf.line(cw - s, s, cw - s, s + l);
+                                                        // Bottom Left
+                                                        pdf.line(s, ch - s, s + l, ch - s);
+                                                        pdf.line(s, ch - s, s, ch - s - l);
+                                                        // Bottom Right
+                                                        pdf.line(cw - s, ch - s, cw - s - l, ch - s);
+                                                        pdf.line(cw - s, ch - s, cw - s, ch - s - l);
+
                                                         pdf.setTextColor(30, 41, 59);
+                                                        pdf.setFont("times", "bold");
+                                                        pdf.setFontSize(14);
+                                                        pdf.text("PEMERINTAH KOTA / KABUPATEN...", cw / 2, 30, { align: 'center' });
                                                         pdf.setFontSize(12);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.text("Guru Pengajar", cw - 50, ch - 22, { align: 'center' });
+                                                        pdf.setFont("times", "normal");
+                                                        pdf.text("DINAS PENDIDIKAN KEPEMUDAAN DAN OLAHRAGA", cw / 2, 36, { align: 'center' });
+                                                        pdf.setFontSize(18);
+                                                        pdf.setFont("times", "bold");
+                                                        pdf.text("NAMA SEKOLAH...", cw / 2, 44, { align: 'center' });
+
+                                                        pdf.setDrawColor(30, 41, 59);
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.line(cw * 0.15, 50, cw * 0.85, 50);
+
+                                                        pdf.setTextColor(180, 83, 9); // amber-700
+                                                        pdf.setFontSize(40);
+                                                        pdf.text("PIAGAM PENGHARGAAN", cw / 2, 75, { align: 'center' });
+
+                                                        pdf.setTextColor(71, 85, 105);
+                                                        pdf.setFont("times", "italic");
+                                                        pdf.setFontSize(14);
+                                                        pdf.text("dengan bangga diberikan kepada:", cw / 2, 90, { align: 'center' });
+
+                                                        // Signatures
+                                                        pdf.setTextColor(30, 41, 59);
+                                                        pdf.setFont("times", "normal");
+                                                        pdf.setFontSize(12);
+
+                                                        // Left Signature
+                                                        pdf.text("Kepala Sekolah", cw * 0.25, ch - 50, { align: 'center' });
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.line(cw * 0.15, ch - 25, cw * 0.35, ch - 25);
+                                                        pdf.setFontSize(10);
+                                                        pdf.text("NIP.", cw * 0.25, ch - 20, { align: 'center' });
+
+                                                        // Right Signature
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Guru Pengajar", cw * 0.75, ch - 50, { align: 'center' });
+                                                        pdf.line(cw * 0.65, ch - 25, cw * 0.85, ch - 25);
+                                                        pdf.setFontSize(10);
+                                                        pdf.text("NIP.", cw * 0.75, ch - 20, { align: 'center' });
                                                     }
 
                                                     // student name
