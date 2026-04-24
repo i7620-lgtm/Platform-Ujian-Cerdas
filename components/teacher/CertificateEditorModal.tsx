@@ -248,9 +248,12 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                 }}
               >
                 {!current.backgroundUrl && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center opacity-10 pointer-events-none">
-                    <SparklesIcon className="w-24 h-24 mb-4" />
-                    <span className="text-3xl font-black tracking-widest uppercase text-center max-w-[80%]">TEMPLATE DASAR SERTIFIKAT</span>
+                  <div className="absolute inset-4 border-[4px] border-slate-200 pointer-events-none">
+                    <div className="absolute inset-[4px] border border-slate-300"></div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center opacity-10">
+                      <SparklesIcon className="w-24 h-24 mb-4" />
+                      <span className="text-3xl font-black tracking-widest uppercase text-center max-w-[80%]">TEMPLATE DASAR</span>
+                    </div>
                   </div>
                 )}
                 {/* Draggable items */}
@@ -268,7 +271,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       style={{
                         left: `${item.x}%`,
                         top: `${item.y}%`,
-                        fontSize: `${item.fontSize / 3}cqw`, // scaling using container query roughly
+                        fontSize: `${item.fontSize * 0.118}cqw`, // scaling using container query roughly
                         color: item.color,
                         fontWeight: 'bold',
                       }}
