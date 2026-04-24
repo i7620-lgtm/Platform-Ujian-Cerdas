@@ -501,6 +501,82 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                     </button>
                                 )}
 
+                                {/* Sertifikat */}
+                                {displayExam.config.certificateSettings?.enabled && (
+                                    <button 
+                                        onClick={async () => {
+                                            const completedStudents = localResults.filter(r => r.status === 'completed' || r.status === 'force_closed');
+                                            if (completedStudents.length === 0) {
+                                                alert("Belum ada siswa yang selesai.");
+                                                return;
+                                            }
+                                            
+                                            // Provide an indication this might take a bit
+                                            alert(`Mempersiapkan ${completedStudents.length} sertifikat. Harap tunggu...`);
+
+                                            try {
+                                                const { jsPDF } = await import('jspdf');
+                                                const pdf = new jsPDF({
+                                                    orientation: 'landscape',
+                                                    unit: 'mm',
+                                                    format: 'a4'
+                                                });
+
+                                                const config = displayExam.config.certificateSettings!;
+                                                const cw = 297, ch = 210; // A4 landscape dimensions in mm
+
+                                                for (let i = 0; i < completedStudents.length; i++) {
+                                                    const r = completedStudents[i];
+                                                    if (i > 0) pdf.addPage();
+                                                    
+                                                    // Add Background if given
+                                                    if (config.backgroundUrl) {
+                                                        // if URL is base64
+                                                        try {
+                                                            pdf.addImage(config.backgroundUrl, 'JPEG', 0, 0, cw, ch);
+                                                        } catch (e) {
+                                                            console.error("Failed to load background image to pdf", e);
+                                                        }
+                                                    }
+
+                                                    // student name
+                                                    if (config.positions.studentName.visible) {
+                                                        const p = config.positions.studentName;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFontSize(p.fontSize); // mapped loosely 
+                                                        pdf.text(r.student.fullName, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+
+                                                    // score
+                                                    if (config.positions.score.visible) {
+                                                        const p = config.positions.score;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFontSize(p.fontSize); 
+                                                        pdf.text(`Nilai: ${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+
+                                                    // exam
+                                                    if (config.positions.examName.visible) {
+                                                        const p = config.positions.examName;
+                                                        pdf.setTextColor(p.color);
+                                                        pdf.setFontSize(p.fontSize); 
+                                                        pdf.text(displayExam.config.subject || displayExam.code, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
+                                                    }
+                                                }
+
+                                                pdf.save(`Sertifikat_${displayExam.code}.pdf`);
+                                            } catch (e) {
+                                                console.error("Gagal mencetak PDF", e);
+                                                alert("Terjadi kesalahan saat memproses PDF.");
+                                            }
+                                        }}
+                                        className="p-1.5 sm:px-3 sm:py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-amber-100 dark:border-amber-800"
+                                        title="Unduh Sertifikat"
+                                    >
+                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span>
+                                    </button>
+                                )}
+
                                 {/* Cara Pakai */}
                                 <button onClick={() => setIsGuideModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-blue-100 dark:border-blue-800" title="Cara Pakai">
                                     <BookOpenIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Cara Pakai</span>
