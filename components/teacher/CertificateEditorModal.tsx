@@ -27,9 +27,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 45, fontSize: 44, color: '#0f172a', visible: true },
-      score: { x: 50, y: 56, fontSize: 24, color: '#ef4444', visible: true },
-      examName: { x: 50, y: 74, fontSize: 24, color: '#334155', visible: true }
+      studentName: { x: 50, y: 52, fontSize: 54, color: '#1e3a8a', visible: true },
+      score: { x: 50, y: 64, fontSize: 20, color: '#b45309', visible: true },
+      examName: { x: 50, y: 72, fontSize: 16, color: '#475569', visible: true }
     }
   });
 
@@ -248,30 +248,40 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                 }}
               >
                 {!current.backgroundUrl && (
-                  <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none">
-                    <div className="absolute inset-[10px] border border-slate-800"></div>
-                    <div className="absolute inset-[16px] border-[4px] border-slate-300"></div>
-                    
-                    {/* Top Left Geometry */}
-                    <div className="absolute top-0 left-0 w-[18%] aspect-square bg-slate-900" style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}></div>
-                    <div className="absolute top-0 left-0 w-[10%] aspect-square bg-blue-600" style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}></div>
-                    
-                    {/* Bottom Right Geometry */}
-                    <div className="absolute bottom-0 right-0 w-[18%] aspect-square bg-slate-900" style={{ clipPath: 'polygon(100% 100%, 0 100%, 100% 0)' }}></div>
-                    <div className="absolute bottom-0 right-0 w-[10%] aspect-square bg-blue-600" style={{ clipPath: 'polygon(100% 100%, 0 100%, 100% 0)' }}></div>
-                    
-                    {/* Static Texts */}
-                    <div className="absolute top-[28%] left-1/2 -translate-x-1/2 w-full text-center">
-                      <h1 className="text-[4cqw] font-serif font-bold text-slate-900 tracking-[0.15em] uppercase">Sertifikat Penghargaan</h1>
-                      <p className="text-[1.5cqw] text-slate-500 tracking-[0.2em] mt-3 font-medium">DIBERIKAN KEPADA</p>
-                    </div>
-                    
-                    <div className="absolute top-[65%] left-1/2 -translate-x-1/2 w-full text-center">
-                      <p className="text-[1.5cqw] text-slate-600">Atas pencapaian dan kelulusannya pada ujian:</p>
-                    </div>
-
-                    <div className="absolute bottom-[10%] right-[10%] w-[20%] text-center border-t border-slate-800 pt-[1cqw]">
-                       <p className="text-[1.2cqw] text-slate-800 font-bold">Guru Pengajar</p>
+                  <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none p-4">
+                    <div className="w-full h-full border-[6px] border-blue-900 relative bg-white">
+                      <div className="absolute inset-[4px] border-[1px] border-amber-600"></div>
+                      
+                      {/* Decorative corners */}
+                      <div className="absolute top-[8px] left-[8px] w-6 h-6 border-t-[3px] border-l-[3px] border-amber-500"></div>
+                      <div className="absolute top-[8px] right-[8px] w-6 h-6 border-t-[3px] border-r-[3px] border-amber-500"></div>
+                      <div className="absolute bottom-[8px] left-[8px] w-6 h-6 border-b-[3px] border-l-[3px] border-amber-500"></div>
+                      <div className="absolute bottom-[8px] right-[8px] w-6 h-6 border-b-[3px] border-r-[3px] border-amber-500"></div>
+                      
+                      {/* Header */}
+                      <div className="mt-[2%] flex flex-col items-center">
+                        <h2 className="text-[1.2cqw] font-serif font-bold text-slate-800 tracking-wide">PEMERINTAH KOTA / KABUPATEN</h2>
+                        <h3 className="text-[1cqw] font-serif text-slate-700 tracking-wide mt-0.5">DINAS PENDIDIKAN KEPEMUDAAN DAN OLAHRAGA</h3>
+                        <h1 className="text-[1.5cqw] font-serif font-bold text-slate-900 mt-1 uppercase">NAMA SEKOLAH DASAR / MENENGAH</h1>
+                        <div className="w-[80%] h-[1px] bg-slate-800 mt-[2%]"></div>
+                        
+                        <h1 className="text-[3.5cqw] font-serif font-bold text-amber-700 mt-[4%] tracking-widest drop-shadow-sm uppercase" style={{ textShadow: '1px 1px 0px rgba(0,0,0,0.1)' }}>PIAGAM PENGHARGAAN</h1>
+                        <p className="text-[1.2cqw] font-serif italic text-slate-600 mt-[2%]">dengan bangga diberikan kepada:</p>
+                      </div>
+                      
+                      {/* Signatures */}
+                      <div className="absolute bottom-[8%] w-full flex justify-between px-[15%]">
+                        <div className="text-center">
+                          <p className="text-[1cqw] font-serif text-slate-800">Kepala Sekolah</p>
+                          <div className="mt-[4cqw] w-[15cqw] border-b-[1px] border-slate-800"></div>
+                          <p className="text-[0.8cqw] mt-1 text-slate-600">NIP.</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[1cqw] font-serif text-slate-800">Guru Pengajar</p>
+                          <div className="mt-[4cqw] w-[15cqw] border-b-[1px] border-slate-800"></div>
+                          <p className="text-[0.8cqw] mt-1 text-slate-600">NIP.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
