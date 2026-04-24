@@ -538,24 +538,63 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             console.error("Failed to load background image to pdf", e);
                                                         }
                                                     } else {
-                                                        // Draw default border
-                                                        pdf.setDrawColor(200, 200, 200);
-                                                        pdf.setLineWidth(4);
-                                                        pdf.rect(10, 10, cw - 20, ch - 20);
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.rect(15, 15, cw - 30, ch - 30);
+                                                        // Professional Default Template
                                                         
-                                                        // Watermark
-                                                        pdf.setTextColor(240, 240, 240);
-                                                        pdf.setFontSize(80);
-                                                        pdf.text("SERTIFIKAT", cw / 2, ch / 2, { align: 'center', angle: -20 });
+                                                        // Background
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.rect(0, 0, cw, ch, 'F');
+                                                        
+                                                        // Outer Border
+                                                        pdf.setDrawColor(30, 41, 59); // slate-800
+                                                        pdf.setLineWidth(1);
+                                                        pdf.rect(10, 10, cw - 20, ch - 20);
+                                                        
+                                                        // Inner Border
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(4);
+                                                        pdf.rect(16, 16, cw - 32, ch - 32);
+
+                                                        // Top Left Geometry
+                                                        pdf.setFillColor(15, 23, 42); // slate-900
+                                                        pdf.triangle(0, 0, 70, 0, 0, 70, 'F');
+                                                        pdf.setFillColor(37, 99, 235); // blue-600
+                                                        pdf.triangle(0, 0, 40, 0, 0, 40, 'F');
+
+                                                        // Bottom Right Geometry
+                                                        pdf.setFillColor(15, 23, 42); // slate-900
+                                                        pdf.triangle(cw, ch, cw - 70, ch, cw, ch - 70, 'F');
+                                                        pdf.setFillColor(37, 99, 235); // blue-600
+                                                        pdf.triangle(cw, ch, cw - 40, ch, cw, ch - 40, 'F');
+                                                        
+                                                        // Static Text
+                                                        pdf.setTextColor(15, 23, 42);
+                                                        pdf.setFont("times", "bold");
+                                                        pdf.setFontSize(36);
+                                                        pdf.text("SERTIFIKAT PENGHARGAAN", cw / 2, ch * 0.30, { align: 'center' });
+                                                        
+                                                        pdf.setTextColor(100, 116, 139);
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(14);
+                                                        pdf.text("DIBERIKAN KEPADA", cw / 2, ch * 0.35, { align: 'center', charSpace: 2 });
+                                                        
+                                                        pdf.text("Atas pencapaian dan kelulusannya pada ujian:", cw / 2, ch * 0.65, { align: 'center' });
+
+                                                        // Signature Line
+                                                        pdf.setDrawColor(30, 41, 59);
+                                                        pdf.setLineWidth(1);
+                                                        pdf.line(cw - 80, ch - 30, cw - 20, ch - 30);
+                                                        pdf.setTextColor(30, 41, 59);
+                                                        pdf.setFontSize(12);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.text("Guru Pengajar", cw - 50, ch - 22, { align: 'center' });
                                                     }
 
                                                     // student name
                                                     if (config.positions.studentName.visible) {
                                                         const p = config.positions.studentName;
                                                         pdf.setTextColor(p.color);
-                                                        pdf.setFontSize(p.fontSize); // mapped loosely 
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(p.fontSize); 
                                                         pdf.text(r.student.fullName, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
 
@@ -563,6 +602,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     if (config.positions.score.visible) {
                                                         const p = config.positions.score;
                                                         pdf.setTextColor(p.color);
+                                                        pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(p.fontSize); 
                                                         pdf.text(`Nilai: ${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
@@ -571,6 +611,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                     if (config.positions.examName.visible) {
                                                         const p = config.positions.examName;
                                                         pdf.setTextColor(p.color);
+                                                        pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(p.fontSize); 
                                                         pdf.text(displayExam.config.subject || displayExam.code, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
