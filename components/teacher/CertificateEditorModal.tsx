@@ -80,7 +80,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
   };
 
   const handleDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!activeItem || !containerRef.current || !current.backgroundUrl) return;
+    if (!activeItem || !containerRef.current) return;
     
     // Default prevent for touch to avoid scrolling
     if (e.type === 'touchmove') {
@@ -235,13 +235,14 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
             {current.enabled ? (
               <div 
                 ref={containerRef}
-                className={`relative w-full aspect-[1.414/1] shadow-md bg-white select-none touch-none @container ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                className={`relative w-full aspect-[1.414/1] shadow-md bg-white select-none touch-none ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
                 onMouseMove={activeItem ? handleDrag : undefined}
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
                 onTouchMove={activeItem ? handleDrag : undefined}
                 onTouchEnd={handleDragEnd}
                 style={{
+                  containerType: 'inline-size',
                   backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center'
@@ -300,9 +301,10 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       style={{
                         left: `${item.x}%`,
                         top: `${item.y}%`,
-                        fontSize: `${item.fontSize * 0.118}cqw`, // scaling using container query roughly
+                        fontSize: `${item.fontSize * 0.1188}cqw`, // scaling using container query roughly
                         color: item.color,
                         fontWeight: 'bold',
+                        zIndex: 10,
                       }}
                     >
                       {labels[key]}
