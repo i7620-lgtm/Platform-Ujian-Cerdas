@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon } from '../Icons';
 import { storageService } from '../../services/storage';
@@ -418,7 +419,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         return scorableQuestions.length > 0 ? Math.round((correctCount / scorableQuestions.length) * 100) : 0;
     };
 
-    return (
+    return createPortal(
         <>
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
                 <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-full h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
@@ -1225,7 +1226,8 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                     </div>
                 </div>
             )}
-        </>
+        </>,
+        document.body
     );
 };
 
@@ -1533,7 +1535,7 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
         }
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl w-full max-w-full h-[85vh] flex flex-col overflow-hidden border border-white dark:border-slate-700 relative">
                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-slate-800 sticky top-0 z-10 gap-4">
@@ -1858,7 +1860,8 @@ export const FinishedExamModal: React.FC<FinishedExamModalProps> = ({ exam, teac
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
