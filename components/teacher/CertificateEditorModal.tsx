@@ -27,9 +27,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 50, fontSize: 36, color: '#000000', visible: true },
-      score: { x: 50, y: 65, fontSize: 24, color: '#000000', visible: true },
-      examName: { x: 50, y: 35, fontSize: 20, color: '#000000', visible: true }
+      studentName: { x: 50, y: 45, fontSize: 44, color: '#0f172a', visible: true },
+      score: { x: 50, y: 56, fontSize: 24, color: '#ef4444', visible: true },
+      examName: { x: 50, y: 74, fontSize: 24, color: '#334155', visible: true }
     }
   });
 
@@ -248,11 +248,30 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                 }}
               >
                 {!current.backgroundUrl && (
-                  <div className="absolute inset-4 border-[4px] border-slate-200 pointer-events-none">
-                    <div className="absolute inset-[4px] border border-slate-300"></div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center opacity-10">
-                      <SparklesIcon className="w-24 h-24 mb-4" />
-                      <span className="text-3xl font-black tracking-widest uppercase text-center max-w-[80%]">TEMPLATE DASAR</span>
+                  <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none">
+                    <div className="absolute inset-[10px] border border-slate-800"></div>
+                    <div className="absolute inset-[16px] border-[4px] border-slate-300"></div>
+                    
+                    {/* Top Left Geometry */}
+                    <div className="absolute top-0 left-0 w-[18%] aspect-square bg-slate-900" style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}></div>
+                    <div className="absolute top-0 left-0 w-[10%] aspect-square bg-blue-600" style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}></div>
+                    
+                    {/* Bottom Right Geometry */}
+                    <div className="absolute bottom-0 right-0 w-[18%] aspect-square bg-slate-900" style={{ clipPath: 'polygon(100% 100%, 0 100%, 100% 0)' }}></div>
+                    <div className="absolute bottom-0 right-0 w-[10%] aspect-square bg-blue-600" style={{ clipPath: 'polygon(100% 100%, 0 100%, 100% 0)' }}></div>
+                    
+                    {/* Static Texts */}
+                    <div className="absolute top-[28%] left-1/2 -translate-x-1/2 w-full text-center">
+                      <h1 className="text-[4cqw] font-serif font-bold text-slate-900 tracking-[0.15em] uppercase">Sertifikat Penghargaan</h1>
+                      <p className="text-[1.5cqw] text-slate-500 tracking-[0.2em] mt-3 font-medium">DIBERIKAN KEPADA</p>
+                    </div>
+                    
+                    <div className="absolute top-[65%] left-1/2 -translate-x-1/2 w-full text-center">
+                      <p className="text-[1.5cqw] text-slate-600">Atas pencapaian dan kelulusannya pada ujian:</p>
+                    </div>
+
+                    <div className="absolute bottom-[10%] right-[10%] w-[20%] text-center border-t border-slate-800 pt-[1cqw]">
+                       <p className="text-[1.2cqw] text-slate-800 font-bold">Guru Pengajar</p>
                     </div>
                   </div>
                 )}
