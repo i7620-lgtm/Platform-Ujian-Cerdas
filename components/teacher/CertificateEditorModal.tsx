@@ -235,10 +235,10 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           {/* Preview Canvas */}
           <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700 flex flex-col min-h-[400px]">
             {current.enabled ? (
-              <div className="flex-1 p-4 lg:p-6 overflow-x-auto overflow-y-auto custom-scrollbar flex items-center xl:justify-center">
+              <div className="flex-1 p-4 lg:p-6 overflow-auto custom-scrollbar border-t dark:border-slate-800 flex items-start justify-start xl:justify-center">
                 <div 
                   ref={containerRef}
-                  className={`@container relative w-full min-w-[600px] lg:min-w-[700px] max-w-[900px] mx-auto aspect-[1.414/1] shadow-xl bg-white select-none touch-none ${!current.backgroundUrl ? 'border-[8px] md:border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                  className={`@container relative w-[800px] lg:w-[960px] shrink-0 aspect-[1.414/1] mx-auto shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
                   onMouseMove={activeItem ? handleDrag : undefined}
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
@@ -324,7 +324,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       key={key}
                       onMouseDown={() => handleDragStart(key)}
                       onTouchStart={() => handleDragStart(key)}
-                      className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none whitespace-nowrap p-2 border-2 border-dashed ${activeItem === key ? 'border-sky-500 bg-sky-500/10' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-600'}`}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none whitespace-nowrap p-2 border-2 border-dashed touch-none ${activeItem === key ? 'border-sky-500 bg-sky-500/10' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-600'}`}
                       style={{
                         left: `${item.x}%`,
                         top: `${item.y}%`,
