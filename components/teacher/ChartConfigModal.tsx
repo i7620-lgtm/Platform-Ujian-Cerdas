@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChartData } from '../../types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon } from '../Icons';
 
@@ -78,7 +79,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
     onClose();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
@@ -251,6 +252,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
