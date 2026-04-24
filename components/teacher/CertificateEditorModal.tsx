@@ -184,9 +184,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                           />
                         </label>
                         {current.positions[key].visible && (
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Ukuran</label>
+                          <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                            <div className="flex items-center justify-between gap-3">
+                              <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400 w-16">Ukuran</label>
                               <input 
                                 type="number" 
                                 value={current.positions[key].fontSize}
@@ -194,20 +194,31 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                                   ...prev,
                                   positions: { ...prev.positions, [key]: { ...prev.positions[key], fontSize: Number(e.target.value) } }
                                 }))}
-                                className="w-full text-sm p-1.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg dark:text-white"
+                                className="flex-1 min-w-0 text-sm p-1.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg dark:text-white focus:ring-2 focus:ring-indigo-500"
                               />
                             </div>
-                            <div className="flex-1">
-                              <label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Warna</label>
-                              <input 
-                                type="color" 
-                                value={current.positions[key].color}
-                                onChange={e => setCurrent(prev => ({
-                                  ...prev,
-                                  positions: { ...prev.positions, [key]: { ...prev.positions[key], color: e.target.value } }
-                                }))}
-                                className="w-full h-8 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg cursor-pointer"
-                              />
+                            <div className="flex items-center justify-between gap-3">
+                              <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400 w-16">Warna</label>
+                              <div className="flex-1 flex min-w-0 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
+                                <input 
+                                  type="color" 
+                                  value={current.positions[key].color}
+                                  onChange={e => setCurrent(prev => ({
+                                    ...prev,
+                                    positions: { ...prev.positions, [key]: { ...prev.positions[key], color: e.target.value } }
+                                  }))}
+                                  className="w-10 h-8 p-0 border-0 cursor-pointer"
+                                />
+                                <input 
+                                  type="text" 
+                                  value={current.positions[key].color}
+                                  onChange={e => setCurrent(prev => ({
+                                    ...prev,
+                                    positions: { ...prev.positions, [key]: { ...prev.positions[key], color: e.target.value } }
+                                  }))}
+                                  className="flex-1 w-full text-xs p-1.5 px-2 bg-transparent border-0 focus:ring-0 dark:text-white font-mono uppercase"
+                                />
+                              </div>
                             </div>
                           </div>
                         )}
@@ -222,52 +233,51 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           {/* Preview Canvas */}
           <div className="flex-1 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center p-4 relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700">
             {current.enabled ? (
-              current.backgroundUrl ? (
-                <div 
-                  ref={containerRef}
-                  className="relative w-full aspect-[1.414/1] shadow-md bg-white select-none touch-none @container"
-                  onMouseMove={activeItem ? handleDrag : undefined}
-                  onMouseUp={handleDragEnd}
-                  onMouseLeave={handleDragEnd}
-                  onTouchMove={activeItem ? handleDrag : undefined}
-                  onTouchEnd={handleDragEnd}
-                  style={{
-                    backgroundImage: `url(${current.backgroundUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
-                >
-                  {/* Draggable items */}
-                  {(['studentName', 'score', 'examName'] as const).map(key => {
-                    const item = current.positions[key];
-                    if (!item.visible) return null;
-                    const labels = { studentName: 'Budi Santoso', score: 'Nilai: 100', examName: 'Ujian Tengah Semester' };
-                    
-                    return (
-                      <div
-                        key={key}
-                        onMouseDown={() => handleDragStart(key)}
-                        onTouchStart={() => handleDragStart(key)}
-                        className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none whitespace-nowrap p-2 border-2 border-dashed ${activeItem === key ? 'border-sky-500 bg-sky-500/10' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-600'}`}
-                        style={{
-                          left: `${item.x}%`,
-                          top: `${item.y}%`,
-                          fontSize: `${item.fontSize / 3}cqw`, // scaling using container query roughly
-                          color: item.color,
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        {labels[key]}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center text-slate-400 dark:text-slate-500">
-                  <PhotoIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Unggah background sertifikat untuk memposisikan letak text.</p>
-                </div>
-              )
+              <div 
+                ref={containerRef}
+                className={`relative w-full aspect-[1.414/1] shadow-md bg-white select-none touch-none @container ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                onMouseMove={activeItem ? handleDrag : undefined}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+                onTouchMove={activeItem ? handleDrag : undefined}
+                onTouchEnd={handleDragEnd}
+                style={{
+                  backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {!current.backgroundUrl && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center opacity-10 pointer-events-none">
+                    <SparklesIcon className="w-24 h-24 mb-4" />
+                    <span className="text-3xl font-black tracking-widest uppercase text-center max-w-[80%]">TEMPLATE DASAR SERTIFIKAT</span>
+                  </div>
+                )}
+                {/* Draggable items */}
+                {(['studentName', 'score', 'examName'] as const).map(key => {
+                  const item = current.positions[key];
+                  if (!item.visible) return null;
+                  const labels = { studentName: 'Budi Santoso', score: 'Nilai: 100', examName: 'Ujian Tengah Semester' };
+                  
+                  return (
+                    <div
+                      key={key}
+                      onMouseDown={() => handleDragStart(key)}
+                      onTouchStart={() => handleDragStart(key)}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none whitespace-nowrap p-2 border-2 border-dashed ${activeItem === key ? 'border-sky-500 bg-sky-500/10' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-600'}`}
+                      style={{
+                        left: `${item.x}%`,
+                        top: `${item.y}%`,
+                        fontSize: `${item.fontSize / 3}cqw`, // scaling using container query roughly
+                        color: item.color,
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {labels[key]}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div className="text-center text-slate-400 dark:text-slate-500">
                 <SparklesIcon className="w-12 h-12 mx-auto mb-2 opacity-50 text-indigo-400" />
