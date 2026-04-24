@@ -1224,9 +1224,9 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                 )}
                              </div>
                              
-                             <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm relative overflow-hidden group gap-4">
+                             <div className="mt-4 flex flex-wrap items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm relative overflow-hidden group gap-4">
                                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-200/40 via-transparent to-transparent z-0 group-hover:from-amber-200/60 transition-colors"></div>
-                                 <div className="flex items-start sm:items-center gap-3 z-10">
+                                 <div className="flex items-start sm:items-center gap-3 z-10 flex-1 min-w-[200px]">
                                      <SparklesIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                                      <div>
                                          <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200">Sertifikat Kelulusan Otomatis</h5>
@@ -1235,7 +1235,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                  </div>
                                  <button 
                                      onClick={() => setIsCertificateModalOpen(true)}
-                                     className="z-10 w-full sm:w-auto px-4 py-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all shadow-sm active:scale-95 whitespace-nowrap text-center"
+                                     className="z-10 px-4 py-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all shadow-sm active:scale-95 whitespace-nowrap"
                                  >
                                      {config.certificateSettings?.enabled ? 'Ubah Desain' : 'Buat Sertifikat'}
                                  </button>
