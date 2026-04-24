@@ -140,9 +140,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6">
           {/* Controls Sidebar */}
-          <div className="w-full md:w-1/3 space-y-6">
+          <div className="w-full lg:w-1/3 space-y-6 shrink-0">
             <label className="flex items-center gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl cursor-pointer">
               <input 
                 type="checkbox" 
@@ -160,8 +160,8 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                   <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-200 dark:border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <PhotoIcon className="w-8 h-8 text-slate-400 mb-2" />
-                      <p className="text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold text-indigo-600 dark:text-indigo-400">Klik untuk unggah</span> atau drag</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">JPEG, PNG (Maks 2MB). Landscape direkomendasikan.</p>
+                      <p className="text-sm text-center text-slate-500 dark:text-slate-400"><span className="font-semibold text-indigo-600 dark:text-indigo-400">Klik untuk unggah</span> atau drag</p>
+                      <p className="text-xs text-center text-slate-400 dark:text-slate-500 mt-1 px-2">JPEG, PNG (Maks 2MB). Landscape direkomendasikan.</p>
                     </div>
                     <input type="file" className="hidden" accept="image/jpeg, image/png" onChange={handleImageUpload} />
                   </label>
@@ -233,12 +233,13 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           </div>
 
           {/* Preview Canvas */}
-          <div className="flex-1 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center p-4 relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700">
+          <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700 flex flex-col">
             {current.enabled ? (
-              <div 
-                ref={containerRef}
-                className={`relative w-full aspect-[1.414/1] shadow-md bg-white select-none touch-none ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
-                onMouseMove={activeItem ? handleDrag : undefined}
+              <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+                <div 
+                  ref={containerRef}
+                  className={`relative w-full min-w-[600px] max-w-[800px] mx-auto aspect-[1.414/1] shadow-md bg-white select-none touch-none ${!current.backgroundUrl ? 'border-[12px] sm:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                  onMouseMove={activeItem ? handleDrag : undefined}
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
                 onTouchMove={activeItem ? handleDrag : undefined}
@@ -338,8 +339,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                   );
                 })}
               </div>
+              </div>
             ) : (
-              <div className="text-center text-slate-400 dark:text-slate-500">
+              <div className="text-center text-slate-400 dark:text-slate-500 m-auto">
                 <SparklesIcon className="w-12 h-12 mx-auto mb-2 opacity-50 text-indigo-400" />
                 <p>Opsi Sertifikat Otomatis Tidak Aktif</p>
               </div>
