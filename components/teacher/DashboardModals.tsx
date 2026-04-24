@@ -566,27 +566,27 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setTextColor(49, 46, 129); // indigo-900
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(16);
-                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 35, { align: 'center', charSpace: 2 });
+                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 40, { align: 'center', charSpace: 2 });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(10);
-                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 42, { align: 'center', charSpace: 1 });
+                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 47, { align: 'center', charSpace: 1 });
                                                         
                                                         // Line separator
                                                         pdf.setDrawColor(199, 210, 254); // indigo-200
                                                         pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.2, 50, cw * 0.8, 50);
+                                                        pdf.line(cw * 0.25, 55, cw * 0.75, 55);
 
                                                         pdf.setTextColor(55, 48, 163); // indigo-800
                                                         pdf.setFontSize(32);
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 58, { align: 'center', charSpace: 1 });
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 65, { align: 'center', charSpace: 1 });
 
                                                         pdf.setTextColor(71, 85, 105); // slate-600
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(12);
-                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 86, { align: 'center' });
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 88, { align: 'center' });
                                                         
                                                         pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
 
@@ -596,46 +596,46 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         
                                                         pdf.setFont("times", "italic");
                                                         pdf.setFontSize(10);
-                                                        pdf.text(promoText, cw / 2, 142, { align: 'center', lineHeightFactor: 1.5 });
+                                                        pdf.text(promoText, cw / 2, 148, { align: 'center', lineHeightFactor: 1.5 });
 
                                                         // Signature Line (Centered)
                                                         pdf.setTextColor(51, 65, 85); // slate-700
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(11);
-                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 42, { align: 'center' });
+                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 38, { align: 'center' });
                                                         
                                                         pdf.setDrawColor(203, 213, 225); // slate-300
                                                         pdf.setLineWidth(1);
-                                                        pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
+                                                        pdf.line(cw / 2 - 50, ch - 24, cw / 2 + 10, ch - 24);
                                                         
                                                         pdf.setTextColor(30, 41, 59); // slate-800
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(10);
-                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
+                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 18, { align: 'center' });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(8);
-                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 15, { align: 'center' });
+                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 13, { align: 'center' });
 
                                                         // Fake Barcode (Right Side)
                                                         const bcx = cw / 2 + 40;
                                                         pdf.setFillColor(255, 255, 255);
                                                         pdf.setDrawColor(203, 213, 225); // slate-300
                                                         pdf.setLineWidth(0.5);
-                                                        pdf.roundedRect(bcx, ch - 50, 30, 30, 2, 2, 'FD');
+                                                        pdf.roundedRect(bcx, ch - 48, 28, 28, 2, 2, 'FD');
                                                         
                                                         pdf.setFillColor(15, 23, 42); // slate-900
                                                         // draw a pseudo QR code pattern
-                                                        pdf.rect(bcx + 5, ch - 50 + 5, 20, 20, 'F');
+                                                        pdf.rect(bcx + 4, ch - 48 + 4, 20, 20, 'F');
                                                         pdf.setFillColor(255, 255, 255);
-                                                        pdf.rect(bcx + 7, ch - 50 + 7, 16, 16, 'F');
+                                                        pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
                                                         pdf.setFillColor(15, 23, 42);
-                                                        pdf.rect(bcx + 10, ch - 50 + 10, 10, 10, 'F');
+                                                        pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
                                                         pdf.setFontSize(6);
                                                         pdf.setFont("courier", "normal");
                                                         pdf.setTextColor(148, 163, 184); // slate-400
-                                                        pdf.text("VERIFY-0X98A", bcx + 15, ch - 50 + 29, { align: 'center' });
+                                                        pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
                                                     }
 
                                                     // student name
