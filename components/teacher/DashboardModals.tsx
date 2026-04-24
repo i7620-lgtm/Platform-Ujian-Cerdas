@@ -538,82 +538,101 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                             console.error("Failed to load background image to pdf", e);
                                                         }
                                                     } else {
-                                                        // Professional Default Template
+                                                        // Modern Certificate Default Template
                                                         
                                                         // Background
-                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.setFillColor(248, 250, 252); // slate-50
                                                         pdf.rect(0, 0, cw, ch, 'F');
                                                         
-                                                        // Outer Border (Blue)
-                                                        pdf.setDrawColor(30, 58, 138); // blue-900
+                                                        // Outer Border
+                                                        pdf.setDrawColor(49, 46, 129); // indigo-900
                                                         pdf.setLineWidth(4);
                                                         pdf.rect(10, 10, cw - 20, ch - 20);
 
-                                                        // Inner Border (Amber)
-                                                        pdf.setDrawColor(217, 119, 6); // amber-600
+                                                        // Inner Border
+                                                        pdf.setDrawColor(165, 180, 252); // indigo-300
                                                         pdf.setLineWidth(1);
                                                         pdf.rect(14, 14, cw - 28, ch - 28);
 
-                                                        // Decorative corners (Amber)
-                                                        pdf.setDrawColor(245, 158, 11); // amber-500
-                                                        pdf.setLineWidth(2);
-                                                        const s = 15; // padding to inner border corner
-                                                        const l = 20; // length of corner arm
-                                                        // Top Left
-                                                        pdf.line(s, s, s + l, s);
-                                                        pdf.line(s, s, s, s + l);
-                                                        // Top Right
-                                                        pdf.line(cw - s, s, cw - s - l, s);
-                                                        pdf.line(cw - s, s, cw - s, s + l);
-                                                        // Bottom Left
-                                                        pdf.line(s, ch - s, s + l, ch - s);
-                                                        pdf.line(s, ch - s, s, ch - s - l);
-                                                        // Bottom Right
-                                                        pdf.line(cw - s, ch - s, cw - s - l, ch - s);
-                                                        pdf.line(cw - s, ch - s, cw - s, ch - s - l);
-
-                                                        pdf.setTextColor(30, 41, 59);
-                                                        pdf.setFont("times", "bold");
-                                                        pdf.setFontSize(14);
-                                                        pdf.text("PEMERINTAH KOTA / KABUPATEN...", cw / 2, 30, { align: 'center' });
-                                                        pdf.setFontSize(12);
-                                                        pdf.setFont("times", "normal");
-                                                        pdf.text("DINAS PENDIDIKAN KEPEMUDAAN DAN OLAHRAGA", cw / 2, 36, { align: 'center' });
-                                                        pdf.setFontSize(18);
-                                                        pdf.setFont("times", "bold");
-                                                        pdf.text("NAMA SEKOLAH...", cw / 2, 44, { align: 'center' });
-
-                                                        pdf.setDrawColor(30, 41, 59);
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.15, 50, cw * 0.85, 50);
-
-                                                        pdf.setTextColor(180, 83, 9); // amber-700
-                                                        pdf.setFontSize(40);
-                                                        pdf.text("PIAGAM PENGHARGAAN", cw / 2, 75, { align: 'center' });
-
-                                                        pdf.setTextColor(71, 85, 105);
-                                                        pdf.setFont("times", "italic");
-                                                        pdf.setFontSize(14);
-                                                        pdf.text("dengan bangga diberikan kepada:", cw / 2, 90, { align: 'center' });
-
-                                                        // Signatures
-                                                        pdf.setTextColor(30, 41, 59);
-                                                        pdf.setFont("times", "normal");
-                                                        pdf.setFontSize(12);
-
-                                                        // Left Signature
-                                                        pdf.text("Kepala Sekolah", cw * 0.25, ch - 50, { align: 'center' });
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.15, ch - 25, cw * 0.35, ch - 25);
+                                                        // Top Left Geometry
+                                                        pdf.setFillColor(79, 70, 229); // indigo-600
+                                                        pdf.triangle(10, 10, 90, 10, 10, 30, 'F');
+                                                        
+                                                        // Bottom Right Geometry
+                                                        pdf.setFillColor(49, 46, 129); // indigo-900
+                                                        pdf.triangle(cw - 10, ch - 10, cw - 120, ch - 10, cw - 10, ch - 35, 'F');
+                                                        
+                                                        // Header text
+                                                        pdf.setTextColor(49, 46, 129); // indigo-900
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(16);
+                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 35, { align: 'center', charSpace: 2 });
+                                                        
+                                                        pdf.setTextColor(100, 116, 139); // slate-500
+                                                        pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(10);
-                                                        pdf.text("NIP.", cw * 0.25, ch - 20, { align: 'center' });
+                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 42, { align: 'center', charSpace: 1 });
+                                                        
+                                                        // Line separator
+                                                        pdf.setDrawColor(199, 210, 254); // indigo-200
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.line(cw * 0.2, 50, cw * 0.8, 50);
 
-                                                        // Right Signature
+                                                        pdf.setTextColor(55, 48, 163); // indigo-800
+                                                        pdf.setFontSize(32);
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 70, { align: 'center', charSpace: 1 });
+
+                                                        pdf.setTextColor(71, 85, 105); // slate-600
+                                                        pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(12);
-                                                        pdf.text("Guru Pengajar", cw * 0.75, ch - 50, { align: 'center' });
-                                                        pdf.line(cw * 0.65, ch - 25, cw * 0.85, ch - 25);
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 85, { align: 'center' });
+
+                                                        // Motivation/Context Text
+                                                        const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+                                                        const promoText = `"Telah berpartisipasi dan berhasil menyelesaikan evaluasi dengan komitmen penuh pada ${docDate}.\nPendidikan adalah senjata paling mematikan di dunia, karena dengan pendidikan,\nAnda dapat mengubah dunia."`;
+                                                        
+                                                        pdf.setFont("helvetica", "italic");
                                                         pdf.setFontSize(10);
-                                                        pdf.text("NIP.", cw * 0.75, ch - 20, { align: 'center' });
+                                                        pdf.text(promoText, cw / 2, 145, { align: 'center', lineHeightFactor: 1.5 });
+
+                                                        // Fake Barcode Placeholder
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(0.5);
+                                                        pdf.roundedRect(cw * 0.12, ch - 50, 30, 30, 2, 2, 'FD');
+                                                        
+                                                        pdf.setFillColor(15, 23, 42); // slate-900
+                                                        // draw a pseudo QR code pattern
+                                                        pdf.rect(cw * 0.12 + 5, ch - 50 + 5, 20, 20, 'F');
+                                                        pdf.setFillColor(255, 255, 255);
+                                                        pdf.rect(cw * 0.12 + 7, ch - 50 + 7, 16, 16, 'F');
+                                                        pdf.setFillColor(15, 23, 42);
+                                                        pdf.rect(cw * 0.12 + 10, ch - 50 + 10, 10, 10, 'F');
+                                                        pdf.setFontSize(6);
+                                                        pdf.setFont("courier", "normal");
+                                                        pdf.setTextColor(148, 163, 184); // slate-400
+                                                        pdf.text("VERIFY-0X98A", cw * 0.12 + 15, ch - 50 + 29, { align: 'center' });
+
+                                                        // Signature Line
+                                                        pdf.setTextColor(51, 65, 85); // slate-700
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(11);
+                                                        pdf.text("Instansi Penyelenggara", cw * 0.8, ch - 42, { align: 'center' });
+                                                        
+                                                        pdf.setDrawColor(203, 213, 225); // slate-300
+                                                        pdf.setLineWidth(1);
+                                                        pdf.line(cw * 0.70, ch - 26, cw * 0.90, ch - 26);
+                                                        
+                                                        pdf.setTextColor(30, 41, 59); // slate-800
+                                                        pdf.setFont("helvetica", "bold");
+                                                        pdf.setFontSize(10);
+                                                        pdf.text("Administrator / Guru", cw * 0.8, ch - 20, { align: 'center' });
+                                                        
+                                                        pdf.setTextColor(100, 116, 139); // slate-500
+                                                        pdf.setFont("helvetica", "normal");
+                                                        pdf.setFontSize(8);
+                                                        pdf.text("Platform Ujian Cerdas", cw * 0.8, ch - 15, { align: 'center' });
                                                     }
 
                                                     // student name
