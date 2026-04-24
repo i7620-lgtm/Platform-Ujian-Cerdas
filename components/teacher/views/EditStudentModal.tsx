@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Result } from '../../../types';
 import { XMarkIcon, CheckCircleIcon } from '../../Icons';
 
@@ -21,7 +22,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ result, onCl
         onSave(result.id!, result.student.studentId, formData);
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-in-up border border-white dark:border-slate-700 relative">
                 <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
@@ -83,6 +84,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ result, onCl
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
