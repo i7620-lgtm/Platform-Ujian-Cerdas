@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Exam, Result } from '../../../types';
 import { ClockIcon, QrCodeIcon, ShareIcon, DocumentDuplicateIcon, XMarkIcon, UserIcon } from '../../Icons';
 import { RemainingTime, MetaBadge } from './SharedComponents';
@@ -59,7 +60,7 @@ export const OngoingExamsView: React.FC<{
             <div className="flex justify-between items-start mb-2"><div className="flex flex-col"><span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md w-fit mb-2 flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>Sedang Berlangsung</span><h3 className="font-bold text-xl text-neutral dark:text-white">{exam.config.subject || exam.code}</h3><p className="text-sm font-code slashed-zero text-gray-400 dark:text-slate-500 mt-0.5">{exam.code}</p></div></div><div className="flex flex-wrap gap-2 mt-3 mb-5"><MetaBadge text={exam.config.classLevel} colorClass="bg-gray-100 text-gray-600" /><MetaBadge text={exam.config.examType} colorClass="bg-gray-100 text-gray-600" />{exam.config.targetClasses && exam.config.targetClasses.length > 0 && <MetaBadge text={exam.config.targetClasses.join(', ')} colorClass="bg-orange-50 text-orange-700 border-orange-100" />}</div><div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between"><div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Partisipan</span><div className="flex items-center gap-2 mt-1"><div className="flex -space-x-2">{[...Array(Math.min(3, activeCount))].map((_, i) => (<div key={i} className="w-6 h-6 rounded-full bg-emerald-200 dark:bg-emerald-800 border-2 border-white dark:border-slate-700"></div>))}</div><span className="text-sm font-bold text-gray-700 dark:text-slate-300">{activeCount} Siswa</span></div></div><div className="text-right"><span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">Sisa Waktu</span><div className="mt-1"><RemainingTime exam={exam} /></div></div></div></div>)})}</div>) : (<div className="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700"><div className="bg-gray-50 dark:bg-slate-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><ClockIcon className="h-8 w-8 text-gray-300 dark:text-slate-500" /></div><h3 className="text-base font-bold text-gray-900 dark:text-white">Tidak Ada Ujian Aktif</h3><p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Saat ini tidak ada ujian yang sedang berlangsung.</p></div>)}
             
             {/* Modal QR Code Join */}
-            {joinQrExam && (
+            {joinQrExam && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[70] animate-fade-in">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-slide-in-up border border-white dark:border-slate-700 relative">
                         <button onClick={() => setJoinQrExam(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors"><XMarkIcon className="w-5 h-5"/></button>
@@ -90,7 +91,8 @@ export const OngoingExamsView: React.FC<{
                             Salin Link Ujian
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Modal Collaborator */}
