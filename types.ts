@@ -92,6 +92,15 @@ export interface ExamConfig {
   manualParticipantCount?: number; // Added for manual override in archives
   collaborators?: Collaborator[]; // Moved here for JSONB persistence
   kkm?: number; // Nilai KKM (Kriteria Ketuntasan Minimal)
+  certificateSettings?: {
+    enabled: boolean;
+    backgroundUrl: string; 
+    positions: {
+      studentName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
+      score: { x: number; y: number; fontSize: number; color: string; visible: boolean };
+      examName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
+    };
+  };
 }
 
 export interface Exam {
