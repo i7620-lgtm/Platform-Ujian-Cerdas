@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; 
+import React, { useState, useEffect, useRef } from 'react';
 import type { Question, QuizConfig } from '../../../types';
 import { parsePdfAndAutoCrop, convertPdfToImages } from '../examUtils';
 import { generateQuestions } from '../../services/gemini';
@@ -55,8 +55,14 @@ export const CreationView: React.FC<CreationViewProps> = ({ onQuestionsGenerated
             } 
         } catch (err) { 
             const errorMessage = err instanceof Error ? err.message : 'Gagal memproses permintaan.';
-            if (errorMessage === 'QUOTA_EXCEEDED') {
-                setError('Kuota API telah habis. Silakan coba lagi besok atau gunakan metode pembuatan soal lainnya.');
+            if (errorMessage === 'QUOTA_EXCEEDED_MINUTE') {
+                setError('⚠️ Peringatan Tipe 1: Batas 15 penggunaan (request) per menit telah tercapai pada akun gratis Gemini Flash (atau 10 API request/menit untuk model terpisah). Silakan tunggu 1 menit lalu coba lagi.');
+            } else if (errorMessage === 'QUOTA_EXCEEDED_DAY') {
+                setError('⛔ Peringatan Tipe 2: Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari atau gunakan model dengan akun berbayar (Jika dikonfigurasi).');
+            } else if (errorMessage === 'QUOTA_EXCEEDED_TOKENS') {
+                setError('⚠️ Peringatan Tipe 3: Teks/Konteks materi yang dimasukkan terlalu panjang dan melebihi batas (Maksimum 1 juta token/menit). Kurangi panjang kisi-kisi atau tunggu 1 menit sebelum mencoba lagi.');
+            } else if (errorMessage === 'QUOTA_EXCEEDED_GENERAL' || errorMessage === 'QUOTA_EXCEEDED') {
+                setError('⛔ Peringatan: Batas kuota gratis pemakaian AI / Gemini API telah tercapai (15 req/menit atau 1500 req/hari). Silakan tunggu beberapa saat atau coba lagi besok hari.');
             } else {
                 setError(errorMessage); 
             }
