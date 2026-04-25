@@ -1677,13 +1677,32 @@ class StorageService {
           console.error("Gemini Error:", e);
           
           // Friendly Error UI for Rate Limits (429)
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          if (errorMsg.includes('429') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
+          const errorMsg = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+          
+          let title = "Layanan Sedang Sibuk";
+          let message = "Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.";
+          let alertTipe = "";
+
+          if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('exhausted') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
+              if (errorMsg.includes('per minute') && errorMsg.includes('requests')) {
+                  title = "Peringatan Tipe 1: Batas Per Menit";
+                  message = "Batas 15 penggunaan per menit telah tercapai pada akun gratis Gemini Flash. Silakan tunggu 1 menit lalu coba lagi.";
+              } else if (errorMsg.includes('per day')) {
+                  title = "Peringatan Tipe 2: Batas Harian";
+                  message = "Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari.";
+              } else if (errorMsg.includes('tokens')) {
+                  title = "Peringatan Tipe 3: Batas Token Teks";
+                  message = "Data analisis terlalu panjang dan melebihi batas (Maks 1 juta token/menit). Kurangi data atau tunggu 1 menit sebelum mencoba lagi.";
+              } else {
+                 title = "Batas Kuota Pemakaian Tercapai";
+                 message = "Batas pemakaian wajar (kuota gratis) Gemini AI (per menit/harian) telah habis. Silahkan mencobanya kembali nanti.";
+              }
+
              return `
                 <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
                     <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
-                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">Layanan Sedang Sibuk</h3>
-                    <p class="text-sm text-rose-600 dark:text-rose-400">Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.</p>
+                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">${title}</h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-400">${message}</p>
                 </div>
              `;
           }
