@@ -160,7 +160,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     const err = error as Error & { status?: number };
     const errorMessage = err?.message?.toLowerCase() || "";
     if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
-      throw new Error("QUOTA_EXCEEDED");
+      if (errorMessage.includes('per minute') && errorMessage.includes('requests')) {
+          throw new Error("QUOTA_EXCEEDED_MINUTE");
+      }
+      if (errorMessage.includes('per day')) {
+          throw new Error("QUOTA_EXCEEDED_DAY");
+      }
+      if (errorMessage.includes('tokens')) {
+          throw new Error("QUOTA_EXCEEDED_TOKENS");
+      }
+      throw new Error("QUOTA_EXCEEDED_GENERAL");
     }
     throw new Error(`API Error: ${err?.message || "Terjadi kesalahan jaringan/server."}`);
   }
