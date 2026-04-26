@@ -93,7 +93,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
               barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
@@ -129,7 +129,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
+                iconType="circle"
+                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Bar
@@ -147,7 +148,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -20, bottom: 40 }}
+              margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
@@ -182,7 +183,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
+                iconType="circle"
+                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
               />
               {datasets.map((dataset, index) => (
                 <Line
@@ -206,7 +208,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         }));
         return (
           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 40 }}>
+            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <Pie
                 data={pieData}
                 cx="50%"
@@ -234,7 +236,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
+                iconType="circle"
+                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -248,8 +251,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   return (
     <div className="w-full h-[500px] sm:h-[600px] flex flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
       {title && <h3 className="text-center font-bold mb-4 sm:mb-6 text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">{title}</h3>}
-      <div className="flex-1 w-full relative">
-        <div className="absolute inset-0">
+      <div className="flex-1 w-full relative min-h-[1px] min-w-[1px]">
+        <div className="absolute inset-0 min-h-[1px] min-w-[1px]">
           {renderChart()}
         </div>
       </div>
