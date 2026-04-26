@@ -137,32 +137,98 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     } : {})
   };
 
-  let response;
-  try {
-    response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: properties,
-            required: ["id", "questionText", "correctAnswer"]
-          },
-        },
-      },
-    });
-  } catch (error: unknown) {
-    console.error("Gemini API Error:", error);
-    const err = error as Error & { status?: number };
-    const errorMessage = err?.message?.toLowerCase() || "";
-    if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
-      throw new Error("QUOTA_EXCEEDED");
-    }
-    throw new Error(`API Error: ${err?.message || "Terjadi kesalahan jaringan/server."}`);
+  const combinedText = `${config.difficulty || ''} ${config.subject || ''} ${config.blueprint || ''}`.toUpperCase();
+  
+  // Deteksi LOTS (C1, C2, Level 1, Level 2, LOTS, atau angka persis 1 & 2 pada input difficulty)
+  const isLOTS = combinedText.includes('C1') || combinedText.includes('C2') || 
+                 combinedText.includes('LEVEL 1') || combinedText.includes('LEVEL 2') || 
+                 combinedText.includes('LOTS') || 
+                 /^(1|2)$/.test((config.difficulty || '').trim());
+
+  // Deteksi MOTS (C3, C4, Level 3, Level 4, MOTS, atau angka persis 3 & 4 pada input difficulty)
+  const isMOTS = combinedText.includes('C3') || combinedText.includes('C4') || 
+                 combinedText.includes('LEVEL 3') || combinedText.includes('LEVEL 4') || 
+                 combinedText.includes('MOTS') || 
+                 /^(3|4)$/.test((config.difficulty || '').trim());
+
+  // Deteksi HOTS (C5, C6, Level 5, Level 6, HOTS, SULIT, atau angka persis 5 & 6 pada input difficulty)
+  const isHOTS = combinedText.includes('C5') || combinedText.includes('C6') || 
+                 combinedText.includes('LEVEL 5') || combinedText.includes('LEVEL 6') || 
+                 combinedText.includes('HOTS') || combinedText.includes('SULIT') || 
+                 /^(5|6)$/.test((config.difficulty || '').trim());
+  
+  let modelsToTry: string[] = [];
+  if (isHOTS) {
+      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
+  } else {
+      modelsToTry = ['gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
+  }
+
+  let response = null;
+  let lastError: unknown = null;
+
+  for (const currentModel of modelsToTry) {
+      try {
+          console.log(`Mencoba membuat soal menggunakan model: ${currentModel}`);
+          response = await ai.models.generateContent({
+            model: currentModel,
+            contents: prompt,
+            config: {
+              systemInstruction: systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: properties,
+                  required: ["id", "questionText", "correctAnswer"]
+                },
+              },
+            },
+          });
+          lastError = null;
+          break; // Berhasil, keluar dari loop
+      } catch (error: unknown) {
+          console.warn(`Gagal menggunakan model ${currentModel}:`, error);
+          lastError = error;
+          
+          const err = error as Error & { status?: number };
+          const errorMessage = err?.message?.toLowerCase() || "";
+          
+          const isQuota = err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429');
+          const isTokenQuota = isQuota && errorMessage.includes('tokens');
+          
+          // Jika limit token konteks panjang, ganti model tidak akan banyak membantu
+          if (isTokenQuota) {
+             break; 
+          }
+          
+          // Lanjut coba model berikutnya
+          continue;
+      }
+  }
+
+  if (lastError && !response) {
+      console.error("Semua opsi model gagal. Error terakhir:", lastError);
+      const err = lastError as Error & { status?: number };
+      const errorMessage = err?.message?.toLowerCase() || "";
+      if (err?.status === 429 || errorMessage.includes('quota') || errorMessage.includes('exhausted') || errorMessage.includes('429')) {
+        if (errorMessage.includes('per minute') && errorMessage.includes('requests')) {
+            throw new Error("QUOTA_EXCEEDED_MINUTE");
+        }
+        if (errorMessage.includes('per day')) {
+            throw new Error("QUOTA_EXCEEDED_DAY");
+        }
+        if (errorMessage.includes('tokens')) {
+            throw new Error("QUOTA_EXCEEDED_TOKENS");
+        }
+        throw new Error("QUOTA_EXCEEDED_GENERAL");
+      }
+      throw new Error(`API Error: ${err?.message || "Terjadi kesalahan jaringan/server."}`);
+  }
+
+  if (!response) {
+      throw new Error("Gagal mendapatkan respons dari AI setelah mencoba berbagai model.");
   }
 
   try {
