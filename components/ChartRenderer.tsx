@@ -206,15 +206,15 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         }));
         return (
           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+            <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 40 }}>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
                 labelLine={true}
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={160}
-                innerRadius={100}
+                outerRadius="60%"
+                innerRadius="40%"
                 paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
@@ -231,7 +231,11 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
-              <Legend verticalAlign="bottom" height={36}/>
+              <Legend 
+                verticalAlign="bottom" 
+                align="center" 
+                wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 'bold' }}
+              />
             </PieChart>
           </ResponsiveContainer>
         );
