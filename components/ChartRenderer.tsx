@@ -47,6 +47,25 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return null;
 };
 
+interface CustomLegendProps {
+  payload?: readonly { color?: string; value?: string; type?: string }[];
+}
+
+const renderCustomLegend = ({ payload }: CustomLegendProps) => {
+  if (!payload || !payload.length) return null;
+
+  return (
+    <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 pt-4">
+      {payload.map((entry, index) => (
+        <div key={`item-${index}`} className="flex items-center text-[13px] font-bold text-slate-700 dark:text-slate-300">
+          <span className="w-2.5 h-2.5 rounded-full mr-2 shrink-0" style={{ backgroundColor: entry.color }} />
+          <span className="truncate">{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
 
@@ -90,7 +109,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     switch (type) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
             <BarChart 
               data={chartData} 
               margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
@@ -129,8 +148,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                iconType="circle"
-                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                content={renderCustomLegend}
               />
               {datasets.map((dataset, index) => (
                 <Bar
@@ -145,7 +163,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         );
       case 'line':
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
             <LineChart 
               data={chartData} 
               margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
@@ -183,8 +201,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                iconType="circle"
-                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                content={renderCustomLegend}
               />
               {datasets.map((dataset, index) => (
                 <Line
@@ -207,7 +224,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           value: datasets[0].data[index]
         }));
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
             <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <Pie
                 data={pieData}
@@ -236,8 +253,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               <Legend 
                 verticalAlign="bottom" 
                 align="center" 
-                iconType="circle"
-                wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                content={renderCustomLegend}
               />
             </PieChart>
           </ResponsiveContainer>
