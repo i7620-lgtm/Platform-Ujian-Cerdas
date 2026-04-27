@@ -570,12 +570,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         // Header text
                                                         pdf.setTextColor(49, 46, 129); // indigo-900
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(16);
+                                                        pdf.setFontSize(20);
                                                         pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 40, { align: 'center', charSpace: 2 });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(10);
+                                                        pdf.setFontSize(12);
                                                         pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 47, { align: 'center', charSpace: 1 });
                                                         
                                                         // Line separator
@@ -584,13 +584,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.line(cw * 0.25, 55, cw * 0.75, 55);
 
                                                         pdf.setTextColor(55, 48, 163); // indigo-800
-                                                        pdf.setFontSize(32);
+                                                        pdf.setFontSize(36);
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 65, { align: 'center', charSpace: 1 });
 
                                                         pdf.setTextColor(71, 85, 105); // slate-600
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(12);
+                                                        pdf.setFontSize(14);
                                                         pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 88, { align: 'center' });
                                                         
                                                         pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
@@ -600,28 +600,28 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi pada ${docDate}.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
                                                         
                                                         pdf.setFont("times", "italic");
-                                                        pdf.setFontSize(10);
+                                                        pdf.setFontSize(12);
                                                         pdf.text(promoText, cw / 2, 148, { align: 'center', lineHeightFactor: 1.5 });
 
                                                         // Signature Line (Centered)
                                                         pdf.setTextColor(51, 65, 85); // slate-700
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(11);
-                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 38, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 40, { align: 'center' });
                                                         
                                                         pdf.setDrawColor(203, 213, 225); // slate-300
                                                         pdf.setLineWidth(1);
-                                                        pdf.line(cw / 2 - 50, ch - 24, cw / 2 + 10, ch - 24);
+                                                        pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
                                                         
                                                         pdf.setTextColor(30, 41, 59); // slate-800
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(10);
-                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 18, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(8);
-                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 13, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 14, { align: 'center' });
 
                                                         // Fake Barcode (Right Side)
                                                         const bcx = cw / 2 + 40;
@@ -637,7 +637,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
                                                         pdf.setFillColor(15, 23, 42);
                                                         pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
-                                                        pdf.setFontSize(6);
+                                                        pdf.setFontSize(10);
                                                         pdf.setFont("courier", "normal");
                                                         pdf.setTextColor(148, 163, 184); // slate-400
                                                         pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
