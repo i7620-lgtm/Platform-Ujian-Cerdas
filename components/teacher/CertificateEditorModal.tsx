@@ -12,7 +12,6 @@ interface CertificateSettings {
   positions: {
     studentName: PositionDef;
     score: PositionDef;
-    examName: PositionDef;
   };
 }
 
@@ -21,17 +20,26 @@ interface Props {
   onClose: () => void;
   settings?: CertificateSettings;
   onSave: (settings: CertificateSettings) => void;
-  examNamePlaceholder?: string;
+  subjectPlaceholder?: string;
+  examTypePlaceholder?: string;
+  classLevelPlaceholder?: string;
 }
 
-export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, settings, onSave, examNamePlaceholder = 'Ujian Tengah Semester' }) => {
+export const CertificateEditorModal: React.FC<Props> = ({ 
+  isOpen, 
+  onClose, 
+  settings, 
+  onSave, 
+  subjectPlaceholder = 'Matematika',
+  examTypePlaceholder = 'Ujian Akhir Semester',
+  classLevelPlaceholder = 'Semester 1'
+}) => {
   const getDefaultSettings = (): CertificateSettings => ({
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 50, fontSize: 50, color: '#1e3a8a', visible: true },
-      score: { x: 50, y: 64, fontSize: 28, color: '#ef4444', visible: true },
-      examName: { x: 50, y: 34, fontSize: 18, color: '#475569', visible: true }
+      studentName: { x: 50, y: 40, fontSize: 50, color: '#1e3a8a', visible: true },
+      score: { x: 50, y: 58.5, fontSize: 40, color: '#ef4444', visible: true }
     }
   });
 
@@ -189,8 +197,8 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
 
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Elemen Cetak</h3>
-                  {(['studentName', 'score', 'examName'] as const).map(key => {
-                    const lables = { studentName: 'Nama Siswa', score: 'Nilai/Skor', examName: 'Nama Ujian' };
+                  {(['studentName', 'score'] as const).map(key => {
+                    const lables = { studentName: 'Nama Siswa', score: 'Nilai/Skor' };
                     return (
                       <div key={key} className="p-3 border border-slate-100 dark:border-slate-700 rounded-xl space-y-2">
                         <label className="flex items-center justify-between text-sm">
@@ -293,7 +301,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       <div className="absolute bottom-0 right-0 w-[40%] h-[12%] bg-indigo-900 rounded-tl-full opacity-90" style={{ clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)' }}></div>
                       
                       {/* Header */}
-                      <div className="mt-[5%] flex flex-col items-center relative z-10">
+                      <div className="mt-[2%] flex flex-col items-center relative z-10">
                         <div className="flex items-center gap-2 mb-1">
                           <AcademicCapIcon className="w-[2cqw] h-[2cqw] text-indigo-600" />
                           <h2 className="text-[1.8cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
@@ -306,16 +314,16 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       </div>
                       
                       {/* Subtitles & Descriptions */}
-                      <div className="absolute top-[42%] w-full text-center z-10">
+                      <div className="absolute top-[28%] w-full text-center z-10">
                          <p className="text-[1.2cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
                       </div>
                       
-                      <div className="absolute top-[56%] w-full text-center z-10">
-                         <p className="text-[1.2cqw] font-medium text-slate-600">telah menyelesaikan evaluasi dan mendapatkan nilai akhir:</p>
+                      <div className="absolute top-[49%] w-full px-[5%] text-center z-10">
+                         <p className="text-[1.2cqw] font-medium text-slate-600">telah menyelesaikan evaluasi {examTypePlaceholder} pada mata pelajaran {subjectPlaceholder} untuk kelas {classLevelPlaceholder} dan mendapatkan nilai akhir:</p>
                       </div>
 
                       {/* Motivation Text */}
-                      <div className="absolute top-[72%] w-full px-[15%] text-center z-10">
+                      <div className="absolute top-[68%] w-full px-[15%] text-center z-10">
                         <p className="text-[1.2cqw] italic text-slate-600 leading-relaxed font-serif">
                           "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
                         </p>
@@ -346,10 +354,10 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                   </div>
                 )}
                 {/* Draggable items */}
-                {(['studentName', 'score', 'examName'] as const).map(key => {
+                {(['studentName', 'score'] as const).map(key => {
                   const item = current.positions[key];
                   if (!item.visible) return null;
-                  const labels = { studentName: 'Budi Santoso', score: '100', examName: examNamePlaceholder || 'Jenis Ujian' };
+                  const labels = { studentName: 'Budi Santoso', score: '100' };
                   
                   return (
                     <div
