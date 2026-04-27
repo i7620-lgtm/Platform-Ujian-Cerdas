@@ -1,4 +1,4 @@
-
+ 
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface QuizConfig {
@@ -98,7 +98,6 @@ export interface ExamConfig {
     positions: {
       studentName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
       score: { x: number; y: number; fontSize: number; color: string; visible: boolean };
-      examName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
     };
   };
 }

@@ -506,6 +506,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 {displayExam.config.certificateSettings?.enabled && (
                                     <button 
                                         onClick={async () => {
+                                            if (!isPremium) {
+                                                alert("Mencetak sertifikat adalah fitur Premium. Hubungi Super Admin untuk meningkatkan akun Anda.");
+                                                return;
+                                            }
                                             const completedStudents = localResults.filter(r => r.status === 'completed' || r.status === 'force_closed');
                                             if (completedStudents.length === 0) {
                                                 alert("Belum ada siswa yang selesai.");
@@ -566,58 +570,58 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         // Header text
                                                         pdf.setTextColor(49, 46, 129); // indigo-900
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(16);
-                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 40, { align: 'center', charSpace: 2 });
+                                                        pdf.setFontSize(20);
+                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 28, { align: 'center', charSpace: 2 });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(10);
-                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 47, { align: 'center', charSpace: 1 });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 35, { align: 'center', charSpace: 1 });
                                                         
                                                         // Line separator
                                                         pdf.setDrawColor(199, 210, 254); // indigo-200
                                                         pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.25, 55, cw * 0.75, 55);
+                                                        pdf.line(cw * 0.25, 43, cw * 0.75, 43);
 
                                                         pdf.setTextColor(55, 48, 163); // indigo-800
-                                                        pdf.setFontSize(32);
+                                                        pdf.setFontSize(36);
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 65, { align: 'center', charSpace: 1 });
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 53, { align: 'center', charSpace: 1 });
 
                                                         pdf.setTextColor(71, 85, 105); // slate-600
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 88, { align: 'center' });
+                                                        pdf.setFontSize(14);
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 70, { align: 'center' });
                                                         
-                                                        pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
+                                                        pdf.text(`telah menyelesaikan evaluasi ${displayExam.config.examType || 'Ujian'} pada mata pelajaran ${displayExam.config.subject || 'Mata Pelajaran'} untuk kelas ${displayExam.config.classLevel || r.student.class || '-'} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
 
                                                         // Motivation/Context Text
                                                         const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
                                                         const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi pada ${docDate}.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
                                                         
                                                         pdf.setFont("times", "italic");
-                                                        pdf.setFontSize(10);
-                                                        pdf.text(promoText, cw / 2, 148, { align: 'center', lineHeightFactor: 1.5 });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text(promoText, cw / 2, 140, { align: 'center', lineHeightFactor: 1.5 });
 
                                                         // Signature Line (Centered)
                                                         pdf.setTextColor(51, 65, 85); // slate-700
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(11);
-                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 38, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 40, { align: 'center' });
                                                         
                                                         pdf.setDrawColor(203, 213, 225); // slate-300
                                                         pdf.setLineWidth(1);
-                                                        pdf.line(cw / 2 - 50, ch - 24, cw / 2 + 10, ch - 24);
+                                                        pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
                                                         
                                                         pdf.setTextColor(30, 41, 59); // slate-800
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(10);
-                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 18, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(8);
-                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 13, { align: 'center' });
+                                                        pdf.setFontSize(12);
+                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 14, { align: 'center' });
 
                                                         // Fake Barcode (Right Side)
                                                         const bcx = cw / 2 + 40;
@@ -633,7 +637,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
                                                         pdf.setFillColor(15, 23, 42);
                                                         pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
-                                                        pdf.setFontSize(6);
+                                                        pdf.setFontSize(12);
                                                         pdf.setFont("courier", "normal");
                                                         pdf.setTextColor(148, 163, 184); // slate-400
                                                         pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
@@ -656,15 +660,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setFontSize(p.fontSize); 
                                                         pdf.text(`${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
-
-                                                    // exam
-                                                    if (config.positions.examName.visible) {
-                                                        const p = config.positions.examName;
-                                                        pdf.setTextColor(p.color);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(p.fontSize); 
-                                                        pdf.text(displayExam.config.subject || displayExam.code, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
-                                                    }
                                                 }
 
                                                 pdf.save(`Sertifikat_${displayExam.code}.pdf`);
@@ -673,10 +668,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                 alert("Terjadi kesalahan saat memproses PDF.");
                                             }
                                         }}
-                                        className="p-1.5 sm:px-3 sm:py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-amber-100 dark:border-amber-800"
-                                        title="Unduh Sertifikat"
+                                        className={`p-1.5 sm:px-3 sm:py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border ${isPremium ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-100 dark:border-amber-800' : 'bg-gray-50 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 text-gray-400 opacity-70 cursor-not-allowed'}`}
+                                        title={isPremium ? "Unduh Sertifikat" : "Fitur Premium"}
+                                        disabled={!isPremium}
                                     >
-                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span>
+                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span> {!isPremium && <span className="hidden sm:inline bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-1 py-0.5 rounded-[4px] text-[8px] leading-none">PREMIUM</span>}
                                     </button>
                                 )}
 

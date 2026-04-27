@@ -12,7 +12,6 @@ interface CertificateSettings {
   positions: {
     studentName: PositionDef;
     score: PositionDef;
-    examName: PositionDef;
   };
 }
 
@@ -21,24 +20,55 @@ interface Props {
   onClose: () => void;
   settings?: CertificateSettings;
   onSave: (settings: CertificateSettings) => void;
-  examNamePlaceholder?: string;
+  subjectPlaceholder?: string;
+  examTypePlaceholder?: string;
+  classLevelPlaceholder?: string;
+  datePlaceholder?: string;
 }
 
-export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, settings, onSave, examNamePlaceholder = 'Ujian Tengah Semester' }) => {
+export const CertificateEditorModal: React.FC<Props> = ({ 
+  isOpen, 
+  onClose, 
+  settings, 
+  onSave, 
+  subjectPlaceholder = 'Matematika',
+  examTypePlaceholder = 'Ujian Akhir Semester',
+  classLevelPlaceholder = 'Semester 1',
+  datePlaceholder = new Date().toISOString()
+}) => {
   const getDefaultSettings = (): CertificateSettings => ({
     enabled: true,
     backgroundUrl: '',
     positions: {
-      studentName: { x: 50, y: 50, fontSize: 50, color: '#1e3a8a', visible: true },
-      score: { x: 50, y: 64, fontSize: 28, color: '#ef4444', visible: true },
-      examName: { x: 50, y: 36, fontSize: 18, color: '#475569', visible: true }
+      studentName: { x: 50, y: 40, fontSize: 50, color: '#1e3a8a', visible: true },
+      score: { x: 50, y: 58.5, fontSize: 40, color: '#ef4444', visible: true }
     }
   });
 
   const [current, setCurrent] = useState<CertificateSettings>(settings || getDefaultSettings());
   const [activeItem, setActiveItem] = useState<keyof CertificateSettings['positions'] | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [bgImageSize, setBgImageSize] = useState({ width: 0, height: 0 });
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (!isOpen || !wrapperRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Original size is 1000x707
+        // We add some padding ratio to scale
+        const scaleX = width / 1000;
+        const scaleY = height / 707;
+        setScale(Math.min(scaleX, scaleY, 1));
+      }
+    });
+
+    observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -127,7 +157,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-[95vw] xl:max-w-[1400px] max-h-[95vh] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -140,9 +170,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col xl:flex-row gap-6">
           {/* Controls Sidebar */}
-          <div className="w-full lg:w-1/3 space-y-6 shrink-0">
+          <div className="w-full xl:w-80 space-y-6 shrink-0">
             <label className="flex items-center gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl cursor-pointer">
               <input 
                 type="checkbox" 
@@ -169,8 +199,8 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
 
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Elemen Cetak</h3>
-                  {(['studentName', 'score', 'examName'] as const).map(key => {
-                    const lables = { studentName: 'Nama Siswa', score: 'Nilai/Skor', examName: 'Nama Ujian' };
+                  {(['studentName', 'score'] as const).map(key => {
+                    const lables = { studentName: 'Nama Siswa', score: 'Nilai/Skor' };
                     return (
                       <div key={key} className="p-3 border border-slate-100 dark:border-slate-700 rounded-xl space-y-2">
                         <label className="flex items-center justify-between text-sm">
@@ -235,22 +265,34 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           {/* Preview Canvas */}
           <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700 flex flex-col min-h-[400px]">
             {current.enabled ? (
-              <div className="flex-1 p-4 lg:p-6 overflow-auto custom-scrollbar border-t dark:border-slate-800 flex items-start justify-start xl:justify-center">
-                <div 
-                  ref={containerRef}
-                  className={`@container relative w-[800px] lg:w-[960px] shrink-0 aspect-[1.414/1] mx-auto shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
-                  onMouseMove={activeItem ? handleDrag : undefined}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-                onTouchMove={activeItem ? handleDrag : undefined}
-                onTouchEnd={handleDragEnd}
-                style={{
-                  containerType: 'inline-size',
-                  backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
+              <div 
+                ref={wrapperRef}
+                className="flex-1 border-t dark:border-slate-800 overflow-hidden flex items-center justify-center p-4 lg:p-6"
               >
+                <div 
+                  className="flex items-center justify-center shrink-0"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'center center',
+                    width: '1000px',
+                    height: '707px',
+                  }}
+                >
+                  <div 
+                    ref={containerRef}
+                    className={`@container relative w-full h-full shrink-0 shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                    onMouseMove={activeItem ? handleDrag : undefined}
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                    onTouchMove={activeItem ? handleDrag : undefined}
+                    onTouchEnd={handleDragEnd}
+                    style={{
+                      containerType: 'inline-size',
+                      backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  >
                 {!current.backgroundUrl && (
                   <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none p-4">
                     <div className="w-full h-full border-[6px] border-indigo-900 relative bg-slate-50">
@@ -261,41 +303,48 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       <div className="absolute bottom-0 right-0 w-[40%] h-[12%] bg-indigo-900 rounded-tl-full opacity-90" style={{ clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)' }}></div>
                       
                       {/* Header */}
-                      <div className="mt-[5%] flex flex-col items-center relative z-10">
+                      <div className="mt-[2%] flex flex-col items-center relative z-10">
                         <div className="flex items-center gap-2 mb-1">
-                          <AcademicCapIcon className="w-[1.8cqw] h-[1.8cqw] text-indigo-600" />
-                          <h2 className="text-[1.4cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
+                          <AcademicCapIcon className="w-[2cqw] h-[2cqw] text-indigo-600" />
+                          <h2 className="text-[1.8cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
                         </div>
-                        <h3 className="text-[0.9cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
+                        <h3 className="text-[1.2cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
                         
-                        <div className="w-[50%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[2%]"></div>
+                        <div className="w-[50%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[1.5%]"></div>
                         
-                        <h1 className="text-[3cqw] font-bold text-indigo-800 mt-[2%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
+                        <h1 className="text-[3.5cqw] font-bold text-indigo-800 mt-[1.5%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
                       </div>
                       
                       {/* Subtitles & Descriptions */}
-                      <div className="absolute top-[42%] w-full text-center z-10">
-                         <p className="text-[1.1cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
+                      <div className="absolute top-[28%] w-full text-center z-10">
+                         <p className="text-[1.2cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
                       </div>
                       
-                      <div className="absolute top-[56%] w-full text-center z-10">
-                         <p className="text-[1.1cqw] font-medium text-slate-600">telah menyelesaikan evaluasi dan mendapatkan nilai akhir:</p>
+                      <div className="absolute top-[49%] w-full px-[5%] text-center z-10">
+                         <p className="text-[1.2cqw] font-medium text-slate-600">
+                           telah menyelesaikan evaluasi {examTypePlaceholder} untuk mata pelajaran {subjectPlaceholder} kelas {classLevelPlaceholder} pada {(() => {
+                             const d = new Date(datePlaceholder);
+                             const day = d.toLocaleDateString('id-ID', { weekday: 'long' });
+                             const date = d.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+                             return `${day}, ${date}`;
+                           })()} dan mendapatkan nilai akhir:
+                         </p>
                       </div>
 
                       {/* Motivation Text */}
-                      <div className="absolute top-[72%] w-full px-[15%] text-center z-10">
-                        <p className="text-[0.9cqw] italic text-slate-600 leading-relaxed font-serif">
-                          "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
+                      <div className="absolute top-[68%] w-full px-[15%] text-center z-10">
+                        <p className="text-[1.2cqw] italic text-slate-600 leading-relaxed font-serif">
+                          "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
                         </p>
                       </div>
                       
                       {/* Signatures & Barcode */}
                       <div className="absolute bottom-[6%] w-full flex items-end justify-center px-[12%] gap-[20%]">
                         <div className="text-center">
-                          <p className="text-[1cqw] font-medium text-slate-700">Instansi Penyelenggara</p>
+                          <p className="text-[1.2cqw] font-medium text-slate-700">Instansi Penyelenggara</p>
                           <div className="mt-[3.5cqw] w-[18cqw] border-b-2 border-slate-300"></div>
-                          <p className="text-[1cqw] mt-1.5 font-bold text-slate-800">Administrator / Guru</p>
-                          <p className="text-[0.8cqw] text-slate-500">Platform Ujian Cerdas</p>
+                          <p className="text-[1.2cqw] mt-1.5 font-bold text-slate-800">Administrator / Guru</p>
+                          <p className="text-[1.2cqw] text-slate-500">Platform Ujian Cerdas</p>
                         </div>
                         
                         <div className="w-[10cqw] h-[10cqw] bg-white border border-slate-200 shadow-sm p-[0.8cqw] rounded-lg flex flex-col items-center justify-center">
@@ -307,17 +356,17 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                               <div className="bg-white col-span-2 row-span-2"></div><div className="bg-white"></div><div className="bg-slate-900 col-span-2 row-span-2"></div>
                               <div className="bg-slate-900"></div><div className="bg-white"></div>
                            </div>
-                           <span className="text-[0.5cqw] font-mono text-slate-400 mt-1">VERIFY-0X98A</span>
+                           <span className="text-[1cqw] font-mono text-slate-400 mt-1">VERIFY-0X98A</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
                 {/* Draggable items */}
-                {(['studentName', 'score', 'examName'] as const).map(key => {
+                {(['studentName', 'score'] as const).map(key => {
                   const item = current.positions[key];
                   if (!item.visible) return null;
-                  const labels = { studentName: 'Budi Santoso', score: '100', examName: examNamePlaceholder || 'Jenis Ujian' };
+                  const labels = { studentName: 'Budi Santoso', score: '100' };
                   
                   return (
                     <div
@@ -338,6 +387,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                     </div>
                   );
                 })}
+              </div>
               </div>
               </div>
             ) : (
