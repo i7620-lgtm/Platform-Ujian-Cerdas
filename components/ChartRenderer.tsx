@@ -47,6 +47,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 
+const BAR_CHART_MARGIN = { top: 20, right: 20, left: -20, bottom: 0 };
+
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
 
@@ -76,13 +78,49 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   }, [type, labels, datasets]);
 
   // Transform data for Recharts
-  const chartData = labels.map((label, index) => {
-    const entry: Record<string, string | number> = { name: label };
-    datasets.forEach(dataset => {
-      entry[dataset.label] = dataset.data[index];
+  const chartData = React.useMemo(() => {
+    return labels.map((label, index) => {
+      const entry: Record<string, string | number> = { name: label };
+      datasets.forEach(dataset => {
+        entry[dataset.label] = dataset.data[index];
+      });
+      return entry;
     });
-    return entry;
-  });
+  }, [labels, datasets]);
+
+  const pieData = React.useMemo(() => {
+    if (type !== 'pie') return [];
+    return labels.map((label, index) => ({
+      name: label,
+      value: datasets[0]?.data[index] ?? 0
+    }));
+  }, [type, labels, datasets]);
+
+  const renderPieLabel = React.useCallback((props: any) => {
+    if (isMobile) return null;
+    const { name, percent, x, y, textAnchor, fill } = props;
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        textAnchor={textAnchor} 
+        dominantBaseline="central" 
+        fill={fill}
+        fontWeight={700}
+        style={{ fontSize: 'clamp(9px, 2.5vw, 13px)' }}
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  }, [isMobile]);
+
+  const labelLineConfig = React.useMemo(() => {
+    return isMobile ? false : { stroke: '#64748b', strokeWidth: 1 };
+  }, [isMobile]);
+
+  const pieChartMargin = React.useMemo(() => {
+    return { top: 10, right: isMobile ? 10 : 40, left: isMobile ? 10 : 40, bottom: 10 };
+  }, [isMobile]);
 
   // Calculate Y-axis ticks based on max data value
   const yTicks = React.useMemo(() => {
@@ -118,7 +156,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
             <BarChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
+              margin={BAR_CHART_MARGIN}
               barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
@@ -157,6 +195,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   dataKey={dataset.label}
                   fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
                   maxBarSize={80}
+                  isAnimationActive={false}
                 />
               ))}
             </BarChart>
@@ -167,7 +206,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
             <LineChart 
               data={chartData} 
-              margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
+              margin={BAR_CHART_MARGIN}
             >
               <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
               <XAxis 
@@ -208,43 +247,28 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   strokeWidth={4}
                   dot={{ r: 6, strokeWidth: 2, fill: '#fff' }}
                   activeDot={{ r: 8, strokeWidth: 0 }}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>
           </ResponsiveContainer>
         );
       case 'pie': {
-        // Pie chart usually takes one dataset
-        const pieData = labels.map((label, index) => ({
-          name: label,
-          value: datasets[0].data[index]
-        }));
         return (
           <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
-            <PieChart margin={{ top: 10, right: isMobile ? 10 : 40, left: isMobile ? 10 : 40, bottom: 10 }}>
+            <PieChart margin={pieChartMargin}>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                labelLine={isMobile ? false : { stroke: '#64748b', strokeWidth: 1 }}
-                label={isMobile ? false : ({ name, percent, x, y, textAnchor, fill }) => (
-                  <text 
-                    x={x} 
-                    y={y} 
-                    textAnchor={textAnchor} 
-                    dominantBaseline="central" 
-                    fill={fill}
-                    fontWeight={700}
-                    style={{ fontSize: 'clamp(9px, 2.5vw, 13px)' }}
-                  >
-                    {`${name}: ${(percent * 100).toFixed(0)}%`}
-                  </text>
-                )}
+                labelLine={labelLineConfig}
+                label={renderPieLabel}
                 outerRadius={isMobile ? "70%" : "60%"}
                 innerRadius={isMobile ? "45%" : "35%"}
                 paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
+                isAnimationActive={false}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
