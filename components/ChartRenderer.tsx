@@ -7,7 +7,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -47,27 +46,34 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return null;
 };
 
-interface CustomLegendProps {
-  payload?: readonly { color?: string; value?: string; type?: string }[];
-}
-
-const renderCustomLegend = ({ payload }: CustomLegendProps) => {
-  if (!payload || !payload.length) return null;
-
-  return (
-    <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 pt-4">
-      {payload.map((entry, index) => (
-        <div key={`item-${index}`} className="flex items-center text-[13px] font-bold text-slate-700 dark:text-slate-300">
-          <span className="w-2.5 h-2.5 rounded-full mr-2 shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="truncate">{entry.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
+
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile(); // Check initial size
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const legendItems = React.useMemo(() => {
+    if (type === 'pie') {
+      return labels.map((label, index) => ({
+        value: label,
+        color: COLORS[index % COLORS.length]
+      }));
+    } else {
+      return datasets.map((dataset, index) => ({
+        value: dataset.label,
+        color: dataset.backgroundColor?.[0] || dataset.borderColor?.[0] || COLORS[index % COLORS.length]
+      }));
+    }
+  }, [type, labels, datasets]);
 
   // Transform data for Recharts
   const chartData = labels.map((label, index) => {
@@ -145,11 +151,6 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
-              <Legend 
-                verticalAlign="bottom" 
-                align="center" 
-                content={renderCustomLegend}
-              />
               {datasets.map((dataset, index) => (
                 <Bar
                   key={dataset.label}
@@ -198,11 +199,6 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
-              <Legend 
-                verticalAlign="bottom" 
-                align="center" 
-                content={renderCustomLegend}
-              />
               {datasets.map((dataset, index) => (
                 <Line
                   key={dataset.label}
@@ -225,15 +221,27 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         }));
         return (
           <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
-            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+            <PieChart margin={{ top: 10, right: isMobile ? 10 : 40, left: isMobile ? 10 : 40, bottom: 10 }}>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                labelLine={true}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius="60%"
-                innerRadius="40%"
+                labelLine={isMobile ? false : { stroke: '#64748b', strokeWidth: 1 }}
+                label={isMobile ? false : ({ name, percent, x, y, textAnchor, fill }) => (
+                  <text 
+                    x={x} 
+                    y={y} 
+                    textAnchor={textAnchor} 
+                    dominantBaseline="central" 
+                    fill={fill}
+                    fontWeight={700}
+                    style={{ fontSize: 'clamp(9px, 2.5vw, 13px)' }}
+                  >
+                    {`${name}: ${(percent * 100).toFixed(0)}%`}
+                  </text>
+                )}
+                outerRadius={isMobile ? "70%" : "60%"}
+                innerRadius={isMobile ? "45%" : "35%"}
                 paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
@@ -250,11 +258,6 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   allowEscapeViewBox={{ x: false, y: false }}
                 />
               )}
-              <Legend 
-                verticalAlign="bottom" 
-                align="center" 
-                content={renderCustomLegend}
-              />
             </PieChart>
           </ResponsiveContainer>
         );
@@ -265,12 +268,20 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-[500px] sm:h-[600px] flex flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
-      {title && <h3 className="text-center font-bold mb-4 sm:mb-6 text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">{title}</h3>}
+    <div className="w-full h-[450px] sm:h-[500px] flex flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all">
+      {title && <h3 className="text-center font-bold mb-[10px] text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">{title}</h3>}
       <div className="flex-1 w-full relative min-h-[1px] min-w-[1px]">
         <div className="absolute inset-0 min-h-[1px] min-w-[1px]">
           {renderChart()}
         </div>
+      </div>
+      <div className="mt-[10px] flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 shrink-0">
+        {legendItems.map((item, index) => (
+          <div key={`item-${index}`} className="flex items-center text-[13px] sm:text-[14px] font-bold" style={{ color: item.color }}>
+            <span className="w-3 h-3 rounded-full mr-1.5 shrink-0" style={{ backgroundColor: item.color }} />
+            <span className="truncate max-w-[150px] sm:max-w-[200px]">{item.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
