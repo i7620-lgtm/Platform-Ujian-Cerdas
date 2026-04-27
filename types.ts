@@ -98,7 +98,6 @@ export interface ExamConfig {
     positions: {
       studentName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
       score: { x: number; y: number; fontSize: number; color: string; visible: boolean };
-      examName: { x: number; y: number; fontSize: number; color: string; visible: boolean };
     };
   };
 }
