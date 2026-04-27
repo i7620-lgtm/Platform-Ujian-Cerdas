@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { XMarkIcon, PhotoIcon, SparklesIcon, AcademicCapIcon } from '../Icons';
-
+  
 interface PositionDef {
   x: number; y: number; fontSize: number; color: string; visible: boolean;
 }
