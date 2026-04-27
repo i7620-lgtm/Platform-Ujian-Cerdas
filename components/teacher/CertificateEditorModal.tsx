@@ -235,11 +235,12 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           {/* Preview Canvas */}
           <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700 flex flex-col min-h-[400px]">
             {current.enabled ? (
-              <div className="flex-1 p-4 lg:p-6 overflow-auto custom-scrollbar border-t dark:border-slate-800 flex items-start justify-start xl:justify-center">
-                <div 
-                  ref={containerRef}
-                  className={`@container relative w-[800px] lg:w-[960px] shrink-0 aspect-[1.414/1] mx-auto shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
-                  onMouseMove={activeItem ? handleDrag : undefined}
+              <div className="flex-1 border-t dark:border-slate-800 overflow-auto custom-scrollbar">
+                <div className="w-fit min-w-full min-h-full p-4 lg:p-6 flex items-center justify-center">
+                  <div 
+                    ref={containerRef}
+                    className={`@container relative w-[800px] lg:w-[960px] shrink-0 aspect-[1.414/1] shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                    onMouseMove={activeItem ? handleDrag : undefined}
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
                 onTouchMove={activeItem ? handleDrag : undefined}
@@ -338,6 +339,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                     </div>
                   );
                 })}
+              </div>
               </div>
               </div>
             ) : (
