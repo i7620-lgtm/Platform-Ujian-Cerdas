@@ -571,29 +571,29 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setTextColor(49, 46, 129); // indigo-900
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(20);
-                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 40, { align: 'center', charSpace: 2 });
+                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 28, { align: 'center', charSpace: 2 });
                                                         
                                                         pdf.setTextColor(100, 116, 139); // slate-500
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(12);
-                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 47, { align: 'center', charSpace: 1 });
+                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 35, { align: 'center', charSpace: 1 });
                                                         
                                                         // Line separator
                                                         pdf.setDrawColor(199, 210, 254); // indigo-200
                                                         pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.25, 55, cw * 0.75, 55);
+                                                        pdf.line(cw * 0.25, 43, cw * 0.75, 43);
 
                                                         pdf.setTextColor(55, 48, 163); // indigo-800
                                                         pdf.setFontSize(36);
                                                         pdf.setFont("helvetica", "bold");
-                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 65, { align: 'center', charSpace: 1 });
+                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 53, { align: 'center', charSpace: 1 });
 
                                                         pdf.setTextColor(71, 85, 105); // slate-600
                                                         pdf.setFont("helvetica", "normal");
                                                         pdf.setFontSize(14);
-                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 88, { align: 'center' });
+                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 70, { align: 'center' });
                                                         
-                                                        pdf.text("telah menyelesaikan evaluasi dan mendapatkan nilai akhir:", cw / 2, 118, { align: 'center' });
+                                                        pdf.text(`telah menyelesaikan evaluasi ${displayExam.config.examType || 'Ujian'} pada mata pelajaran ${displayExam.config.subject || 'Mata Pelajaran'} untuk kelas ${displayExam.config.classLevel || r.student.class || '-'} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
 
                                                         // Motivation/Context Text
                                                         const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
@@ -601,7 +601,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         
                                                         pdf.setFont("times", "italic");
                                                         pdf.setFontSize(12);
-                                                        pdf.text(promoText, cw / 2, 148, { align: 'center', lineHeightFactor: 1.5 });
+                                                        pdf.text(promoText, cw / 2, 140, { align: 'center', lineHeightFactor: 1.5 });
 
                                                         // Signature Line (Centered)
                                                         pdf.setTextColor(51, 65, 85); // slate-700
@@ -637,7 +637,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
                                                         pdf.setFillColor(15, 23, 42);
                                                         pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
-                                                        pdf.setFontSize(10);
+                                                        pdf.setFontSize(12);
                                                         pdf.setFont("courier", "normal");
                                                         pdf.setTextColor(148, 163, 184); // slate-400
                                                         pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
@@ -659,15 +659,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setFont("helvetica", "bold");
                                                         pdf.setFontSize(p.fontSize); 
                                                         pdf.text(`${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
-                                                    }
-
-                                                    // exam
-                                                    if (config.positions.examName.visible) {
-                                                        const p = config.positions.examName;
-                                                        pdf.setTextColor(p.color);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(p.fontSize); 
-                                                        pdf.text(displayExam.config.subject || displayExam.code, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
                                                     }
                                                 }
 
