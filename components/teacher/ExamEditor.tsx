@@ -1229,13 +1229,14 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                  <div className="flex items-start sm:items-center gap-3 z-10 flex-1 min-w-[200px]">
                                      <SparklesIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                                      <div>
-                                         <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200">Sertifikat Kelulusan Otomatis</h5>
+                                         <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">Sertifikat Kelulusan Otomatis {!isPremium && <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1"><SparklesIcon className="w-3 h-3"/> Premium</span>}</h5>
                                          <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-full sm:max-w-xs leading-relaxed mt-0.5">Berikan e-Certificate otomatis untuk siswa. Bisa diunduh secara massal di Dasbor Guru.</p>
                                      </div>
                                  </div>
                                  <button 
-                                     onClick={() => setIsCertificateModalOpen(true)}
-                                     className="z-10 px-4 py-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                                     onClick={() => isPremium && setIsCertificateModalOpen(true)}
+                                     disabled={!isPremium}
+                                     className={`z-10 px-4 py-2 text-xs font-bold whitespace-nowrap rounded-xl transition-all shadow-sm ${isPremium ? 'text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/30 active:scale-95' : 'text-gray-400 bg-gray-50 border border-gray-200 dark:border-slate-700 dark:bg-slate-800/50 cursor-not-allowed'}`}
                                  >
                                      {config.certificateSettings?.enabled ? 'Ubah Desain' : 'Buat Sertifikat'}
                                  </button>
