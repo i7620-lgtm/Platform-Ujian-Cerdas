@@ -1,4 +1,4 @@
- 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { Question, QuestionType, ExamConfig, ChartData } from '../../types';
@@ -1406,6 +1406,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                 subjectPlaceholder={config.subject || 'Mata Pelajaran'}
                 examTypePlaceholder={config.examType || 'Ujian'}
                 classLevelPlaceholder={config.classLevel || '10'}
+                datePlaceholder={config.startDate || config.date || undefined}
             />
         </div>
     );
