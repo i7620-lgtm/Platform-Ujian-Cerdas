@@ -1,4 +1,4 @@
- 
+
 import { supabase } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Exam, Result, Question, TeacherProfile, AccountType, UserProfile, ExamSummary, ExamConfig, ResultStatus } from '../types';
@@ -1677,13 +1677,32 @@ class StorageService {
           console.error("Gemini Error:", e);
           
           // Friendly Error UI for Rate Limits (429)
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          if (errorMsg.includes('429') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
+          const errorMsg = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+          
+          let title = "Layanan Sedang Sibuk";
+          let message = "Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.";
+          let alertTipe = "";
+
+          if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('exhausted') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
+              if (errorMsg.includes('per minute') && errorMsg.includes('requests')) {
+                  title = "Peringatan Tipe 1: Batas Per Menit";
+                  message = "Batas 15 penggunaan per menit telah tercapai pada akun gratis Gemini Flash. Silakan tunggu 1 menit lalu coba lagi.";
+              } else if (errorMsg.includes('per day')) {
+                  title = "Peringatan Tipe 2: Batas Harian";
+                  message = "Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari.";
+              } else if (errorMsg.includes('tokens')) {
+                  title = "Peringatan Tipe 3: Batas Token Teks";
+                  message = "Data analisis terlalu panjang dan melebihi batas (Maks 1 juta token/menit). Kurangi data atau tunggu 1 menit sebelum mencoba lagi.";
+              } else {
+                 title = "Batas Kuota Pemakaian Tercapai";
+                 message = "Batas pemakaian wajar (kuota gratis) Gemini AI (per menit/harian) telah habis. Silahkan mencobanya kembali nanti.";
+              }
+
              return `
                 <div class="p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex flex-col items-center text-center gap-3">
                     <div class="w-12 h-12 bg-rose-100 dark:bg-rose-800 text-rose-500 rounded-full flex items-center justify-center text-xl">⏳</div>
-                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">Layanan Sedang Sibuk</h3>
-                    <p class="text-sm text-rose-600 dark:text-rose-400">Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.</p>
+                    <h3 class="text-lg font-bold text-rose-700 dark:text-rose-300">${title}</h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-400">${message}</p>
                 </div>
              `;
           }
@@ -1863,121 +1882,43 @@ class StorageService {
     }
 
     try {
-        // SECURITY FIX: Recalculate score on server-side (or at least using true DB data before insert)
-        // to prevent client-side manipulation of the score.
-        let calculatedScore = resultPayload.score || 0;
-        let calculatedCorrect = resultPayload.correctAnswers || 0;
-        let calculatedTotal = resultPayload.totalQuestions || 0;
+        // SECURITY FIX: SECURE SERVER-SIDE SCORING VIA RPC
+        // Tries to use Supabase stored function to securely calculate and store results
+        const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
+            p_exam_code: resultPayload.examCode,
+            p_student_id: resultPayload.student.studentId,
+            p_student_name: resultPayload.student.fullName,
+            p_class_name: resultPayload.student.class,
+            p_school_name: resultPayload.student.schoolName || '',
+            p_answers: resultPayload.answers || {},
+            p_status: resultPayload.status || 'in_progress',
+            p_device_info: null,
+            p_location: resultPayload.location || null,
+            p_activity_log: resultPayload.activityLog || [],
+            p_result_id: resultPayload.student.resultId || null
+        });
 
-        try {
-            // Fetch existing result to preserve manual grades
-            let existingAnswers: Record<string, string> = {};
-            let existingStatus: string | undefined;
-            let existingLog: string[] = [];
-            if (resultPayload.student.resultId) {
-                const { data: existingResult } = await supabase.from('results').select('answers, status, activity_log').eq('id', resultPayload.student.resultId).single();
-                if (existingResult) {
-                    if (existingResult.answers) existingAnswers = existingResult.answers as Record<string, string>;
-                    existingStatus = existingResult.status;
-                    if (existingResult.activity_log) existingLog = existingResult.activity_log as string[];
-                }
-            }
-
-            // If the exam was already completed/force_closed by teacher, and this is just an auto-save (in_progress), reject it
-            if ((existingStatus === 'completed' || existingStatus === 'force_closed') && resultPayload.status === 'in_progress') {
-                console.warn("Exam already finished by teacher. Ignoring auto-save.");
-                return { ...resultPayload, status: existingStatus as ResultStatus };
-            }
-
-            // Merge activity logs to preserve teacher's force stop logs
-            const mergedLogs = Array.from(new Set([...existingLog, ...(resultPayload.activityLog || [])]));
-            resultPayload.activityLog = mergedLogs;
-
-            // Merge answers, preserving manual grades
-            const mergedAnswers = { ...resultPayload.answers };
-            Object.keys(existingAnswers).forEach(key => {
-                if (key.startsWith('_grade_')) {
-                    mergedAnswers[key] = existingAnswers[key];
-                }
-            });
-            resultPayload.answers = mergedAnswers;
-
-            const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).single();
-            if (examData) {
-                const exam = examData as Exam;
-                const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, resultPayload.answers || {});
-                calculatedScore = score;
-                calculatedCorrect = correctAnswers;
-                calculatedTotal = totalQuestions;
-            }
-        } catch (err) {
-            console.error("Failed to recalculate score securely", err);
+        if (rpcError) {
+             console.error("RPC calculate_and_submit_exam failed. You must deploy the RPC function in Supabase.", rpcError);
+             throw rpcError;
         }
 
-        let data, error;
-
-        // CRITICAL FIX: If resultId exists, update by Primary Key ID.
-        // This ensures that if a teacher edits student data (changing student_id),
-        // the student's submission still updates the correct record without reverting the identity changes.
-        if (resultPayload.student.resultId) {
-             const { data: updatedData, error: updateError } = await supabase
-                .from('results')
-                .update({
-                    answers: resultPayload.answers || {},
-                    status: resultPayload.status,
-                    activity_log: resultPayload.activityLog || [],
-                    score: calculatedScore,
-                    correct_answers: calculatedCorrect,
-                    total_questions: calculatedTotal,
-                    location: resultPayload.location,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', resultPayload.student.resultId)
-                .select()
-                .single();
-             
-             data = updatedData;
-             error = updateError;
-        } else {
-            // Fallback: Upsert by Composite Key (exam_code, student_id) for initial creation
-            const classNameWithSchool = resultPayload.student.schoolName 
-                ? `${resultPayload.student.schoolName}::${resultPayload.student.class}`
-                : resultPayload.student.class;
-
-            const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
-                exam_code: resultPayload.examCode, 
-                student_id: resultPayload.student.studentId, 
-                student_name: resultPayload.student.fullName,
-                class_name: classNameWithSchool, 
-                answers: resultPayload.answers || {}, 
-                status: resultPayload.status,
-                activity_log: resultPayload.activityLog || [], 
-                score: calculatedScore, 
-                correct_answers: calculatedCorrect,
-                total_questions: calculatedTotal, 
-                location: resultPayload.location, 
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'exam_code,student_id' })
-            .select()
-            .single();
-
-            data = upsertData;
-            error = upsertError;
-        }
-
-        if (error) throw error;
-        
         const completionTime = resultPayload.answers['_duration'] ? parseInt(resultPayload.answers['_duration']) : undefined;
-        
-        return { 
-            ...resultPayload, 
-            id: data?.id,
-            student: { ...resultPayload.student, resultId: data?.id },
-            score: calculatedScore,
-            correctAnswers: calculatedCorrect,
-            totalQuestions: calculatedTotal,
+
+        // Return successfully scored and saved result directly from server response
+        return {
+            ...resultPayload,
+            id: rpcData.id,
+            student: {
+                 ...resultPayload.student,
+                 resultId: rpcData.id
+            },
+            score: rpcData.score,
+            correctAnswers: rpcData.correct_answers,
+            totalQuestions: rpcData.total_questions,
+            status: rpcData.status,
             completionTime: completionTime,
-            isSynced: true 
+            isSynced: true
         };
     } catch (error) {
         console.error("CRITICAL DB ERROR:", error);

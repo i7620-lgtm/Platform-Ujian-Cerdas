@@ -222,30 +222,30 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
           </div>
         </div>
 
-        <div className="p-6 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex justify-between gap-3">
+        <div className="p-4 sm:p-6 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row justify-between gap-3">
           {onDelete ? (
             <button
               onClick={() => {
                 onDelete();
                 onClose();
               }}
-              className="px-6 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
             >
               Hapus Diagram
             </button>
           ) : (
-            <div></div>
+            <div className="hidden sm:block"></div>
           )}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-6 py-2 border dark:border-slate-700 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium dark:text-slate-300"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 border dark:border-slate-700 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium dark:text-slate-300"
             >
               Batal
             </button>
             <button
               onClick={handleSave}
-              className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-lg shadow-blue-200 dark:shadow-blue-900/20"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-lg shadow-blue-200 dark:shadow-blue-900/20"
             >
               Simpan Diagram
             </button>
