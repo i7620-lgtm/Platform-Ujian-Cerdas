@@ -31,7 +31,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
     positions: {
       studentName: { x: 50, y: 50, fontSize: 50, color: '#1e3a8a', visible: true },
       score: { x: 50, y: 64, fontSize: 28, color: '#ef4444', visible: true },
-      examName: { x: 50, y: 36, fontSize: 18, color: '#475569', visible: true }
+      examName: { x: 50, y: 34, fontSize: 18, color: '#475569', visible: true }
     }
   });
 
@@ -295,28 +295,28 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       {/* Header */}
                       <div className="mt-[5%] flex flex-col items-center relative z-10">
                         <div className="flex items-center gap-2 mb-1">
-                          <AcademicCapIcon className="w-[1.8cqw] h-[1.8cqw] text-indigo-600" />
-                          <h2 className="text-[1.4cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
+                          <AcademicCapIcon className="w-[2cqw] h-[2cqw] text-indigo-600" />
+                          <h2 className="text-[1.8cqw] font-bold text-indigo-900 tracking-wider">PLATFORM UJIAN CERDAS</h2>
                         </div>
-                        <h3 className="text-[0.9cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
+                        <h3 className="text-[1.2cqw] font-medium text-slate-500 tracking-widest mt-1 opacity-80 uppercase">Laporan Hasil Evaluasi Pembelajaran</h3>
                         
-                        <div className="w-[50%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[2%]"></div>
+                        <div className="w-[50%] h-[2px] bg-gradient-to-r from-transparent via-indigo-200 to-transparent mt-[1.5%]"></div>
                         
-                        <h1 className="text-[3cqw] font-bold text-indigo-800 mt-[2%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
+                        <h1 className="text-[3.5cqw] font-bold text-indigo-800 mt-[1.5%] tracking-wide uppercase drop-shadow-sm">Sertifikat Hasil Ujian</h1>
                       </div>
                       
                       {/* Subtitles & Descriptions */}
                       <div className="absolute top-[42%] w-full text-center z-10">
-                         <p className="text-[1.1cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
+                         <p className="text-[1.2cqw] font-medium text-slate-600">Dokumen ini mengkonfirmasi bahwa siswa berikut:</p>
                       </div>
                       
                       <div className="absolute top-[56%] w-full text-center z-10">
-                         <p className="text-[1.1cqw] font-medium text-slate-600">telah menyelesaikan evaluasi dan mendapatkan nilai akhir:</p>
+                         <p className="text-[1.2cqw] font-medium text-slate-600">telah menyelesaikan evaluasi dan mendapatkan nilai akhir:</p>
                       </div>
 
                       {/* Motivation Text */}
                       <div className="absolute top-[72%] w-full px-[15%] text-center z-10">
-                        <p className="text-[0.9cqw] italic text-slate-600 leading-relaxed font-serif">
+                        <p className="text-[1.2cqw] italic text-slate-600 leading-relaxed font-serif">
                           "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
                         </p>
                       </div>
@@ -324,10 +324,10 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                       {/* Signatures & Barcode */}
                       <div className="absolute bottom-[6%] w-full flex items-end justify-center px-[12%] gap-[20%]">
                         <div className="text-center">
-                          <p className="text-[1cqw] font-medium text-slate-700">Instansi Penyelenggara</p>
+                          <p className="text-[1.2cqw] font-medium text-slate-700">Instansi Penyelenggara</p>
                           <div className="mt-[3.5cqw] w-[18cqw] border-b-2 border-slate-300"></div>
-                          <p className="text-[1cqw] mt-1.5 font-bold text-slate-800">Administrator / Guru</p>
-                          <p className="text-[0.8cqw] text-slate-500">Platform Ujian Cerdas</p>
+                          <p className="text-[1.2cqw] mt-1.5 font-bold text-slate-800">Administrator / Guru</p>
+                          <p className="text-[1.2cqw] text-slate-500">Platform Ujian Cerdas</p>
                         </div>
                         
                         <div className="w-[10cqw] h-[10cqw] bg-white border border-slate-200 shadow-sm p-[0.8cqw] rounded-lg flex flex-col items-center justify-center">
@@ -339,7 +339,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                               <div className="bg-white col-span-2 row-span-2"></div><div className="bg-white"></div><div className="bg-slate-900 col-span-2 row-span-2"></div>
                               <div className="bg-slate-900"></div><div className="bg-white"></div>
                            </div>
-                           <span className="text-[0.5cqw] font-mono text-slate-400 mt-1">VERIFY-0X98A</span>
+                           <span className="text-[1cqw] font-mono text-slate-400 mt-1">VERIFY-0X98A</span>
                         </div>
                       </div>
                     </div>
