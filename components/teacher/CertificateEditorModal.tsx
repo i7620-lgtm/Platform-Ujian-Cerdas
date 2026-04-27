@@ -38,7 +38,27 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
   const [current, setCurrent] = useState<CertificateSettings>(settings || getDefaultSettings());
   const [activeItem, setActiveItem] = useState<keyof CertificateSettings['positions'] | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [bgImageSize, setBgImageSize] = useState({ width: 0, height: 0 });
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (!isOpen || !wrapperRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Original size is 1000x707
+        // We add some padding ratio to scale
+        const scaleX = width / 1000;
+        const scaleY = height / 707;
+        setScale(Math.min(scaleX, scaleY, 1));
+      }
+    });
+
+    observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -235,23 +255,34 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           {/* Preview Canvas */}
           <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 rounded-xl relative overflow-hidden ring-1 ring-inset ring-slate-200 dark:ring-slate-700 flex flex-col min-h-[400px]">
             {current.enabled ? (
-              <div className="flex-1 border-t dark:border-slate-800 overflow-auto custom-scrollbar">
-                <div className="w-fit min-w-full min-h-full p-4 lg:p-6 flex items-center justify-center">
+              <div 
+                ref={wrapperRef}
+                className="flex-1 border-t dark:border-slate-800 overflow-hidden flex items-center justify-center p-4 lg:p-6"
+              >
+                <div 
+                  className="flex items-center justify-center shrink-0"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'center center',
+                    width: '1000px',
+                    height: '707px',
+                  }}
+                >
                   <div 
                     ref={containerRef}
-                    className={`@container relative w-[600px] md:w-[800px] 2xl:w-[1000px] shrink-0 aspect-[1.414/1] shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[8px] md:border-[12px] 2xl:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                    className={`@container relative w-full h-full shrink-0 shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
                     onMouseMove={activeItem ? handleDrag : undefined}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-                onTouchMove={activeItem ? handleDrag : undefined}
-                onTouchEnd={handleDragEnd}
-                style={{
-                  containerType: 'inline-size',
-                  backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                    onTouchMove={activeItem ? handleDrag : undefined}
+                    onTouchEnd={handleDragEnd}
+                    style={{
+                      containerType: 'inline-size',
+                      backgroundImage: current.backgroundUrl ? `url(${current.backgroundUrl})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  >
                 {!current.backgroundUrl && (
                   <div className="absolute inset-0 bg-white overflow-hidden pointer-events-none p-4">
                     <div className="w-full h-full border-[6px] border-indigo-900 relative bg-slate-50">
