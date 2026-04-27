@@ -127,7 +127,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-[95vw] xl:max-w-[1400px] max-h-[95vh] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -140,9 +140,9 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col xl:flex-row gap-6">
           {/* Controls Sidebar */}
-          <div className="w-full lg:w-1/3 space-y-6 shrink-0">
+          <div className="w-full xl:w-80 space-y-6 shrink-0">
             <label className="flex items-center gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl cursor-pointer">
               <input 
                 type="checkbox" 
@@ -239,7 +239,7 @@ export const CertificateEditorModal: React.FC<Props> = ({ isOpen, onClose, setti
                 <div className="w-fit min-w-full min-h-full p-4 lg:p-6 flex items-center justify-center">
                   <div 
                     ref={containerRef}
-                    className={`@container relative w-[800px] lg:w-[960px] shrink-0 aspect-[1.414/1] shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[12px] lg:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
+                    className={`@container relative w-[600px] md:w-[800px] 2xl:w-[1000px] shrink-0 aspect-[1.414/1] shadow-2xl bg-white select-none ${!current.backgroundUrl ? 'border-[8px] md:border-[12px] 2xl:border-[16px] border-double border-slate-200 dark:border-slate-600' : ''}`}
                     onMouseMove={activeItem ? handleDrag : undefined}
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
