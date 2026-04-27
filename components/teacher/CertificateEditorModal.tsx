@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { XMarkIcon, PhotoIcon, SparklesIcon, AcademicCapIcon } from '../Icons';
-  
+
 interface PositionDef {
   x: number; y: number; fontSize: number; color: string; visible: boolean;
 }
@@ -23,6 +23,7 @@ interface Props {
   subjectPlaceholder?: string;
   examTypePlaceholder?: string;
   classLevelPlaceholder?: string;
+  datePlaceholder?: string;
 }
 
 export const CertificateEditorModal: React.FC<Props> = ({ 
@@ -32,7 +33,8 @@ export const CertificateEditorModal: React.FC<Props> = ({
   onSave, 
   subjectPlaceholder = 'Matematika',
   examTypePlaceholder = 'Ujian Akhir Semester',
-  classLevelPlaceholder = 'Semester 1'
+  classLevelPlaceholder = 'Semester 1',
+  datePlaceholder = new Date().toISOString()
 }) => {
   const getDefaultSettings = (): CertificateSettings => ({
     enabled: true,
@@ -319,13 +321,20 @@ export const CertificateEditorModal: React.FC<Props> = ({
                       </div>
                       
                       <div className="absolute top-[49%] w-full px-[5%] text-center z-10">
-                         <p className="text-[1.2cqw] font-medium text-slate-600">telah menyelesaikan evaluasi {examTypePlaceholder} pada mata pelajaran {subjectPlaceholder} untuk kelas {classLevelPlaceholder} dan mendapatkan nilai akhir:</p>
+                         <p className="text-[1.2cqw] font-medium text-slate-600">
+                           telah menyelesaikan evaluasi {examTypePlaceholder} untuk mata pelajaran {subjectPlaceholder} kelas {classLevelPlaceholder} pada {(() => {
+                             const d = new Date(datePlaceholder);
+                             const day = d.toLocaleDateString('id-ID', { weekday: 'long' });
+                             const date = d.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+                             return `${day}, ${date}`;
+                           })()} dan mendapatkan nilai akhir:
+                         </p>
                       </div>
 
                       {/* Motivation Text */}
                       <div className="absolute top-[68%] w-full px-[15%] text-center z-10">
                         <p className="text-[1.2cqw] italic text-slate-600 leading-relaxed font-serif">
-                          "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi pada {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
+                          "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah dalam menyelesaikan evaluasi. Semoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."
                         </p>
                       </div>
                       
