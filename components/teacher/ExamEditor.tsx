@@ -1401,9 +1401,11 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             <CertificateEditorModal 
                 isOpen={isCertificateModalOpen}
                 onClose={() => setIsCertificateModalOpen(false)}
-                settings={config.certificateSettings}
+                settings={config.certificateSettings as any}
                 onSave={(newSettings) => setConfig(prev => ({ ...prev, certificateSettings: newSettings }))}
-                examNamePlaceholder={config.subject || undefined}
+                subjectPlaceholder={config.subject || 'Mata Pelajaran'}
+                examTypePlaceholder={config.examType || 'Ujian'}
+                classLevelPlaceholder={config.classLevel || '10'}
             />
         </div>
     );
