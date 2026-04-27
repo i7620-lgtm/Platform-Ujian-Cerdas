@@ -506,6 +506,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                 {displayExam.config.certificateSettings?.enabled && (
                                     <button 
                                         onClick={async () => {
+                                            if (!isPremium) {
+                                                alert("Mencetak sertifikat adalah fitur Premium. Hubungi Super Admin untuk meningkatkan akun Anda.");
+                                                return;
+                                            }
                                             const completedStudents = localResults.filter(r => r.status === 'completed' || r.status === 'force_closed');
                                             if (completedStudents.length === 0) {
                                                 alert("Belum ada siswa yang selesai.");
@@ -673,10 +677,11 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                 alert("Terjadi kesalahan saat memproses PDF.");
                                             }
                                         }}
-                                        className="p-1.5 sm:px-3 sm:py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-amber-100 dark:border-amber-800"
-                                        title="Unduh Sertifikat"
+                                        className={`p-1.5 sm:px-3 sm:py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border ${isPremium ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-100 dark:border-amber-800' : 'bg-gray-50 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 text-gray-400 opacity-70 cursor-not-allowed'}`}
+                                        title={isPremium ? "Unduh Sertifikat" : "Fitur Premium"}
+                                        disabled={!isPremium}
                                     >
-                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span>
+                                        <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span> {!isPremium && <span className="hidden sm:inline bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-1 py-0.5 rounded-[4px] text-[8px] leading-none">PREMIUM</span>}
                                     </button>
                                 )}
 
