@@ -1596,3 +1596,173 @@ export const cleanupQuestionContent = (q: any): any => {
     }
     return qClean;
 };
+
+export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
+    try {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("Pop-up blocker mencegah pembukaan tab baru. Mohon izinkan pop-up untuk situs ini.");
+            return;
+        }
+
+        // Get all stylesheets from current document to ensure KaTeX and Tailwind are applied
+        const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(el => el.outerHTML)
+            .join('\n');
+
+        let htmlContent = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + ' - ' : ''}${exam.config.subject || 'Ujian'} - ${exam.code}</title>
+            ${styleTags}
+            <style>
+                @page { margin: 20mm; }
+                body { font-family: 'Inter', sans-serif; background: white; color: black; padding: 0; margin: 0; }
+                .print-container { max-width: 100%; margin: 0 auto; }
+                .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid black; padding-bottom: 10px; }
+                .header h1 { margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase; font-weight: 800; }
+                .meta-info { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
+                .question-item { margin-bottom: 24px; page-break-inside: avoid; }
+                .question-text { font-size: 14px; margin-bottom: 10px; }
+                .options-container { margin-left: 20px; font-size: 14px; }
+                .option-item { margin-bottom: 8px; }
+                .answer-key { page-break-before: always; }
+                img { max-width: 100%; height: auto; object-fit: contain; }
+                table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+                table, th, td { border: 1px solid #ddd; padding: 8px; }
+                .prose { max-width: none !important; }
+            </style>
+        </head>
+        <body class="bg-white text-black p-8">
+            <div class="print-container">
+                <div class="header">
+                    <h1>NASKAH SOAL UJIAN</h1>
+                    <div class="meta-info">
+                        <div><strong>Mata Pelajaran:</strong> ${exam.config.subject || '-'}</div>
+                        <div><strong>Kelas:</strong> ${exam.config.classLevel || '-'}</div>
+                        <div><strong>Jenis Ujian:</strong> ${exam.config.examType || '-'}</div>
+                    </div>
+                </div>
+                
+                <div class="questions-list">
+        `;
+
+        const scorableQuestions = exam.questions.filter(q => q.questionType !== 'INFO');
+        
+        scorableQuestions.forEach((q, index) => {
+            htmlContent += `<div class="question-item">`;
+            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${q.questionText}</div></div>`;
+            
+            htmlContent += `<div class="options-container">`;
+            if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                if (q.options) {
+                    q.options.forEach((opt, optIdx) => {
+                        htmlContent += `<div class="option-item flex gap-3">
+                            <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
+                            <div class="prose prose-sm max-w-none text-black flex-1">${opt}</div>
+                        </div>`;
+                    });
+                }
+            } else if (q.questionType === 'TRUE_FALSE') {
+                if (q.trueFalseRows) {
+                    htmlContent += `<table class="w-full mt-2 mb-4 border border-slate-300">
+                        <thead>
+                            <tr class="bg-slate-100">
+                                <th class="p-2 border border-slate-300 text-left">Pernyataan</th>
+                                <th class="p-2 border border-slate-300 w-24 text-center">Benar</th>
+                                <th class="p-2 border border-slate-300 w-24 text-center">Salah</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                    q.trueFalseRows.forEach((row) => {
+                        htmlContent += `<tr>
+                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${row.text}</div></td>
+                            <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
+                            <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
+                        </tr>`;
+                    });
+                    htmlContent += `</tbody></table>`;
+                }
+            } else if (q.questionType === 'MATCHING') {
+                if (q.matchingPairs) {
+                    htmlContent += `<div class="mt-2 space-y-4">`;
+                    q.matchingPairs.forEach((pair) => {
+                        htmlContent += `<div class="flex items-center gap-4">
+                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${pair.left}</div></div>
+                            <div class="font-bold mx-2">......</div>
+                            <div class="flex-1 border-b border-slate-400"></div>
+                        </div>`;
+                    });
+                    htmlContent += `</div>`;
+                }
+            } else if (q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') {
+                htmlContent += `<div class="mt-4 mb-4">
+                    <strong>Jawaban:</strong>
+                    <div class="w-full h-32 border border-slate-300 rounded-lg mt-2"></div>
+                </div>`;
+            }
+            htmlContent += `</div></div>`; // End options-container and question-item
+        });
+
+        // Answer Key
+        htmlContent += `
+                </div>
+                
+                <div class="answer-key">
+                    <div class="header" style="margin-top: 40px;">
+                        <h1>KUNCI JAWABAN</h1>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-8 gap-y-6 text-sm mt-6">
+        `;
+
+        scorableQuestions.forEach((q, index) => {
+            let ansStr = "";
+            if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                ansStr = parseList(q.correctAnswer || '').map(s => String(s)).join(", ");
+            } else if (q.questionType === 'TRUE_FALSE') {
+                if (q.trueFalseRows) {
+                    ansStr = q.trueFalseRows.map(r => `${r.text}: <strong>${r.answer ? 'Benar' : 'Salah'}</strong>`).join("<br/>");
+                }
+            } else if (q.questionType === 'MATCHING') {
+                if (q.matchingPairs) {
+                    ansStr = q.matchingPairs.map(p => `${p.left} &rarr; ${p.right}`).join("<br/>");
+                }
+            } else if (q.correctAnswer) {
+                if (Array.isArray(q.correctAnswer)) {
+                    ansStr = q.correctAnswer.map(a => String(a)).join(", ");
+                } else {
+                    ansStr = String(q.correctAnswer);
+                }
+            } else {
+                ansStr = "<em>Koreksi Manual</em>";
+            }
+            
+            htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
+        });
+
+        htmlContent += `
+                    </div>
+                </div>
+            </div>
+            <script>
+                // Wait for images and fonts to load before printing
+                window.onload = () => {
+                    setTimeout(() => {
+                        window.print();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+        `;
+
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    } catch (e) {
+        console.error("Gagal membuat naskah soal", e);
+        alert("Terjadi kesalahan saat membuat dokumen soal.");
+    }
+};

@@ -3,10 +3,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { Exam, Result, Question } from '../../../types';
 import { storageService } from '../../../services/storage';
-import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch } from '../examUtils';
+    import { calculateAggregateStats, analyzeStudentPerformance, compressImage, parseList, analyzeQuestionTypePerformance, analyzeClassPerformance, isAnswerMatch, generateQuestionsPDF } from '../examUtils';
 import { 
     CloudArrowUpIcon, DocumentDuplicateIcon, TrashIcon, ExclamationTriangleIcon, ChartBarIcon, PrinterIcon,
-    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon, ClockIcon 
+    CheckCircleIcon, XMarkIcon, UserIcon, ListBulletIcon, TableCellsIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon, ClockIcon, FilePdfIcon
 } from '../../Icons';
 import { StatWidget, QuestionAnalysisItem } from './SharedComponents';
 import * as XLSX from 'xlsx';
@@ -734,6 +734,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         XLSX.writeFile(wb, `Data_Mentah_${exam.config.subject}_${exam.code}.xlsx`);
     };
 
+    const handleDownloadQuestionsPDF = async () => {
+        if (!archiveData) return;
+        await generateQuestionsPDF(archiveData.exam);
+    };
+
     const handlePrint = () => {
         const isDark = document.documentElement.classList.contains('dark');
         if (isDark) {
@@ -1167,6 +1172,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                         )}
 
                         <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
+                        <button onClick={handleDownloadQuestionsPDF} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><FilePdfIcon className="w-4 h-4"/> PDF Soal</button>
                         <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
                         <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>

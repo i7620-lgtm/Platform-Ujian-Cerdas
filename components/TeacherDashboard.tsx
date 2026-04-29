@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; 
 import { createPortal } from 'react-dom';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -109,6 +109,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             onRefreshResults();
         }
     }, [view, onRefreshExams, onRefreshResults]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if ((view === 'UPLOAD' && questions.length > 0) || isEditModalOpen) {
+                const message = 'Anda memiliki pekerjaan yang belum disimpan. Klik "Simpan Draf" atau "Perbarui Draf" agar pekerjaan Anda tidak hilang.';
+                e.preventDefault();
+                e.returnValue = message;
+                return message;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [view, questions.length, isEditModalOpen]);
 
     if (isMainGuideModalOpen) {
         return <TutorialPage onBack={() => setIsMainGuideModalOpen(false)} />;
