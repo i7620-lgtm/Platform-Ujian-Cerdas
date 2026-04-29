@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
-import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon } from '../Icons';
+import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon, FilePdfIcon } from '../Icons';
 import { storageService } from '../../services/storage';
 import { supabase } from '../../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { RemainingTime, QuestionAnalysisItem, StatWidget } from './DashboardViews';
-import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize } from './examUtils';
+import { calculateAggregateStats, parseList, analyzeQuestionTypePerformance, normalize, generateQuestionsPDF } from './examUtils';
 
 // --- OngoingExamModal ---
 interface OngoingExamModalProps { exam: Exam | null; teacherProfile?: TeacherProfile; onClose: () => void; isReadOnly?: boolean; isPremium?: boolean; }
@@ -520,7 +520,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             alert(`Mempersiapkan ${completedStudents.length} sertifikat. Harap tunggu...`);
 
                                             try {
-                                                const { jsPDF } = await import('jspdf');
+                                                const { default: jsPDF } = await import('jspdf');
                                                 const pdf = new jsPDF({
                                                     orientation: 'landscape',
                                                     unit: 'mm',
@@ -593,11 +593,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                                         pdf.setFontSize(14);
                                                         pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 70, { align: 'center' });
                                                         
-                                                        pdf.text(`telah menyelesaikan evaluasi ${displayExam.config.examType || 'Ujian'} pada mata pelajaran ${displayExam.config.subject || 'Mata Pelajaran'} untuk kelas ${displayExam.config.classLevel || r.student.class || '-'} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
+                                                        const examDateStr = displayExam.config.startDate || displayExam.config.date || displayExam.createdAt || new Date().toISOString();
+                                                        const examDateObj = new Date(examDateStr);
+                                                        const examDay = examDateObj.toLocaleDateString('id-ID', { weekday: 'long' });
+                                                        const examDateFormatted = examDateObj.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+                                                        
+                                                        pdf.text(`telah menyelesaikan evaluasi ${displayExam.config.examType || 'Ujian'} untuk mata pelajaran ${displayExam.config.subject || 'Mata Pelajaran'} kelas ${displayExam.config.classLevel || r.student.class || '-'} pada ${examDay}, ${examDateFormatted} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
 
                                                         // Motivation/Context Text
-                                                        const docDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-                                                        const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi pada ${docDate}.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
+                                                        const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
                                                         
                                                         pdf.setFont("times", "italic");
                                                         pdf.setFontSize(12);
@@ -675,6 +679,17 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                         <SparklesIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Sertifikat</span> {!isPremium && <span className="hidden sm:inline bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-1 py-0.5 rounded-[4px] text-[8px] leading-none">PREMIUM</span>}
                                     </button>
                                 )}
+
+                                {/* PDF Soal */}
+                                <button 
+                                    onClick={async () => {
+                                        if (displayExam) {
+                                            await generateQuestionsPDF(displayExam);
+                                        }
+                                    }}
+                                    className="p-1.5 sm:px-3 sm:py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-slate-200 dark:border-slate-600" title="Unduh Soal PDF">
+                                    <FilePdfIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> <span className="hidden sm:inline">Soal PDF</span>
+                                </button>
 
                                 {/* Cara Pakai */}
                                 <button onClick={() => setIsGuideModalOpen(true)} className="p-1.5 sm:px-3 sm:py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm border border-blue-100 dark:border-blue-800" title="Cara Pakai">
