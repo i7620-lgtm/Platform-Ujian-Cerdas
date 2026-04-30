@@ -767,10 +767,10 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                              <>
                                                  <button 
                                                      type="button" 
-                                                     onClick={(e) => { e.stopPropagation(); isPremium && handleGenerateSingleQuestion(q); }} 
-                                                     disabled={isGeneratingId === q.id || !isPremium}
-                                                     className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 ${!isPremium ? 'bg-gray-50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-700 cursor-not-allowed' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-200 dark:border-amber-800'}`} 
-                                                     title={isPremium ? "Buat dengan AI" : "Fitur Premium"}
+                                                     onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
+                                                     disabled={isGeneratingId === q.id}
+                                                     className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800`} 
+                                                     title={"Buat dengan AI"}
                                                  >
                                                      {isGeneratingId === q.id ? (
                                                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
