@@ -770,7 +770,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
                                                      onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
                                                      disabled={isGeneratingId === q.id}
                                                      className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800`} 
-                                                     title={"Buat dengan AI (Freemium)"}
+                                                     title={"Buat dengan AI"}
                                                  >
                                                      {isGeneratingId === q.id ? (
                                                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
