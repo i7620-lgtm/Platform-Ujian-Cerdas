@@ -54,10 +54,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
   const prompt = `
     Buatlah ${config.count} soal ${config.type} untuk mata pelajaran/materi: ${config.subject}.
-    Tingkat kognitif (Bloom Revisi): ${config.difficulty}.
-    Kisi-kisi materi: ${config.blueprint}.
+    Tingkat kognitif (Bloom Revisi) secara umum: ${config.difficulty}.
+    Kisi-kisi / Indikator Soal: ${config.blueprint}.
     
-    PENTING: Pastikan urutan soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal.
+    PENGATURAN TINGKAT KESULITAN & INDIKATOR:
+    Anda WAJIB membaca dan menerapkan deskripsi spesifik mengenai tingkat kesulitan, konteks, dan indikator soal yang dijabarkan dalam "Kisi-kisi / Indikator Soal" di atas.
+    JANGAN hanya mengandalkan label "Tingkat kognitif", melainkan jadikan "Kisi-kisi / Indikator Soal" sebagai panduan UTAMA tingkat kesulitan teknis ujian ini. Jika kisi-kisi meminta soal yang panjang, mengecoh, analisis mendalam, penalaran matematis, atau HOTS berbasis kasus, pastikan soal yang dibuat benar-benar mencerminkan tingkat kerumitan tersebut.
+
+    PENTING: Pastikan urutan dan jenis soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal secara sembarangan.
   `;
 
   const chartDataSchema = {
