@@ -1605,6 +1605,58 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             return;
         }
 
+        let chartCounter = 0;
+        let chartScripts = '';
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const injectChart = (chartData: any, html: string): string => {
+            let processedHtml = html;
+            if (chartData) {
+                chartCounter++;
+                const canvasId = `pdf-chart-${chartCounter}`;
+                const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
+                
+                if (processedHtml.includes('chart-placeholder')) {
+                    processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
+                } else {
+                    processedHtml += canvasHtml;
+                }
+                
+                const typedData = chartData as any;
+                const labelsStr = JSON.stringify(typedData.labels || []);
+                const datasetsStr = JSON.stringify(typedData.datasets?.map((ds: any, idx: number) => {
+                    const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+                    const color = colors[idx % colors.length];
+                    return {
+                        label: ds.label,
+                        data: ds.data,
+                        backgroundColor: ds.backgroundColor || (typedData.type === 'pie' ? colors : color),
+                        borderColor: ds.borderColor || color,
+                        borderWidth: 1
+                    };
+                }) || []);
+
+                chartScripts += `
+                    new Chart(document.getElementById("${canvasId}"), {
+                        type: "${typedData.type}",
+                        data: {
+                            labels: ${labelsStr},
+                            datasets: ${datasetsStr}
+                        },
+                        options: {
+                            responsive: true,
+                            animation: false,
+                            plugins: {
+                                title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} }
+                            }
+                        }
+                    });
+                `;
+            }
+            processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, '');
+            return processedHtml;
+        };
+
         // Get all stylesheets from current document to ensure KaTeX and Tailwind are applied
         const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
             .map(el => el.outerHTML)
@@ -1616,10 +1668,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
         <head>
             <meta charset="UTF-8">
             <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + ' - ' : ''}${exam.config.subject || 'Ujian'} - ${exam.code}</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             ${styleTags}
             <style>
                 @page { margin: 20mm; }
-                body { font-family: 'Inter', sans-serif; background: white; color: black; padding: 0; margin: 0; }
+                body { font-family: 'Inter', 'Segoe UI', 'Segoe UI Symbol', 'Noto Sans', 'Arial Unicode MS', sans-serif; background: white; color: black; padding: 0; margin: 0; }
                 .print-container { max-width: 100%; margin: 0 auto; }
                 .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid black; padding-bottom: 10px; }
                 .header h1 { margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase; font-weight: 800; }
@@ -1629,6 +1682,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .options-container { margin-left: 20px; font-size: 14px; }
                 .option-item { margin-bottom: 8px; }
                 .answer-key { page-break-before: always; }
+                .chart-wrapper { max-width: 500px; margin: 15px auto; page-break-inside: avoid; }
                 img { max-width: 100%; height: auto; object-fit: contain; }
                 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
                 table, th, td { border: 1px solid #ddd; padding: 8px; }
@@ -1653,15 +1707,23 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
         
         scorableQuestions.forEach((q, index) => {
             htmlContent += `<div class="question-item">`;
-            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${q.questionText}</div></div>`;
+            
+            let questionHtml = q.questionText || '';
+            questionHtml = injectChart(q.chartData, questionHtml);
+            
+            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
             
             htmlContent += `<div class="options-container">`;
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                 if (q.options) {
                     q.options.forEach((opt, optIdx) => {
+                        let optHtml = opt;
+                        if (q.optionCharts && q.optionCharts[optIdx]) {
+                            optHtml = injectChart(q.optionCharts[optIdx], optHtml);
+                        }
                         htmlContent += `<div class="option-item flex gap-3">
                             <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
-                            <div class="prose prose-sm max-w-none text-black flex-1">${opt}</div>
+                            <div class="prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
                         </div>`;
                     });
                 }
@@ -1677,8 +1739,12 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         </thead>
                         <tbody>`;
                     q.trueFalseRows.forEach((row) => {
+                        let rowHtml = row.text;
+                        if (row.chartData) {
+                             rowHtml = injectChart(row.chartData, rowHtml);
+                        }
                         htmlContent += `<tr>
-                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${row.text}</div></td>
+                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${rowHtml}</div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                         </tr>`;
@@ -1689,8 +1755,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 if (q.matchingPairs) {
                     htmlContent += `<div class="mt-2 space-y-4">`;
                     q.matchingPairs.forEach((pair) => {
+                        let leftHtml = pair.left;
+                        if (pair.leftChart) leftHtml = injectChart(pair.leftChart, leftHtml);
+                        
                         htmlContent += `<div class="flex items-center gap-4">
-                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${pair.left}</div></div>
+                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${leftHtml}</div></div>
                             <div class="font-bold mx-2">......</div>
                             <div class="flex-1 border-b border-slate-400"></div>
                         </div>`;
@@ -1739,6 +1808,10 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 ansStr = "<em>Koreksi Manual</em>";
             }
             
+            if (q.correctAnswerChart) {
+                ansStr = injectChart(q.correctAnswerChart, ansStr);
+            }
+            
             htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
         });
 
@@ -1746,6 +1819,10 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     </div>
                 </div>
             </div>
+            <script>
+                // Initialize charts
+                ${chartScripts}
+            </script>
             <script>
                 // Wait for images and fonts to load before printing
                 window.onload = () => {
