@@ -1921,7 +1921,7 @@ class StorageService {
             isSynced: true
         };
     } catch (error) {
-        console.error("CRITICAL DB ERROR:", error);
+        console.error("CRITICAL DB ERROR / RPC FAILED:", error);
         
         const errObj = error as Record<string, unknown>;
         const isNetworkError = !errObj.code && errObj.message === 'Failed to fetch'; 
@@ -1930,8 +1930,72 @@ class StorageService {
             console.warn("Network glitch, adding to queue...");
             this.addToQueue(resultPayload);
             return { ...resultPayload, isSynced: false };
-        } else {
-             throw new Error("Gagal menyimpan ke server: " + (errObj.message || "Izin database ditolak (RLS)."));
+        }
+        
+        // --- FALLBACK TO CLIENT-SIDE UPSERT IF RPC FAILS ---
+        console.warn("Falling back to client-side insert/update...");
+        try {
+             // Let's do the standard client-side calculation if we have to.
+             // We'll trust the payload's score, or just pass what we have.
+             const student = resultPayload.student;
+             const classNameWithSchool = student.schoolName 
+                 ? `${student.schoolName}::${student.class}`
+                 : student.class;
+             
+             let finalError;
+             let newId = student.resultId;
+             
+             if (student.resultId) {
+                 const { error: updateError } = await supabase
+                     .from('results')
+                     .update({ 
+                         answers: resultPayload.answers || {}, 
+                         status: resultPayload.status || 'in_progress',
+                         activity_log: resultPayload.activityLog || [], 
+                         score: resultPayload.score || 0, 
+                         correct_answers: resultPayload.correctAnswers || 0,
+                         total_questions: resultPayload.totalQuestions || 0, 
+                         location: resultPayload.location || null, 
+                         updated_at: new Date().toISOString()
+                     })
+                     .eq('id', student.resultId);
+                 finalError = updateError;
+             } else {
+                 const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
+                    exam_code: resultPayload.examCode, 
+                    student_id: student.studentId, 
+                    student_name: student.fullName,
+                    class_name: classNameWithSchool, 
+                    answers: resultPayload.answers || {}, 
+                    status: resultPayload.status || 'in_progress',
+                    activity_log: resultPayload.activityLog || [], 
+                    score: resultPayload.score || 0, 
+                    correct_answers: resultPayload.correctAnswers || 0,
+                    total_questions: resultPayload.totalQuestions || 0, 
+                    location: resultPayload.location || null, 
+                    updated_at: new Date().toISOString()
+                 }, { onConflict: 'exam_code,student_id' }).select('id').single();
+                 
+                 finalError = upsertError;
+                 if (upsertData) newId = upsertData.id;
+             }
+             
+             if (finalError) throw finalError;
+             
+             // Successfully submitted using fallback
+             return {
+                 ...resultPayload,
+                 id: newId ? Number(newId) : undefined,
+                 student: {
+                     ...resultPayload.student,
+                     resultId: newId ? Number(newId) : undefined
+                 },
+                 isSynced: true
+             };
+        } catch (fallbackError) {
+             console.error("Fallback UPSERT also failed:", fallbackError);
+             const fallbackErrObj = fallbackError as Record<string, unknown>;
+             throw new Error("Gagal menyimpan ke server: " + (fallbackErrObj.message || errObj.message || "Izin database ditolak (RLS)."));
         }
     }
   }
