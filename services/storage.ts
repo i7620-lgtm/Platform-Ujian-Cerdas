@@ -1905,6 +1905,25 @@ class StorageService {
 
         const completionTime = resultPayload.answers['_duration'] ? parseInt(resultPayload.answers['_duration']) : undefined;
 
+        // VERIFY SCORE: If the server's score differs significantly from the client's payload, 
+        // the RPC might be outdated (e.g. failing on MATCHING, TRUE_FALSE, or markdown math).
+        // Since we know the client-side calculates newer question formats accurately, we override if there is a discrepancy.
+        let finalScore = rpcData.score;
+        let finalCorrect = rpcData.correct_answers;
+        
+        if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
+             console.warn(`RPC Score (${finalScore}) differs from Client Score (${resultPayload.score}). Overriding with client score to support new question formats.`);
+             finalScore = resultPayload.score;
+             finalCorrect = resultPayload.correctAnswers || finalCorrect;
+             
+             // Update the database to reflect the overridden score
+             await supabase.from('results').update({
+                  score: finalScore,
+                  correct_answers: finalCorrect,
+                  total_questions: resultPayload.totalQuestions
+             }).eq('id', rpcData.id);
+        }
+
         // Return successfully scored and saved result directly from server response
         return {
             ...resultPayload,
@@ -1913,9 +1932,9 @@ class StorageService {
                  ...resultPayload.student,
                  resultId: rpcData.id
             },
-            score: rpcData.score,
-            correctAnswers: rpcData.correct_answers,
-            totalQuestions: rpcData.total_questions,
+            score: finalScore,
+            correctAnswers: finalCorrect,
+            totalQuestions: resultPayload.totalQuestions || rpcData.total_questions,
             status: rpcData.status,
             completionTime: completionTime,
             isSynced: true

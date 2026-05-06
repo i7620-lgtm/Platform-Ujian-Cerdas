@@ -30,9 +30,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan format Markdown secara maksimal pada teks pertanyaan.
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
     - Gunakan bullet points atau numbering untuk daftar.
-    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation).
-    - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel.
-    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal. JANGAN gunakan tabel atau ASCII art jika soal secara eksplisit meminta diagram/grafik. Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
+    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. Anda JUGA WAJIB menggunakan format LaTeX ($...$) pada list opsi jawaban (PG/PG Kompleks) jika itu adalah persamaan/angka matematika.
+    - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel. JANGAN membuat diagram ('chartData') jika Anda sudah merepresentasikan data dalam bentuk tabel atau turus.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal. JANGAN gunakan tabel atau ASCII art jika soal secara eksplisit meminta diagram/grafik. Pastikan tidak ada duplikasi penyajian data (misalnya: jika soal berisi tabel turus, jangan membuat diagram chartData untuk data yang sama kecuali diminta). Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
     - PENTING UNTUK DIAGRAM: Jika Anda membuat diagram, Anda WAJIB menyisipkan tag HTML <span class="chart-placeholder" data-chart="true" style="display: block;"></span> di dalam teks (questionText, opsi, dll) tepat di mana diagram tersebut harus ditampilkan.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
@@ -54,10 +54,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
   const prompt = `
     Buatlah ${config.count} soal ${config.type} untuk mata pelajaran/materi: ${config.subject}.
-    Tingkat kognitif (Bloom Revisi): ${config.difficulty}.
-    Kisi-kisi materi: ${config.blueprint}.
+    Tingkat kognitif (Bloom Revisi) secara umum: ${config.difficulty}.
+    Kisi-kisi / Indikator Soal: ${config.blueprint}.
     
-    PENTING: Pastikan urutan soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal.
+    PENGATURAN TINGKAT KESULITAN & INDIKATOR:
+    Anda WAJIB membaca dan menerapkan deskripsi spesifik mengenai tingkat kesulitan, konteks, dan indikator soal yang dijabarkan dalam "Kisi-kisi / Indikator Soal" di atas.
+    JANGAN hanya mengandalkan label "Tingkat kognitif", melainkan jadikan "Kisi-kisi / Indikator Soal" sebagai panduan UTAMA tingkat kesulitan teknis ujian ini. Jika kisi-kisi meminta soal yang panjang, mengecoh, analisis mendalam, penalaran matematis, atau HOTS berbasis kasus, pastikan soal yang dibuat benar-benar mencerminkan tingkat kerumitan tersebut.
+
+    PENTING: Pastikan urutan dan jenis soal yang dihasilkan sesuai dengan urutan materi/kisi-kisi yang diberikan. Jangan mengacak urutan soal secara sembarangan.
   `;
 
   const chartDataSchema = {

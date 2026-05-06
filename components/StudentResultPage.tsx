@@ -186,11 +186,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
         if (result.status === 'in_progress') return true;
         
         // 2. If score is 0 but we have auto-gradable questions and calculated score is > 0, we are definitely waiting for the server to update the score field.
-        if (result.score === 0 && hasAutoGradable && (calculatedStats?.calculatedScore || 0) > 0) return true;
+        // BUT ONLY if the status is NOT completed. If it's completed, the server has finished its job (even if it falsely evaluated to 0).
+        if (result.status !== 'completed' && result.status !== 'force_closed' && result.score === 0 && hasAutoGradable && (calculatedStats?.calculatedScore || 0) > 0) return true;
         
         // 3. If totalQuestions is 0 but exam has scorable questions, it means the server hasn't processed the result yet.
         const scorableCount = exam.questions.filter(q => q.questionType !== 'INFO').length;
-        if (result.totalQuestions === 0 && scorableCount > 0) return true;
+        if (result.totalQuestions === 0 && scorableCount > 0 && result.status !== 'completed' && result.status !== 'force_closed') return true;
 
         return false;
     }, [result.score, result.status, result.totalQuestions, hasAutoGradable, calculatedStats?.calculatedScore, exam.questions]);
@@ -262,8 +263,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
 
     const showResult = config.showResultToStudent;
     
-    // REAL-TIME FALLBACK: If server score is 0 but client calculated > 0, use client score for display if we are waiting
-    const displayScore = isWaitingForServer ? (calculatedStats?.calculatedScore || 0) : result.score;
+    // REAL-TIME FALLBACK & RPC BUGFIX: 
+    // If server score is 0 but client calculated > 0, use client score for display (happens on outdated RPCs when submitting MATCHING logic)
+    const displayScore = calculatedStats?.calculatedScore > result.score ? calculatedStats.calculatedScore : result.score;
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-sans relative overflow-hidden transition-colors duration-300">

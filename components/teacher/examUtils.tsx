@@ -1433,55 +1433,9 @@ import { marked } from 'marked';
 export const markdownToHtml = (markdown: string): string => {
     if (!markdown) return '';
     
-    // Fix literal \n that might come from AI JSON parsing
-    let processedMarkdown = markdown.replace(/\\n/g, '\n');
-    
-    // Fix trailing double pipes in table rows (AI hallucination fix)
-    processedMarkdown = processedMarkdown.replace(/\|\|[ \t]*$/gm, '|');
+    let processedMarkdown = markdown;
 
-    // Remove blank lines between table rows (AI hallucination fix)
-    // We need to do this repeatedly until no more blank lines exist between rows
-    let previousMarkdown;
-    do {
-        previousMarkdown = processedMarkdown;
-        processedMarkdown = processedMarkdown.replace(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/g, '$1\n$2');
-    } while (processedMarkdown !== previousMarkdown);
-
-    // Ensure blank lines before markdown tables (only if previous line is not part of the table)
-    processedMarkdown = processedMarkdown.replace(/(^|\n)(?![ \t]*\|)([^\n]+)\n([ \t]*\|)/g, '$1$2\n\n$3');
-
-    // Fix tables that might have missing leading/trailing pipes
-    // This is a common AI hallucination where it provides rows like "Col 1 | Col 2" instead of "| Col 1 | Col 2 |"
-    processedMarkdown = processedMarkdown.replace(/^([ \t]*[^|\n]+(?:\|[^|\n]+)+[ \t]*)$/gm, (match) => {
-        // Only wrap if it looks like a table row and not already wrapped
-        if (match.includes('|') && !match.trim().startsWith('|')) {
-            return `| ${match.trim()} |`;
-        }
-        return match;
-    });
-
-    // Ensure table headers have the separator row if missing
-    // This looks for a row with pipes followed by a row without pipes (or end of string)
-    // and inserts a separator if the next row doesn't look like a separator
-    const lines = processedMarkdown.split('\n');
-    for (let i = 0; i < lines.length - 1; i++) {
-        const currentLine = lines[i].trim();
-        const nextLine = lines[i+1].trim();
-        if (currentLine.startsWith('|') && currentLine.endsWith('|') && currentLine.includes('|')) {
-            // Check if next line is a separator
-            if (!nextLine.startsWith('|') || !nextLine.includes('-')) {
-                // If next line is another table row, we might need a separator before it if this is the first row
-                if (nextLine.startsWith('|') && (i === 0 || !lines[i-1].trim().startsWith('|'))) {
-                    const colCount = currentLine.split('|').length - 2;
-                    const separator = `|${' --- |'.repeat(colCount)}`;
-                    lines.splice(i + 1, 0, separator);
-                }
-            }
-        }
-    }
-    processedMarkdown = lines.join('\n');
-    
-    // 1. Extract Math to prevent marked from messing it up
+    // 1. Extract Math to prevent ANY replacements from messing it up
     const mathBlocks: string[] = [];
     processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
         const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
@@ -1504,6 +1458,47 @@ export const markdownToHtml = (markdown: string): string => {
         return placeholder;
     });
 
+    // Fix literal \n that might come from AI JSON parsing (only applies to non-math text)
+    processedMarkdown = processedMarkdown.replace(/\\n/g, '\n');
+    
+    // Fix trailing double pipes in table rows (AI hallucination fix)
+    processedMarkdown = processedMarkdown.replace(/\|\|[ \t]*$/gm, '|');
+
+    // Remove blank lines between table rows (AI hallucination fix)
+    let previousMarkdown;
+    do {
+        previousMarkdown = processedMarkdown;
+        processedMarkdown = processedMarkdown.replace(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/g, '$1\n$2');
+    } while (processedMarkdown !== previousMarkdown);
+
+    // Ensure blank lines before markdown tables
+    processedMarkdown = processedMarkdown.replace(/(^|\n)(?![ \t]*\|)([^\n]+)\n([ \t]*\|)/g, '$1$2\n\n$3');
+
+    // Fix tables that might have missing leading/trailing pipes
+    processedMarkdown = processedMarkdown.replace(/^([ \t]*[^|\n]+(?:\|[^|\n]+)+[ \t]*)$/gm, (match) => {
+        if (match.includes('|') && !match.trim().startsWith('|')) {
+            return `| ${match.trim()} |`;
+        }
+        return match;
+    });
+
+    // Ensure table headers have the separator row if missing
+    const lines = processedMarkdown.split('\n');
+    for (let i = 0; i < lines.length - 1; i++) {
+        const currentLine = lines[i].trim();
+        const nextLine = lines[i+1].trim();
+        if (currentLine.startsWith('|') && currentLine.endsWith('|') && currentLine.includes('|')) {
+            if (!nextLine.startsWith('|') || !nextLine.includes('-')) {
+                if (nextLine.startsWith('|') && (i === 0 || !lines[i-1].trim().startsWith('|'))) {
+                    const colCount = currentLine.split('|').length - 2;
+                    const separator = `|${' --- |'.repeat(colCount)}`;
+                    lines.splice(i + 1, 0, separator);
+                }
+            }
+        }
+    }
+    processedMarkdown = lines.join('\n');
+    
     // 3. Parse with marked
     let html = marked.parse(processedMarkdown) as string;
 
@@ -1514,6 +1509,9 @@ export const markdownToHtml = (markdown: string): string => {
 
     // 5. Restore Math
     const renderMath = (latex: string, displayMode: boolean) => {
+        // If the latex has \n inside it (from AI output formatting), we can remove them or replace them with spaces, 
+        // BUT wait, in math blocks \\ is used for newlines. We shouldn't mess with it unless it breaks KaTeX.
+        // Actually, KaTeX handles literal newlines gracefully.
         let rendered = latex;
         const w = window as unknown as { katex?: { renderToString: (latex: string, options: { throwOnError: boolean, displayMode: boolean }) => string } };
         if (w.katex) {
@@ -1605,6 +1603,58 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             return;
         }
 
+        let chartCounter = 0;
+        let chartScripts = '';
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const injectChart = (chartData: any, html: string): string => {
+            let processedHtml = html;
+            if (chartData) {
+                chartCounter++;
+                const canvasId = `pdf-chart-${chartCounter}`;
+                const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
+                
+                if (processedHtml.includes('chart-placeholder')) {
+                    processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
+                } else {
+                    processedHtml += canvasHtml;
+                }
+                
+                const typedData = chartData as any;
+                const labelsStr = JSON.stringify(typedData.labels || []);
+                const datasetsStr = JSON.stringify(typedData.datasets?.map((ds: any, idx: number) => {
+                    const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+                    const color = colors[idx % colors.length];
+                    return {
+                        label: ds.label,
+                        data: ds.data,
+                        backgroundColor: ds.backgroundColor || (typedData.type === 'pie' ? colors : color),
+                        borderColor: ds.borderColor || color,
+                        borderWidth: 1
+                    };
+                }) || []);
+
+                chartScripts += `
+                    new Chart(document.getElementById("${canvasId}"), {
+                        type: "${typedData.type}",
+                        data: {
+                            labels: ${labelsStr},
+                            datasets: ${datasetsStr}
+                        },
+                        options: {
+                            responsive: true,
+                            animation: false,
+                            plugins: {
+                                title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} }
+                            }
+                        }
+                    });
+                `;
+            }
+            processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, '');
+            return processedHtml;
+        };
+
         // Get all stylesheets from current document to ensure KaTeX and Tailwind are applied
         const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
             .map(el => el.outerHTML)
@@ -1616,10 +1666,12 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
         <head>
             <meta charset="UTF-8">
             <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + ' - ' : ''}${exam.config.subject || 'Ujian'} - ${exam.code}</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
             ${styleTags}
             <style>
                 @page { margin: 20mm; }
-                body { font-family: 'Inter', sans-serif; background: white; color: black; padding: 0; margin: 0; }
+                body { font-family: 'Inter', 'Segoe UI', 'Segoe UI Symbol', 'Noto Sans', 'Arial Unicode MS', sans-serif; background: white; color: black; padding: 0; margin: 0; }
                 .print-container { max-width: 100%; margin: 0 auto; }
                 .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid black; padding-bottom: 10px; }
                 .header h1 { margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase; font-weight: 800; }
@@ -1629,6 +1681,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .options-container { margin-left: 20px; font-size: 14px; }
                 .option-item { margin-bottom: 8px; }
                 .answer-key { page-break-before: always; }
+                .chart-wrapper { max-width: 500px; margin: 15px auto; page-break-inside: avoid; }
                 img { max-width: 100%; height: auto; object-fit: contain; }
                 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
                 table, th, td { border: 1px solid #ddd; padding: 8px; }
@@ -1653,15 +1706,23 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
         
         scorableQuestions.forEach((q, index) => {
             htmlContent += `<div class="question-item">`;
-            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${q.questionText}</div></div>`;
+            
+            let questionHtml = q.questionText || '';
+            questionHtml = injectChart(q.chartData, questionHtml);
+            
+            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
             
             htmlContent += `<div class="options-container">`;
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
                 if (q.options) {
                     q.options.forEach((opt, optIdx) => {
+                        let optHtml = opt;
+                        if (q.optionCharts && q.optionCharts[optIdx]) {
+                            optHtml = injectChart(q.optionCharts[optIdx], optHtml);
+                        }
                         htmlContent += `<div class="option-item flex gap-3">
                             <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
-                            <div class="prose prose-sm max-w-none text-black flex-1">${opt}</div>
+                            <div class="prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
                         </div>`;
                     });
                 }
@@ -1677,8 +1738,12 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         </thead>
                         <tbody>`;
                     q.trueFalseRows.forEach((row) => {
+                        let rowHtml = row.text;
+                        if (row.chartData) {
+                             rowHtml = injectChart(row.chartData, rowHtml);
+                        }
                         htmlContent += `<tr>
-                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${row.text}</div></td>
+                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${rowHtml}</div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                         </tr>`;
@@ -1689,8 +1754,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 if (q.matchingPairs) {
                     htmlContent += `<div class="mt-2 space-y-4">`;
                     q.matchingPairs.forEach((pair) => {
+                        let leftHtml = pair.left;
+                        if (pair.leftChart) leftHtml = injectChart(pair.leftChart, leftHtml);
+                        
                         htmlContent += `<div class="flex items-center gap-4">
-                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${pair.left}</div></div>
+                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${leftHtml}</div></div>
                             <div class="font-bold mx-2">......</div>
                             <div class="flex-1 border-b border-slate-400"></div>
                         </div>`;
@@ -1739,6 +1807,10 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 ansStr = "<em>Koreksi Manual</em>";
             }
             
+            if (q.correctAnswerChart) {
+                ansStr = injectChart(q.correctAnswerChart, ansStr);
+            }
+            
             htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
         });
 
@@ -1746,9 +1818,32 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     </div>
                 </div>
             </div>
+            <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+            <script>
+                // Initialize charts
+                ${chartScripts}
+            </script>
             <script>
                 // Wait for images and fonts to load before printing
                 window.onload = () => {
+                    // Render KaTeX Equations
+                    if (window.katex) {
+                        document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
+                            try {
+                                const latex = el.getAttribute('data-latex');
+                                if (latex) {
+                                    const isBlock = el.style.display === 'block';
+                                    el.innerHTML = window.katex.renderToString(latex, {
+                                        throwOnError: false,
+                                        displayMode: isBlock
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('KaTeX error:', e);
+                            }
+                        });
+                    }
+
                     setTimeout(() => {
                         window.print();
                     }, 500);
