@@ -1667,6 +1667,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             <meta charset="UTF-8">
             <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + ' - ' : ''}${exam.config.subject || 'Ujian'} - ${exam.code}</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
             ${styleTags}
             <style>
                 @page { margin: 20mm; }
@@ -1817,6 +1818,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     </div>
                 </div>
             </div>
+            <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
             <script>
                 // Initialize charts
                 ${chartScripts}
@@ -1824,6 +1826,24 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             <script>
                 // Wait for images and fonts to load before printing
                 window.onload = () => {
+                    // Render KaTeX Equations
+                    if (window.katex) {
+                        document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
+                            try {
+                                const latex = el.getAttribute('data-latex');
+                                if (latex) {
+                                    const isBlock = el.style.display === 'block';
+                                    el.innerHTML = window.katex.renderToString(latex, {
+                                        throwOnError: false,
+                                        displayMode: isBlock
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('KaTeX error:', e);
+                            }
+                        });
+                    }
+
                     setTimeout(() => {
                         window.print();
                     }, 500);
