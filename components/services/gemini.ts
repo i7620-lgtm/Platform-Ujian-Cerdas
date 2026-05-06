@@ -33,8 +33,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, atau pangkat! Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$".
     - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel. JANGAN membuat diagram ('chartData') jika Anda sudah merepresentasikan data dalam bentuk tabel atau turus.
     - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal atau opsi.
-    - PENTING UNTUK DIAGRAM: JIKA DAN HANYA JIKA Anda mengisi 'chartData', Anda WAJIB menyisipkan tag HTML <span class="chart-placeholder" data-chart="true" style="display: block;"></span> di dalam teks (questionText, opsi, dll) tepat di mana diagram tersebut harus ditampilkan.
-    - LARANGAN KERAS: DILARANG KERAS menyisipkan tag <span class="chart-placeholder"> untuk tabel, gambar raster (JPEG/PNG), atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel. Karena Anda AI berbasis teks, hindari membuat soal yang mutlak mengharuskan gambar raster; gunakan tabel, diagram (chartData), atau teks deskriptif sebagai gantinya.
+    - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
+      * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
+      * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie).
+      * Jika diminta gambar/ilustrasi/foto: Karena Anda AI berbasis teks yang dilarang menggunakan tag <img>, Anda WAJIB menyajikan data gambar tersebut ke dalam bentuk DESKRIPSI TEKS yang jelas, tabel, atau bentuk narasi (contoh: "*Perhatikan gambar berikut: Terdapat dua garis sejajar A dan B...*" atau "*Diketahui sebuah foto berukuran 3x4...*"). DILARANG menyisipkan tag placeholder gambar yang tidak valid!
+    - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel. Karena Anda AI berbasis teks, hindari membuat soal yang mutlak mengharuskan gambar raster; gunakan tabel, diagram (chartData), atau teks deskriptif sebagai gantinya.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
     - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi soal yang harus dijawab oleh siswa.
@@ -161,10 +164,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                  combinedText.includes('LEVEL 5') || combinedText.includes('LEVEL 6') || 
                  combinedText.includes('HOTS') || combinedText.includes('SULIT') || 
                  /^(5|6)$/.test((config.difficulty || '').trim());
+                 
+  const hasSpecificInstructions = (config.blueprint || '').includes('(') || (config.blueprint || '').includes('[');
   
   let modelsToTry: string[] = [];
   if (isHOTS) {
-      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
+      modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'];
+  } else if (hasSpecificInstructions) {
+      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'];
   } else {
       modelsToTry = ['gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
   }
