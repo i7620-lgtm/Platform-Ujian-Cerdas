@@ -1410,4 +1410,4 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             />
         </div>
     );
-};
+}; 
