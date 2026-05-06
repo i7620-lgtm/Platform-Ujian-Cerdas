@@ -1433,55 +1433,9 @@ import { marked } from 'marked';
 export const markdownToHtml = (markdown: string): string => {
     if (!markdown) return '';
     
-    // Fix literal \n that might come from AI JSON parsing
-    let processedMarkdown = markdown.replace(/\\n/g, '\n');
-    
-    // Fix trailing double pipes in table rows (AI hallucination fix)
-    processedMarkdown = processedMarkdown.replace(/\|\|[ \t]*$/gm, '|');
+    let processedMarkdown = markdown;
 
-    // Remove blank lines between table rows (AI hallucination fix)
-    // We need to do this repeatedly until no more blank lines exist between rows
-    let previousMarkdown;
-    do {
-        previousMarkdown = processedMarkdown;
-        processedMarkdown = processedMarkdown.replace(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/g, '$1\n$2');
-    } while (processedMarkdown !== previousMarkdown);
-
-    // Ensure blank lines before markdown tables (only if previous line is not part of the table)
-    processedMarkdown = processedMarkdown.replace(/(^|\n)(?![ \t]*\|)([^\n]+)\n([ \t]*\|)/g, '$1$2\n\n$3');
-
-    // Fix tables that might have missing leading/trailing pipes
-    // This is a common AI hallucination where it provides rows like "Col 1 | Col 2" instead of "| Col 1 | Col 2 |"
-    processedMarkdown = processedMarkdown.replace(/^([ \t]*[^|\n]+(?:\|[^|\n]+)+[ \t]*)$/gm, (match) => {
-        // Only wrap if it looks like a table row and not already wrapped
-        if (match.includes('|') && !match.trim().startsWith('|')) {
-            return `| ${match.trim()} |`;
-        }
-        return match;
-    });
-
-    // Ensure table headers have the separator row if missing
-    // This looks for a row with pipes followed by a row without pipes (or end of string)
-    // and inserts a separator if the next row doesn't look like a separator
-    const lines = processedMarkdown.split('\n');
-    for (let i = 0; i < lines.length - 1; i++) {
-        const currentLine = lines[i].trim();
-        const nextLine = lines[i+1].trim();
-        if (currentLine.startsWith('|') && currentLine.endsWith('|') && currentLine.includes('|')) {
-            // Check if next line is a separator
-            if (!nextLine.startsWith('|') || !nextLine.includes('-')) {
-                // If next line is another table row, we might need a separator before it if this is the first row
-                if (nextLine.startsWith('|') && (i === 0 || !lines[i-1].trim().startsWith('|'))) {
-                    const colCount = currentLine.split('|').length - 2;
-                    const separator = `|${' --- |'.repeat(colCount)}`;
-                    lines.splice(i + 1, 0, separator);
-                }
-            }
-        }
-    }
-    processedMarkdown = lines.join('\n');
-    
-    // 1. Extract Math to prevent marked from messing it up
+    // 1. Extract Math to prevent ANY replacements from messing it up
     const mathBlocks: string[] = [];
     processedMarkdown = processedMarkdown.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
         const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
@@ -1504,6 +1458,47 @@ export const markdownToHtml = (markdown: string): string => {
         return placeholder;
     });
 
+    // Fix literal \n that might come from AI JSON parsing (only applies to non-math text)
+    processedMarkdown = processedMarkdown.replace(/\\n/g, '\n');
+    
+    // Fix trailing double pipes in table rows (AI hallucination fix)
+    processedMarkdown = processedMarkdown.replace(/\|\|[ \t]*$/gm, '|');
+
+    // Remove blank lines between table rows (AI hallucination fix)
+    let previousMarkdown;
+    do {
+        previousMarkdown = processedMarkdown;
+        processedMarkdown = processedMarkdown.replace(/(\|[^\n]*\|)\n\n+(\|[^\n]*\|)/g, '$1\n$2');
+    } while (processedMarkdown !== previousMarkdown);
+
+    // Ensure blank lines before markdown tables
+    processedMarkdown = processedMarkdown.replace(/(^|\n)(?![ \t]*\|)([^\n]+)\n([ \t]*\|)/g, '$1$2\n\n$3');
+
+    // Fix tables that might have missing leading/trailing pipes
+    processedMarkdown = processedMarkdown.replace(/^([ \t]*[^|\n]+(?:\|[^|\n]+)+[ \t]*)$/gm, (match) => {
+        if (match.includes('|') && !match.trim().startsWith('|')) {
+            return `| ${match.trim()} |`;
+        }
+        return match;
+    });
+
+    // Ensure table headers have the separator row if missing
+    const lines = processedMarkdown.split('\n');
+    for (let i = 0; i < lines.length - 1; i++) {
+        const currentLine = lines[i].trim();
+        const nextLine = lines[i+1].trim();
+        if (currentLine.startsWith('|') && currentLine.endsWith('|') && currentLine.includes('|')) {
+            if (!nextLine.startsWith('|') || !nextLine.includes('-')) {
+                if (nextLine.startsWith('|') && (i === 0 || !lines[i-1].trim().startsWith('|'))) {
+                    const colCount = currentLine.split('|').length - 2;
+                    const separator = `|${' --- |'.repeat(colCount)}`;
+                    lines.splice(i + 1, 0, separator);
+                }
+            }
+        }
+    }
+    processedMarkdown = lines.join('\n');
+    
     // 3. Parse with marked
     let html = marked.parse(processedMarkdown) as string;
 
@@ -1514,6 +1509,9 @@ export const markdownToHtml = (markdown: string): string => {
 
     // 5. Restore Math
     const renderMath = (latex: string, displayMode: boolean) => {
+        // If the latex has \n inside it (from AI output formatting), we can remove them or replace them with spaces, 
+        // BUT wait, in math blocks \\ is used for newlines. We shouldn't mess with it unless it breaks KaTeX.
+        // Actually, KaTeX handles literal newlines gracefully.
         let rendered = latex;
         const w = window as unknown as { katex?: { renderToString: (latex: string, options: { throwOnError: boolean, displayMode: boolean }) => string } };
         if (w.katex) {
