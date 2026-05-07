@@ -30,10 +30,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan format Markdown secara maksimal pada teks pertanyaan.
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
     - Gunakan bullet points atau numbering untuk daftar.
-    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. Anda JUGA WAJIB menggunakan format LaTeX ($...$) pada list opsi jawaban (PG/PG Kompleks) jika itu adalah persamaan/angka matematika.
+    - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, atau pangkat! Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$".
     - Turus (Tally Marks): Gunakan karakter '|' (1), '||' (2), '|||' (3), '||||' (4), dan '卌' (5) untuk merepresentasikan turus dalam teks pertanyaan atau tabel. JANGAN membuat diagram ('chartData') jika Anda sudah merepresentasikan data dalam bentuk tabel atau turus.
-    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal. JANGAN gunakan tabel atau ASCII art jika soal secara eksplisit meminta diagram/grafik. Pastikan tidak ada duplikasi penyajian data (misalnya: jika soal berisi tabel turus, jangan membuat diagram chartData untuk data yang sama kecuali diminta). Anda juga dapat menambahkan diagram pada opsi jawaban ('optionCharts'), baris benar/salah ('chartData' di dalam 'trueFalseRows'), pasangan menjodohkan ('leftChart' dan 'rightChart' di dalam 'matchingPairs'), dan kunci jawaban ('correctAnswerChart').
-    - PENTING UNTUK DIAGRAM: Jika Anda membuat diagram, Anda WAJIB menyisipkan tag HTML <span class="chart-placeholder" data-chart="true" style="display: block;"></span> di dalam teks (questionText, opsi, dll) tepat di mana diagram tersebut harus ditampilkan.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal atau opsi.
+    - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
+      * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
+      * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie).
+      * Jika diminta gambar/ilustrasi/foto: Karena Anda dilarang menggunakan tag <img>, Anda WAJIB mengisi property 'imageSearchKeyword' menggunakan bahasa Inggris. JANGAN menyisipkan placeholder HTML untuk gambar.
+    - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel. Karena Anda AI berbasis teks, hindari membuat teks yang mutlak mengharuskan gambar raster; gunakan tabel, diagram (chartData), atau teks deskriptif sebagai gantinya, KECUALI jika diminta khusus dalam kurung.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
     - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi soal yang harus dijawab oleh siswa.
@@ -133,12 +137,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       description: "Pasangan untuk soal Menjodohkan"
     },
     chartData: chartDataSchema,
-    ...(config.includeImages ? {
-      imageSearchKeyword: { 
-        type: Type.STRING, 
-        description: "Kata kunci pencarian gambar spesifik dalam bahasa Inggris (2-3 kata)" 
-      }
-    } : {})
+    imageSearchKeyword: { 
+      type: Type.STRING, 
+      description: "WAJIB diisi jika instruksi meminta gambar/foto ilustrasi. Berisi kata kunci spesifik dalam bahasa Inggris (2-3 kata) untuk pencarian di Wikimedia Commons. Jangan pernah menyisipkan tag <img> manual." 
+    }
   };
 
   const combinedText = `${config.difficulty || ''} ${config.subject || ''} ${config.blueprint || ''}`.toUpperCase();
@@ -160,10 +162,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                  combinedText.includes('LEVEL 5') || combinedText.includes('LEVEL 6') || 
                  combinedText.includes('HOTS') || combinedText.includes('SULIT') || 
                  /^(5|6)$/.test((config.difficulty || '').trim());
+                 
+  const hasSpecificInstructions = (config.blueprint || '').includes('(') || (config.blueprint || '').includes('[');
   
   let modelsToTry: string[] = [];
   if (isHOTS) {
-      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
+      modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'];
+  } else if (hasSpecificInstructions) {
+      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'];
   } else {
       modelsToTry = ['gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
   }
@@ -417,29 +423,42 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     });
 
     // Jika pengguna meminta gambar, cari referensi gambar asli dari Wikimedia Commons
-    if (config.includeImages) {
-      for (let i = 0; i < finalQuestions.length; i++) {
-        const q = finalQuestions[i];
-        const originalQ = questions[i];
-        if (originalQ.imageSearchKeyword) {
-          try {
-            const keyword = encodeURIComponent(originalQ.imageSearchKeyword);
-            const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${keyword}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+    // Fetch images if keyword is provided
+    for (let i = 0; i < finalQuestions.length; i++) {
+      const q = finalQuestions[i];
+      const originalQ = questions[i];
+      if (originalQ.imageSearchKeyword) {
+        try {
+          const keyword = encodeURIComponent(originalQ.imageSearchKeyword);
+          const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${keyword}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+          
+          const res = await fetch(url);
+          const data = await res.json();
+          
+          const pages = data.query?.pages;
+          if (pages) {
+            const pageId = Object.keys(pages)[0];
+            const pageData = pages[pageId];
+            const imageInfo = pageData?.imageinfo?.[0];
             
-            const res = await fetch(url);
-            const data = await res.json();
-            
-            const pages = data.query?.pages;
-            if (pages) {
-              const pageId = Object.keys(pages)[0];
-              const imageInfo = pages[pageId]?.imageinfo?.[0];
-              if (imageInfo?.thumburl) {
-                q.questionText = `<img src="${imageInfo.thumburl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 10px 0; display: block;" /><br/>${q.questionText}`;
+            if (imageInfo) {
+              const imgUrl = imageInfo.thumburl || imageInfo.url;
+              const sourceUrl = imageInfo.descriptionurl || `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(pageData.title)}`;
+              
+              if (imgUrl) {
+                const imgHtml = `
+<div style="margin: 16px 0; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">
+  <img src="${imgUrl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 4px; display: inline-block; margin: 0 auto;" />
+  <span style="font-size: 12px; color: #64748b; display: block; margin-top: 8px;">
+    Sumber gambar: <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">Wikimedia Commons ("${originalQ.imageSearchKeyword}")</a>
+  </span>
+</div><br/>`;
+                q.questionText = imgHtml + q.questionText;
               }
             }
-          } catch (imgError) {
-            console.error("Failed to fetch image for keyword:", originalQ.imageSearchKeyword, imgError);
           }
+        } catch (imgError) {
+          console.error("Failed to fetch image for keyword:", originalQ.imageSearchKeyword, imgError);
         }
       }
     }
