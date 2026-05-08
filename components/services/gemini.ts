@@ -36,7 +36,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
       * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie).
-      * Jika diminta gambar/ilustrasi/foto: Karena Anda dilarang menggunakan tag <img>, Anda WAJIB mengisi property 'imageSearchKeyword' menggunakan bahasa Inggris. JANGAN menyisipkan placeholder HTML untuk gambar.
+      ${config.includeImages ? `* Jika diminta gambar/ilustrasi/foto: Karena Anda dilarang menggunakan tag <img>, Anda WAJIB mengisi property 'imageSearchKeyword' menggunakan SATU ATAU DUA KATA KUNCI BENDA SPESIFIK DALAM BAHASA INGGRIS (contoh: "cuboid", "elephant", "microscope") untuk pencarian di Wikimedia Commons. JANGAN menuliskan kalimat pengantar gambar seperti "Perhatikan gambar berikut" atau "Gambar balok" ke dalam \`questionText\`. Langsung saja tulis inti pertanyaannya, karena gambar akan secara otomatis dirender di atas soal oleh sistem. JANGAN menyisipkan placeholder HTML untuk gambar.` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel. Karena Anda AI berbasis teks, hindari membuat teks yang mutlak mengharuskan gambar raster; gunakan tabel, diagram (chartData), atau teks deskriptif sebagai gantinya, KECUALI jika diminta khusus dalam kurung.
     - PENTING: Jika soal, opsi, atau jawaban mengandung Aksara Bali, WAJIB bungkus teks Aksara Bali tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span> agar dapat dirender dengan benar.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
@@ -139,7 +139,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     chartData: chartDataSchema,
     imageSearchKeyword: { 
       type: Type.STRING, 
-      description: "WAJIB diisi jika instruksi meminta gambar/foto ilustrasi. Berisi kata kunci spesifik dalam bahasa Inggris (2-3 kata) untuk pencarian di Wikimedia Commons. Jangan pernah menyisipkan tag <img> manual." 
+      description: config.includeImages 
+        ? "WAJIB diisi jika instruksi meminta gambar/foto ilustrasi. Berisi 1-2 kata kunci bahasa Inggris spesifik (contoh: 'cuboid rectangle') untuk mencari gambar dari Wikimedia Commons." 
+        : "FITUR GAMBAR NONAKTIF. Abaikan field ini." 
     }
   };
 
@@ -447,12 +449,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               
               if (imgUrl) {
                 const imgHtml = `
-<div style="margin: 16px 0; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">
-  <img src="${imgUrl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 4px; display: inline-block; margin: 0 auto;" />
-  <span style="font-size: 12px; color: #64748b; display: block; margin-top: 8px;">
+<p style="text-align: center; margin-bottom: 16px;">
+  <img src="${imgUrl}" alt="${originalQ.imageSearchKeyword}" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 4px; display: inline-block; margin: 0 auto;" /><br/>
+  <span style="font-size: 12px; color: #64748b;">
     Sumber gambar: <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">Wikimedia Commons ("${originalQ.imageSearchKeyword}")</a>
   </span>
-</div><br/>`;
+</p>`;
                 q.questionText = imgHtml + q.questionText;
               }
             }
