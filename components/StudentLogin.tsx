@@ -368,45 +368,34 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
                     return;
                 }
             }
-            const endDateStr = examConfig.endDate;
-            if (endDateStr) {
-                const endDateTime = new Date(`${endDateStr}T23:59:59`);
-                if (now > endDateTime) {
-                    setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
-                    setIsLoading(false);
-                    return;
+            const getLocalDateStr = (raw: string) => {
+                if (!raw) return '';
+                if (raw.includes('T')) {
+                    const d = new Date(raw);
+                    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
                 }
+                return raw;
+            };
+
+            const endDateStr = getLocalDateStr(examConfig.endDate || examConfig.date);
+            const endTimeStr = examConfig.endTime || '23:59';
+            let endDateTime: Date;
+            if (examConfig.endDate && examConfig.endDate.includes('T')) {
+                endDateTime = new Date(examConfig.endDate);
             } else {
-                let endDateTime: Date;
-                const startDateStr = examConfig.startDate || examConfig.date;
-                const startDateTime = startDateStr.includes('T') && startDateStr.length > 10 ? new Date(startDateStr) : new Date(`${startDateStr}T${examConfig.startTime || '00:00'}`);
-                
-                if (examConfig.timeLimit > 0) {
-                    endDateTime = new Date(startDateTime.getTime() + (examConfig.timeLimit * 60000));
-                } else {
-                    const localDateStr = startDateTime.toLocaleDateString('en-CA');
-                    endDateTime = new Date(`${localDateStr}T23:59:59`);
-                }
-                
-                if (now > endDateTime) {
-                    setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
-                    setIsLoading(false);
-                    return;
-                }
+                endDateTime = new Date(`${endDateStr}T${endTimeStr}:59`);
+            }
+            
+            if (!isNaN(endDateTime.getTime()) && now > endDateTime) {
+                setError(`Ujian telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
+                setIsLoading(false);
+                return;
             }
         } else if (mode === 'PR') {
-            const endDateStr = examConfig.endDate;
-            if (endDateStr) {
-                const endDateTime = new Date(`${endDateStr}T23:59:59`);
-                if (now > endDateTime) {
-                    setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
-                    setIsLoading(false);
-                    return;
-                }
-            } else {
-                const fallbackDate = new Date(examConfig.date || new Date());
-                const localDateStr = fallbackDate.toLocaleDateString('en-CA');
-                const endDateTime = new Date(`${localDateStr}T23:59:59`);
+            const fallbackDateStr = examConfig.endDate || examConfig.date;
+            if (fallbackDateStr) {
+                const datePart = fallbackDateStr.includes('T') ? fallbackDateStr.split('T')[0] : fallbackDateStr;
+                const endDateTime = new Date(`${datePart}T23:59:59`);
                 if (now > endDateTime) {
                     setError(`Batas waktu pengerjaan PR telah berakhir pada ${endDateTime.toLocaleString('id-ID')}`);
                     setIsLoading(false);
