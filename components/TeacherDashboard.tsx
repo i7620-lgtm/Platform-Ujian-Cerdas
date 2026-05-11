@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react'; 
+import React, { useState, useEffect, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import type { Exam, Question, ExamConfig, Result, TeacherProfile } from '../types';
 import { 
@@ -64,6 +64,7 @@ const DEFAULT_CONFIG: ExamConfig = {
     continueWithPermission: false,
     showResultToStudent: true,
     showCorrectAnswer: false,
+    enableCertificate: false,
     enablePublicStream: false,
     disableRealtime: true,
     trackLocation: false,
@@ -512,7 +513,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         if (mode === 'PR') {
             start = new Date(0); // PR is always available before end date
-            end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+            end = new Date(`${localEndDateStr}T23:59:59`);
         } else {
             if (endDateRaw || exam.config.endTime) {
                 if (endDateRaw && endDateRaw.includes('T')) {
@@ -529,7 +530,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         // Final safety for end date
         if (isNaN(end.getTime())) {
-            end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+            end = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // Default 1 year from now if date is invalid/empty
         }
 
         return { start, end };

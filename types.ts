@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface QuizConfig {
@@ -80,6 +80,7 @@ export interface ExamConfig {
   continueWithPermission: boolean;
   showResultToStudent: boolean;
   showCorrectAnswer: boolean;
+  enableCertificate?: boolean;
   enablePublicStream: boolean;
   disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
   trackLocation: boolean;

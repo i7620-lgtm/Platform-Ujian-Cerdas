@@ -1635,6 +1635,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 }) || []);
 
                 chartScripts += `
+                    Chart.register(ChartDataLabels);
                     new Chart(document.getElementById("${canvasId}"), {
                         type: "${typedData.type}",
                         data: {
@@ -1645,7 +1646,15 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                             responsive: true,
                             animation: false,
                             plugins: {
-                                title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} }
+                                title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
+                                datalabels: {
+                                    color: '${typedData.type === 'pie' ? '#fff' : '#000'}',
+                                    font: { weight: 'bold', size: 12 },
+                                    display: true,
+                                    align: '${typedData.type === 'pie' ? 'center' : 'end'}',
+                                    anchor: '${typedData.type === 'pie' ? 'center' : 'end'}',
+                                    formatter: function(value) { return value; }
+                                }
                             }
                         }
                     });
@@ -1667,6 +1676,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             <meta charset="UTF-8">
             <title>Naskah Soal UjianCerdas - ${exam.config.examType ? exam.config.examType + ' - ' : ''}${exam.config.subject || 'Ujian'} - ${exam.code}</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
             ${styleTags}
             <style>

@@ -500,7 +500,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         };
 
         const endDateStr = getLocalDateStr(activeExam.config.endDate || activeExam.config.date);
-        const endTimeStr = activeExam.config.endTime || '23:59';
+        const endTimeStr = mode === 'PR' ? '23:59' : (activeExam.config.endTime || '23:59');
         
         // Tentukan deadline absolut ujian
         let absoluteExamEndTime: number;
@@ -512,19 +512,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
         
         let calculatedDeadline: number;
         
+        if (isNaN(absoluteExamEndTime)) {
+            absoluteExamEndTime = Infinity;
+        }
+        
         if (timeLimitMs > 0) {
             // Deadline adalah waktu mulai + durasi, tapi tidak boleh melebihi batas akhir ujian
             calculatedDeadline = Math.min(actualStartTime + timeLimitMs, absoluteExamEndTime);
         } else {
             // Jika tidak ada durasi (timeLimit = 0), deadline adalah batas akhir ujian
             calculatedDeadline = absoluteExamEndTime;
-        }
-        
-        // FIX: For PR mode, if the deadline is somehow in the past but they were allowed to login,
-        // we shouldn't auto-submit immediately. We should give them at least some time or just let it be Infinity.
-        // Actually, if it's PR mode and they are logged in, just let them do it.
-        if (mode === 'PR' && calculatedDeadline < Date.now()) {
-            calculatedDeadline = Infinity;
         }
 
         setDeadline(calculatedDeadline);

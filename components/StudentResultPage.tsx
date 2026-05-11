@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Result, Exam } from '../types';
-import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon } from './Icons';
+import { CheckCircleIcon, LockClosedIcon, ChevronDownIcon, ChevronUpIcon, SunIcon, MoonIcon, ChartBarIcon, ArrowPathIcon, SparklesIcon } from './Icons';
 import { storageService } from '../services/storage';
 import { analyzeStudentPerformance, parseList, analyzeQuestionTypePerformance, sanitizeHtml, normalize, isAnswerMatch } from './teacher/examUtils';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -104,6 +104,117 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
         } catch {
             setUnlockError("Gagal verifikasi. Cek koneksi.");
             setIsUnlocking(false);
+        }
+    };
+
+    const handleDownloadCertificate = async () => {
+        try {
+            const { default: jsPDF } = await import('jspdf');
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            
+            const certConfig = exam.config.certificateSettings || { enabled: true, backgroundUrl: '' };
+            const cw = 297, ch = 210;
+
+            if (certConfig.backgroundUrl) {
+                 try { pdf.addImage(certConfig.backgroundUrl, 'JPEG', 0, 0, cw, ch); } catch(e) { console.error('BG error', e); }
+            } else {
+                 pdf.setFillColor(248, 250, 252);
+                 pdf.rect(0, 0, cw, ch, 'F');
+                 pdf.setDrawColor(49, 46, 129);
+                 pdf.setLineWidth(4);
+                 pdf.rect(10, 10, cw - 20, ch - 20);
+                 pdf.setDrawColor(165, 180, 252);
+                 pdf.setLineWidth(1);
+                 pdf.rect(14, 14, cw - 28, ch - 28);
+                 pdf.setFillColor(79, 70, 229);
+                 pdf.triangle(10, 10, 90, 10, 10, 30, 'F');
+                 pdf.setFillColor(49, 46, 129);
+                 pdf.triangle(cw - 10, ch - 10, cw - 120, ch - 10, cw - 10, ch - 35, 'F');
+                 pdf.setTextColor(49, 46, 129);
+                 pdf.setFont("helvetica", "bold");
+                 pdf.setFontSize(20);
+                 pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 28, { align: 'center', charSpace: 2 });
+                 pdf.setTextColor(100, 116, 139);
+                 pdf.setFont("helvetica", "normal");
+                 pdf.setFontSize(12);
+                 pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 35, { align: 'center', charSpace: 1 });
+                 pdf.setDrawColor(199, 210, 254);
+                 pdf.setLineWidth(0.5);
+                 pdf.line(cw * 0.25, 43, cw * 0.75, 43);
+                 pdf.setTextColor(55, 48, 163);
+                 pdf.setFontSize(36);
+                 pdf.setFont("helvetica", "bold");
+                 pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 53, { align: 'center', charSpace: 1 });
+                 pdf.setTextColor(71, 85, 105);
+                 pdf.setFont("helvetica", "normal");
+                 pdf.setFontSize(14);
+                 pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 70, { align: 'center' });
+                 
+                 const examDateStr = exam.config.startDate || exam.config.date || exam.createdAt || new Date().toISOString();
+                 const examDateObj = new Date(examDateStr);
+                 const examDay = examDateObj.toLocaleDateString('id-ID', { weekday: 'long' });
+                 const examDateFormatted = examDateObj.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+                 
+                 pdf.text(`telah menyelesaikan evaluasi ${exam.config.examType || 'Ujian'} untuk mata pelajaran ${exam.config.subject || 'Mata Pelajaran'} kelas ${exam.config.classLevel || result.student.class || '-'} pada ${examDay}, ${examDateFormatted} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
+                 const promoText = '"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\\ndalam menyelesaikan evaluasi.\\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."';
+                 pdf.setFont("times", "italic");
+                 pdf.setFontSize(12);
+                 pdf.text(promoText, cw / 2, 140, { align: 'center', lineHeightFactor: 1.5 });
+                 
+                 pdf.setTextColor(51, 65, 85);
+                 pdf.setFont("helvetica", "normal");
+                 pdf.setFontSize(12);
+                 pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 40, { align: 'center' });
+                 pdf.setDrawColor(203, 213, 225);
+                 pdf.setLineWidth(1);
+                 pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
+                 pdf.setTextColor(30, 41, 59);
+                 pdf.setFont("helvetica", "bold");
+                 pdf.setFontSize(12);
+                 pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
+                 pdf.setTextColor(100, 116, 139);
+                 pdf.setFont("helvetica", "normal");
+                 pdf.setFontSize(12);
+                 pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 14, { align: 'center' });
+                 
+                 const bcx = cw / 2 + 40;
+                 pdf.setFillColor(255, 255, 255);
+                 pdf.setDrawColor(203, 213, 225);
+                 pdf.setLineWidth(0.5);
+                 pdf.roundedRect(bcx, ch - 48, 28, 28, 2, 2, 'FD');
+                 pdf.setFillColor(15, 23, 42);
+                 pdf.rect(bcx + 4, ch - 48 + 4, 20, 20, 'F');
+                 pdf.setFillColor(255, 255, 255);
+                 pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
+                 pdf.setFillColor(15, 23, 42);
+                 pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
+                 pdf.setFontSize(12);
+                 pdf.setFont("courier", "normal");
+                 pdf.setTextColor(148, 163, 184);
+                 pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
+            }
+            
+            const namePos = (certConfig as any).positions?.studentName || { visible: true, x: 50, y: 38, fontSize: 36, color: '#1e293b' };
+            if (namePos.visible) {
+                pdf.setTextColor(namePos.color);
+                pdf.setFont("helvetica", "bold");
+                pdf.setFontSize(namePos.fontSize); 
+                pdf.text(result.student.fullName, (namePos.x / 100) * cw, (namePos.y / 100) * ch, { align: 'center' });
+            }
+
+            const scorePos = (certConfig as any).positions?.score || { visible: true, x: 50, y: 55, fontSize: 48, color: '#4f46e5' };
+            if (scorePos.visible) {
+                pdf.setTextColor(scorePos.color);
+                pdf.setFont("helvetica", "bold");
+                pdf.setFontSize(scorePos.fontSize); 
+                const displayScore = result.status === 'completed' || result.status === 'force_closed' ? (result.score === 0 && hasAutoGradable && (calculatedStats?.calculatedScore || 0) > 0 ? calculatedStats?.calculatedScore || 0 : result.score) : 0;
+                pdf.text(`${displayScore}`, (scorePos.x / 100) * cw, (scorePos.y / 100) * ch, { align: 'center' });
+            }
+
+            pdf.save(`Sertifikat_${exam.code}_${result.student.fullName}.pdf`);
+        } catch (error) {
+            console.error("Gagal mencetak PDF", error);
+            alert("Terjadi kesalahan saat mengunduh sertifikat.");
         }
     };
 
@@ -437,6 +548,14 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ result, ex
                             </div>
 
                             <div className="flex flex-col md:flex-row items-center justify-end gap-6 border-t border-slate-50 dark:border-slate-800 pt-6">
+                                {config.enableCertificate && (
+                                    <button 
+                                        onClick={handleDownloadCertificate}
+                                        className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:text-white hover:bg-emerald-600 dark:hover:bg-emerald-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-emerald-100 dark:border-emerald-900/30"
+                                    >
+                                        <SparklesIcon className="w-3.5 h-3.5"/> Unduh Sertifikat
+                                    </button>
+                                )}
                                 
                                 {config.showCorrectAnswer && (
                                     <button 
