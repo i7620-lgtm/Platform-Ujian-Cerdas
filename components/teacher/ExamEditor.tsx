@@ -97,74 +97,154 @@ const TableConfigModal: React.FC<{ isOpen: boolean; onClose: () => void; onInser
 };
 
 const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (latex: string) => void; }> = ({ isOpen, onClose, onInsert }) => {
-    const [tab, setTab] = useState<'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS'>('BASIC');
-    const [val1, setVal1] = useState(''); const [val2, setVal2] = useState(''); const [val3, setVal3] = useState(''); 
-    const [rows, setRows] = useState(2); const [cols, setCols] = useState(2);
-    const [matData, setMatData] = useState<string[][]>(() => Array.from({ length: 2 }, () => Array(2).fill('')));
+    const [tab, setTab] = useState<'EDITOR' | 'SYMBOLS'>('EDITOR');
+    const [latexInput, setLatexInput] = useState('');
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const previewContainerRef = useRef<HTMLDivElement>(null);
 
-    const handleRowsChange = (val: number) => {
-        const newRows = Math.max(1, Math.min(10, Math.floor(val || 1)));
-        setRows(newRows);
-        setMatData(prev => {
-            const newData = Array.from({ length: newRows }, (_, r) => {
-                return Array.from({ length: cols }, (_, c) => (prev[r] && prev[r][c]) || '');
-            });
-            return newData;
-        });
+    const symbolCategories = {
+        'Basic': [
+            { l: '×', v: '\\times ' }, { l: '÷', v: '\\div ' }, { l: '≠', v: '\\neq ' }, { l: '±', v: '\\pm ' }, 
+            { l: '≤', v: '\\leq ' }, { l: '≥', v: '\\geq ' }, { l: '≈', v: '\\approx ' }, { l: '∞', v: '\\infty ' }
+        ],
+        'Greek': [
+            { l: 'α', v: '\\alpha ' }, { l: 'β', v: '\\beta ' }, { l: 'θ', v: '\\theta ' }, { l: 'π', v: '\\pi ' }, 
+            { l: 'Δ', v: '\\Delta ' }, { l: 'Ω', v: '\\Omega ' }, { l: '∑', v: '\\Sigma ' }
+        ],
+        'Calculus': [
+            { l: '∫', v: '\\int ' }, { l: '∂', v: '\\partial ' }, { l: '∇', v: '\\nabla ' },
+            { l: 'lim', v: '\\lim\\limits_{x \\to \\infty} ' }
+        ],
+        'Symbols': [
+            { l: '∠', v: '\\angle ' }, { l: '°', v: '^\\circ ' }, { l: '∈', v: '\\in ' }, { l: '→', v: '\\rightarrow ' },
+            { l: 'Turus', v: '卌' }
+        ]
     };
 
-    const handleColsChange = (val: number) => {
-        const newCols = Math.max(1, Math.min(10, Math.floor(val || 1)));
-        setCols(newCols);
-        setMatData(prev => {
-            return prev.map(row => {
-                const newRow = Array(newCols).fill('');
-                row.forEach((v, i) => { if (i < newCols) newRow[i] = v; });
-                return newRow;
-            });
-        });
-    };
-
-    const updateMatrix = (r: number, c: number, v: string) => { const d = matData.map(row => [...row]); if(d[r]) { d[r][c] = v; setMatData(d); }};
-    const insertStructure = (type: 'FRAC' | 'ROOT' | 'LIMIT' | 'INT' | 'SUM' | 'MATRIX' | 'SYMBOL', symbolVal?: string) => {
-        let latex = '';
-        switch(type) {
-            case 'FRAC': latex = `${val3 || ''}\\frac{${val1 || 'x'}}{${val2 || 'y'}}`; break;
-            case 'ROOT': latex = val1 ? `\\sqrt[${val1}]{${val2 || 'x'}}` : `\\sqrt{${val2 || 'x'}}`; break;
-            case 'LIMIT': latex = `\\lim\\limits_{${val1 || 'x'} \\to ${val2 || '\\infty'}} ${val3 || 'f(x)'}`; break;
-            case 'INT': latex = `\\int_{${val1 || 'a'}}^{${val2 || 'b'}} ${val3 || 'x'} \\,dx`; break;
-            case 'SUM': latex = `\\sum_{${val1 || 'i=1'}}^{${val2 || 'n'}} ${val3 || 'x_i'}`; break;
-            case 'MATRIX': latex = `\\begin{pmatrix} ${matData.map(row => row.map(c => c || '0').join(' & ')).join(' \\\\ ')} \\end{pmatrix}`; break;
-            case 'SYMBOL': 
-                if (symbolVal && !symbolVal.includes('\\')) {
-                    // Insert as plain text for simple symbols
-                    document.execCommand('insertText', false, symbolVal);
-                    return;
-                }
-                latex = symbolVal || ''; 
-                break;
-        }
-        onInsert(latex); if (type !== 'SYMBOL') onClose(); 
-    };
-    if (!isOpen) return null;
-    const symbols = [
-        { l: '×', v: '×' }, { l: '÷', v: '÷' }, { l: '≠', v: '≠' }, { l: '±', v: '±' }, 
-        { l: '≤', v: '≤' }, { l: '≥', v: '≥' }, { l: '≈', v: '≈' }, { l: '∞', v: '∞' }, 
-        { l: 'α', v: '\\alpha' }, { l: 'β', v: '\\beta' }, { l: 'θ', v: '\\theta' }, { l: 'π', v: '\\pi' }, 
-        { l: 'Δ', v: '\\Delta' }, { l: 'Ω', v: '\\Omega' }, { l: '∑', v: '\\Sigma' }, { l: '∫', v: '\\int' }, 
-        { l: '∠', v: '∠' }, { l: '°', v: '°' }, { l: '∈', v: '∈' }, { l: '→', v: '→' }, 
-        { l: 'Turus 5', v: '卌' }
+    const templates = [
+        { label: 'Pecahan', code: '\\frac{x}{y}' },
+        { label: 'Akar', code: '\\sqrt{x}' },
+        { label: 'Akar n', code: '\\sqrt[n]{x}' },
+        { label: 'Pangkat', code: 'x^{2}' },
+        { label: 'Subskrip', code: 'x_{i}' },
+        { label: 'Integral', code: '\\int_{a}^{b} x \\,dx' },
+        { label: 'Sigma', code: '\\sum_{i=1}^{n} x_i' },
+        { label: 'Matriks 2x2', code: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' }
     ];
+
+    const insertAtCursor = (code: string) => {
+        if (!inputRef.current) return;
+        const textarea = inputRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const before = text.substring(0, start);
+        const after = text.substring(end, text.length);
+        const newValue = before + code + after;
+        setLatexInput(newValue);
+        
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+                inputRef.current.setSelectionRange(start + code.length, start + code.length);
+            }
+        }, 0);
+    };
+
+    // State is reset via React key prop in the parent component when toggled
+
+    useEffect(() => {
+        if (previewContainerRef.current) {
+            const w = window as unknown as { katex?: { render: (tex: string, elem: HTMLElement, opts: any) => void } };
+            if (w.katex && latexInput.trim()) {
+                try {
+                    w.katex.render(latexInput, previewContainerRef.current, { throwOnError: false, displayMode: true });
+                } catch(e) {
+                    previewContainerRef.current.innerText = 'Format tidak valid';
+                }
+            } else {
+                previewContainerRef.current.innerHTML = '<span class="text-gray-400 text-sm">Preview (Ketik untuk melihat hasil)</span>';
+            }
+        }
+    }, [latexInput, tab]);
+
+    if (!isOpen) return null;
+
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
-                <div className="bg-gray-50 dark:bg-slate-900 p-3 border-b dark:border-slate-700 flex justify-between items-center"><h3 className="text-sm font-bold text-gray-700 dark:text-slate-200">Rumus Matematika</h3><button onClick={onClose}><XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"/></button></div>
-                <div className="flex border-b dark:border-slate-700 overflow-x-auto">{['BASIC', 'CALCULUS', 'MATRIX', 'SYMBOLS'].map((t: string) => (<button key={t} onClick={() => setTab(t as 'BASIC' | 'CALCULUS' | 'MATRIX' | 'SYMBOLS')} className={`flex-1 py-2 text-[10px] font-bold tracking-wider ${tab === t ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>{t === 'BASIC' ? 'ALJABAR' : t === 'CALCULUS' ? 'KALKULUS' : t === 'MATRIX' ? 'MATRIKS' : 'SIMBOL'}</button>))}</div>
-                <div className="p-5 overflow-y-auto">
-                    {tab === 'BASIC' && (<div className="space-y-6"><div className="bg-gray-50 dark:bg-slate-700/30 p-3 rounded-lg border border-gray-100 dark:border-slate-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-3 text-center">Pecahan</p><div className="flex flex-col gap-2"><div className="flex items-center justify-center gap-3"><input placeholder="Int" className="w-12 h-10 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val3} onChange={e => setVal3(e.target.value)} /><div className="flex flex-col items-center gap-1"><input placeholder="Atas" className="w-16 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val1} onChange={e => setVal1(e.target.value)} /><div className="w-20 h-0.5 bg-gray-800 dark:bg-slate-400 rounded-full"></div><input placeholder="Bawah" className="w-16 text-center text-sm p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 dark:text-slate-200" value={val2} onChange={e => setVal2(e.target.value)} /></div></div><button onClick={() => insertStructure('FRAC')} className="mt-2 w-full text-xs bg-indigo-600 text-white font-bold py-1.5 rounded">Sisipkan</button></div></div><div className="bg-gray-50 dark:bg-slate-700/30 p-3 rounded-lg border border-gray-100 dark:border-slate-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">Akar</p><div className="flex items-end gap-1 justify-center"><input placeholder="n" className="w-8 text-center text-xs p-1 border dark:border-slate-600 rounded mb-4 bg-white dark:bg-slate-800 dark:text-slate-200" value={val1} onChange={e => setVal1(e.target.value)} /><span className="text-3xl text-gray-400 font-light">√</span><input placeholder="Nilai" className="w-24 text-sm p-1 border dark:border-slate-600 rounded mb-1 bg-white dark:bg-slate-800 dark:text-slate-200" value={val2} onChange={e => setVal2(e.target.value)} /><button onClick={() => insertStructure('ROOT')} className="mb-1 text-xs bg-white dark:bg-slate-800 border dark:border-slate-600 font-bold px-3 py-1.5 rounded dark:text-slate-200">OK</button></div></div></div>)}
-                    {tab === 'CALCULUS' && (<div className="space-y-4"><div className="border dark:border-slate-700 p-3 rounded bg-white dark:bg-slate-800 dark:text-slate-200"><p className="text-[10px] font-bold mb-2">Limit</p><div className="flex items-center gap-3 text-sm"><div className="flex flex-col items-center"><span className="font-serif italic text-lg leading-none">lim</span><div className="flex items-center gap-1 text-[10px] mt-1"><input placeholder="x" className="w-8 p-0.5 border dark:border-slate-600 rounded text-center bg-white dark:bg-slate-900" value={val1} onChange={e => setVal1(e.target.value)} /><span>→</span><input placeholder="∞" className="w-8 p-0.5 border dark:border-slate-600 rounded text-center bg-white dark:bg-slate-900" value={val2} onChange={e => setVal2(e.target.value)} /></div></div><input placeholder="f(x)" className="w-24 p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-900 self-center" value={val3} onChange={e => setVal3(e.target.value)} /><button onClick={() => insertStructure('LIMIT')} className="ml-auto text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded font-bold">Add</button></div></div><div className="border dark:border-slate-700 p-3 rounded bg-white dark:bg-slate-800 dark:text-slate-200"><p className="text-[10px] font-bold mb-2">Integral / Sigma</p><div className="flex items-center gap-2"><div className="flex flex-col items-center"><input placeholder="b" className="w-10 text-center text-xs border dark:border-slate-600 rounded mb-1 bg-white dark:bg-slate-900" value={val2} onChange={e => setVal2(e.target.value)} /><span className="text-2xl text-gray-400">∫/∑</span><input placeholder="a" className="w-10 text-center text-xs border dark:border-slate-600 rounded mt-1 bg-white dark:bg-slate-900" value={val1} onChange={e => setVal1(e.target.value)} /></div><input placeholder="Fungsi" className="flex-1 p-1 border dark:border-slate-600 rounded bg-white dark:bg-slate-900" value={val3} onChange={e => setVal3(e.target.value)} /></div><div className="flex gap-2 mt-2"><button onClick={() => insertStructure('INT')} className="flex-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 py-1 rounded">Integral</button><button onClick={() => insertStructure('SUM')} className="flex-1 text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 py-1 rounded">Sigma</button></div></div></div>)}
-                    {tab === 'MATRIX' && (<div><div className="flex gap-4 justify-center mb-4 dark:text-slate-200"><label className="text-[10px] font-bold">Baris <input type="number" min="1" max="5" value={rows} onChange={e => handleRowsChange(parseInt(e.target.value))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label><label className="text-[10px] font-bold">Kolom <input type="number" min="1" max="5" value={cols} onChange={e => handleColsChange(parseInt(e.target.value))} className="w-10 ml-1 border dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900" /></label></div><div className="grid gap-1 justify-center bg-gray-100 dark:bg-slate-700/50 p-2 rounded" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>{matData.map((rArr, r) => rArr.map((val, c) => (<input key={`${r}-${c}`} value={val} onChange={e => updateMatrix(r, c, e.target.value)} className="w-10 h-8 text-center border dark:border-slate-600 rounded text-xs focus:bg-indigo-50 dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-900 dark:text-slate-200" placeholder="0" />)))}</div><button onClick={() => insertStructure('MATRIX')} className="w-full mt-4 bg-indigo-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-indigo-700">Sisipkan Matriks</button></div>)}
-                    {tab === 'SYMBOLS' && (<div className="grid grid-cols-5 gap-2">{symbols.map((s, i) => (<button key={i} onClick={() => insertStructure('SYMBOL', s.v)} className="aspect-square bg-gray-50 dark:bg-slate-700/50 border dark:border-slate-600 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 transition-colors text-sm font-serif dark:text-slate-200">{s.l}</button>))}</div>)}
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
+                <div className="bg-gray-50 dark:bg-slate-900 p-4 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h3 className="text-md font-bold text-gray-700 dark:text-slate-200">Math Pro Editor</h3>
+                    <button onClick={onClose}><XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"/></button>
+                </div>
+                
+                <div className="flex bg-gray-50 dark:bg-slate-900 border-b dark:border-slate-700 relative z-10 shrink-0">
+                    {['EDITOR', 'SYMBOLS'].map(t => (
+                        <button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 text-xs font-bold tracking-wider ${tab === t ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 bg-white dark:bg-slate-800' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+                            {t === 'EDITOR' ? 'KODE LATEX' : 'DAFTAR SIMBOL'}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex-1 flex flex-col overflow-y-auto w-full relative z-0">
+                    {tab === 'EDITOR' && (
+                        <div className="p-4 flex flex-col gap-4">
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">Template Cepat</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {templates.map(t => (
+                                        <button key={t.label} onClick={() => insertAtCursor(t.code)} className="px-3 py-1.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-100 dark:hover:bg-slate-600 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shadow-sm">
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase">Input LaTeX</label>
+                                <textarea
+                                    ref={inputRef}
+                                    value={latexInput}
+                                    onChange={e => setLatexInput(e.target.value)}
+                                    placeholder="Ketik kode LaTeX di sini (contoh: \sqrt{x^2 + y^2})"
+                                    className="w-full p-4 font-mono text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 dark:text-slate-200 min-h-[140px] resize-y shadow-inner"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase">Preview KaTeX</label>
+                                <div 
+                                    ref={previewContainerRef}
+                                    className="w-full min-h-[120px] max-h-[250px] flex items-center justify-center p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 overflow-x-auto shadow-sm"
+                                >
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {tab === 'SYMBOLS' && (
+                        <div className="p-5 space-y-6">
+                            {Object.entries(symbolCategories).map(([cat, syms]) => (
+                                <div key={cat}>
+                                    <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 dark:border-slate-700 pb-2">{cat}</h4>
+                                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                                        {syms.map(s => (
+                                            <button key={s.l} onClick={() => { setTab('EDITOR'); insertAtCursor(s.v); }} className="aspect-square flex items-center justify-center text-lg font-serif bg-gray-50 dark:bg-slate-700/50 border border-gray-100 dark:border-slate-600 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-600 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors shadow-sm">
+                                                {s.l}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex justify-end gap-3 shrink-0">
+                    <button onClick={onClose} className="px-5 py-2.5 font-bold text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">Batal</button>
+                    <button onClick={() => { onInsert(latexInput); onClose(); }} disabled={!latexInput.trim()} className="px-5 py-2.5 font-bold text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                        Sisipkan Formula
+                    </button>
                 </div>
             </div>
         </div>
