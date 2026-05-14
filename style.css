@@ -169,13 +169,13 @@
 
   /* Ensure images, tables, and diagrams inside options don't overflow */
   .option-content img,
-  .option-content svg,
+  .option-content svg:not(.katex *):not(.math-visual *),
   .option-content canvas,
   .wysiwyg-content img,
-  .wysiwyg-content svg,
+  .wysiwyg-content svg:not(.katex *):not(.math-visual *),
   .wysiwyg-content canvas,
   .prose img,
-  .prose svg,
+  .prose svg:not(.katex *):not(.math-visual *),
   .prose canvas {
     max-width: 100%;
     height: auto;
