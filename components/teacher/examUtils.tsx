@@ -1343,6 +1343,16 @@ export const sanitizeHtml = (html: string): string => {
 
     // Wrap tables in a responsive container to prevent overflow
     doc.body.querySelectorAll('table').forEach(table => {
+        table.classList.add('border-collapse', 'border', 'border-slate-300', 'dark:border-slate-600', 'my-2', 'w-full', 'text-sm', 'min-w-[500px]');
+        
+        table.querySelectorAll('th').forEach(th => {
+            th.classList.add('border', 'border-slate-300', 'dark:border-slate-600', 'p-2', 'bg-slate-50', 'dark:bg-slate-800', 'text-slate-800', 'dark:text-slate-100');
+        });
+        
+        table.querySelectorAll('td').forEach(td => {
+            td.classList.add('border', 'border-slate-300', 'dark:border-slate-600', 'p-2', 'text-slate-800', 'dark:text-slate-200');
+        });
+
         // Check if it's already wrapped
         if (table.parentElement && table.parentElement.classList.contains('overflow-x-auto')) {
             return;
@@ -1687,9 +1697,13 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .header h1 { margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase; font-weight: 800; }
                 .meta-info { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
                 .question-item { margin-bottom: 24px; page-break-inside: avoid; }
-                .question-text { font-size: 14px; margin-bottom: 10px; }
-                .options-container { margin-left: 20px; font-size: 14px; }
-                .option-item { margin-bottom: 8px; }
+                .question-text { font-size: 14px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 12px; }
+                .question-text > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
+                .question-text > .prose { flex: 1; }
+                .options-container { margin-left: 36px; font-size: 14px; }
+                .option-item { margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px; }
+                .option-item > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
+                .option-item > .prose { flex: 1; }
                 .answer-key { page-break-before: always; }
                 .chart-wrapper { max-width: 500px; margin: 15px auto; page-break-inside: avoid; }
                 img { max-width: 100%; height: auto; object-fit: contain; }
