@@ -488,7 +488,11 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
             studentData.studentId = remoteResult.student.studentId;
 
             // Jika nama cocok tapi statusnya sedang berlangsung atau terkunci
-            if (remoteResult.status === 'force_closed') {
+            if (remoteResult.status === 'completed') {
+                setError("Anda sudah menyelesaikan ujian ini dan tidak dapat mengulang kembali.");
+                setIsLoading(false);
+                return;
+            } else if (remoteResult.status === 'force_closed') {
                 setIsLocked(true);
                 setIsLoading(false);
                 return;
