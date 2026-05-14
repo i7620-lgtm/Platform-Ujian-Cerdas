@@ -201,7 +201,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({ exam, student,
             setIsSubmitting(false);
             isSubmittingRef.current = false;
         }
-    }, [activeExam, onSubmit, userLocation, STORAGE_KEY]);
+    }, [activeExam, onSubmit, userLocation, STORAGE_KEY, student.studentId]);
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null;
