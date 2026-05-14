@@ -428,3 +428,18 @@
 .dark .recharts-legend-item-text {
   color: #cbd5e1 !important;
 }
+
+/* --- Fix KaTeX Issues with Tailwind --- */
+.katex * {
+  border-color: currentColor;
+}
+.katex .frac-line {
+  border-bottom-style: solid;
+  border-bottom-width: 1px !important;
+}
+.katex-display {
+  overflow: auto hidden;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+/* -------------------------------------- */
