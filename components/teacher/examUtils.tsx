@@ -1334,6 +1334,12 @@ export const sanitizeHtml = (html: string): string => {
 
                 if (el.getAttribute('style') === '') el.removeAttribute('style');
                 if (el.getAttribute('class') === '') el.removeAttribute('class');
+                
+                // Aggressively clean up table elements to rely on style.css
+                if (['TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD'].includes(el.tagName)) {
+                    el.removeAttribute('class');
+                    el.removeAttribute('style');
+                }
             }
             // Remove legacy attributes
             el.removeAttribute('color');
@@ -1343,16 +1349,6 @@ export const sanitizeHtml = (html: string): string => {
 
     // Wrap tables in a responsive container to prevent overflow
     doc.body.querySelectorAll('table').forEach(table => {
-        table.classList.add('border-collapse', 'border', 'border-slate-300', 'dark:border-slate-600', 'my-2', 'w-full', 'text-sm', 'min-w-[500px]');
-        
-        table.querySelectorAll('th').forEach(th => {
-            th.classList.add('border', 'border-slate-300', 'dark:border-slate-600', 'p-2', 'bg-slate-50', 'dark:bg-slate-800', 'text-slate-800', 'dark:text-slate-100');
-        });
-        
-        table.querySelectorAll('td').forEach(td => {
-            td.classList.add('border', 'border-slate-300', 'dark:border-slate-600', 'p-2', 'text-slate-800', 'dark:text-slate-200');
-        });
-
         // Check if it's already wrapped
         if (table.parentElement && table.parentElement.classList.contains('overflow-x-auto')) {
             return;

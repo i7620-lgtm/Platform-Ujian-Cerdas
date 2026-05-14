@@ -44,8 +44,7 @@
     margin: 1rem 0; 
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
   } 
 
   /* Specific styles for tables inside options to prevent overflow and look better */
@@ -56,8 +55,7 @@
     margin: 0.5rem 0; 
     border: 1px solid #e2e8f0;
     border-radius: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
   }
 
   /* Cell Borders & Spacing */
@@ -187,11 +185,9 @@
   .wysiwyg-content table,
   .prose table,
   .option-content table {
-    display: block;
+    display: table;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .wysiwyg-content table thead,
@@ -203,8 +199,19 @@
   .option-content table thead,
   .option-content table tbody,
   .option-content table tfoot {
-    display: table;
-    width: 100%;
+    display: table-row-group;
+  }
+  
+  .wysiwyg-content table thead,
+  .prose table thead,
+  .option-content table thead {
+    display: table-header-group;
+  }
+
+  .wysiwyg-content table tfoot,
+  .prose table tfoot,
+  .option-content table tfoot {
+    display: table-footer-group;
   }
 
   .wysiwyg-content table th, 
@@ -421,3 +428,18 @@
 .dark .recharts-legend-item-text {
   color: #cbd5e1 !important;
 }
+
+/* --- Fix KaTeX Issues with Tailwind --- */
+.katex * {
+  border-color: currentColor;
+}
+.katex .frac-line {
+  border-bottom-style: solid;
+  border-bottom-width: 1px !important;
+}
+.katex-display {
+  overflow: auto hidden;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+/* -------------------------------------- */
