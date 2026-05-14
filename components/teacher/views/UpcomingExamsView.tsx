@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Exam } from '../../../types';
-import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon, DocumentDuplicateIcon, EyeIcon } from '../../Icons';
+import { CalendarDaysIcon, ClockIcon, PencilIcon, EnvelopeIcon, UserIcon, DocumentDuplicateIcon, EyeIcon, TrashIcon } from '../../Icons';
 import { MetaBadge } from './SharedComponents';
 import { InvitationModal } from '../InvitationModal';
 import { CollaboratorModal } from '../CollaboratorModal';
@@ -10,12 +10,13 @@ interface UpcomingExamsViewProps {
     exams: Exam[];
     onEditExam: (exam: Exam) => void;
     onDuplicateExam: (exam: Exam) => void;
+    onDeleteExam: (exam: Exam) => void;
     teacherName?: string;
     schoolName?: string;
     onRefresh?: () => void;
 }
 
-export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, onDuplicateExam, teacherName, schoolName, onRefresh }) => {
+export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onEditExam, onDuplicateExam, onDeleteExam, teacherName, schoolName, onRefresh }) => {
     const [selectedInviteExam, setSelectedInviteExam] = useState<Exam | null>(null);
     const [selectedCollaboratorExam, setSelectedCollaboratorExam] = useState<Exam | null>(null);
 
@@ -110,6 +111,14 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({ exams, onE
                                 >
                                     <PencilIcon className="w-4 h-4" /> 
                                     Edit
+                                </button>
+                                <button
+                                    onClick={() => onDeleteExam(exam)}
+                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-5 py-2.5 text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-all font-bold shadow-sm border border-red-100 dark:border-red-800"
+                                    title="Hapus Ujian"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                    <span className="hidden lg:inline">Hapus</span>
                                 </button>
                             </div>
                         </div>
