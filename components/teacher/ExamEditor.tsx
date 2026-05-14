@@ -215,7 +215,7 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
                                 <label className="text-[10px] font-bold text-gray-400 uppercase">Preview KaTeX</label>
                                 <div 
                                     ref={previewContainerRef}
-                                    className="w-full min-h-[120px] max-h-[250px] flex items-center justify-center p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 overflow-x-auto shadow-sm"
+                                    className="w-full min-h-[120px] max-h-[250px] p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 overflow-auto shadow-sm text-center"
                                 >
                                 </div>
                             </div>
