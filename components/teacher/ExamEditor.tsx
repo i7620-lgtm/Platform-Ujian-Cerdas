@@ -528,6 +528,39 @@ const WysiwygEditor: React.FC<{
 
     const handlePaste = (e: React.ClipboardEvent) => {
         e.preventDefault();
+
+        const items = e.clipboardData.items;
+        let imagePasted = false;
+        
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    imagePasted = true;
+                    // Pastikan fokus ke editor agar execCommand bekerja di posisi kursor terakhir
+                    if (document.activeElement !== editorRef.current) {
+                        editorRef.current?.focus();
+                        restoreSelection();
+                    }
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                        const rawDataUrl = ev.target?.result as string;
+                        try {
+                            const dataUrl = await compressImage(rawDataUrl, 0.7);
+                            const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 8px 0;" />&nbsp;`;
+                            document.execCommand('insertHTML', false, imgTag);
+                            handleInput();
+                        } catch (error) {
+                            console.error("Image compression failed", error);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        }
+        
+        if (imagePasted) return;
+
         const text = e.clipboardData.getData('text/plain');
         const html = e.clipboardData.getData('text/html');
         
