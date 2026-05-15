@@ -34,8 +34,12 @@ interface ExamEditorProps {
 
 const SUBJECTS = [
     "Agama Buddha", "Agama Hindu", "Agama Islam", "Agama Katolik", "Agama Khonghucu", "Agama Kristen",
-    "Bahasa Indonesia", "Bahasa Inggris", "IPA", "IPAS", "IPS", "Kepercayaan", "KKA", "Lainnya",
-    "Matematika", "Matematika Lanjut", "Muatan Lokal", "Pendidikan Pancasila", "PJOK", "Seni Budaya", "TIK"
+    "Antropologi", "Bahasa Bali", "Bahasa Indonesia", "Bahasa Indonesia Lanjut", "Bahasa Inggris", "Bahasa Inggris Lanjut", 
+    "Bimbingan Konseling (BK)", "Biologi", "Biologi Lanjut", "Ekonomi", "Fisika", "Fisika Lanjut", "Geografi",
+    "Ilmu Pengetahuan Alam (IPA)", "Ilmu Pengetahuan Alam dan Sosial (IPAS)", "Ilmu Pengetahuan Sosial (IPS)", "Informatika",
+    "Kepercayaan", "Kimia", "Kimia Lanjut", "Koding dan Kecerdasan Artifisial (KKA)", "Lainnya",
+    "Matematika", "Matematika Lanjut", "Muatan Lokal", "Pendidikan Jasmani, Olahraga dan Kesehatan (PJOK)",
+    "Pendidikan Pancasila", "Prakarya", "Sejarah", "Seni Budaya", "Sosiologi", "Teknologi Informasi dan Komunikasi (TIK)"
 ];
 
 const CLASSES = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6", "Kelas 7", "Kelas 8", "Kelas 9", "Kelas 10", "Kelas 11", "Kelas 12", "Mahasiswa", "Umum"];
