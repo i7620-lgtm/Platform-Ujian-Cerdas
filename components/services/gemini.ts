@@ -80,7 +80,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           type: Type.OBJECT,
           properties: {
             label: { type: Type.STRING },
-            data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+            data: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["label", "data"]
         }
