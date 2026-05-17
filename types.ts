@@ -1,4 +1,4 @@
- 
+
 export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'ESSAY' | 'FILL_IN_THE_BLANK' | 'INFO';
 
 export interface QuizConfig {
@@ -21,6 +21,7 @@ export interface ChartData {
     borderColor?: string[];
   }[];
   showTooltip?: boolean;
+  showLegend?: boolean;
 }
 
 export interface Question {
