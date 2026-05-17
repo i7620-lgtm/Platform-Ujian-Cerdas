@@ -475,7 +475,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           {renderChart()}
         </div>
       </div>
-      {legendItems.length > 0 && (
+      {data.showLegend !== false && legendItems.length > 0 && (
         <div className="mt-[10px] flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 shrink-0">
           {legendItems.map((item, index) => (
             <div key={`item-${index}`} className="flex items-center text-[13px] sm:text-[14px] font-bold" style={{ color: item.color }}>
