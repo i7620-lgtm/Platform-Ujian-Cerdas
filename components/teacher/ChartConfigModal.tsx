@@ -26,6 +26,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
     { label: 'Data 1', data: [10, 20, 30] }
   ]);
   const [showTooltip, setShowTooltip] = useState<boolean>(true);
+  const [showLegend, setShowLegend] = useState<boolean>(true);
 
   useEffect(() => {
     if (initialData) {
@@ -35,6 +36,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       setLabels(initialData.labels);
       setDatasets(initialData.datasets.map(d => ({ label: d.label, data: d.data })));
       setShowTooltip(initialData.showTooltip !== false);
+      setShowLegend(initialData.showLegend !== false);
     }
   }, [initialData, isOpen]);
 
@@ -91,7 +93,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       title,
       labels,
       datasets,
-      showTooltip
+      showTooltip,
+      showLegend
     });
     onClose();
   };
@@ -134,17 +137,32 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="showTooltip"
-              checked={showTooltip}
-              onChange={(e) => setShowTooltip(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
-              Tampilkan Tooltip (Kotak Info saat disentuh/hover)
-            </label>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showTooltip"
+                checked={showTooltip}
+                onChange={(e) => setShowTooltip(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                Tampilkan Tooltip (Kotak Info saat disentuh/hover)
+              </label>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showLegend"
+                checked={showLegend}
+                onChange={(e) => setShowLegend(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="showLegend" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                Tampilkan Legend / Keterangan Warna
+              </label>
+            </div>
           </div>
 
           {type === 'relation' ? (
