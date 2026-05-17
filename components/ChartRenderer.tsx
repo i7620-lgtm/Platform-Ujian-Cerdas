@@ -85,17 +85,21 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     return labels.map((label, index) => {
       const entry: Record<string, string | number> = { name: label };
       datasets.forEach(dataset => {
-        entry[dataset.label] = dataset.data[index];
+        if (type === 'bar' || type === 'line') {
+           entry[dataset.label] = Number(dataset.data[index]) || 0;
+        } else {
+           entry[dataset.label] = dataset.data[index];
+        }
       });
       return entry;
     });
-  }, [labels, datasets]);
+  }, [labels, datasets, type]);
 
   const pieData = React.useMemo(() => {
     if (type !== 'pie') return [];
     return labels.map((label, index) => ({
       name: label,
-      value: datasets[0]?.data[index] ?? 0
+      value: Number(datasets[0]?.data[index]) || 0
     }));
   }, [type, labels, datasets]);
 
@@ -130,7 +134,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     let max = 0;
     datasets.forEach(d => {
       d.data.forEach(v => {
-        if (typeof v === 'number' && v > max) max = v;
+        const num = Number(v);
+        if (!isNaN(num) && num > max) max = num;
       });
     });
     
