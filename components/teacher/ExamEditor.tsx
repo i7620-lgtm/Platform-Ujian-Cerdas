@@ -133,7 +133,24 @@ const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert
         { label: 'Subskrip', code: 'x_{i}' },
         { label: 'Integral', code: '\\int_{a}^{b} x \\,dx' },
         { label: 'Sigma', code: '\\sum_{i=1}^{n} x_i' },
-        { label: 'Matriks 2x2', code: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' }
+        { label: 'Matriks 2x2', code: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
+        { label: 'Matriks nxn', code: '\\begin{pmatrix} a_{11} & \\cdots & a_{1n} \\\\ \\vdots & \\ddots & \\vdots \\\\ a_{n1} & \\cdots & a_{nn} \\end{pmatrix}' },
+        { label: 'Matriks nx1', code: '\\begin{pmatrix} a_{1} \\\\ a_{2} \\\\ \\vdots \\\\ a_{n} \\end{pmatrix}' },
+        { label: 'Matriks 1xn', code: '\\begin{pmatrix} a_{1} & a_{2} & \\cdots & a_{n} \\end{pmatrix}' },
+        { label: 'Limit', code: '\\lim_{x \\to a} f(x)' },
+        { label: 'Logaritma', code: '\\log_{a} x' },
+        { label: 'Kurung Kurawal', code: '\\left\\{ x \\right\\}' },
+        { label: 'Kurung Biasa', code: '\\left( x \\right)' },
+        { label: 'Kurung Siku', code: '\\left[ x \\right]' },
+        { label: 'Permutasi', code: '_{n}P_{r}' },
+        { label: 'Kombinasi', code: '_{n}C_{r}' },
+        { label: 'Vektor', code: '\\vec{v}' },
+        { label: 'Vektor Kolom', code: '\\begin{pmatrix} x \\\\ y \\\\ z \\end{pmatrix}' },
+        { label: 'Nilai Mutlak', code: '\\left| x \\right|' },
+        { label: 'Fungsi Piecewise', code: '\\begin{cases} x, & \\text{jika } x > 0 \\\\ -x, & \\text{jika } x \\leq 0 \\end{cases}' },
+        { label: 'Irisan Himpunan', code: 'A \\cap B' },
+        { label: 'Gabungan Himpunan', code: 'A \\cup B' },
+        { label: 'Turunan (dy/dx)', code: '\\frac{dy}{dx}' }
     ];
 
     const insertAtCursor = (code: string) => {
