@@ -19,24 +19,43 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   onDelete,
   initialData
 }) => {
-  const [type, setType] = useState<'bar' | 'line' | 'pie'>('bar');
+  const [type, setType] = useState<'bar' | 'line' | 'pie' | 'venn' | 'relation'>('bar');
   const [title, setTitle] = useState('');
   const [labels, setLabels] = useState<string[]>(['Jan', 'Feb', 'Mar']);
-  const [datasets, setDatasets] = useState<{ label: string; data: number[] }[]>([
+  const [datasets, setDatasets] = useState<{ label: string; data: (number | string)[] }[]>([
     { label: 'Data 1', data: [10, 20, 30] }
   ]);
   const [showTooltip, setShowTooltip] = useState<boolean>(true);
+  const [showLegend, setShowLegend] = useState<boolean>(true);
 
   useEffect(() => {
     if (initialData) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setType(initialData.type);
+      setType(initialData.type as any);
       setTitle(initialData.title || '');
       setLabels(initialData.labels);
       setDatasets(initialData.datasets.map(d => ({ label: d.label, data: d.data })));
       setShowTooltip(initialData.showTooltip !== false);
+      setShowLegend(initialData.showLegend !== false);
     }
   }, [initialData, isOpen]);
+
+  const handleTypeChange = (newType: string) => {
+    setType(newType as any);
+    if (newType === 'venn') {
+       if (labels.length !== 2 && labels.length !== 3) {
+         setLabels(['A', 'B']);
+         setDatasets([{ label: 'Data', data: ['', '', '', '', ''] }]);
+       }
+    } else if (newType === 'relation') {
+       setLabels(['A', 'B']);
+       setDatasets([
+         { label: 'Domain', data: ['1', '2', '3'] },
+         { label: 'Kodomain', data: ['a', 'b', 'c'] },
+         { label: 'Relasi', data: ['0-0', '1-1', '2-2'] }
+       ]);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -74,7 +93,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       title,
       labels,
       datasets,
-      showTooltip
+      showTooltip,
+      showLegend
     });
     onClose();
   };
@@ -105,121 +125,354 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Jenis Diagram</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as 'bar' | 'line' | 'pie')}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
               >
                 <option value="bar">Diagram Batang (Bar)</option>
                 <option value="line">Diagram Garis (Line)</option>
                 <option value="pie">Diagram Lingkaran (Pie)</option>
+                <option value="venn">Diagram Venn Himpunan</option>
+                <option value="relation">Diagram Relasi / Fungsi</option>
               </select>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="showTooltip"
-              checked={showTooltip}
-              onChange={(e) => setShowTooltip(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
-              Tampilkan Tooltip (Kotak Info saat disentuh/hover)
-            </label>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showTooltip"
+                checked={showTooltip}
+                onChange={(e) => setShowTooltip(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                Tampilkan Tooltip (Kotak Info saat disentuh/hover)
+              </label>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showLegend"
+                checked={showLegend}
+                onChange={(e) => setShowLegend(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="showLegend" className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                Tampilkan Legend / Keterangan Warna
+              </label>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-gray-700 dark:text-slate-200">Label & Data</h3>
-              <div className="space-x-2">
-                <button
-                  onClick={handleAddLabel}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-600 dark:text-white rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors flex items-center gap-1 inline-flex"
-                >
-                  <PlusCircleIcon className="w-4 h-4" /> Tambah Label
-                </button>
-                {type !== 'pie' && (
-                  <button
-                    onClick={handleAddDataset}
-                    className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-600 dark:text-white rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-700 transition-colors flex items-center gap-1 inline-flex"
-                  >
-                    <PlusCircleIcon className="w-4 h-4" /> Tambah Dataset
-                  </button>
-                )}
+          {type === 'relation' ? (
+            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Nama Himpunan 1 (Domain)</label>
+                  <input type="text" value={labels[0] || ''} onChange={e => { const newL = [...labels]; newL[0] = e.target.value; setLabels(newL); }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Nama Himpunan 2 (Kodomain)</label>
+                  <input type="text" value={labels[1] || ''} onChange={e => { const newL = [...labels]; newL[1] = e.target.value; setLabels(newL); }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs font-bold text-slate-500">Anggota Domain</label>
+                    <button onClick={() => {
+                      const newD = [...datasets];
+                      if (!newD[0]) newD[0] = { label: 'Domain', data: [] };
+                      newD[0].data.push('');
+                      setDatasets(newD);
+                    }} className="text-xs text-blue-600 font-bold">+ Tambah</button>
+                  </div>
+                  <div className="space-y-2">
+                    {datasets[0]?.data.map((item, idx) => (
+                      <div key={`dom-${idx}`} className="flex gap-2">
+                        <input type="text" value={item} onChange={e => {
+                          const newD = [...datasets]; newD[0].data[idx] = e.target.value; setDatasets(newD);
+                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                        <button onClick={() => {
+                          const newD = [...datasets]; newD[0].data.splice(idx, 1); setDatasets(newD);
+                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs font-bold text-slate-500">Anggota Kodomain</label>
+                    <button onClick={() => {
+                      const newD = [...datasets];
+                      if (!newD[1]) newD[1] = { label: 'Kodomain', data: [] };
+                      newD[1].data.push('');
+                      setDatasets(newD);
+                    }} className="text-xs text-blue-600 font-bold">+ Tambah</button>
+                  </div>
+                  <div className="space-y-2">
+                    {datasets[1]?.data.map((item, idx) => (
+                      <div key={`codom-${idx}`} className="flex gap-2">
+                        <input type="text" value={item} onChange={e => {
+                          const newD = [...datasets]; newD[1].data[idx] = e.target.value; setDatasets(newD);
+                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                        <button onClick={() => {
+                          const newD = [...datasets]; newD[1].data.splice(idx, 1); setDatasets(newD);
+                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t dark:border-slate-700">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Relasi Pemetaan</label>
+                  <button onClick={() => {
+                    const newD = [...datasets];
+                    if (!newD[2]) newD[2] = { label: 'Relasi', data: [] };
+                    newD[2].data.push('0-0');
+                    setDatasets(newD);
+                  }} className="text-sm bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400">+ Tambah Relasi</button>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {datasets[2]?.data.map((rel, idx) => {
+                    const [dIdx, cIdx] = String(rel).split('-');
+                    return (
+                      <div key={`rel-${idx}`} className="flex gap-2 items-center bg-white dark:bg-slate-800 p-2 rounded border dark:border-slate-700">
+                        <select value={dIdx} onChange={e => {
+                          const newD = [...datasets]; newD[2].data[idx] = `${e.target.value}-${cIdx}`; setDatasets(newD);
+                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                          <option value="">Pilih Domain</option>
+                          {datasets[0]?.data.map((item, i) => (
+                            <option key={`d-${i}`} value={i}>{item}</option>
+                          ))}
+                        </select>
+                        <span className="text-slate-400 font-bold">→</span>
+                        <select value={cIdx} onChange={e => {
+                          const newD = [...datasets]; newD[2].data[idx] = `${dIdx}-${e.target.value}`; setDatasets(newD);
+                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                          <option value="">Pilih Kodomain</option>
+                          {datasets[1]?.data.map((item, i) => (
+                            <option key={`c-${i}`} value={i}>{item}</option>
+                          ))}
+                        </select>
+                        <button onClick={() => {
+                          const newD = [...datasets]; newD[2].data.splice(idx, 1); setDatasets(newD);
+                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
+          ) : type === 'venn' ? (
+            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
+              <div className="flex justify-between items-center mb-4">
+                 <h3 className="font-bold text-gray-700 dark:text-slate-200">Data Diagram Venn</h3>
+                 <div className="flex gap-2">
+                   <button onClick={() => { setLabels(['A', 'B']); setDatasets([{ label: 'Data', data: ['', '', '', '', ''] }]); }} className={`px-3 py-1 rounded text-sm ${labels.length !== 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-slate-300'}`}>2 Himpunan</button>
+                   <button onClick={() => { setLabels(['A', 'B', 'C']); setDatasets([{ label: 'Data', data: ['', '', '', '', '', '', '', '', ''] }]); }} className={`px-3 py-1 rounded text-sm ${labels.length === 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-slate-300'}`}>3 Himpunan</button>
+                 </div>
+              </div>
 
-            <div className="overflow-x-auto border dark:border-slate-700 rounded-xl">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-slate-800/50 border-b dark:border-slate-700">
-                  <tr>
-                    <th className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">Label</th>
-                    {datasets.map((d, i) => (
-                      <th key={i} className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">
-                        <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 mb-1">Total Semesta (S)</label>
+                   <input type="text" value={datasets[0]?.data[labels.length === 3 ? 8 : 4] || ''} onChange={e => {
+                     const newD = [...(datasets[0]?.data || [])];
+                     newD[labels.length === 3 ? 8 : 4] = e.target.value;
+                     const newDatasets = [...datasets];
+                     if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] };
+                     newDatasets[0].data = newD;
+                     setDatasets(newDatasets);
+                   }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 mb-1">Nilai di Luar Himpunan</label>
+                   <input type="text" value={datasets[0]?.data[labels.length === 3 ? 7 : 3] || ''} onChange={e => {
+                     const newD = [...(datasets[0]?.data || [])];
+                     newD[labels.length === 3 ? 7 : 3] = e.target.value;
+                     const newDatasets = [...datasets];
+                     if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] };
+                     newDatasets[0].data = newD;
+                     setDatasets(newDatasets);
+                   }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-3 mt-4">
+                <h4 className="font-bold text-sm text-slate-600 dark:text-slate-300 border-b dark:border-slate-700 pb-1">Himpunan</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                     <input type="text" placeholder="Nama Himpunan 1" value={labels[0] || 'A'} onChange={e => {
+                       const newL = [...labels]; newL[0] = e.target.value; setLabels(newL);
+                     }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
+                     <label className="text-xs text-slate-500">Nilai Hanya {labels[0] || 'A'}</label>
+                     <input type="text" value={datasets[0]?.data[0] ?? ''} onChange={e => {
+                       const newD = [...(datasets[0]?.data || [])]; newD[0] = e.target.value;
+                       const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                     }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <input type="text" placeholder="Nama Himpunan 2" value={labels[1] || 'B'} onChange={e => {
+                       const newL = [...labels]; newL[1] = e.target.value; setLabels(newL);
+                     }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
+                     <label className="text-xs text-slate-500">Nilai Hanya {labels[1] || 'B'}</label>
+                     <input type="text" value={datasets[0]?.data[1] ?? ''} onChange={e => {
+                       const newD = [...(datasets[0]?.data || [])]; newD[1] = e.target.value;
+                       const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                     }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                  </div>
+                  {labels.length === 3 && (
+                    <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                       <input type="text" placeholder="Nama Himpunan 3" value={labels[2] || 'C'} onChange={e => {
+                         const newL = [...labels]; newL[2] = e.target.value; setLabels(newL);
+                       }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
+                       <label className="text-xs text-slate-500">Nilai Hanya {labels[2] || 'C'}</label>
+                       <input type="text" value={datasets[0]?.data[2] ?? ''} onChange={e => {
+                         const newD = [...(datasets[0]?.data || [])]; newD[2] = e.target.value;
+                         const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                       }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 mt-4">
+                <h4 className="font-bold text-sm text-slate-600 dark:text-slate-300 border-b dark:border-slate-700 pb-1">Irisan</h4>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="flex flex-col gap-1">
+                      <label className="text-xs text-slate-500">Irisan {labels[0] || 'A'} & {labels[1] || 'B'}</label>
+                      <input type="text" value={datasets[0]?.data[labels.length === 3 ? 3 : 2] ?? ''} onChange={e => {
+                        const newD = [...(datasets[0]?.data || [])]; newD[labels.length === 3 ? 3 : 2] = e.target.value;
+                        const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                      }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                   </div>
+                   {labels.length === 3 && (
+                     <>
+                       <div className="flex flex-col gap-1">
+                          <label className="text-xs text-slate-500">Irisan {labels[0] || 'A'} & {labels[2] || 'C'}</label>
+                          <input type="text" value={datasets[0]?.data[4] ?? ''} onChange={e => {
+                            const newD = [...(datasets[0]?.data || [])]; newD[4] = e.target.value;
+                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                       </div>
+                       <div className="flex flex-col gap-1">
+                          <label className="text-xs text-slate-500">Irisan {labels[1] || 'B'} & {labels[2] || 'C'}</label>
+                          <input type="text" value={datasets[0]?.data[5] ?? ''} onChange={e => {
+                            const newD = [...(datasets[0]?.data || [])]; newD[5] = e.target.value;
+                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                       </div>
+                       <div className="flex flex-col gap-1 col-span-2">
+                          <label className="text-xs text-slate-500 font-bold">Irisan Ketiganya ({labels[0] || 'A'}, {labels[1] || 'B'} & {labels[2] || 'C'})</label>
+                          <input type="text" value={datasets[0]?.data[6] ?? ''} onChange={e => {
+                            const newD = [...(datasets[0]?.data || [])]; newD[6] = e.target.value;
+                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
+                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                       </div>
+                     </>
+                   )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-700 dark:text-slate-200">Label & Data</h3>
+                <div className="space-x-2">
+                  <button
+                    onClick={handleAddLabel}
+                    className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-600 dark:text-white rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors flex items-center gap-1 inline-flex"
+                  >
+                    <PlusCircleIcon className="w-4 h-4" /> Tambah Label
+                  </button>
+                  {type !== 'pie' && (
+                    <button
+                      onClick={handleAddDataset}
+                      className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-600 dark:text-white rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-700 transition-colors flex items-center gap-1 inline-flex"
+                    >
+                      <PlusCircleIcon className="w-4 h-4" /> Tambah Dataset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border dark:border-slate-700 rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-slate-800/50 border-b dark:border-slate-700">
+                    <tr>
+                      <th className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">Label</th>
+                      {datasets.map((d, i) => (
+                        <th key={i} className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={d.label}
+                              onChange={(e) => {
+                                const newDatasets = [...datasets];
+                                newDatasets[i].label = e.target.value;
+                                setDatasets(newDatasets);
+                              }}
+                              className="border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none w-24 bg-transparent dark:text-white"
+                            />
+                            {datasets.length > 1 && (
+                              <button onClick={() => handleDeleteDataset(i)} className="text-red-500 hover:text-red-700">
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="p-3 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-slate-700">
+                    {labels.map((label, labelIdx) => (
+                      <tr key={labelIdx} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="p-3">
                           <input
                             type="text"
-                            value={d.label}
+                            value={label}
                             onChange={(e) => {
-                              const newDatasets = [...datasets];
-                              newDatasets[i].label = e.target.value;
-                              setDatasets(newDatasets);
+                              const newLabels = [...labels];
+                              newLabels[labelIdx] = e.target.value;
+                              setLabels(newLabels);
                             }}
-                            className="border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none w-24 bg-transparent dark:text-white"
+                            className="w-full border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none bg-transparent dark:text-white"
                           />
-                          {datasets.length > 1 && (
-                            <button onClick={() => handleDeleteDataset(i)} className="text-red-500 hover:text-red-700">
+                        </td>
+                        {datasets.map((dataset, datasetIdx) => (
+                          <td key={datasetIdx} className="p-3">
+                            <input
+                              type="number"
+                              value={dataset.data[labelIdx]}
+                              onChange={(e) => {
+                                const newDatasets = [...datasets];
+                                newDatasets[datasetIdx].data[labelIdx] = Number(e.target.value);
+                                setDatasets(newDatasets);
+                              }}
+                              className="w-full p-1 border dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
+                            />
+                          </td>
+                        ))}
+                        <td className="p-3">
+                          {labels.length > 1 && (
+                            <button onClick={() => handleDeleteLabel(labelIdx)} className="text-red-500 hover:text-red-700">
                               <TrashIcon className="w-4 h-4" />
                             </button>
                           )}
-                        </div>
-                      </th>
-                    ))}
-                    <th className="p-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y dark:divide-slate-700">
-                  {labels.map((label, labelIdx) => (
-                    <tr key={labelIdx} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={label}
-                          onChange={(e) => {
-                            const newLabels = [...labels];
-                            newLabels[labelIdx] = e.target.value;
-                            setLabels(newLabels);
-                          }}
-                          className="w-full border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none bg-transparent dark:text-white"
-                        />
-                      </td>
-                      {datasets.map((dataset, datasetIdx) => (
-                        <td key={datasetIdx} className="p-3">
-                          <input
-                            type="number"
-                            value={dataset.data[labelIdx]}
-                            onChange={(e) => {
-                              const newDatasets = [...datasets];
-                              newDatasets[datasetIdx].data[labelIdx] = Number(e.target.value);
-                              setDatasets(newDatasets);
-                            }}
-                            className="w-full p-1 border dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
-                          />
                         </td>
-                      ))}
-                      <td className="p-3">
-                        {labels.length > 1 && (
-                          <button onClick={() => handleDeleteLabel(labelIdx)} className="text-red-500 hover:text-red-700">
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="p-4 sm:p-6 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row justify-between gap-3">

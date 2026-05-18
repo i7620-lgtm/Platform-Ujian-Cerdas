@@ -11,16 +11,17 @@ export interface QuizConfig {
 }
 
 export interface ChartData {
-  type: 'bar' | 'line' | 'pie';
+  type: 'bar' | 'line' | 'pie' | 'venn' | 'relation';
   title?: string;
   labels: string[];
   datasets: {
     label: string;
-    data: number[];
+    data: (number | string)[];
     backgroundColor?: string[];
     borderColor?: string[];
   }[];
   showTooltip?: boolean;
+  showLegend?: boolean;
 }
 
 export interface Question {

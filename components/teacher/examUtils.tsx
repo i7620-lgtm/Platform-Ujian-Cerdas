@@ -1627,44 +1627,185 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 }
                 
                 const typedData = chartData as any;
-                const labelsStr = JSON.stringify(typedData.labels || []);
-                const datasetsStr = JSON.stringify(typedData.datasets?.map((ds: any, idx: number) => {
-                    const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-                    const color = colors[idx % colors.length];
-                    return {
-                        label: ds.label,
-                        data: ds.data,
-                        backgroundColor: ds.backgroundColor || (typedData.type === 'pie' ? colors : color),
-                        borderColor: ds.borderColor || color,
-                        borderWidth: 1
-                    };
-                }) || []);
+                
+                if (typedData.type === 'venn') {
+                    const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
+                    const labels = typedData.labels || [];
+                    const d = typedData.datasets?.[0]?.data || [];
+                    
+                    let svgContent = '';
+                    if (labels.length <= 2) {
+                        const vA = d[0] ?? '';
+                        const vB = d[1] ?? '';
+                        const vAB = d[2] ?? '';
+                        const vOuter = d[3] ?? '';
+                        const vTotal = d[4] ?? '';
+                        svgContent = `
+                            <svg viewBox="0 0 400 300" style="width: 100%; max-width: 400px; height: auto;">
+                                <rect x="10" y="10" width="380" height="280" fill="none" stroke="#1e293b" stroke-width="2" />
+                                <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
+                                <text x="360" y="270" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
+                                <circle cx="160" cy="150" r="100" fill="${COLORS[0]}" fill-opacity="0.5" stroke="${COLORS[0]}" stroke-width="2" />
+                                <circle cx="240" cy="150" r="100" fill="${COLORS[1]}" fill-opacity="0.5" stroke="${COLORS[1]}" stroke-width="2" />
+                                <text x="110" y="70" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${labels[0] || 'A'}</text>
+                                <text x="290" y="70" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${labels[1] || 'B'}</text>
+                                <text x="120" y="155" text-anchor="middle" fill="#000" font-weight="bold" font-size="20">${vA}</text>
+                                <text x="280" y="155" text-anchor="middle" fill="#000" font-weight="bold" font-size="20">${vB}</text>
+                                <text x="200" y="155" text-anchor="middle" fill="#000" font-weight="bold" font-size="20">${vAB}</text>
+                            </svg>
+                        `;
+                    } else {
+                        const vA = d[0] ?? '';
+                        const vB = d[1] ?? '';
+                        const vC = d[2] ?? '';
+                        const vAB = d[3] ?? '';
+                        const vAC = d[4] ?? '';
+                        const vBC = d[5] ?? '';
+                        const vABC = d[6] ?? '';
+                        const vOuter = d[7] ?? '';
+                        const vTotal = d[8] ?? '';
+                        svgContent = `
+                            <svg viewBox="0 0 400 400" style="width: 100%; max-width: 400px; height: auto;">
+                                <rect x="10" y="10" width="380" height="380" fill="none" stroke="#1e293b" stroke-width="2" />
+                                <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
+                                <text x="360" y="370" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
+                                <circle cx="160" cy="160" r="90" fill="${COLORS[0]}" fill-opacity="0.5" stroke="${COLORS[0]}" stroke-width="2" />
+                                <circle cx="240" cy="160" r="90" fill="${COLORS[1]}" fill-opacity="0.5" stroke="${COLORS[1]}" stroke-width="2" />
+                                <circle cx="200" cy="230" r="90" fill="${COLORS[2]}" fill-opacity="0.5" stroke="${COLORS[2]}" stroke-width="2" />
+                                <text x="100" y="80" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${labels[0] || 'A'}</text>
+                                <text x="300" y="80" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${labels[1] || 'B'}</text>
+                                <text x="200" y="350" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${labels[2] || 'C'}</text>
+                                <text x="130" y="150" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vA}</text>
+                                <text x="270" y="150" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vB}</text>
+                                <text x="200" y="270" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vC}</text>
+                                <text x="200" y="135" text-anchor="middle" fill="#000" font-weight="bold" font-size="14">${vAB}</text>
+                                <text x="155" y="210" text-anchor="middle" fill="#000" font-weight="bold" font-size="14">${vAC}</text>
+                                <text x="245" y="210" text-anchor="middle" fill="#000" font-weight="bold" font-size="14">${vBC}</text>
+                                <text x="200" y="185" text-anchor="middle" fill="#000" font-weight="bold" font-size="16">${vABC}</text>
+                            </svg>
+                        `;
+                    }
+                    
+                    const newHtml = `<div class="chart-wrapper" style="text-align: center;">${typedData.title ? `<h3>${typedData.title}</h3>` : ''}${svgContent}</div>`;
+                    if (processedHtml.includes('chart-placeholder')) {
+                        processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, newHtml);
+                    } else {
+                        processedHtml += newHtml;
+                    }
+                } else if (typedData.type === 'relation') {
+                    const domainName = typedData.labels?.[0] || 'A';
+                    const codomainName = typedData.labels?.[1] || 'B';
+                    const domainItems = typedData.datasets?.[0]?.data || [];
+                    const codomainItems = typedData.datasets?.[1]?.data || [];
+                    const relationships = typedData.datasets?.[2]?.data || [];
 
-                chartScripts += `
-                    Chart.register(ChartDataLabels);
-                    new Chart(document.getElementById("${canvasId}"), {
-                        type: "${typedData.type}",
-                        data: {
-                            labels: ${labelsStr},
-                            datasets: ${datasetsStr}
-                        },
-                        options: {
-                            responsive: true,
-                            animation: false,
-                            plugins: {
-                                title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
-                                datalabels: {
-                                    color: '${typedData.type === 'pie' ? '#fff' : '#000'}',
-                                    font: { weight: 'bold', size: 12 },
-                                    display: true,
-                                    align: '${typedData.type === 'pie' ? 'center' : 'end'}',
-                                    anchor: '${typedData.type === 'pie' ? 'center' : 'end'}',
-                                    formatter: function(value) { return value; }
-                                }
+                    const svgW = 400;
+                    const svgH = Math.max(300, Math.max(domainItems.length, codomainItems.length) * 40 + 100);
+                    const domainX = 100;
+                    const codomainX = 300;
+                    const ovalWidth = 100;
+                    const ovalHeight = svgH - 60;
+
+                    const getY = (index: number, total: number) => {
+                        if (total === 1) return svgH / 2 + 10;
+                        const startY = 80;
+                        const endY = svgH - 50;
+                        return startY + (index * (endY - startY)) / (total - 1);
+                    };
+
+                    let pathsHtml = '';
+                    relationships.forEach((rel: string) => {
+                        const pts = String(rel).split('-');
+                        if (pts.length === 2) {
+                            const dIdx = parseInt(pts[0], 10);
+                            const cIdx = parseInt(pts[1], 10);
+                            if (dIdx >= 0 && dIdx < domainItems.length && cIdx >= 0 && cIdx < codomainItems.length) {
+                                const startY = getY(dIdx, domainItems.length);
+                                const endY = getY(cIdx, codomainItems.length);
+                                pathsHtml += `<path d="M ${domainX + 15} ${startY} C ${domainX + 60} ${startY}, ${codomainX - 60} ${endY}, ${codomainX - 15} ${endY}" fill="none" stroke="#1e293b" stroke-width="1.5" marker-end="url(#arrowhead-${chartCounter})" />`;
                             }
                         }
                     });
-                `;
+
+                    let itemsHtml = '';
+                    domainItems.forEach((item: string, i: number) => {
+                        const y = getY(i, domainItems.length);
+                        itemsHtml += `<text x="${domainX - 10}" y="${y + 5}" text-anchor="end" fill="#000" font-weight="600" font-size="14">${item}</text><circle cx="${domainX + 10}" cy="${y}" r="4" fill="#334155" />`;
+                    });
+                    codomainItems.forEach((item: string, i: number) => {
+                        const y = getY(i, codomainItems.length);
+                        itemsHtml += `<circle cx="${codomainX - 10}" cy="${y}" r="4" fill="#334155" /><text x="${codomainX + 10}" y="${y + 5}" text-anchor="start" fill="#000" font-weight="600" font-size="14">${item}</text>`;
+                    });
+
+                    const svgContent = `
+                        <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; max-width: 400px; height: auto;">
+                            <defs>
+                                <marker id="arrowhead-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                                    <polygon points="0 0, 6 2.5, 0 5" fill="#1e293b" />
+                                </marker>
+                            </defs>
+                            <ellipse cx="${domainX}" cy="${svgH/2 + 10}" rx="${ovalWidth/2}" ry="${ovalHeight/2}" fill="#e2e8f0" fill-opacity="0.5" stroke="#94a3b8" stroke-width="2" />
+                            <ellipse cx="${codomainX}" cy="${svgH/2 + 10}" rx="${ovalWidth/2}" ry="${ovalHeight/2}" fill="#e2e8f0" fill-opacity="0.5" stroke="#94a3b8" stroke-width="2" />
+                            <text x="${domainX}" y="30" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${domainName}</text>
+                            <text x="${codomainX}" y="30" text-anchor="middle" fill="#1e293b" font-weight="bold" font-size="16">${codomainName}</text>
+                            ${pathsHtml}
+                            ${itemsHtml}
+                        </svg>
+                    `;
+                    const newHtml = `<div class="chart-wrapper" style="text-align: center;">${typedData.title ? `<h3>${typedData.title}</h3>` : ''}${svgContent}</div>`;
+                    if (processedHtml.includes('chart-placeholder')) {
+                        processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, newHtml);
+                    } else {
+                        processedHtml += newHtml;
+                    }
+                } else {
+                    const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
+                    
+                    if (processedHtml.includes('chart-placeholder')) {
+                        processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
+                    } else {
+                        processedHtml += canvasHtml;
+                    }
+                    
+                    const labelsStr = JSON.stringify(typedData.labels || []);
+                    const datasetsStr = JSON.stringify(typedData.datasets?.map((ds: any, idx: number) => {
+                        const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+                        const color = colors[idx % colors.length];
+                        return {
+                            label: ds.label,
+                            data: ds.data,
+                            backgroundColor: ds.backgroundColor || (typedData.type === 'pie' ? colors : color),
+                            borderColor: ds.borderColor || color,
+                            borderWidth: 1
+                        };
+                    }) || []);
+
+                    chartScripts += `
+                        Chart.register(ChartDataLabels);
+                        new Chart(document.getElementById("${canvasId}"), {
+                            type: "${typedData.type}",
+                            data: {
+                                labels: ${labelsStr},
+                                datasets: ${datasetsStr}
+                            },
+                            options: {
+                                responsive: true,
+                                animation: false,
+                                plugins: {
+                                    title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
+                                    datalabels: {
+                                        color: '${typedData.type === 'pie' ? '#fff' : '#000'}',
+                                        font: { weight: 'bold', size: 12 },
+                                        display: true,
+                                        align: '${typedData.type === 'pie' ? 'center' : 'end'}',
+                                        anchor: '${typedData.type === 'pie' ? 'center' : 'end'}',
+                                        formatter: function(value) { return value; }
+                                    }
+                                }
+                            }
+                        });
+                    `;
+                }
             }
             processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, '');
             return processedHtml;

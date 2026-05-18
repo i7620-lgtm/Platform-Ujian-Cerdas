@@ -32,10 +32,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. KHUSUS untuk akar (square root/roots), Anda WAJIB menggunakan perintah $\\\\sqrt{...}$ atau $\\\\sqrt[n]{...}$ dan DILARANG menggunakan karakter unicode akar (√) secara langsung. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, akar, atau pangkat! Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$" atau "$\\\\sqrt{x^2 + y^2}$".
     - Turus & Tabel Frekuensi (Tally Marks): WAJIB menggunakan huruf kapital 'I' (bukan simbol pipe '|') untuk turus satuan agar tabel Markdown tidak pecah. Gunakan 'I' (1), 'II' (2), 'III' (3), 'IIII' (4), dan '卌' (5). Untuk angka lebih dari 5, gabungkan kelipatan 5 dengan sisa satuan (pisahkan dengan spasi). Contoh: 6 = '卌 I', 7 = '卌 II', 10 = '卌 卌', 13 = '卌 卌 III'. Jika instruksi meminta "tabel turus saja" ATAU "tabel frekuensi saja", Anda WAJIB mematuhi permintaan tersebut dengan hanya membuat kolom yang spesifik diminta (misal hanya kolom data dan kolom turus, ATAU hanya kolom data dan kolom frekuensi). JANGAN secara otomatis menggabungkan kolom Turus dan Frekuensi menjadi satu tabel jika tidak diminta secara eksplisit. JANGAN menggunakan gambar untuk turus, gunakan teks ini saja.
-    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), atau lingkaran (pie), Anda WAJIB mengisi field 'chartData' pada tingkat soal atau opsi.
+    - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), lingkaran (pie), diagram venn himpunan (venn), atau diagram relasi/fungsi (relation), Anda WAJIB mengisi field 'chartData' pada tingkat soal atau opsi. Khusus untuk diagram venn himpunan, gunakan 'labels' untuk nama-nama himpunan (contoh: ["A", "B"] atau ["A", "B", "C"]) dan 'datasets.data' untuk nilainya. Untuk 2 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Irisan A & B, Di Luar Himpunan, Semesta]. Untuk 3 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Hanya C, Irisan A&B, Irisan A&C, Irisan B&C, Irisan A&B&C, Di Luar Himpunan, Semesta]. Khusus untuk relasi/fungsi (relation), gunakan 'labels' untuk nama himpunan (contoh: ["A", "B"]). 'datasets' ke-0 berisi data anggota domain (e.g. data: ["1", "2"]). 'datasets' ke-1 berisi data anggota kodomain. 'datasets' ke-2 berisi relasi dengan format "indexDomain-indexKodomain" (contoh: ["0-1", "1-2"]).
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
-      * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie).
+      * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie/venn/relation).
       ${config.includeImages ? `* Jika diminta gambar/ilustrasi/foto: Karena Anda dilarang menggunakan tag <img>, Anda WAJIB mengisi property 'imageSearchKeyword' menggunakan SATU ATAU DUA KATA KUNCI BENDA SPESIFIK DALAM BAHASA INGGRIS (contoh: "cuboid", "elephant", "microscope") untuk pencarian di Wikimedia Commons. JANGAN menuliskan kalimat pengantar gambar seperti "Perhatikan gambar berikut" atau "Gambar balok" ke dalam \`questionText\`. Langsung saja tulis inti pertanyaannya, karena gambar akan secara otomatis dirender di atas soal oleh sistem. JANGAN menyisipkan placeholder HTML untuk gambar.` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel. Karena Anda AI berbasis teks, hindari membuat teks yang mutlak mengharuskan gambar raster; gunakan tabel, diagram (chartData), atau teks deskriptif sebagai gantinya, KECUALI jika diminta khusus dalam kurung.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan atau menguji kemampuan baca/tulis Aksara Bali siswa (meskipun perintah pengguna tidak memintanya secara eksplisit). Anda memiliki kemampuan native untuk menulis dan menerjemahkan teks ke Aksara Bali. Setiap kali Anda menggunakan teks Aksara Bali, WAJIB bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
@@ -71,7 +71,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
   const chartDataSchema = {
     type: Type.OBJECT,
     properties: {
-      type: { type: Type.STRING, enum: ["bar", "line", "pie"] },
+      type: { type: Type.STRING, enum: ["bar", "line", "pie", "venn", "relation"] },
       title: { type: Type.STRING },
       labels: { type: Type.ARRAY, items: { type: Type.STRING } },
       datasets: {
@@ -80,14 +80,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           type: Type.OBJECT,
           properties: {
             label: { type: Type.STRING },
-            data: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+            data: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["label", "data"]
         }
       }
     },
     required: ["type", "labels", "datasets"],
-    description: "Data untuk membuat diagram (batang, garis, atau lingkaran)"
+    description: "Data untuk membuat diagram (batang, garis, lingkaran, venn, atau relasi)"
   };
 
   const properties = {
@@ -147,18 +147,6 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
   const combinedText = `${config.difficulty || ''} ${config.subject || ''} ${config.blueprint || ''}`.toUpperCase();
   
-  // Deteksi LOTS (C1, C2, Level 1, Level 2, LOTS, atau angka persis 1 & 2 pada input difficulty)
-  const isLOTS = combinedText.includes('C1') || combinedText.includes('C2') || 
-                 combinedText.includes('LEVEL 1') || combinedText.includes('LEVEL 2') || 
-                 combinedText.includes('LOTS') || 
-                 /^(1|2)$/.test((config.difficulty || '').trim());
-
-  // Deteksi MOTS (C3, C4, Level 3, Level 4, MOTS, atau angka persis 3 & 4 pada input difficulty)
-  const isMOTS = combinedText.includes('C3') || combinedText.includes('C4') || 
-                 combinedText.includes('LEVEL 3') || combinedText.includes('LEVEL 4') || 
-                 combinedText.includes('MOTS') || 
-                 /^(3|4)$/.test((config.difficulty || '').trim());
-
   // Deteksi HOTS (C5, C6, Level 5, Level 6, HOTS, SULIT, atau angka persis 5 & 6 pada input difficulty)
   const isHOTS = combinedText.includes('C5') || combinedText.includes('C6') || 
                  combinedText.includes('LEVEL 5') || combinedText.includes('LEVEL 6') || 

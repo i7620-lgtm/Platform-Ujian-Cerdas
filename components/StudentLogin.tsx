@@ -489,9 +489,19 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onLoginSuccess, onBa
 
             // Jika nama cocok tapi statusnya sedang berlangsung atau terkunci
             if (remoteResult.status === 'completed') {
-                setError("Anda sudah menyelesaikan ujian ini dan tidak dapat mengulang kembali.");
-                setIsLoading(false);
-                return;
+                if (examConfig && examConfig.allowRetakes) {
+                    try {
+                        await storageService.deleteStudentResult(cleanExamCode, remoteResult.student.studentId);
+                        const localKey = `exam_local_${cleanExamCode}_${seatId}`;
+                        await storageService.clearLocalProgress(localKey);
+                    } catch (err) {
+                        console.error("Gagal menghapus data lama untuk kerjakan ulang:", err);
+                    }
+                } else {
+                    setError("Anda sudah menyelesaikan ujian ini dan tidak dapat mengulang kembali.");
+                    setIsLoading(false);
+                    return;
+                }
             } else if (remoteResult.status === 'force_closed') {
                 setIsLocked(true);
                 setIsLoading(false);
