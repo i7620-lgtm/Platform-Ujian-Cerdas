@@ -1758,6 +1758,94 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     } else {
                         processedHtml += newHtml;
                     }
+                } else if (typedData.type === 'cartesian') {
+                    const config = typedData.cartesianConfig || { xMin: -10, xMax: 10, yMin: -10, yMax: 10, xStep: 1, yStep: 1 };
+                    const w = 400;
+                    const h = 400;
+                    const padding = 20;
+                    const graphW = w - 2 * padding;
+                    const graphH = h - 2 * padding;
+            
+                    const xRange = config.xMax - config.xMin;
+                    const yRange = config.yMax - config.yMin;
+            
+                    // Origin coords in SVG
+                    const originX = padding + (Math.abs(config.xMin) / xRange) * graphW;
+                    const originY = h - padding - (Math.abs(config.yMin) / yRange) * graphH;
+            
+                    // Tick generation
+                    const xTicks = [];
+                    for(let i = Math.ceil(config.xMin); i <= Math.floor(config.xMax); i += config.xStep || 1) {
+                      xTicks.push(i);
+                    }
+                    const yTicks = [];
+                    for(let MathI = Math.ceil(config.yMin); MathI <= Math.floor(config.yMax); MathI += config.yStep || 1) {
+                      yTicks.push(MathI);
+                    }
+            
+                    const mapX = (x: number) => padding + ((x - config.xMin) / xRange) * graphW;
+                    const mapY = (y: number) => h - padding - ((y - config.yMin) / yRange) * graphH;
+
+                    let gridHtml = '';
+                    xTicks.forEach(x => { gridHtml += `<line x1="${mapX(x)}" y1="${padding}" x2="${mapX(x)}" y2="${h-padding}" stroke="#f1f5f9" stroke-width="1" />`; });
+                    yTicks.forEach(y => { gridHtml += `<line x1="${padding}" y1="${mapY(y)}" x2="${w-padding}" y2="${mapY(y)}" stroke="#f1f5f9" stroke-width="1" />`; });
+
+                    let axesHtml = `
+                       <line x1="${padding}" y1="${originY}" x2="${w-padding+10}" y2="${originY}" stroke="#334155" stroke-width="2" marker-end="url(#arrowX-${chartCounter})" />
+                       <line x1="${originX}" y1="${h-padding}" x2="${originX}" y2="${padding-10}" stroke="#334155" stroke-width="2" marker-end="url(#arrowY-${chartCounter})" />
+                       <text x="${w-padding+5}" y="${originY + 15}" font-size="14" font-weight="bold" fill="#334155" font-style="italic">X</text>
+                       <text x="${originX - 15}" y="${padding-5}" font-size="14" font-weight="bold" fill="#334155" font-style="italic">Y</text>
+                    `;
+
+                    let ticksHtml = '';
+                    xTicks.forEach(x => {
+                        if(x !== 0) {
+                            ticksHtml += `<line x1="${mapX(x)}" y1="${originY - 3}" x2="${mapX(x)}" y2="${originY + 3}" stroke="#334155" stroke-width="1.5" /><text x="${mapX(x)}" y="${originY + 14}" font-size="10" text-anchor="middle" fill="#64748b" font-weight="600">${x}</text>`;
+                        }
+                    });
+                    yTicks.forEach(y => {
+                        if(y !== 0) {
+                            ticksHtml += `<line x1="${originX - 3}" y1="${mapY(y)}" x2="${originX + 3}" y2="${mapY(y)}" stroke="#334155" stroke-width="1.5" /><text x="${originX - 6}" y="${mapY(y) + 3}" font-size="10" text-anchor="end" fill="#64748b" font-weight="600">${y}</text>`;
+                        }
+                    });
+                    ticksHtml += `<text x="${originX - 6}" y="${originY + 12}" font-size="10" text-anchor="end" fill="#64748b" font-weight="600">0</text>`;
+
+                    let datasetsHtml = '';
+                    const cartesianColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+                    (typedData.datasets || []).forEach((ds: any, dIdx: number) => {
+                        const points = ds.data as {x: number, y: number}[];
+                        if (!points || points.length === 0) return;
+                        const color = ds.backgroundColor?.[0] || cartesianColors[dIdx % cartesianColors.length];
+                        if (ds.showLine && points.length > 1) {
+                            datasetsHtml += `<polyline points="${points.map(pt => `${mapX(pt.x)},${mapY(pt.y)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" />`;
+                        }
+                        points.forEach((pt: any) => {
+                            datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
+                        });
+                    });
+
+                    const svgContent = `
+                        <svg viewBox="0 0 ${w} ${h}" style="width: 100%; max-width: 400px; height: auto; background-color: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <defs>
+                                <marker id="arrowX-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                                    <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
+                                </marker>
+                                <marker id="arrowY-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                                    <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
+                                </marker>
+                            </defs>
+                            ${gridHtml}
+                            ${axesHtml}
+                            ${ticksHtml}
+                            ${datasetsHtml}
+                        </svg>
+                    `;
+                    const newHtml = `<div class="chart-wrapper" style="text-align: center;">${typedData.title ? `<h3>${typedData.title}</h3>` : ''}${svgContent}</div>`;
+                    if (processedHtml.includes('chart-placeholder')) {
+                        processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, newHtml);
+                    } else {
+                        processedHtml += newHtml;
+                    }
                 } else {
                     const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
                     
