@@ -1976,6 +1976,9 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
                 table, th, td { border: 1px solid #ddd; padding: 8px; }
                 .prose { max-width: none !important; }
+                blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; margin: 1.5em 0; }
+                /* Untuk indentasi yang di-generate dengan style inline */
+                blockquote[style*="margin"] { border-left: 3px solid #cbd5e1 !important; padding-left: 1rem !important; }
             </style>
         </head>
         <body class="bg-white text-black p-8">
@@ -2000,7 +2003,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             let questionHtml = q.questionText || '';
             questionHtml = injectChart(q.chartData, questionHtml);
             
-            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
+            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
             
             htmlContent += `<div class="options-container">`;
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
@@ -2012,7 +2015,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         }
                         htmlContent += `<div class="option-item flex gap-3">
                             <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
-                            <div class="prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
+                            <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
                         </div>`;
                     });
                 }
@@ -2033,7 +2036,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                              rowHtml = injectChart(row.chartData, rowHtml);
                         }
                         htmlContent += `<tr>
-                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${rowHtml}</div></td>
+                            <td class="p-2 border border-slate-300"><div class="wysiwyg-content prose prose-sm max-w-none text-black">${rowHtml}</div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                         </tr>`;
@@ -2048,7 +2051,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         if (pair.leftChart) leftHtml = injectChart(pair.leftChart, leftHtml);
                         
                         htmlContent += `<div class="flex items-center gap-4">
-                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${leftHtml}</div></div>
+                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="wysiwyg-content prose prose-sm max-w-none text-black">${leftHtml}</div></div>
                             <div class="font-bold mx-2">......</div>
                             <div class="flex-1 border-b border-slate-400"></div>
                         </div>`;
@@ -2101,7 +2104,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 ansStr = injectChart(q.correctAnswerChart, ansStr);
             }
             
-            htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
+            htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="wysiwyg-content prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
         });
 
         htmlContent += `
