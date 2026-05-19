@@ -21,6 +21,9 @@ export interface ChartData {
     borderColor?: string[];
     showLine?: boolean;
     fill?: boolean;
+    isFunction?: boolean;
+    functionStr?: string;
+    icon?: string;
   }[];
   showTooltip?: boolean;
   showLegend?: boolean;
