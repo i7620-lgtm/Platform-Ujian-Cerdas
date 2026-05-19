@@ -1,4 +1,4 @@
-  
+ 
 import type { Question, QuestionType, Exam, Result } from '../../types';
 
 // --- INTERFACES ---
@@ -1921,6 +1921,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                                 animation: false,
                                 plugins: {
                                     title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
+                                    legend: { position: 'bottom' },
                                     datalabels: {
                                         color: '${typedData.type === 'pie' ? '#fff' : '#000'}',
                                         font: { weight: 'bold', size: 12 },
