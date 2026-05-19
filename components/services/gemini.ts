@@ -1,6 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai"; 
+import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../../types";
 import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../teacher/examUtils";
+import { generateGeometrySVG } from "../teacher/GeometryModal";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -32,6 +33,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan bullet points atau numbering untuk daftar.
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$. KHUSUS untuk akar (square root/roots), Anda WAJIB menggunakan perintah $\\\\sqrt{...}$ atau $\\\\sqrt[n]{...}$ dan DILARANG menggunakan karakter unicode akar (√) secara langsung. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, akar, atau pangkat! Jika relevan, Anda juga WAJIB menggunakan standar LaTeX untuk matriks (nxn, nx1, 1xn), limit ($\\\\lim$), logaritma ($\\\\log$), permutasi (contoh: $_{n}P_{r}$), kombinasi ($_{n}C_{r}$), jenis kurung berbatas (\\\\left( \\\\right), dll), vektor kolom, nilai mutlak (\\\\left| \\\\right|), fungsi piecewise (\\\\begin{cases} \\\\end{cases}), irisan (\\\\cap), turunan (\\\\frac{dy}{dx}) dan gabungan himpunan (\\\\cup). Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$" atau "$\\\\sqrt{x^2 + y^2}$".
     - Turus & Tabel Frekuensi (Tally Marks): WAJIB menggunakan huruf kapital 'I' (bukan simbol pipe '|') untuk turus satuan agar tabel Markdown tidak pecah. Gunakan 'I' (1), 'II' (2), 'III' (3), 'IIII' (4), dan '卌' (5). Untuk angka lebih dari 5, gabungkan kelipatan 5 dengan sisa satuan (pisahkan dengan spasi). Contoh: 6 = '卌 I', 7 = '卌 II', 10 = '卌 卌', 13 = '卌 卌 III'. Jika instruksi meminta "tabel turus saja" ATAU "tabel frekuensi saja", Anda WAJIB mematuhi permintaan tersebut dengan hanya membuat kolom yang spesifik diminta (misal hanya kolom data dan kolom turus, ATAU hanya kolom data dan kolom frekuensi). JANGAN secara otomatis menggabungkan kolom Turus dan Frekuensi menjadi satu tabel jika tidak diminta secara eksplisit. JANGAN menggunakan gambar untuk turus, gunakan teks ini saja.
+    - Piktogram (Simbol/Emoji): Untuk soal yang membutuhkan data piktogram (diagram gambar), Anda BISA dan DISARANKAN untuk menggunakan emoji langsung (misalnya: 🍎, 🚗, ⭐️, 👦) dalam tabel atau teks soal untuk mewakili unit data.
+    - Bangun Datar & Ruang: Jika soal atau jawaban membutuhkan gambar bangun geometri standar (seperti segitiga, persegi, persegi panjang, jajar genjang, layang-layang, belah ketupat, trapesium, segi banyak, lingkaran, kubus, balok, tabung, kerucut, bola, limas, prisma), JANGAN gunakan emoji, unicode, atau \`imageSearchKeyword\`. Sebagai gantinya, Anda WAJIB menyisipkan tag khusus berikut langsung ke dalam teks (bisa di \`questionText\`, \`options\`, \`correctAnswer\`, dll): [GEOMETRY:shape_name:{"label_key":"label_value"}]. 
+      Daftar \`shape_name\` yang valid: "triangle", "square", "rectangle", "parallelogram", "kite", "rhombus", "trapezoid", "polygon", "circle", "cube", "cuboid", "cylinder", "cone", "sphere", "pyramid", "prism".
+      Contoh penggunaan label JSON (pastikan valid JSON di dalam tanda kurungnya):
+      [GEOMETRY:rectangle:{"bottom":"10 cm","right":"5 cm"}]
+      [GEOMETRY:triangle:{"bottom":"8","height":"6","left":"5"}]
+      [GEOMETRY:circle:{"radius":"7 cm"}]
+      [GEOMETRY:cube:{"edge":"5"}]
+      [GEOMETRY:cuboid:{"width":"10","height":"5","depth":"4"}]
     - Diagram (Charts): Jika soal memerlukan diagram batang (bar), garis (line), lingkaran (pie), diagram venn himpunan (venn), diagram relasi/fungsi (relation), atau diagram kartesius (cartesian), Anda WAJIB mengisi field 'chartData' pada tingkat soal atau opsi. Khusus untuk diagram venn himpunan, gunakan 'labels' untuk nama-nama himpunan (contoh: ["A", "B"] atau ["A", "B", "C"]) dan 'datasets.data' untuk nilainya. Untuk 2 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Irisan A & B, Di Luar Himpunan, Semesta]. Untuk 3 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Hanya C, Irisan A&B, Irisan A&C, Irisan B&C, Irisan A&B&C, Di Luar Himpunan, Semesta]. Khusus untuk relasi/fungsi (relation), gunakan 'labels' untuk nama himpunan (contoh: ["A", "B"]). 'datasets' ke-0 berisi data anggota domain (e.g. data: ["1", "2"]). 'datasets' ke-1 berisi data anggota kodomain. 'datasets' ke-2 berisi relasi dengan format "indexDomain-indexKodomain" (contoh: ["0-1", "1-2"]). Khusus diagram kartesius (cartesian), Anda WAJIB menyertakan field 'cartesianConfig' yang berisi 'xMin', 'xMax', 'yMin', 'yMax', 'xStep', dan 'yStep'. Dan 'datasets' berisi array of object dengan 'label' (UNTUK NAMA GARIS JIKA ADA), 'showLine' (boolean), serta titiknya ATAU fungsi matematikanya. JIKA fungsi matematika, beri property 'isFunction': true dan 'functionStr' (misal "x^2 - 2x + 1" atau "2x" dalam sintaks JS/Matematika dasar). JIKA titik manual, beri property 'data' berupa array of object {x: number, y: number}. Contoh 'datasets' dengan fungsi: [{"label": "Garis A", "isFunction": true, "functionStr": "x^2 + 2x"}]. Contoh 'datasets' dengan titik: [{"label": "Garis A", "showLine": true, "data": [{"x": 0, "y": 0}, {"x": 2, "y": 4}]}].
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
@@ -260,9 +270,24 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         mappedQuestionType = 'FILL_IN_THE_BLANK';
     }
 
+    const replaceGeometryPlaceholders = (text: string) => {
+        if (!text) return text;
+        return text.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+):(\{.*?\})\]/g, (match, shape, labelsJson) => {
+            try {
+                const labels = JSON.parse(labelsJson);
+                const svgContent = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
+                return `<span class="geometry-shape" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0 0.5rem; text-align: center; line-height: 1;">${svgContent}</span>`;
+            } catch (e) {
+                console.error("Failed to parse geometry labels:", e);
+                return match;
+            }
+        });
+    };
+
     const finalQuestions: Question[] = questions.map(q => {
-        const questionText = markdownToHtml(q.questionText || '');
-        const options = q.options ? q.options.map((opt: string) => markdownToHtml(opt || '')) : undefined;
+        const rawQuestionText = replaceGeometryPlaceholders(q.questionText || '');
+        const questionText = markdownToHtml(rawQuestionText);
+        const options = q.options ? q.options.map((opt: string) => markdownToHtml(replaceGeometryPlaceholders(opt || ''))) : undefined;
         
         let correctAnswer: string | string[] | number | boolean = q.correctAnswer || '';
         if (Array.isArray(correctAnswer)) {
@@ -272,7 +297,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         }
                if (mappedQuestionType === 'MULTIPLE_CHOICE') {
             // Find the option that matches the correct answer most closely
-            const htmlCorrectAnswer = markdownToHtml(correctAnswer);
+            const htmlCorrectAnswer = markdownToHtml(replaceGeometryPlaceholders(String(correctAnswer)));
             
             const matchingOption = options?.find(opt => isAnswerMatch(htmlCorrectAnswer, opt, mappedQuestionType));
 
@@ -311,7 +336,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             
             // Map each answer to the closest matching option
             const mappedAnswers = splitAnswers.map(ans => {
-                const htmlAns = markdownToHtml(ans);
+                const htmlAns = markdownToHtml(replaceGeometryPlaceholders(ans));
 
                 const matchingOption = options?.find(opt => isAnswerMatch(htmlAns, opt, mappedQuestionType));
                 if (matchingOption) return matchingOption;
@@ -348,7 +373,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             // Do not convert to HTML for fill in the blank or essay to preserve the raw text answer
             correctAnswer = String(correctAnswer).trim();
         } else {
-            correctAnswer = markdownToHtml(correctAnswer);
+            correctAnswer = markdownToHtml(replaceGeometryPlaceholders(String(correctAnswer)));
         }
 
         const mappedQ: Question = {
@@ -381,7 +406,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                         }
                     }
                     return {
-                        text: markdownToHtml(r.text || ''),
+                        text: markdownToHtml(replaceGeometryPlaceholders(r.text || '')),
                         answer: boolAnswer,
                         chartData: r.chartData
                     };
@@ -397,8 +422,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         if (mappedQuestionType === 'MATCHING') {
             if (q.matchingPairs && q.matchingPairs.length > 0) {
                 mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
-                    left: markdownToHtml(p.left || ''),
-                    right: markdownToHtml(p.right || ''),
+                    left: markdownToHtml(replaceGeometryPlaceholders(p.left || '')),
+                    right: markdownToHtml(replaceGeometryPlaceholders(p.right || '')),
                     leftChart: p.leftChart,
                     rightChart: p.rightChart
                 }));
