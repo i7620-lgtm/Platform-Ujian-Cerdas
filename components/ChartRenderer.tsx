@@ -1,637 +1,631 @@
 
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { ChartData } from '../../types';
-import { XMarkIcon, PlusCircleIcon, TrashIcon } from '../Icons';
+import React from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import { ChartData } from '../types';
 
-interface ChartConfigModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: ChartData) => void;
-  onDelete?: () => void;
-  initialData?: ChartData;
+interface ChartRendererProps {
+  data: ChartData;
 }
 
-export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-  initialData
-}) => {
-  const [type, setType] = useState<'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian'>('bar');
-  const [title, setTitle] = useState('');
-  const [labels, setLabels] = useState<string[]>(['Jan', 'Feb', 'Mar']);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [datasets, setDatasets] = useState<{ label: string; data: (number | string | any)[]; backgroundColor?: string[]; borderColor?: string[]; showLine?: boolean; fill?: boolean; isFunction?: boolean; functionStr?: string; }[]>([
-    { label: 'Data 1', data: [10, 20, 30] }
-  ]);
-  const [showTooltip, setShowTooltip] = useState<boolean>(true);
-  const [showLegend, setShowLegend] = useState<boolean>(true);
-  const [cartesianConfig, setCartesianConfig] = useState({
-    xMin: -10, xMax: 10, yMin: -10, yMax: 10, xStep: 1, yStep: 1
-  });
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-  useEffect(() => {
-    if (initialData) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setType(initialData.type);
-      setTitle(initialData.title || '');
-      setLabels(initialData.labels);
-      setDatasets(initialData.datasets.map(d => ({ 
-        label: d.label, 
-        data: d.data,
-        backgroundColor: d.backgroundColor,
-        borderColor: d.borderColor,
-        showLine: d.showLine,
-        fill: d.fill,
-        isFunction: d.isFunction,
-        functionStr: d.functionStr
-      })));
-      setShowTooltip(initialData.showTooltip !== false);
-      setShowLegend(initialData.showLegend !== false);
-      if (initialData.cartesianConfig) {
-        setCartesianConfig(initialData.cartesianConfig);
-      }
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: { color: string; name: string; value: number | string }[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur-md dark:bg-slate-800/95 p-4 border-2 border-indigo-100 dark:border-indigo-900/50 shadow-2xl rounded-2xl z-[100] min-w-[200px] mx-auto transform -translate-x-1/2 left-1/2 relative">
+        <p className="font-black text-slate-800 dark:text-slate-100 mb-2 border-b border-slate-100 dark:border-slate-700 pb-2 text-center">{label}</p>
+        {payload.map((entry: { color: string; name: string; value: number | string }, index: number) => (
+          <div key={index} className="flex items-center justify-center gap-3 text-sm mt-2">
+            <div className="w-4 h-4 rounded-md shadow-sm" style={{ backgroundColor: entry.color }} />
+            <span className="text-slate-600 dark:text-slate-400 font-medium">{entry.name}:</span>
+            <span className="font-black text-indigo-600 dark:text-indigo-400 text-base">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+
+const BAR_CHART_MARGIN = { top: 20, right: 20, left: -20, bottom: 0 };
+
+export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
+  const { type, title, labels, datasets } = data;
+
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile(); // Check initial size
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const legendItems = React.useMemo(() => {
+    if (type === 'venn' || type === 'relation') {
+      return [];
     }
-  }, [initialData, isOpen]);
-
-  const handleTypeChange = (newType: string) => {
-    setType(newType as 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian');
-    if (newType === 'venn') {
-       if (labels.length !== 2 && labels.length !== 3) {
-         setLabels(['A', 'B']);
-         setDatasets([{ label: 'Data', data: ['', '', '', '', ''] }]);
-       }
-    } else if (newType === 'relation') {
-       setLabels(['A', 'B']);
-       setDatasets([
-         { label: 'Domain', data: ['1', '2', '3'] },
-         { label: 'Kodomain', data: ['a', 'b', 'c'] },
-         { label: 'Relasi', data: ['0-0', '1-1', '2-2'] }
-       ]);
-    } else if (newType === 'cartesian') {
-       setLabels(['X', 'Y']);
-       setDatasets([
-         { label: 'Titik Data', data: [], backgroundColor: ['#3b82f6'], showLine: false }
-       ]);
+    if (type === 'pie') {
+      return labels.map((label, index) => {
+        const val = datasets[0]?.data[index] ?? 0;
+        return {
+          value: `${label} (${val})`,
+          color: COLORS[index % COLORS.length]
+        };
+      });
+    } else {
+      return datasets.map((dataset, index) => ({
+        value: dataset.label,
+        color: dataset.backgroundColor?.[0] || dataset.borderColor?.[0] || COLORS[index % COLORS.length]
+      }));
     }
-  };
+  }, [type, labels, datasets]);
 
-  if (!isOpen) return null;
-
-  const handleAddLabel = () => {
-    setLabels([...labels, `Label ${labels.length + 1}`]);
-    setDatasets(datasets.map(d => ({ ...d, data: [...d.data, 0] })));
-  };
-
-  const handleDeleteLabel = (index: number) => {
-    if (labels.length <= 1) return;
-    const newLabels = [...labels];
-    newLabels.splice(index, 1);
-    setLabels(newLabels);
-    setDatasets(datasets.map(d => {
-      const newData = [...d.data];
-      newData.splice(index, 1);
-      return { ...d, data: newData };
-    }));
-  };
-
-  const handleAddDataset = () => {
-    setDatasets([...datasets, { label: `Data ${datasets.length + 1}`, data: labels.map(() => 0) }]);
-  };
-
-  const handleDeleteDataset = (index: number) => {
-    if (datasets.length <= 1) return;
-    const newDatasets = [...datasets];
-    newDatasets.splice(index, 1);
-    setDatasets(newDatasets);
-  };
-
-  const handleSave = () => {
-    onSave({
-      type,
-      title,
-      labels,
-      datasets,
-      showTooltip,
-      showLegend,
-      ...(type === 'cartesian' ? { cartesianConfig } : {})
+  // Transform data for Recharts
+  const chartData = React.useMemo(() => {
+    return labels.map((label, index) => {
+      const entry: Record<string, string | number> = { name: label };
+      datasets.forEach(dataset => {
+        if (type === 'bar' || type === 'line') {
+           entry[dataset.label] = Number(dataset.data[index]) || 0;
+        } else {
+           entry[dataset.label] = dataset.data[index];
+        }
+      });
+      return entry;
     });
-    onClose();
+  }, [labels, datasets, type]);
+
+  const pieData = React.useMemo(() => {
+    if (type !== 'pie') return [];
+    return labels.map((label, index) => ({
+      name: label,
+      value: Number(datasets[0]?.data[index]) || 0
+    }));
+  }, [type, labels, datasets]);
+
+  const renderPieLabel = React.useCallback((props: any) => {
+    const { name, percent, x, y, textAnchor, fill } = props;
+    if (!percent || percent === 0) return null;
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        textAnchor={textAnchor} 
+        dominantBaseline="central" 
+        fill={fill}
+        fontWeight={700}
+        style={{ fontSize: 'clamp(9px, 2.5vw, 13px)' }}
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  }, []);
+
+  const labelLineConfig = React.useMemo(() => {
+    return { stroke: '#64748b', strokeWidth: 1 };
+  }, []);
+
+  const pieChartMargin = React.useMemo(() => {
+    return { top: 10, right: isMobile ? 10 : 40, left: isMobile ? 10 : 40, bottom: 10 };
+  }, [isMobile]);
+
+  // Calculate Y-axis ticks based on max data value
+  const yTicks = React.useMemo(() => {
+    let max = 0;
+    datasets.forEach(d => {
+      d.data.forEach(v => {
+        const num = Number(v);
+        if (!isNaN(num) && num > max) max = num;
+      });
+    });
+    
+    // Fallback if no numeric max found
+    if (max === 0) return undefined;
+
+    let interval = 5;
+    if (max > 50 && max <= 100) interval = 10;
+    else if (max > 100 && max <= 500) interval = 50;
+    else if (max > 500) interval = 100;
+
+    const ticks = [];
+    const maxTick = Math.ceil(max / interval) * interval;
+    for (let i = 0; i <= maxTick; i += interval) {
+      ticks.push(i);
+    }
+    return ticks;
+  }, [datasets]);
+
+  const yDomain = yTicks && yTicks.length > 0 ? [0, yTicks[yTicks.length - 1]] : undefined;
+
+  const renderChart = () => {
+    switch (type) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
+            <BarChart 
+              data={chartData} 
+              margin={BAR_CHART_MARGIN}
+              barCategoryGap="15%"
+            >
+              <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={70}
+                tickMargin={5}
+              />
+              <YAxis 
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                tickMargin={5}
+                width={45}
+                ticks={yTicks}
+                domain={yDomain}
+              />
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
+              {datasets.map((dataset, index) => (
+                <Bar
+                  key={dataset.label}
+                  dataKey={dataset.label}
+                  fill={dataset.backgroundColor?.[0] || COLORS[index % COLORS.length]}
+                  maxBarSize={80}
+                  isAnimationActive={false}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
+            <LineChart 
+              data={chartData} 
+              margin={BAR_CHART_MARGIN}
+            >
+              <CartesianGrid strokeDasharray="5 5" stroke="#cbd5e1" opacity={0.8} />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={70}
+                tickMargin={5}
+              />
+              <YAxis 
+                tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }}
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                tickLine={{ stroke: '#64748b' }}
+                tickMargin={5}
+                width={45}
+                ticks={yTicks}
+                domain={yDomain}
+              />
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  cursor={{ stroke: 'rgba(99, 102, 241, 0.2)', strokeWidth: 2 }}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
+              {datasets.map((dataset, index) => (
+                <Line
+                  key={dataset.label}
+                  type="monotone"
+                  dataKey={dataset.label}
+                  stroke={dataset.borderColor?.[0] || COLORS[index % COLORS.length]}
+                  strokeWidth={4}
+                  dot={{ r: 6, strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 0 }}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      case 'pie': {
+        return (
+          <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
+            <PieChart margin={pieChartMargin}>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                labelLine={labelLineConfig}
+                label={renderPieLabel}
+                outerRadius={isMobile ? "60%" : "70%"}
+                innerRadius={isMobile ? "30%" : "35%"}
+                paddingAngle={5}
+                fill="#8884d8"
+                dataKey="value"
+                isAnimationActive={false}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                ))}
+              </Pie>
+              {data.showTooltip !== false && (
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                  position={{ y: 250 }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
+              )}
+            </PieChart>
+          </ResponsiveContainer>
+        );
+      }
+      case 'venn': {
+        const d = datasets[0]?.data || [];
+        if (labels.length <= 2) {
+          // 2 Sets Venn Diagram
+          const vA = d[0] ?? '';
+          const vB = d[1] ?? '';
+          const vAB = d[2] ?? '';
+          const vOuter = d[3] ?? '';
+          const vTotal = d[4] ?? '';
+          return (
+            <div className="w-full h-auto flex items-center justify-center relative">
+              <svg viewBox="0 0 400 300" className="w-full max-w-[400px] h-auto">
+                {/* Universe Rectangle */}
+                <rect x="10" y="10" width="380" height="280" fill="none" stroke="#1e293b" strokeWidth="2" />
+                <text x="20" y="30" fill="#1e293b" fontWeight="bold" fontSize="16">S{vTotal !== '' ? ` = ${vTotal}` : ''}</text>
+                
+                {/* Outer Value */}
+                <text x="360" y="270" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="18">{vOuter}</text>
+
+                {/* Circles */}
+                <circle cx="160" cy="150" r="100" fill={COLORS[0]} fillOpacity="0.5" stroke={COLORS[0]} strokeWidth="2" />
+                <circle cx="240" cy="150" r="100" fill={COLORS[1]} fillOpacity="0.5" stroke={COLORS[1]} strokeWidth="2" />
+                
+                {/* Labels */}
+                <text x="110" y="70" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{labels[0] || 'A'}</text>
+                <text x="290" y="70" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{labels[1] || 'B'}</text>
+                
+                {/* Data Values */}
+                <text x="120" y="155" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="20">{vA}</text>
+                <text x="280" y="155" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="20">{vB}</text>
+                <text x="200" y="155" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="20">{vAB}</text>
+              </svg>
+            </div>
+          );
+        } else {
+          // 3 Sets Venn Diagram
+          const vA = d[0] ?? '';
+          const vB = d[1] ?? '';
+          const vC = d[2] ?? '';
+          const vAB = d[3] ?? '';
+          const vAC = d[4] ?? '';
+          const vBC = d[5] ?? '';
+          const vABC = d[6] ?? '';
+          const vOuter = d[7] ?? '';
+          const vTotal = d[8] ?? '';
+          return (
+            <div className="w-full h-auto flex items-center justify-center relative">
+              <svg viewBox="0 0 400 400" className="w-full max-w-[400px] h-auto">
+                {/* Universe Rectangle */}
+                <rect x="10" y="10" width="380" height="380" fill="none" stroke="#1e293b" strokeWidth="2" />
+                <text x="20" y="30" fill="#1e293b" fontWeight="bold" fontSize="16">S{vTotal !== '' ? ` = ${vTotal}` : ''}</text>
+                
+                {/* Outer Value */}
+                <text x="360" y="370" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="18">{vOuter}</text>
+
+                {/* Circles */}
+                <circle cx="160" cy="160" r="90" fill={COLORS[0]} fillOpacity="0.5" stroke={COLORS[0]} strokeWidth="2" />
+                <circle cx="240" cy="160" r="90" fill={COLORS[1]} fillOpacity="0.5" stroke={COLORS[1]} strokeWidth="2" />
+                <circle cx="200" cy="230" r="90" fill={COLORS[2]} fillOpacity="0.5" stroke={COLORS[2]} strokeWidth="2" />
+                
+                {/* Labels */}
+                <text x="100" y="80" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{labels[0] || 'A'}</text>
+                <text x="300" y="80" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{labels[1] || 'B'}</text>
+                <text x="200" y="350" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{labels[2] || 'C'}</text>
+                
+                {/* Data Values */}
+                <text x="130" y="150" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="18">{vA}</text>
+                <text x="270" y="150" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="18">{vB}</text>
+                <text x="200" y="270" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="18">{vC}</text>
+                
+                <text x="200" y="135" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="14">{vAB}</text>
+                <text x="155" y="210" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="14">{vAC}</text>
+                <text x="245" y="210" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="14">{vBC}</text>
+                
+                <text x="200" y="185" textAnchor="middle" fill="#000" fontWeight="bold" fontSize="16">{vABC}</text>
+              </svg>
+            </div>
+          );
+        }
+      }
+      case 'relation': {
+        const domainName = labels[0] || 'A';
+        const codomainName = labels[1] || 'B';
+        const domainItems = datasets[0]?.data || [];
+        const codomainItems = datasets[1]?.data || [];
+        const relationships = datasets[2]?.data || [];
+
+        // Dynamic sizing for relation
+        const svgW = 400;
+        const svgH = Math.max(300, Math.max(domainItems.length, codomainItems.length) * 40 + 100);
+        
+        const domainX = 100;
+        const codomainX = 300;
+        const ovalWidth = 100;
+        const ovalHeight = svgH - 60;
+
+        const getY = (index: number, total: number) => {
+          if (total === 1) return svgH / 2 + 10;
+          const startY = 80;
+          const endY = svgH - 50;
+          return startY + (index * (endY - startY)) / (total - 1);
+        };
+
+        return (
+          <div className="w-full h-auto flex items-center justify-center relative">
+            <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full max-w-[400px] h-auto">
+              <defs>
+                <marker id="arrowhead" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                  <polygon points="0 0, 6 2.5, 0 5" fill="#1e293b" />
+                </marker>
+              </defs>
+              
+              {/* Ovals */}
+              <ellipse cx={domainX} cy={svgH/2 + 10} rx={ovalWidth/2} ry={ovalHeight/2} fill="#e2e8f0" fillOpacity="0.5" stroke="#94a3b8" strokeWidth="2" />
+              <ellipse cx={codomainX} cy={svgH/2 + 10} rx={ovalWidth/2} ry={ovalHeight/2} fill="#e2e8f0" fillOpacity="0.5" stroke="#94a3b8" strokeWidth="2" />
+
+              {/* Labels */}
+              <text x={domainX} y="30" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{domainName}</text>
+              <text x={codomainX} y="30" textAnchor="middle" fill="#1e293b" fontWeight="bold" fontSize="16">{codomainName}</text>
+
+              {/* Relationships */}
+              {relationships.map((rel, i) => {
+                const pts = String(rel).split('-');
+                if (pts.length === 2) {
+                  const dIdx = parseInt(pts[0], 10);
+                  const cIdx = parseInt(pts[1], 10);
+                  if (dIdx >= 0 && dIdx < domainItems.length && cIdx >= 0 && cIdx < codomainItems.length) {
+                    const startY = getY(dIdx, domainItems.length);
+                    const endY = getY(cIdx, codomainItems.length);
+                    return (
+                      <path 
+                        key={`rel-${i}`}
+                        d={`M ${domainX + 15} ${startY} C ${domainX + 60} ${startY}, ${codomainX - 60} ${endY}, ${codomainX - 15} ${endY}`}
+                        fill="none" 
+                        stroke="#1e293b" 
+                        strokeWidth="1.5" 
+                        markerEnd="url(#arrowhead)"
+                      />
+                    );
+                  }
+                }
+                return null;
+              })}
+              
+              {/* Items and Points */}
+              {domainItems.map((item, i) => {
+                const y = getY(i, domainItems.length);
+                return (
+                  <g key={`dom-${i}`}>
+                    <text x={domainX - 10} y={y + 5} textAnchor="end" fill="#000" fontWeight="600" fontSize="14">{item}</text>
+                    <circle cx={domainX + 10} cy={y} r="4" fill="#334155" />
+                  </g>
+                );
+              })}
+
+              {codomainItems.map((item, i) => {
+                const y = getY(i, codomainItems.length);
+                return (
+                  <g key={`codom-${i}`}>
+                    <circle cx={codomainX - 10} cy={y} r="4" fill="#334155" />
+                    <text x={codomainX + 10} y={y + 5} textAnchor="start" fill="#000" fontWeight="600" fontSize="14">{item}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        );
+      }
+      
+      case 'cartesian': {
+        const config = data.cartesianConfig || { xMin: -10, xMax: 10, yMin: -10, yMax: 10, xStep: 1, yStep: 1 };
+        const w = 400;
+        const h = 400;
+        const padding = 20;
+        const graphW = w - 2 * padding;
+        const graphH = h - 2 * padding;
+
+        const xRange = config.xMax - config.xMin;
+        const yRange = config.yMax - config.yMin;
+
+        // Origin coords in SVG
+        const originX = padding + (Math.abs(config.xMin) / xRange) * graphW;
+        const originY = h - padding - (Math.abs(config.yMin) / yRange) * graphH;
+
+        // Tick generation
+        const xTicks = [];
+        for(let i = Math.ceil(config.xMin); i <= Math.floor(config.xMax); i += config.xStep || 1) {
+          xTicks.push(i);
+        }
+        const yTicks = [];
+        for(let MathI = Math.ceil(config.yMin); MathI <= Math.floor(config.yMax); MathI += config.yStep || 1) {
+          yTicks.push(MathI);
+        }
+
+        const mapX = (x: number) => padding + ((x - config.xMin) / xRange) * graphW;
+        const mapY = (y: number) => h - padding - ((y - config.yMin) / yRange) * graphH;
+
+        return (
+          <div className="w-full h-auto flex items-center justify-center relative">
+            <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-[400px] h-auto bg-white rounded-lg border border-slate-200">
+               <defs>
+                  <marker id="arrowX" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                    <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
+                  </marker>
+                  <marker id="arrowY" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                    <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
+                  </marker>
+               </defs>
+
+               {/* Grid */}
+               {xTicks.map(x => (
+                 <line key={`gx-${x}`} x1={mapX(x)} y1={padding} x2={mapX(x)} y2={h-padding} stroke="#f1f5f9" strokeWidth="1" />
+               ))}
+               {yTicks.map(y => (
+                 <line key={`gy-${y}`} x1={padding} y1={mapY(y)} x2={w-padding} y2={mapY(y)} stroke="#f1f5f9" strokeWidth="1" />
+               ))}
+
+               {/* Axes */}
+               <line x1={padding} y1={originY} x2={w-padding+10} y2={originY} stroke="#334155" strokeWidth="2" markerEnd="url(#arrowX)" />
+               <line x1={originX} y1={h-padding} x2={originX} y2={padding-10} stroke="#334155" strokeWidth="2" markerEnd="url(#arrowY)" />
+
+               {/* Axis Labels */}
+               <text x={w-padding+5} y={originY + 15} fontSize="14" fontWeight="bold" fill="#334155" fontStyle="italic">X</text>
+               <text x={originX - 15} y={padding-5} fontSize="14" fontWeight="bold" fill="#334155" fontStyle="italic">Y</text>
+
+               {/* Ticks */}
+               {xTicks.map(x => x !== 0 && (
+                 <g key={`tx-${x}`}>
+                   <line x1={mapX(x)} y1={originY - 3} x2={mapX(x)} y2={originY + 3} stroke="#334155" strokeWidth="1.5" />
+                   <text x={mapX(x)} y={originY + 14} fontSize="10" textAnchor="middle" fill="#64748b" fontWeight="600">{x}</text>
+                 </g>
+               ))}
+               {yTicks.map(y => y !== 0 && (
+                 <g key={`ty-${y}`}>
+                   <line x1={originX - 3} y1={mapY(y)} x2={originX + 3} y2={mapY(y)} stroke="#334155" strokeWidth="1.5" />
+                   <text x={originX - 6} y={mapY(y) + 3} fontSize="10" textAnchor="end" fill="#64748b" fontWeight="600">{y}</text>
+                 </g>
+               ))}
+               
+               {/* Origin 0 text */}
+               <text x={originX - 6} y={originY + 12} fontSize="10" textAnchor="end" fill="#64748b" fontWeight="600">0</text>
+
+               {/* Plot points and lines from datasets */}
+               {datasets.map((ds, dIdx) => {
+                 let points = ds.data as {x: number, y: number}[];
+                 const color = ds.backgroundColor?.[0] || COLORS[dIdx % COLORS.length];
+
+                 let isFuncPlot = false;
+                 if (ds.isFunction && ds.functionStr) {
+                   isFuncPlot = true;
+                   points = [];
+                   const step = (config.xMax - config.xMin) / 100;
+                   for(let x = config.xMin; x <= config.xMax; x += step) {
+                     try {
+                        let fStr = ds.functionStr.toLowerCase().replace(/\s+/g, '');
+                        if (fStr.startsWith('y=')) fStr = fStr.substring(2);
+                        else if (fStr.startsWith('f(x)=')) fStr = fStr.substring(5);
+                        else if (fStr.endsWith('=0')) fStr = fStr.substring(0, fStr.length - 2);
+                        else if (fStr.startsWith('0=')) fStr = fStr.substring(2);
+                        else if (fStr.endsWith('=y')) fStr = fStr.substring(0, fStr.length - 2);
+                        let f = fStr.replace(/(\d+)x/g, '$1*x').replace(/\^/g, '**');
+                        const mathFuncs = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'abs', 'log', 'exp'];
+                        mathFuncs.forEach(mf => {
+                            f = f.split(mf).join(`Math.${mf}`);
+                            f = f.split(`Math.Math.${mf}`).join(`Math.${mf}`);
+                        });
+                        const calc = new Function('x', `return ${f}`);
+                        const y = calc(x);
+                        if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
+                            points.push({x, y});
+                        }
+                     } catch(e) {
+                        // ignore errors
+                     }
+                   }
+                 }
+
+                 if (!points || points.length === 0) return null;
+
+                 return (
+                   <g key={`ds-${dIdx}`}>
+                     {(ds.showLine || isFuncPlot) && points.length > 1 && (
+                       <polyline
+                         points={points.map(pt => `${mapX(pt.x)},${mapY(pt.y)}`).join(' ')}
+                         fill="none"
+                         stroke={color}
+                         strokeWidth="2.5"
+                       />
+                     )}
+                     {!isFuncPlot && points.map((pt, pIdx) => (
+                       <g key={`pt-${dIdx}-${pIdx}`}>
+                         <circle cx={mapX(pt.x)} cy={mapY(pt.y)} r="4" fill={color} stroke="#fff" strokeWidth="1" />
+                         <text x={mapX(pt.x) + 6} y={mapY(pt.y) - 6} fontSize="12" fontWeight="bold" fill={color}>{`(${pt.x},${pt.y})`}</text>
+                       </g>
+                     ))}
+                     {ds.label && ds.label !== `Dataset ${dIdx + 1}` && ds.label !== 'Titik Data' && points.length > 0 && (
+                       <text x={mapX(points[Math.floor(points.length/2)]?.x || 0)} y={mapY(points[Math.floor(points.length/2)]?.y || 0) - 10} fontSize="12" fontWeight="bold" fill={color}>{ds.label}</text>
+                     )}
+                   </g>
+                 );
+               })}
+            </svg>
+          </div>
+        );
+      }
+
+      default:
+        return null;
+    }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-        <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">Konfigurasi Diagram</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-            <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-slate-400" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Judul Diagram</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white dark:placeholder-slate-400"
-                placeholder="Contoh: Penjualan Bulanan"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Jenis Diagram</label>
-              <select
-                value={type}
-                onChange={(e) => handleTypeChange(e.target.value)}
-                className="w-full p-2 border dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
-              >
-                <option value="bar">Diagram Batang (Bar)</option>
-                <option value="line">Diagram Garis (Line)</option>
-                <option value="pie">Diagram Lingkaran (Pie)</option>
-                <option value="venn">Diagram Venn Himpunan</option>
-                <option value="relation">Diagram Relasi / Fungsi</option>
-                <option value="cartesian">Diagram Kartesius</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="showTooltip"
-                checked={showTooltip}
-                onChange={(e) => setShowTooltip(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="showTooltip" className="text-sm font-medium text-gray-700 dark:text-slate-300">
-                Tampilkan Tooltip (Kotak Info saat disentuh/hover)
-              </label>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="showLegend"
-                checked={showLegend}
-                onChange={(e) => setShowLegend(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="showLegend" className="text-sm font-medium text-gray-700 dark:text-slate-300">
-                Tampilkan Legend / Keterangan Warna
-              </label>
-            </div>
-          </div>
-
-          {type === 'relation' ? (
-            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Nama Himpunan 1 (Domain)</label>
-                  <input type="text" value={labels[0] || ''} onChange={e => { const newL = [...labels]; newL[0] = e.target.value; setLabels(newL); }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Nama Himpunan 2 (Kodomain)</label>
-                  <input type="text" value={labels[1] || ''} onChange={e => { const newL = [...labels]; newL[1] = e.target.value; setLabels(newL); }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-xs font-bold text-slate-500">Anggota Domain</label>
-                    <button onClick={() => {
-                      const newD = [...datasets];
-                      if (!newD[0]) newD[0] = { label: 'Domain', data: [] };
-                      newD[0].data.push('');
-                      setDatasets(newD);
-                    }} className="text-xs text-blue-600 font-bold">+ Tambah</button>
-                  </div>
-                  <div className="space-y-2">
-                    {datasets[0]?.data.map((item, idx) => (
-                      <div key={`dom-${idx}`} className="flex gap-2">
-                        <input type="text" value={item} onChange={e => {
-                          const newD = [...datasets]; newD[0].data[idx] = e.target.value; setDatasets(newD);
-                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                        <button onClick={() => {
-                          const newD = [...datasets]; newD[0].data.splice(idx, 1); setDatasets(newD);
-                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-xs font-bold text-slate-500">Anggota Kodomain</label>
-                    <button onClick={() => {
-                      const newD = [...datasets];
-                      if (!newD[1]) newD[1] = { label: 'Kodomain', data: [] };
-                      newD[1].data.push('');
-                      setDatasets(newD);
-                    }} className="text-xs text-blue-600 font-bold">+ Tambah</button>
-                  </div>
-                  <div className="space-y-2">
-                    {datasets[1]?.data.map((item, idx) => (
-                      <div key={`codom-${idx}`} className="flex gap-2">
-                        <input type="text" value={item} onChange={e => {
-                          const newD = [...datasets]; newD[1].data[idx] = e.target.value; setDatasets(newD);
-                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                        <button onClick={() => {
-                          const newD = [...datasets]; newD[1].data.splice(idx, 1); setDatasets(newD);
-                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t dark:border-slate-700">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Relasi Pemetaan</label>
-                  <button onClick={() => {
-                    const newD = [...datasets];
-                    if (!newD[2]) newD[2] = { label: 'Relasi', data: [] };
-                    newD[2].data.push('0-0');
-                    setDatasets(newD);
-                  }} className="text-sm bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400">+ Tambah Relasi</button>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {datasets[2]?.data.map((rel, idx) => {
-                    const [dIdx, cIdx] = String(rel).split('-');
-                    return (
-                      <div key={`rel-${idx}`} className="flex gap-2 items-center bg-white dark:bg-slate-800 p-2 rounded border dark:border-slate-700">
-                        <select value={dIdx} onChange={e => {
-                          const newD = [...datasets]; newD[2].data[idx] = `${e.target.value}-${cIdx}`; setDatasets(newD);
-                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                          <option value="">Pilih Domain</option>
-                          {datasets[0]?.data.map((item, i) => (
-                            <option key={`d-${i}`} value={i}>{item}</option>
-                          ))}
-                        </select>
-                        <span className="text-slate-400 font-bold">→</span>
-                        <select value={cIdx} onChange={e => {
-                          const newD = [...datasets]; newD[2].data[idx] = `${dIdx}-${e.target.value}`; setDatasets(newD);
-                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                          <option value="">Pilih Kodomain</option>
-                          {datasets[1]?.data.map((item, i) => (
-                            <option key={`c-${i}`} value={i}>{item}</option>
-                          ))}
-                        </select>
-                        <button onClick={() => {
-                          const newD = [...datasets]; newD[2].data.splice(idx, 1); setDatasets(newD);
-                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : type === 'cartesian' ? (
-            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">X Min</label>
-                  <input type="number" value={cartesianConfig.xMin} onChange={e => setCartesianConfig({...cartesianConfig, xMin: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">X Max</label>
-                  <input type="number" value={cartesianConfig.xMax} onChange={e => setCartesianConfig({...cartesianConfig, xMax: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Y Min</label>
-                  <input type="number" value={cartesianConfig.yMin} onChange={e => setCartesianConfig({...cartesianConfig, yMin: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Y Max</label>
-                  <input type="number" value={cartesianConfig.yMax} onChange={e => setCartesianConfig({...cartesianConfig, yMax: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t dark:border-slate-700">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Titik / Garis Data</label>
-                  <button onClick={() => {
-                    const newD = [...datasets];
-                    newD.push({ label: `Dataset ${datasets.length + 1}`, data: [], backgroundColor: ['#3b82f6'], showLine: false });
-                    setDatasets(newD);
-                  }} className="text-sm bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400">+ Tambah Dataset</button>
-                </div>
-                
-                <div className="space-y-4">
-                  {datasets.map((ds, idx) => (
-                    <div key={`ds-${idx}`} className="bg-white dark:bg-slate-800 p-3 rounded border dark:border-slate-700">
-                      <div className="flex gap-2 items-center mb-3">
-                        <input type="text" value={ds.label || ''} onChange={e => {
-                          const newD = [...datasets]; newD[idx].label = e.target.value; setDatasets(newD);
-                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold" />
-                        
-                        <label className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                          <input type="checkbox" checked={ds.showLine || false} onChange={e => {
-                            const newD = [...datasets]; newD[idx].showLine = e.target.checked; setDatasets(newD);
-                          }} className="w-3 h-3 rounded" />
-                          Garis?
-                        </label>
-
-                        <button onClick={() => {
-                          const newD = [...datasets]; newD.splice(idx, 1); setDatasets(newD);
-                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
-                      </div>
-
-                      <div className="flex gap-4 items-center mb-2">
-                        <label className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                          <input type="checkbox" checked={ds.isFunction || false} onChange={e => {
-                            const newD = [...datasets]; newD[idx].isFunction = e.target.checked; setDatasets(newD);
-                          }} className="w-3 h-3 rounded text-indigo-600" />
-                          Gunakan Rumus Fungsi f(x)
-                        </label>
-                      </div>
-
-                      {ds.isFunction ? (
-                        <div className="mb-2">
-                          <label className="text-xs font-bold text-slate-500">Rumus f(x) (misal: x^2 - 2*x + 1 atau Math.sin(x))</label>
-                          <input type="text" value={ds.functionStr || ''} onChange={e => {
-                            const newD = [...datasets]; newD[idx].functionStr = e.target.value; setDatasets(newD);
-                          }} placeholder="x^2 - 2*x + 1" className="w-full p-2 mt-1 text-sm font-mono border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="text-xs font-bold text-slate-500">Titik Koordinat (x, y)</label>
-                            <button onClick={() => {
-                              const newD = [...datasets];
-                              newD[idx].data.push({ x: 0, y: 0 });
-                              setDatasets(newD);
-                            }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300">+ Tambah Titik</button>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                            {ds.data.map((pt, pIdx) => (
-                              <div key={`pt-${idx}-${pIdx}`} className="flex gap-1 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded border dark:border-slate-600">
-                                <span className="text-xs font-mono text-slate-400 pl-1">(</span>
-                                <input type="number" value={pt.x || 0} onChange={e => {
-                                  const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], x: parseFloat(e.target.value) || 0 }; setDatasets(newD);
-                                }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                                <span className="text-xs font-mono text-slate-400">,</span>
-                                <input type="number" value={pt.y || 0} onChange={e => {
-                                  const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], y: parseFloat(e.target.value) || 0 }; setDatasets(newD);
-                                }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                                <span className="text-xs font-mono text-slate-400">)</span>
-                                <button onClick={() => {
-                                  const newD = [...datasets]; newD[idx].data.splice(pIdx, 1); setDatasets(newD);
-                                }} className="ml-auto text-red-400 hover:text-red-600 font-bold px-1 text-xs">✕</button>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : type === 'venn' ? (
-            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
-              <div className="flex justify-between items-center mb-4">
-                 <h3 className="font-bold text-gray-700 dark:text-slate-200">Data Diagram Venn</h3>
-                 <div className="flex gap-2">
-                   <button onClick={() => { setLabels(['A', 'B']); setDatasets([{ label: 'Data', data: ['', '', '', '', ''] }]); }} className={`px-3 py-1 rounded text-sm ${labels.length !== 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-slate-300'}`}>2 Himpunan</button>
-                   <button onClick={() => { setLabels(['A', 'B', 'C']); setDatasets([{ label: 'Data', data: ['', '', '', '', '', '', '', '', ''] }]); }} className={`px-3 py-1 rounded text-sm ${labels.length === 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-slate-300'}`}>3 Himpunan</button>
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                   <label className="block text-xs font-bold text-slate-500 mb-1">Total Semesta (S)</label>
-                   <input type="text" value={datasets[0]?.data[labels.length === 3 ? 8 : 4] || ''} onChange={e => {
-                     const newD = [...(datasets[0]?.data || [])];
-                     newD[labels.length === 3 ? 8 : 4] = e.target.value;
-                     const newDatasets = [...datasets];
-                     if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] };
-                     newDatasets[0].data = newD;
-                     setDatasets(newDatasets);
-                   }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-slate-500 mb-1">Nilai di Luar Himpunan</label>
-                   <input type="text" value={datasets[0]?.data[labels.length === 3 ? 7 : 3] || ''} onChange={e => {
-                     const newD = [...(datasets[0]?.data || [])];
-                     newD[labels.length === 3 ? 7 : 3] = e.target.value;
-                     const newDatasets = [...datasets];
-                     if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] };
-                     newDatasets[0].data = newD;
-                     setDatasets(newDatasets);
-                   }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                </div>
-              </div>
-
-              <div className="space-y-3 mt-4">
-                <h4 className="font-bold text-sm text-slate-600 dark:text-slate-300 border-b dark:border-slate-700 pb-1">Himpunan</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                     <input type="text" placeholder="Nama Himpunan 1" value={labels[0] || 'A'} onChange={e => {
-                       const newL = [...labels]; newL[0] = e.target.value; setLabels(newL);
-                     }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
-                     <label className="text-xs text-slate-500">Nilai Hanya {labels[0] || 'A'}</label>
-                     <input type="text" value={datasets[0]?.data[0] ?? ''} onChange={e => {
-                       const newD = [...(datasets[0]?.data || [])]; newD[0] = e.target.value;
-                       const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                     }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                     <input type="text" placeholder="Nama Himpunan 2" value={labels[1] || 'B'} onChange={e => {
-                       const newL = [...labels]; newL[1] = e.target.value; setLabels(newL);
-                     }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
-                     <label className="text-xs text-slate-500">Nilai Hanya {labels[1] || 'B'}</label>
-                     <input type="text" value={datasets[0]?.data[1] ?? ''} onChange={e => {
-                       const newD = [...(datasets[0]?.data || [])]; newD[1] = e.target.value;
-                       const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                     }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                  </div>
-                  {labels.length === 3 && (
-                    <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
-                       <input type="text" placeholder="Nama Himpunan 3" value={labels[2] || 'C'} onChange={e => {
-                         const newL = [...labels]; newL[2] = e.target.value; setLabels(newL);
-                       }} className="w-full p-2 text-sm border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold" />
-                       <label className="text-xs text-slate-500">Nilai Hanya {labels[2] || 'C'}</label>
-                       <input type="text" value={datasets[0]?.data[2] ?? ''} onChange={e => {
-                         const newD = [...(datasets[0]?.data || [])]; newD[2] = e.target.value;
-                         const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                       }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-3 mt-4">
-                <h4 className="font-bold text-sm text-slate-600 dark:text-slate-300 border-b dark:border-slate-700 pb-1">Irisan</h4>
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="flex flex-col gap-1">
-                      <label className="text-xs text-slate-500">Irisan {labels[0] || 'A'} & {labels[1] || 'B'}</label>
-                      <input type="text" value={datasets[0]?.data[labels.length === 3 ? 3 : 2] ?? ''} onChange={e => {
-                        const newD = [...(datasets[0]?.data || [])]; newD[labels.length === 3 ? 3 : 2] = e.target.value;
-                        const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                      }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                   </div>
-                   {labels.length === 3 && (
-                     <>
-                       <div className="flex flex-col gap-1">
-                          <label className="text-xs text-slate-500">Irisan {labels[0] || 'A'} & {labels[2] || 'C'}</label>
-                          <input type="text" value={datasets[0]?.data[4] ?? ''} onChange={e => {
-                            const newD = [...(datasets[0]?.data || [])]; newD[4] = e.target.value;
-                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                       </div>
-                       <div className="flex flex-col gap-1">
-                          <label className="text-xs text-slate-500">Irisan {labels[1] || 'B'} & {labels[2] || 'C'}</label>
-                          <input type="text" value={datasets[0]?.data[5] ?? ''} onChange={e => {
-                            const newD = [...(datasets[0]?.data || [])]; newD[5] = e.target.value;
-                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                       </div>
-                       <div className="flex flex-col gap-1 col-span-2">
-                          <label className="text-xs text-slate-500 font-bold">Irisan Ketiganya ({labels[0] || 'A'}, {labels[1] || 'B'} & {labels[2] || 'C'})</label>
-                          <input type="text" value={datasets[0]?.data[6] ?? ''} onChange={e => {
-                            const newD = [...(datasets[0]?.data || [])]; newD[6] = e.target.value;
-                            const newDatasets = [...datasets]; if (!newDatasets[0]) newDatasets[0] = { label: 'Data', data: [] }; newDatasets[0].data = newD; setDatasets(newDatasets);
-                          }} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                       </div>
-                     </>
-                   )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-gray-700 dark:text-slate-200">Label & Data</h3>
-                <div className="space-x-2">
-                  <button
-                    onClick={handleAddLabel}
-                    className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-600 dark:text-white rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors flex items-center gap-1 inline-flex"
-                  >
-                    <PlusCircleIcon className="w-4 h-4" /> Tambah Label
-                  </button>
-                  {type !== 'pie' && (
-                    <button
-                      onClick={handleAddDataset}
-                      className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-600 dark:text-white rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-700 transition-colors flex items-center gap-1 inline-flex"
-                    >
-                      <PlusCircleIcon className="w-4 h-4" /> Tambah Dataset
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="overflow-x-auto border dark:border-slate-700 rounded-xl">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-slate-800/50 border-b dark:border-slate-700">
-                    <tr>
-                      <th className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">Label</th>
-                      {datasets.map((d, i) => (
-                        <th key={i} className="p-3 text-left font-medium text-gray-600 dark:text-slate-300">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={d.label || ''}
-                              onChange={(e) => {
-                                const newDatasets = [...datasets];
-                                newDatasets[i].label = e.target.value;
-                                setDatasets(newDatasets);
-                              }}
-                              className="border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none w-24 bg-transparent dark:text-white"
-                            />
-                            {datasets.length > 1 && (
-                              <button onClick={() => handleDeleteDataset(i)} className="text-red-500 hover:text-red-700">
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </th>
-                      ))}
-                      <th className="p-3 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y dark:divide-slate-700">
-                    {labels.map((label, labelIdx) => (
-                      <tr key={labelIdx} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="p-3">
-                          <input
-                            type="text"
-                            value={label || ''}
-                            onChange={(e) => {
-                              const newLabels = [...labels];
-                              newLabels[labelIdx] = e.target.value;
-                              setLabels(newLabels);
-                            }}
-                            className="w-full border-b border-transparent hover:border-gray-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none bg-transparent dark:text-white"
-                          />
-                        </td>
-                        {datasets.map((dataset, datasetIdx) => (
-                          <td key={datasetIdx} className="p-3">
-                            <input
-                              type="number"
-                              value={dataset.data[labelIdx] ?? ''}
-                              onChange={(e) => {
-                                const newDatasets = [...datasets];
-                                newDatasets[datasetIdx].data[labelIdx] = Number(e.target.value);
-                                setDatasets(newDatasets);
-                              }}
-                              className="w-full p-1 border dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 outline-none dark:bg-slate-800 dark:text-white"
-                            />
-                          </td>
-                        ))}
-                        <td className="p-3">
-                          {labels.length > 1 && (
-                            <button onClick={() => handleDeleteLabel(labelIdx)} className="text-red-500 hover:text-red-700">
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 sm:p-6 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row justify-between gap-3">
-          {onDelete ? (
-            <button
-              onClick={() => {
-                onDelete();
-                onClose();
-              }}
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
-            >
-              Hapus Diagram
-            </button>
-          ) : (
-            <div className="hidden sm:block"></div>
-          )}
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button
-              onClick={onClose}
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 border dark:border-slate-700 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium dark:text-slate-300"
-            >
-              Batal
-            </button>
-            <button
-              onClick={handleSave}
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-lg shadow-blue-200 dark:shadow-blue-900/20"
-            >
-              Simpan Diagram
-            </button>
-          </div>
+  return (
+    <div className={`w-full ${['venn', 'relation', 'cartesian'].includes(type) ? 'h-auto max-w-[500px] mx-auto flex' : 'min-h-[350px] h-[350px] sm:h-[450px] flex'} flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all`}>
+      {title && <h3 className="text-center font-bold mb-[10px] text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">{title}</h3>}
+      <div className={`w-full ${['venn', 'relation', 'cartesian'].includes(type) ? 'flex justify-center flex-col' : 'flex-1 relative min-h-[1px] min-w-[1px]'}`}>
+        <div className={['venn', 'relation', 'cartesian'].includes(type) ? 'w-full h-auto' : 'absolute inset-0 min-h-[1px] min-w-[1px]'}>
+          {renderChart()}
         </div>
       </div>
-    </div>,
-    document.body
+      {data.showLegend !== false && legendItems.length > 0 && (
+        <div className="mt-[10px] flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 shrink-0">
+          {legendItems.map((item, index) => (
+            <div key={`item-${index}`} className="flex items-center text-[13px] sm:text-[14px] font-bold" style={{ color: item.color }}>
+              <span className="w-3 h-3 rounded-full mr-1.5 shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="truncate max-w-[150px] sm:max-w-[200px]">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
