@@ -1618,13 +1618,6 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             if (chartData) {
                 chartCounter++;
                 const canvasId = `pdf-chart-${chartCounter}`;
-                const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
-                
-                if (processedHtml.includes('chart-placeholder')) {
-                    processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
-                } else {
-                    processedHtml += canvasHtml;
-                }
                 
                 const typedData = chartData as any;
                 
@@ -1641,7 +1634,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         const vOuter = d[3] ?? '';
                         const vTotal = d[4] ?? '';
                         svgContent = `
-                            <svg viewBox="0 0 400 300" style="width: 100%; max-width: 400px; height: auto;">
+                            <svg viewBox="0 0 400 300" style="width: 100%; max-width: 600px; height: auto;">
                                 <rect x="10" y="10" width="380" height="280" fill="none" stroke="#1e293b" stroke-width="2" />
                                 <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
                                 <text x="360" y="270" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
@@ -1665,7 +1658,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         const vOuter = d[7] ?? '';
                         const vTotal = d[8] ?? '';
                         svgContent = `
-                            <svg viewBox="0 0 400 400" style="width: 100%; max-width: 400px; height: auto;">
+                            <svg viewBox="0 0 400 400" style="width: 100%; max-width: 600px; height: auto;">
                                 <rect x="10" y="10" width="380" height="380" fill="none" stroke="#1e293b" stroke-width="2" />
                                 <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
                                 <text x="360" y="370" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
@@ -1738,7 +1731,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     });
 
                     const svgContent = `
-                        <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; max-width: 400px; height: auto;">
+                        <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; max-width: 600px; height: auto;">
                             <defs>
                                 <marker id="arrowhead-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
                                     <polygon points="0 0, 6 2.5, 0 5" fill="#1e293b" />
@@ -1865,7 +1858,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     });
 
                     const svgContent = `
-                        <svg viewBox="0 0 ${w} ${h}" style="width: 100%; max-width: 400px; height: auto; background-color: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <svg viewBox="0 0 ${w} ${h}" style="width: 100%; max-width: 600px; height: auto; background-color: white; border: 1px solid #e2e8f0; border-radius: 8px;">
                             <defs>
                                 <marker id="arrowX-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
                                     <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
@@ -1887,7 +1880,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         processedHtml += newHtml;
                     }
                 } else {
-                    const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
+                    const canvasHtml = `<div class="chart-wrapper" style="height: 350px; width: 100%; max-width: 750px; margin: 20px auto;"><canvas id="${canvasId}"></canvas></div>`;
                     
                     if (processedHtml.includes('chart-placeholder')) {
                         processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
@@ -1918,6 +1911,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                             },
                             options: {
                                 responsive: true,
+                                maintainAspectRatio: false,
                                 animation: false,
                                 plugins: {
                                     title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
@@ -1971,7 +1965,8 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .option-item > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
                 .option-item > .prose { flex: 1; }
                 .answer-key { page-break-before: always; }
-                .chart-wrapper { max-width: 500px; margin: 15px auto; page-break-inside: avoid; }
+                .chart-wrapper { width: 100%; max-width: 750px; margin: 20px auto; page-break-inside: avoid; display: flex; justify-content: center; }
+                .chart-wrapper canvas { width: 100% !important; max-width: 750px !important; }
                 img { max-width: 100%; height: auto; object-fit: contain; }
                 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
                 table, th, td { border: 1px solid #ddd; padding: 8px; }
