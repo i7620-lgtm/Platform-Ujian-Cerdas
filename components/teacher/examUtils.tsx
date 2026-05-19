@@ -1813,15 +1813,55 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     let datasetsHtml = '';
                     const cartesianColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
                     (typedData.datasets || []).forEach((ds: any, dIdx: number) => {
-                        const points = ds.data as {x: number, y: number}[];
-                        if (!points || points.length === 0) return;
+                        let points = ds.data as {x: number, y: number}[];
                         const color = ds.backgroundColor?.[0] || cartesianColors[dIdx % cartesianColors.length];
-                        if (ds.showLine && points.length > 1) {
+                        
+                        let isFuncPlot = false;
+                        if (ds.isFunction && ds.functionStr) {
+                            isFuncPlot = true;
+                            points = [];
+                            const step = (config.xMax - config.xMin) / 100;
+                            for(let x = config.xMin; x <= config.xMax; x += step) {
+                                try {
+                                    let fStr = ds.functionStr.toLowerCase().replace(/\s+/g, '');
+                                    if (fStr.startsWith('y=')) fStr = fStr.substring(2);
+                                    else if (fStr.startsWith('f(x)=')) fStr = fStr.substring(5);
+                                    else if (fStr.endsWith('=0')) fStr = fStr.substring(0, fStr.length - 2);
+                                    else if (fStr.startsWith('0=')) fStr = fStr.substring(2);
+                                    else if (fStr.endsWith('=y')) fStr = fStr.substring(0, fStr.length - 2);
+                                    let f = fStr.replace(/(\d+)x/g, '$1*x').replace(/\^/g, '**');
+                                    const mathFuncs = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'abs', 'log', 'exp'];
+                                    mathFuncs.forEach((mf: string) => {
+                                        f = f.split(mf).join(`Math.${mf}`);
+                                        f = f.split(`Math.Math.${mf}`).join(`Math.${mf}`);
+                                    });
+                                    const calc = new Function('x', `return ${f}`);
+                                    const y = calc(x);
+                                    if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
+                                        points.push({x, y});
+                                    }
+                                } catch(e) {
+                                    // ignore errors
+                                }
+                            }
+                        }
+
+                        if (!points || points.length === 0) return;
+
+                        if ((ds.showLine || isFuncPlot) && points.length > 1) {
                             datasetsHtml += `<polyline points="${points.map(pt => `${mapX(pt.x)},${mapY(pt.y)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" />`;
                         }
-                        points.forEach((pt: any) => {
-                            datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
-                        });
+                        if (!isFuncPlot) {
+                            points.forEach((pt: any) => {
+                                datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
+                            });
+                        }
+                        if (ds.label && ds.label !== `Dataset ${dIdx + 1}` && ds.label !== 'Titik Data' && points.length > 0) {
+                            const midPt = points[Math.floor(points.length/2)];
+                            if (midPt) {
+                                datasetsHtml += `<text x="${mapX(midPt.x)}" y="${mapY(midPt.y) - 10}" font-size="12" font-weight="bold" fill="${color}">${ds.label}</text>`;
+                            }
+                        }
                     });
 
                     const svgContent = `
