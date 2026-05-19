@@ -11,17 +11,27 @@ export interface QuizConfig {
 }
 
 export interface ChartData {
-  type: 'bar' | 'line' | 'pie' | 'venn' | 'relation';
+  type: 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian';
   title?: string;
   labels: string[];
   datasets: {
     label: string;
-    data: (number | string)[];
+    data: (number | string | any)[];
     backgroundColor?: string[];
     borderColor?: string[];
+    showLine?: boolean;
+    fill?: boolean;
   }[];
   showTooltip?: boolean;
   showLegend?: boolean;
+  cartesianConfig?: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+    xStep: number;
+    yStep: number;
+  };
 }
 
 export interface Question {

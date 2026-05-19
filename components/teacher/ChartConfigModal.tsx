@@ -19,14 +19,17 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   onDelete,
   initialData
 }) => {
-  const [type, setType] = useState<'bar' | 'line' | 'pie' | 'venn' | 'relation'>('bar');
+  const [type, setType] = useState<'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian'>('bar');
   const [title, setTitle] = useState('');
   const [labels, setLabels] = useState<string[]>(['Jan', 'Feb', 'Mar']);
-  const [datasets, setDatasets] = useState<{ label: string; data: (number | string)[] }[]>([
+  const [datasets, setDatasets] = useState<{ label: string; data: (number | string | any)[]; backgroundColor?: string[]; borderColor?: string[]; showLine?: boolean; fill?: boolean }[]>([
     { label: 'Data 1', data: [10, 20, 30] }
   ]);
   const [showTooltip, setShowTooltip] = useState<boolean>(true);
   const [showLegend, setShowLegend] = useState<boolean>(true);
+  const [cartesianConfig, setCartesianConfig] = useState({
+    xMin: -10, xMax: 10, yMin: -10, yMax: 10, xStep: 1, yStep: 1
+  });
 
   useEffect(() => {
     if (initialData) {
@@ -34,9 +37,19 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       setType(initialData.type as any);
       setTitle(initialData.title || '');
       setLabels(initialData.labels);
-      setDatasets(initialData.datasets.map(d => ({ label: d.label, data: d.data })));
+      setDatasets(initialData.datasets.map(d => ({ 
+        label: d.label, 
+        data: d.data,
+        backgroundColor: d.backgroundColor,
+        borderColor: d.borderColor,
+        showLine: d.showLine,
+        fill: d.fill
+      })));
       setShowTooltip(initialData.showTooltip !== false);
       setShowLegend(initialData.showLegend !== false);
+      if (initialData.cartesianConfig) {
+        setCartesianConfig(initialData.cartesianConfig);
+      }
     }
   }, [initialData, isOpen]);
 
@@ -53,6 +66,11 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
          { label: 'Domain', data: ['1', '2', '3'] },
          { label: 'Kodomain', data: ['a', 'b', 'c'] },
          { label: 'Relasi', data: ['0-0', '1-1', '2-2'] }
+       ]);
+    } else if (newType === 'cartesian') {
+       setLabels(['X', 'Y']);
+       setDatasets([
+         { label: 'Titik Data', data: [], backgroundColor: ['#3b82f6'], showLine: false }
        ]);
     }
   };
@@ -94,7 +112,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
       labels,
       datasets,
       showTooltip,
-      showLegend
+      showLegend,
+      ...(type === 'cartesian' ? { cartesianConfig } : {})
     });
     onClose();
   };
@@ -133,6 +152,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                 <option value="pie">Diagram Lingkaran (Pie)</option>
                 <option value="venn">Diagram Venn Himpunan</option>
                 <option value="relation">Diagram Relasi / Fungsi</option>
+                <option value="cartesian">Diagram Kartesius</option>
               </select>
             </div>
           </div>
@@ -265,6 +285,89 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+          ) : type === 'cartesian' ? (
+            <div className="space-y-4 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-700">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">X Min</label>
+                  <input type="number" value={cartesianConfig.xMin} onChange={e => setCartesianConfig({...cartesianConfig, xMin: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">X Max</label>
+                  <input type="number" value={cartesianConfig.xMax} onChange={e => setCartesianConfig({...cartesianConfig, xMax: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Y Min</label>
+                  <input type="number" value={cartesianConfig.yMin} onChange={e => setCartesianConfig({...cartesianConfig, yMin: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Y Max</label>
+                  <input type="number" value={cartesianConfig.yMax} onChange={e => setCartesianConfig({...cartesianConfig, yMax: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded focus:ring-1 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t dark:border-slate-700">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Titik / Garis Data</label>
+                  <button onClick={() => {
+                    const newD = [...datasets];
+                    newD.push({ label: `Dataset ${datasets.length + 1}`, data: [], backgroundColor: ['#3b82f6'], showLine: false });
+                    setDatasets(newD);
+                  }} className="text-sm bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400">+ Tambah Dataset</button>
+                </div>
+                
+                <div className="space-y-4">
+                  {datasets.map((ds, idx) => (
+                    <div key={`ds-${idx}`} className="bg-white dark:bg-slate-800 p-3 rounded border dark:border-slate-700">
+                      <div className="flex gap-2 items-center mb-3">
+                        <input type="text" value={ds.label} onChange={e => {
+                          const newD = [...datasets]; newD[idx].label = e.target.value; setDatasets(newD);
+                        }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold" />
+                        
+                        <label className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                          <input type="checkbox" checked={ds.showLine || false} onChange={e => {
+                            const newD = [...datasets]; newD[idx].showLine = e.target.checked; setDatasets(newD);
+                          }} className="w-3 h-3 rounded" />
+                          Garis?
+                        </label>
+
+                        <button onClick={() => {
+                          const newD = [...datasets]; newD.splice(idx, 1); setDatasets(newD);
+                        }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
+                      </div>
+
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-slate-500">Titik Koordinat (x, y)</label>
+                        <button onClick={() => {
+                          const newD = [...datasets];
+                          newD[idx].data.push({ x: 0, y: 0 });
+                          setDatasets(newD);
+                        }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300">+ Tambah Titik</button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        {ds.data.map((pt, pIdx) => (
+                          <div key={`pt-${idx}-${pIdx}`} className="flex gap-1 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded border dark:border-slate-600">
+                            <span className="text-xs font-mono text-slate-400 pl-1">(</span>
+                            <input type="number" value={pt.x || 0} onChange={e => {
+                              const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], x: parseFloat(e.target.value) || 0 }; setDatasets(newD);
+                            }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                            <span className="text-xs font-mono text-slate-400">,</span>
+                            <input type="number" value={pt.y || 0} onChange={e => {
+                              const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], y: parseFloat(e.target.value) || 0 }; setDatasets(newD);
+                            }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                            <span className="text-xs font-mono text-slate-400">)</span>
+                            <button onClick={() => {
+                              const newD = [...datasets]; newD[idx].data.splice(pIdx, 1); setDatasets(newD);
+                            }} className="ml-auto text-red-400 hover:text-red-600 font-bold px-1 text-xs">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
