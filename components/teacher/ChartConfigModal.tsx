@@ -22,7 +22,8 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   const [type, setType] = useState<'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian'>('bar');
   const [title, setTitle] = useState('');
   const [labels, setLabels] = useState<string[]>(['Jan', 'Feb', 'Mar']);
-  const [datasets, setDatasets] = useState<{ label: string; data: (number | string | any)[]; backgroundColor?: string[]; borderColor?: string[]; showLine?: boolean; fill?: boolean }[]>([
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [datasets, setDatasets] = useState<{ label: string; data: (number | string | any)[]; backgroundColor?: string[]; borderColor?: string[]; showLine?: boolean; fill?: boolean; isFunction?: boolean; functionStr?: string; }[]>([
     { label: 'Data 1', data: [10, 20, 30] }
   ]);
   const [showTooltip, setShowTooltip] = useState<boolean>(true);
@@ -34,7 +35,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   useEffect(() => {
     if (initialData) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setType(initialData.type as any);
+      setType(initialData.type);
       setTitle(initialData.title || '');
       setLabels(initialData.labels);
       setDatasets(initialData.datasets.map(d => ({ 
@@ -43,7 +44,9 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
         backgroundColor: d.backgroundColor,
         borderColor: d.borderColor,
         showLine: d.showLine,
-        fill: d.fill
+        fill: d.fill,
+        isFunction: d.isFunction,
+        functionStr: d.functionStr
       })));
       setShowTooltip(initialData.showTooltip !== false);
       setShowLegend(initialData.showLegend !== false);
@@ -54,7 +57,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
   }, [initialData, isOpen]);
 
   const handleTypeChange = (newType: string) => {
-    setType(newType as any);
+    setType(newType as 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian');
     if (newType === 'venn') {
        if (labels.length !== 2 && labels.length !== 3) {
          setLabels(['A', 'B']);
@@ -323,7 +326,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                   {datasets.map((ds, idx) => (
                     <div key={`ds-${idx}`} className="bg-white dark:bg-slate-800 p-3 rounded border dark:border-slate-700">
                       <div className="flex gap-2 items-center mb-3">
-                        <input type="text" value={ds.label} onChange={e => {
+                        <input type="text" value={ds.label || ''} onChange={e => {
                           const newD = [...datasets]; newD[idx].label = e.target.value; setDatasets(newD);
                         }} className="flex-1 p-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold" />
                         
@@ -339,33 +342,53 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                         }} className="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
                       </div>
 
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="text-xs font-bold text-slate-500">Titik Koordinat (x, y)</label>
-                        <button onClick={() => {
-                          const newD = [...datasets];
-                          newD[idx].data.push({ x: 0, y: 0 });
-                          setDatasets(newD);
-                        }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300">+ Tambah Titik</button>
+                      <div className="flex gap-4 items-center mb-2">
+                        <label className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                          <input type="checkbox" checked={ds.isFunction || false} onChange={e => {
+                            const newD = [...datasets]; newD[idx].isFunction = e.target.checked; setDatasets(newD);
+                          }} className="w-3 h-3 rounded text-indigo-600" />
+                          Gunakan Rumus Fungsi f(x)
+                        </label>
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {ds.data.map((pt, pIdx) => (
-                          <div key={`pt-${idx}-${pIdx}`} className="flex gap-1 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded border dark:border-slate-600">
-                            <span className="text-xs font-mono text-slate-400 pl-1">(</span>
-                            <input type="number" value={pt.x || 0} onChange={e => {
-                              const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], x: parseFloat(e.target.value) || 0 }; setDatasets(newD);
-                            }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                            <span className="text-xs font-mono text-slate-400">,</span>
-                            <input type="number" value={pt.y || 0} onChange={e => {
-                              const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], y: parseFloat(e.target.value) || 0 }; setDatasets(newD);
-                            }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                            <span className="text-xs font-mono text-slate-400">)</span>
+
+                      {ds.isFunction ? (
+                        <div className="mb-2">
+                          <label className="text-xs font-bold text-slate-500">Rumus f(x) (misal: x^2 - 2*x + 1 atau Math.sin(x))</label>
+                          <input type="text" value={ds.functionStr || ''} onChange={e => {
+                            const newD = [...datasets]; newD[idx].functionStr = e.target.value; setDatasets(newD);
+                          }} placeholder="x^2 - 2*x + 1" className="w-full p-2 mt-1 text-sm font-mono border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center mb-2">
+                            <label className="text-xs font-bold text-slate-500">Titik Koordinat (x, y)</label>
                             <button onClick={() => {
-                              const newD = [...datasets]; newD[idx].data.splice(pIdx, 1); setDatasets(newD);
-                            }} className="ml-auto text-red-400 hover:text-red-600 font-bold px-1 text-xs">✕</button>
+                              const newD = [...datasets];
+                              newD[idx].data.push({ x: 0, y: 0 });
+                              setDatasets(newD);
+                            }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300">+ Tambah Titik</button>
                           </div>
-                        ))}
-                      </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            {ds.data.map((pt, pIdx) => (
+                              <div key={`pt-${idx}-${pIdx}`} className="flex gap-1 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded border dark:border-slate-600">
+                                <span className="text-xs font-mono text-slate-400 pl-1">(</span>
+                                <input type="number" value={pt.x || 0} onChange={e => {
+                                  const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], x: parseFloat(e.target.value) || 0 }; setDatasets(newD);
+                                }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                                <span className="text-xs font-mono text-slate-400">,</span>
+                                <input type="number" value={pt.y || 0} onChange={e => {
+                                  const newD = [...datasets]; newD[idx].data[pIdx] = { ...newD[idx].data[pIdx], y: parseFloat(e.target.value) || 0 }; setDatasets(newD);
+                                }} className="w-12 p-0.5 text-xs text-center border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                                <span className="text-xs font-mono text-slate-400">)</span>
+                                <button onClick={() => {
+                                  const newD = [...datasets]; newD[idx].data.splice(pIdx, 1); setDatasets(newD);
+                                }} className="ml-auto text-red-400 hover:text-red-600 font-bold px-1 text-xs">✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -514,7 +537,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              value={d.label}
+                              value={d.label || ''}
                               onChange={(e) => {
                                 const newDatasets = [...datasets];
                                 newDatasets[i].label = e.target.value;
@@ -539,7 +562,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                         <td className="p-3">
                           <input
                             type="text"
-                            value={label}
+                            value={label || ''}
                             onChange={(e) => {
                               const newLabels = [...labels];
                               newLabels[labelIdx] = e.target.value;
@@ -552,7 +575,7 @@ export const ChartConfigModal: React.FC<ChartConfigModalProps> = ({
                           <td key={datasetIdx} className="p-3">
                             <input
                               type="number"
-                              value={dataset.data[labelIdx]}
+                              value={dataset.data[labelIdx] ?? ''}
                               onChange={(e) => {
                                 const newDatasets = [...datasets];
                                 newDatasets[datasetIdx].data[labelIdx] = Number(e.target.value);

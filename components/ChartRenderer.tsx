@@ -68,10 +68,13 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
       return [];
     }
     if (type === 'pie') {
-      return labels.map((label, index) => ({
-        value: label,
-        color: COLORS[index % COLORS.length]
-      }));
+      return labels.map((label, index) => {
+        const val = datasets[0]?.data[index] ?? 0;
+        return {
+          value: `${label} (${val})`,
+          color: COLORS[index % COLORS.length]
+        };
+      });
     } else {
       return datasets.map((dataset, index) => ({
         value: dataset.label,
@@ -104,8 +107,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   }, [type, labels, datasets]);
 
   const renderPieLabel = React.useCallback((props: any) => {
-    if (isMobile) return null;
     const { name, percent, x, y, textAnchor, fill } = props;
+    if (!percent || percent === 0) return null;
     return (
       <text 
         x={x} 
@@ -119,11 +122,11 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         {`${name}: ${(percent * 100).toFixed(0)}%`}
       </text>
     );
-  }, [isMobile]);
+  }, []);
 
   const labelLineConfig = React.useMemo(() => {
-    return isMobile ? false : { stroke: '#64748b', strokeWidth: 1 };
-  }, [isMobile]);
+    return { stroke: '#64748b', strokeWidth: 1 };
+  }, []);
 
   const pieChartMargin = React.useMemo(() => {
     return { top: 10, right: isMobile ? 10 : 40, left: isMobile ? 10 : 40, bottom: 10 };
@@ -271,8 +274,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                 cy="50%"
                 labelLine={labelLineConfig}
                 label={renderPieLabel}
-                outerRadius={isMobile ? "70%" : "60%"}
-                innerRadius={isMobile ? "45%" : "35%"}
+                outerRadius={isMobile ? "60%" : "70%"}
+                innerRadius={isMobile ? "30%" : "35%"}
                 paddingAngle={5}
                 fill="#8884d8"
                 dataKey="value"
@@ -538,12 +541,44 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
 
                {/* Plot points and lines from datasets */}
                {datasets.map((ds, dIdx) => {
-                 const points = ds.data as {x: number, y: number}[];
-                 if (!points || points.length === 0) return null;
+                 let points = ds.data as {x: number, y: number}[];
                  const color = ds.backgroundColor?.[0] || COLORS[dIdx % COLORS.length];
+
+                 let isFuncPlot = false;
+                 if (ds.isFunction && ds.functionStr) {
+                   isFuncPlot = true;
+                   points = [];
+                   const step = (config.xMax - config.xMin) / 100;
+                   for(let x = config.xMin; x <= config.xMax; x += step) {
+                     try {
+                        let fStr = ds.functionStr.toLowerCase().replace(/\s+/g, '');
+                        if (fStr.startsWith('y=')) fStr = fStr.substring(2);
+                        else if (fStr.startsWith('f(x)=')) fStr = fStr.substring(5);
+                        else if (fStr.endsWith('=0')) fStr = fStr.substring(0, fStr.length - 2);
+                        else if (fStr.startsWith('0=')) fStr = fStr.substring(2);
+                        else if (fStr.endsWith('=y')) fStr = fStr.substring(0, fStr.length - 2);
+                        let f = fStr.replace(/(\d+)x/g, '$1*x').replace(/\^/g, '**');
+                        const mathFuncs = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'abs', 'log', 'exp'];
+                        mathFuncs.forEach(mf => {
+                            f = f.split(mf).join(`Math.${mf}`);
+                            f = f.split(`Math.Math.${mf}`).join(`Math.${mf}`);
+                        });
+                        const calc = new Function('x', `return ${f}`);
+                        const y = calc(x);
+                        if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
+                            points.push({x, y});
+                        }
+                     } catch(e) {
+                        // ignore errors
+                     }
+                   }
+                 }
+
+                 if (!points || points.length === 0) return null;
+
                  return (
                    <g key={`ds-${dIdx}`}>
-                     {ds.showLine && points.length > 1 && (
+                     {(ds.showLine || isFuncPlot) && points.length > 1 && (
                        <polyline
                          points={points.map(pt => `${mapX(pt.x)},${mapY(pt.y)}`).join(' ')}
                          fill="none"
@@ -551,12 +586,15 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                          strokeWidth="2.5"
                        />
                      )}
-                     {points.map((pt, pIdx) => (
+                     {!isFuncPlot && points.map((pt, pIdx) => (
                        <g key={`pt-${dIdx}-${pIdx}`}>
                          <circle cx={mapX(pt.x)} cy={mapY(pt.y)} r="4" fill={color} stroke="#fff" strokeWidth="1" />
                          <text x={mapX(pt.x) + 6} y={mapY(pt.y) - 6} fontSize="12" fontWeight="bold" fill={color}>{`(${pt.x},${pt.y})`}</text>
                        </g>
                      ))}
+                     {ds.label && ds.label !== `Dataset ${dIdx + 1}` && ds.label !== 'Titik Data' && points.length > 0 && (
+                       <text x={mapX(points[Math.floor(points.length/2)]?.x || 0)} y={mapY(points[Math.floor(points.length/2)]?.y || 0) - 10} fontSize="12" fontWeight="bold" fill={color}>{ds.label}</text>
+                     )}
                    </g>
                  );
                })}
@@ -571,10 +609,10 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   };
 
   return (
-    <div className={`w-full ${type === 'venn' || type === 'relation' ? 'h-auto max-w-[500px] mx-auto flex' : 'h-[450px] sm:h-[500px] flex'} flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all`}>
+    <div className={`w-full ${['venn', 'relation', 'cartesian'].includes(type) ? 'h-auto max-w-[500px] mx-auto flex' : 'min-h-[350px] h-[350px] sm:h-[450px] flex'} flex-col bg-white dark:bg-slate-900/50 p-4 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm transition-all`}>
       {title && <h3 className="text-center font-bold mb-[10px] text-slate-800 dark:text-white tracking-tight text-xl sm:text-2xl shrink-0">{title}</h3>}
-      <div className={`w-full ${type === 'venn' || type === 'relation' ? 'flex justify-center items-center' : 'flex-1 relative min-h-[1px] min-w-[1px]'}`}>
-        <div className={type === 'venn' || type === 'relation' ? 'w-full h-auto' : 'absolute inset-0 min-h-[1px] min-w-[1px]'}>
+      <div className={`w-full ${['venn', 'relation', 'cartesian'].includes(type) ? 'flex justify-center flex-col' : 'flex-1 relative min-h-[1px] min-w-[1px]'}`}>
+        <div className={['venn', 'relation', 'cartesian'].includes(type) ? 'w-full h-auto' : 'absolute inset-0 min-h-[1px] min-w-[1px]'}>
           {renderChart()}
         </div>
       </div>

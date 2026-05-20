@@ -1618,13 +1618,6 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             if (chartData) {
                 chartCounter++;
                 const canvasId = `pdf-chart-${chartCounter}`;
-                const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
-                
-                if (processedHtml.includes('chart-placeholder')) {
-                    processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
-                } else {
-                    processedHtml += canvasHtml;
-                }
                 
                 const typedData = chartData as any;
                 
@@ -1641,7 +1634,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         const vOuter = d[3] ?? '';
                         const vTotal = d[4] ?? '';
                         svgContent = `
-                            <svg viewBox="0 0 400 300" style="width: 100%; max-width: 400px; height: auto;">
+                            <svg viewBox="0 0 400 300" style="width: 100%; max-width: 600px; height: auto;">
                                 <rect x="10" y="10" width="380" height="280" fill="none" stroke="#1e293b" stroke-width="2" />
                                 <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
                                 <text x="360" y="270" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
@@ -1665,7 +1658,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         const vOuter = d[7] ?? '';
                         const vTotal = d[8] ?? '';
                         svgContent = `
-                            <svg viewBox="0 0 400 400" style="width: 100%; max-width: 400px; height: auto;">
+                            <svg viewBox="0 0 400 400" style="width: 100%; max-width: 600px; height: auto;">
                                 <rect x="10" y="10" width="380" height="380" fill="none" stroke="#1e293b" stroke-width="2" />
                                 <text x="20" y="30" fill="#1e293b" font-weight="bold" font-size="16">S${vTotal !== '' ? ` = ${vTotal}` : ''}</text>
                                 <text x="360" y="370" text-anchor="middle" fill="#000" font-weight="bold" font-size="18">${vOuter}</text>
@@ -1738,7 +1731,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     });
 
                     const svgContent = `
-                        <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; max-width: 400px; height: auto;">
+                        <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; max-width: 600px; height: auto;">
                             <defs>
                                 <marker id="arrowhead-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
                                     <polygon points="0 0, 6 2.5, 0 5" fill="#1e293b" />
@@ -1813,19 +1806,59 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                     let datasetsHtml = '';
                     const cartesianColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
                     (typedData.datasets || []).forEach((ds: any, dIdx: number) => {
-                        const points = ds.data as {x: number, y: number}[];
-                        if (!points || points.length === 0) return;
+                        let points = ds.data as {x: number, y: number}[];
                         const color = ds.backgroundColor?.[0] || cartesianColors[dIdx % cartesianColors.length];
-                        if (ds.showLine && points.length > 1) {
+                        
+                        let isFuncPlot = false;
+                        if (ds.isFunction && ds.functionStr) {
+                            isFuncPlot = true;
+                            points = [];
+                            const step = (config.xMax - config.xMin) / 100;
+                            for(let x = config.xMin; x <= config.xMax; x += step) {
+                                try {
+                                    let fStr = ds.functionStr.toLowerCase().replace(/\s+/g, '');
+                                    if (fStr.startsWith('y=')) fStr = fStr.substring(2);
+                                    else if (fStr.startsWith('f(x)=')) fStr = fStr.substring(5);
+                                    else if (fStr.endsWith('=0')) fStr = fStr.substring(0, fStr.length - 2);
+                                    else if (fStr.startsWith('0=')) fStr = fStr.substring(2);
+                                    else if (fStr.endsWith('=y')) fStr = fStr.substring(0, fStr.length - 2);
+                                    let f = fStr.replace(/(\d+)x/g, '$1*x').replace(/\^/g, '**');
+                                    const mathFuncs = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'abs', 'log', 'exp'];
+                                    mathFuncs.forEach((mf: string) => {
+                                        f = f.split(mf).join(`Math.${mf}`);
+                                        f = f.split(`Math.Math.${mf}`).join(`Math.${mf}`);
+                                    });
+                                    const calc = new Function('x', `return ${f}`);
+                                    const y = calc(x);
+                                    if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
+                                        points.push({x, y});
+                                    }
+                                } catch(e) {
+                                    // ignore errors
+                                }
+                            }
+                        }
+
+                        if (!points || points.length === 0) return;
+
+                        if ((ds.showLine || isFuncPlot) && points.length > 1) {
                             datasetsHtml += `<polyline points="${points.map(pt => `${mapX(pt.x)},${mapY(pt.y)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" />`;
                         }
-                        points.forEach((pt: any) => {
-                            datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
-                        });
+                        if (!isFuncPlot) {
+                            points.forEach((pt: any) => {
+                                datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
+                            });
+                        }
+                        if (ds.label && ds.label !== `Dataset ${dIdx + 1}` && ds.label !== 'Titik Data' && points.length > 0) {
+                            const midPt = points[Math.floor(points.length/2)];
+                            if (midPt) {
+                                datasetsHtml += `<text x="${mapX(midPt.x)}" y="${mapY(midPt.y) - 10}" font-size="12" font-weight="bold" fill="${color}">${ds.label}</text>`;
+                            }
+                        }
                     });
 
                     const svgContent = `
-                        <svg viewBox="0 0 ${w} ${h}" style="width: 100%; max-width: 400px; height: auto; background-color: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <svg viewBox="0 0 ${w} ${h}" style="width: 100%; max-width: 600px; height: auto; background-color: white; border: 1px solid #e2e8f0; border-radius: 8px;">
                             <defs>
                                 <marker id="arrowX-${chartCounter}" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
                                     <polygon points="0 0, 6 2.5, 0 5" fill="#334155" />
@@ -1847,7 +1880,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         processedHtml += newHtml;
                     }
                 } else {
-                    const canvasHtml = `<div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>`;
+                    const canvasHtml = `<div class="chart-wrapper" style="height: 350px; width: 100%; max-width: 750px; margin: 20px auto;"><canvas id="${canvasId}"></canvas></div>`;
                     
                     if (processedHtml.includes('chart-placeholder')) {
                         processedHtml = processedHtml.replace(/<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g, canvasHtml);
@@ -1878,9 +1911,11 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                             },
                             options: {
                                 responsive: true,
+                                maintainAspectRatio: false,
                                 animation: false,
                                 plugins: {
                                     title: { display: ${!!typedData.title}, text: ${JSON.stringify(typedData.title || '')} },
+                                    legend: { position: 'bottom' },
                                     datalabels: {
                                         color: '${typedData.type === 'pie' ? '#fff' : '#000'}',
                                         font: { weight: 'bold', size: 12 },
@@ -1930,11 +1965,15 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 .option-item > span.font-bold { min-width: 20px; text-align: right; margin-top: 2px; }
                 .option-item > .prose { flex: 1; }
                 .answer-key { page-break-before: always; }
-                .chart-wrapper { max-width: 500px; margin: 15px auto; page-break-inside: avoid; }
+                .chart-wrapper { width: 100%; max-width: 750px; margin: 20px auto; page-break-inside: avoid; display: flex; justify-content: center; }
+                .chart-wrapper canvas { width: 100% !important; max-width: 750px !important; }
                 img { max-width: 100%; height: auto; object-fit: contain; }
                 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
                 table, th, td { border: 1px solid #ddd; padding: 8px; }
                 .prose { max-width: none !important; }
+                blockquote { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; margin: 1.5em 0; }
+                /* Untuk indentasi yang di-generate dengan style inline */
+                blockquote[style*="margin"] { border-left: 3px solid #cbd5e1 !important; padding-left: 1rem !important; }
             </style>
         </head>
         <body class="bg-white text-black p-8">
@@ -1959,7 +1998,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             let questionHtml = q.questionText || '';
             questionHtml = injectChart(q.chartData, questionHtml);
             
-            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
+            htmlContent += `<div class="question-text flex gap-4"><span class="font-bold">${index + 1}.</span> <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${questionHtml}</div></div>`;
             
             htmlContent += `<div class="options-container">`;
             if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
@@ -1971,7 +2010,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         }
                         htmlContent += `<div class="option-item flex gap-3">
                             <span class="font-bold mt-1">${String.fromCharCode(65 + optIdx)}.</span> 
-                            <div class="prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
+                            <div class="wysiwyg-content prose prose-sm max-w-none text-black flex-1">${optHtml}</div>
                         </div>`;
                     });
                 }
@@ -1992,7 +2031,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                              rowHtml = injectChart(row.chartData, rowHtml);
                         }
                         htmlContent += `<tr>
-                            <td class="p-2 border border-slate-300"><div class="prose prose-sm max-w-none text-black">${rowHtml}</div></td>
+                            <td class="p-2 border border-slate-300"><div class="wysiwyg-content prose prose-sm max-w-none text-black">${rowHtml}</div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                             <td class="p-2 border border-slate-300 text-center"><div class="w-4 h-4 border border-black rounded-sm mx-auto"></div></td>
                         </tr>`;
@@ -2007,7 +2046,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                         if (pair.leftChart) leftHtml = injectChart(pair.leftChart, leftHtml);
                         
                         htmlContent += `<div class="flex items-center gap-4">
-                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="prose prose-sm max-w-none text-black">${leftHtml}</div></div>
+                            <div class="flex-1 p-3 border border-slate-300 rounded-lg"><div class="wysiwyg-content prose prose-sm max-w-none text-black">${leftHtml}</div></div>
                             <div class="font-bold mx-2">......</div>
                             <div class="flex-1 border-b border-slate-400"></div>
                         </div>`;
@@ -2060,7 +2099,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
                 ansStr = injectChart(q.correctAnswerChart, ansStr);
             }
             
-            htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
+            htmlContent += `<div class="mb-2"><div class="font-bold mb-1">${index + 1}.</div> <div class="wysiwyg-content prose prose-sm max-w-none text-black">${ansStr}</div></div>`;
         });
 
         htmlContent += `
