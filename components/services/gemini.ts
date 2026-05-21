@@ -161,19 +161,23 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
   const combinedText = `${config.difficulty || ''} ${config.subject || ''} ${config.blueprint || ''}`.toUpperCase();
   
-  // Deteksi HOTS (C5, C6, Level 5, Level 6, HOTS, SULIT, atau angka persis 5 & 6 pada input difficulty)
-  const isHOTS = combinedText.includes('C5') || combinedText.includes('C6') || 
-                 combinedText.includes('LEVEL 5') || combinedText.includes('LEVEL 6') || 
-                 combinedText.includes('HOTS') || combinedText.includes('SULIT') || 
-                 /^(5|6)$/.test((config.difficulty || '').trim());
-                 
+  // Deteksi Level untuk prioritas model
+  const diffText = (config.difficulty || '').trim().toUpperCase();
+  const isLevel6 = combinedText.includes('C6') || combinedText.includes('LEVEL 6') || diffText === '6';
+  const isLevel3To5 = combinedText.includes('C3') || combinedText.includes('C4') || combinedText.includes('C5') || 
+                      combinedText.includes('LEVEL 3') || combinedText.includes('LEVEL 4') || combinedText.includes('LEVEL 5') ||
+                      combinedText.includes('HOTS') || combinedText.includes('SULIT') ||
+                      /^(3|4|5)$/.test(diffText);
+                      
   const hasSpecificInstructions = (config.blueprint || '').includes('(') || (config.blueprint || '').includes('[');
   
   let modelsToTry: string[] = [];
-  if (isHOTS) {
+  if (isLevel6) {
       modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'];
+  } else if (isLevel3To5) {
+      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
   } else if (hasSpecificInstructions) {
-      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'];
+      modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
   } else {
       modelsToTry = ['gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
   }
