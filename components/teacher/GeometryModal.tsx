@@ -21,11 +21,13 @@ const SHAPES_2D = [
 ];
 
 const SHAPES_3D = [
-    { id: 'cube', name: 'Kubus / Balok' },
+    { id: 'cube', name: 'Kubus' },
+    { id: 'cuboid', name: 'Balok' },
+    { id: 'prism', name: 'Prisma' },
+    { id: 'pyramid', name: 'Limas' },
     { id: 'cylinder', name: 'Tabung' },
     { id: 'cone', name: 'Kerucut' },
-    { id: 'sphere', name: 'Bola' },
-    { id: 'pyramid', name: 'Limas Segiempat' }
+    { id: 'sphere', name: 'Bola' }
 ];
 
 const SHAPES_COMBINED = [
@@ -296,19 +298,23 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             <line x1="100" y1="100" x2="180" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             ${(showLines && labels.radius) ? `<text x="140" y="90" ${labelSt}>${labels.radius}</text>` : ''}
         `;
-    } else if (shape === 'cube') {
-        let w = 100, h = 100, d = 50;
+    } else if (shape === 'cube' || shape === 'cuboid') {
+        let w = 100, h = 100, d = 100;
+        if (shape === 'cuboid') { w = 120; h = 80; d = 60; }
+        
         if (simulate) {
             w = extractNum(labels.width, w);
             h = extractNum(labels.height, h);
             d = extractNum(labels.depth, d);
         }
-        let dx = d * 0.707, dy = d * 0.707;
+        let projectedD = d * 0.5; // cavalier projection factor
+        let dx = projectedD * Math.cos(Math.PI/6), dy = projectedD * Math.sin(Math.PI/6);
         let tw = w + dx, th = h + dy;
-        let scale = Math.min(160 / tw, 160 / th);
+        let scale = Math.min(130 / tw, 140 / th);
         w*=scale; h*=scale; dx*=scale; dy*=scale; tw*=scale; th*=scale;
         
-        let ox = 100 - tw/2, oy = 100 + th/2 - dy;
+        // Centering
+        let ox = 100 - tw/2 + 25, oy = 100 + th/2;
         
         svgBody = `
             <polygon points="${ox},${oy} ${ox+w},${oy} ${ox+w},${oy-h} ${ox},${oy-h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
@@ -321,7 +327,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         if (showLines) {
             if(labels.width) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.width}</text>`;
             if(labels.height) svgBody += `<text x="${ox - 20}" y="${oy - h/2}" ${labelSt}>${labels.height}</text>`;
-            if(labels.depth) svgBody += `<text x="${ox + w + dx/2 + 20}" y="${oy - dy/2}" ${labelSt}>${labels.depth}</text>`;
+            if(labels.depth) svgBody += `<text x="${ox + w + dx/2 + 15}" y="${oy - dy/2 + 10}" ${labelSt}>${labels.depth}</text>`;
         }
     } else if (shape === 'cylinder') {
         let r = 60, h = 120;
@@ -331,21 +337,21 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         }
         let ry = r * 0.3;
         let tw = r * 2, th = h + ry * 2;
-        let scale = Math.min(160 / tw, 180 / th);
+        let scale = Math.min(140 / tw, 140 / th);
         r*=scale; h*=scale; ry*=scale; tw*=scale; th*=scale;
         
-        let cx = 100, cyTop = 100 - th/2 + ry, cyBot = 100 + th/2 - ry;
+        let cx = 100, cyTop = 100 - th/2 + ry + 10, cyBot = 100 + th/2 - ry + 10;
         
         svgBody = `
+            <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M${cx-r},${cyTop} L${cx-r},${cyBot} A${r},${ry} 0 0,1 ${cx+r},${cyBot} L${cx+r},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
             <ellipse cx="${cx}" cy="${cyTop}" rx="${r}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <path d="M${cx-r},${cyTop} L${cx-r},${cyBot} A${r},${ry} 0 0,0 ${cx+r},${cyBot} L${cx+r},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             <line x1="${cx}" y1="${cyBot}" x2="${cx+r}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             <line x1="${cx}" y1="${cyTop}" x2="${cx}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
         `;
         if (showLines) {
             if(labels.radius) svgBody += `<text x="${cx + r/2}" y="${cyBot - 10}" ${labelSt}>${labels.radius}</text>`;
-            if(labels.height) svgBody += `<text x="${cx - r - 20}" y="${(cyTop+cyBot)/2}" ${labelSt}>${labels.height}</text>`;
+            if(labels.height) svgBody += `<text x="${cx - Math.max(r + 15, 25)}" y="${(cyTop+cyBot)/2}" ${labelSt}>${labels.height}</text>`;
         }
     } else if (shape === 'cone') {
         let r = 60, h = 120;
@@ -361,8 +367,8 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         let cx = 100, cyTop = 100 - th/2, cyBot = 100 + th/2 - ry;
         
         svgBody = `
-            <path d="M${cx-r},${cyBot} A${r},${ry} 0 0,0 ${cx+r},${cyBot} L${cx},${cyTop} Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M${cx-r},${cyBot} A${r},${ry} 0 0,1 ${cx+r},${cyBot} L${cx},${cyTop} Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
             <line x1="${cx}" y1="${cyTop}" x2="${cx}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             <line x1="${cx}" y1="${cyBot}" x2="${cx+r}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
         `;
@@ -380,33 +386,134 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             <line x1="100" y1="100" x2="180" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             ${(showLines && labels.radius) ? `<text x="140" y="90" ${labelSt}>${labels.radius}</text>` : ''}
         `;
-    } else if (shape === 'pyramid') {
-        let w = 120, d = 80, h = 120;
-        if(simulate) {
-            w = extractNum(labels.width, w);
-            d = extractNum(labels.depth, d);
-            h = extractNum(labels.height, h);
-        }
-        let dx = d * 0.5, dy = d * 0.3;
-        let tw = w + dx, th = h + dy;
-        let scale = Math.min(160/tw, 160/th);
-        w*=scale; d*=scale; h*=scale; dx*=scale; dy*=scale; tw*=scale; th*=scale;
-        
-        let cx = 100, cyTop = 100 - th/2;
-        let ox = 100 - tw/2, oy = 100 + th/2;
-        
-        svgBody = `
-            <polygon points="${ox},${oy} ${ox+w},${oy} ${cx},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <polygon points="${ox+w},${oy} ${ox+w+dx},${oy-dy} ${cx},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <line x1="${ox}" y1="${oy}" x2="${ox+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            <line x1="${ox+dx}" y1="${oy-dy}" x2="${ox+w+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            <line x1="${ox+dx}" y1="${oy-dy}" x2="${cx}" y2="${cyTop}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            <line x1="${cx}" y1="${cyTop}" x2="${cx}" y2="${oy - dy/2}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-        `;
-        if (showLines) {
-            if(labels.width) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.width}</text>`;
-            if(labels.depth) svgBody += `<text x="${ox + w + dx/2 + 20}" y="${oy - dy/2}" ${labelSt}>${labels.depth}</text>`;
-            if(labels.height) svgBody += `<text x="${cx - 15}" y="${(cyTop + oy - dy/2)/2}" ${labelSt}>${labels.height}</text>`;
+    } else if (shape === 'prism' || shape === 'pyramid') {
+        let n = parseInt(labels.nSides) || (shape === 'prism' ? 3 : 4);
+        if (n < 3) n = 3;
+        if (n > 20) n = 20;
+
+        if (n === 4) {
+            let w = 100, d = 100, h = 120;
+            if(simulate) {
+                w = extractNum(labels.side, w);
+                d = extractNum(labels.side, d);
+                h = extractNum(labels.height, h);
+            }
+            let dx = d * 0.5, dy = d * 0.3;
+            let tw = w + dx, th = h + dy;
+            let scale = Math.min(130/tw, 130/th);
+            w*=scale; d*=scale; h*=scale; dx*=scale; dy*=scale; tw*=scale; th*=scale;
+            
+            let ox = 100 - tw/2 + 25, oy = 100 + th/2;
+            let cx = ox + w/2 + dx/2;
+            let cyTop = oy - dy/2 - h;
+            let cyBot = oy - dy/2;
+            
+            if (shape === 'pyramid') {
+                svgBody = `
+                    <polygon points="${ox},${oy} ${ox+w},${oy} ${cx},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+                    <polygon points="${ox+w},${oy} ${ox+w+dx},${oy-dy} ${cx},${cyTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+                    <line x1="${ox}" y1="${oy}" x2="${ox+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                    <line x1="${ox+dx}" y1="${oy-dy}" x2="${ox+w+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                    <line x1="${ox+dx}" y1="${oy-dy}" x2="${cx}" y2="${cyTop}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                    <line x1="${cx}" y1="${cyTop}" x2="${cx}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                `;
+                if (showLines) {
+                    if(labels.side) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.side}</text>`;
+                    if(labels.height) svgBody += `<text x="${cx - 15}" y="${cyTop + h/2}" ${labelSt}>${labels.height}</text>`;
+                }
+            } else {
+                svgBody = `
+                    <polygon points="${ox},${oy} ${ox+w},${oy} ${ox+w},${oy-h} ${ox},${oy-h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+                    <polygon points="${ox},${oy-h} ${ox+w},${oy-h} ${ox+w+dx},${oy-h-dy} ${ox+dx},${oy-h-dy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+                    <polygon points="${ox+w},${oy} ${ox+w+dx},${oy-dy} ${ox+w+dx},${oy-h-dy} ${ox+w},${oy-h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+                    <line x1="${ox}" y1="${oy}" x2="${ox+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                    <line x1="${ox+dx}" y1="${oy-dy}" x2="${ox+w+dx}" y2="${oy-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                    <line x1="${ox+dx}" y1="${oy-dy}" x2="${ox+dx}" y2="${oy-h-dy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+                `;
+                if (showLines) {
+                    if(labels.side) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.side}</text>`;
+                    if(labels.height) svgBody += `<text x="${ox - 20}" y="${oy - h/2}" ${labelSt}>${labels.height}</text>`;
+                }
+            }
+        } else {
+            let r = 80, h = 120;
+            if(simulate) {
+                r = extractNum(labels.side, r);
+                h = extractNum(labels.height, h);
+            }
+            let ry = r * 0.4;
+            let tw = r * 2, th = h + ry * 2;
+            if (shape === 'pyramid') th = h + ry;
+            
+            let scale = Math.min(160/tw, 150/th);
+            r*=scale; h*=scale; ry*=scale; tw*=scale; th*=scale;
+            
+            let cx = 100, cyTop = 100 - th/2 + ry, cyBot = 100 + th/2 - ry;
+            if (shape === 'pyramid') {
+                cyTop = 100 - th/2;
+                cyBot = 100 + th/2 - ry;
+            }
+
+            let ptsBot = [], ptsTop = [];
+            for (let i = 0; i < n; i++) {
+                let theta = (i * 2 * Math.PI) / n + (n % 2 !== 0 ? Math.PI / 2 : Math.PI / n);
+
+                let px = cx + r * Math.cos(theta);
+                let py = ry * Math.sin(theta);
+                ptsBot.push({x: px, y: cyBot + py, isBack: Math.sin(theta) < -0.01});
+                ptsTop.push({x: px, y: cyTop + py, isBack: Math.sin(theta) < -0.01});
+            }
+            
+            svgBody = '';
+            
+            if (shape === 'prism') {
+                // Draw back lines
+                ptsBot.forEach((p, i) => {
+                    let pnu = ptsBot[(i+1)%n];
+                    if (p.isBack || pnu.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${pnu.x}" y2="${pnu.y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
+                });
+                ptsBot.forEach((p, i) => {
+                    if (p.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${ptsTop[i].x}" y2="${ptsTop[i].y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
+                });
+                
+                // Draw top face
+                let topStr = ptsTop.map(p => `${p.x},${p.y}`).join(' ');
+                svgBody += `<polygon points="${topStr}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />`;
+                
+                // Draw front faces
+                ptsBot.forEach((p, i) => {
+                    let pnu = ptsBot[(i+1)%n];
+                    if (!p.isBack || !pnu.isBack) {
+                        svgBody += `<polygon points="${p.x},${p.y} ${pnu.x},${pnu.y} ${ptsTop[(i+1)%n].x},${ptsTop[(i+1)%n].y} ${ptsTop[i].x},${ptsTop[i].y}" fill="${fillColor}" fill-opacity="0.6" stroke="${strokeColor}" stroke-width="2" />`;
+                    }
+                });
+            } else {
+                // Draw back lines of base
+                ptsBot.forEach((p, i) => {
+                    let pnu = ptsBot[(i+1)%n];
+                    if (p.isBack || pnu.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${pnu.x}" y2="${pnu.y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
+                });
+                // Draw back edges to apex
+                ptsBot.forEach((p, i) => {
+                    if (p.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${cx}" y2="${cyTop}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
+                });
+                
+                // Draw height line
+                svgBody += `<line x1="${cx}" y1="${cyTop}" x2="${cx}" y2="${cyBot}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
+                
+                // Draw front faces
+                ptsBot.forEach((p, i) => {
+                    let pnu = ptsBot[(i+1)%n];
+                    if (!p.isBack || !pnu.isBack) {
+                        svgBody += `<polygon points="${p.x},${p.y} ${pnu.x},${pnu.y} ${cx},${cyTop}" fill="${fillColor}" fill-opacity="0.6" stroke="${strokeColor}" stroke-width="2" />`;
+                    }
+                });
+            }
+
+            if (showLines) {
+                if(labels.side) svgBody += `<text x="${cx + r/2 + 5}" y="${cyBot + ry/2 + 12}" ${labelSt}>${labels.side}</text>`;
+                if(labels.height) svgBody += `<text x="${cx - 10}" y="${(cyTop + cyBot)/2}" ${labelSt}>${labels.height}</text>`;
+            }
         }
     } else if (shape === 'house') {
         svgBody = `
@@ -637,7 +744,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({ isOpen, onClose, o
                                     <input type="text" placeholder="Jari-jari (r)" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                 )}
 
-                                {shape === 'cube' && (
+                                {['cube', 'cuboid'].includes(shape) && (
                                     <>
                                         <input type="text" placeholder="Panjang (alas)" value={labels.width || ''} onChange={(e) => handleLabelChange('width', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                         <input type="text" placeholder="Lebar (samping)" value={labels.depth || ''} onChange={(e) => handleLabelChange('depth', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
@@ -654,11 +761,14 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({ isOpen, onClose, o
                                 {shape === 'sphere' && (
                                     <input type="text" placeholder="Jari-jari (r)" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                 )}
-                                {shape === 'pyramid' && (
+                                {['prism', 'pyramid'].includes(shape) && (
                                     <>
-                                        <input type="text" placeholder="Panjang Alas" value={labels.width || ''} onChange={(e) => handleLabelChange('width', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
-                                        <input type="text" placeholder="Lebar Alas" value={labels.depth || ''} onChange={(e) => handleLabelChange('depth', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
-                                        <input type="text" placeholder="Tinggi Limas" value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Banyak Sisi Alas:</span>
+                                            <input type="number" min="3" max="20" placeholder={shape === 'prism' ? "3" : "4"} value={labels.nSides || ''} onChange={(e) => handleLabelChange('nSides', e.target.value)} className="w-16 px-2 py-1 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        </div>
+                                        <input type="text" placeholder="Panjang Sisi Alas" value={labels.side || ''} onChange={(e) => handleLabelChange('side', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder={shape === 'prism' ? "Tinggi Prisma" : "Tinggi Limas"} value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                     </>
                                 )}
                                 {shape === 'house' && (
