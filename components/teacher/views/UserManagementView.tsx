@@ -52,10 +52,12 @@ export const UserManagementView: React.FC = () => {
                 // Fetch results FOR exams authored by this user
                 const userResults = (resultsData || []).filter((r: any) => userExamCodes.includes(r.exam_code));
                 
-                // Get summaries ONLY for exams authored by this user (to prevent cloning across all teachers in a school)
-                // If a user added an 'author_id' column to exam_summaries themselves, we use it!
+                // Get summaries ONLY for exams authored by this user OR their school (since legacy archived exams lose author_id)
                 const userSummaries = (summariesData || []).filter((s: any) => {
-                     return userExamCodes.includes(s.exam_code) || (s.author_id && s.author_id === user.id);
+                     const isOwnActiveExam = userExamCodes.includes(s.exam_code);
+                     const isOwnSchool = s.school_name && user.school && s.school_name.toLowerCase() === user.school.toLowerCase();
+                     const isExplicitAuthor = s.author_id && s.author_id === user.id;
+                     return isOwnActiveExam || isExplicitAuthor || isOwnSchool;
                 });
                 
                 // Unique students based on results + summaries
