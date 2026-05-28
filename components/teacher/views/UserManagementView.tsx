@@ -36,8 +36,10 @@ export const UserManagementView: React.FC = () => {
             // 2. Fetch Exams (we need to know author_id, config)
             const { data: examsData } = await supabase.from('exams').select('code, author_id, questions, config');
             
-            // 3. Fetch Exam Summaries for archived/completed exams to get precise participant count
-            // We use select('*') because the user might have added custom time tracking columns
+            // 3. Fetch Results 
+            const { data: resultsData } = await supabase.from('results').select('exam_code, student_id, updated_at');
+            
+            // 4. Summaries 
             const { data: summariesData } = await supabase.from('exam_summaries').select('*');
             
             // Calculate stats for each user
@@ -47,35 +49,51 @@ export const UserManagementView: React.FC = () => {
                 
                 const questionsCount = userExams.reduce((sum: number, e: any) => sum + (Array.isArray(e.questions) ? e.questions.length : 0), 0);
                 
-                // Get summaries related to this user's exams OR their school (since archived exams lose author_id)
+                // Fetch results FOR exams authored by this user
+                const userResults = (resultsData || []).filter((r: any) => userExamCodes.includes(r.exam_code));
+                
+                // Get summaries ONLY for exams authored by this user (to prevent cloning across all teachers in a school)
+                // If a user added an 'author_id' column to exam_summaries themselves, we use it!
                 const userSummaries = (summariesData || []).filter((s: any) => {
-                    const isOwnActiveExam = userExamCodes.includes(s.exam_code);
-                    const isOwnSchool = s.school_name && user.school && s.school_name.toLowerCase() === user.school.toLowerCase();
-                    return isOwnActiveExam || isOwnSchool;
+                     return userExamCodes.includes(s.exam_code) || (s.author_id && s.author_id === user.id);
                 });
                 
-                // Student counts based on concluded assignments
-                const uniqueStudents = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
+                // Unique students based on results + summaries
+                const studentsFromResults = new Set(userResults.map((r: any) => r.student_id)).size;
+                const studentsFromSummaries = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
                 
-                // Total student access time 
+                const uniqueStudents = studentsFromResults + studentsFromSummaries;
+                
+                // Total student access time
                 let totalStudentTimeMins = 0;
+                
+                // From active results:
+                userResults.forEach((r: any) => {
+                    const exam = userExams.find((e: any) => e.code === r.exam_code);
+                    const timeLimit = exam?.config?.timeLimit || 60; // fallback est
+                    totalStudentTimeMins += timeLimit; 
+                });
+
+                // From summaries:
                 userSummaries.forEach((s: any) => {
-                   // Jika data rekap SQL sudah punya kolom waktu, gunakan itu (fallback checking if user added 'total_time', 'access_time', dll)
-                   const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
-                   if (dbTime) {
-                       totalStudentTimeMins += Number(dbTime);
-                   } else {
-                       // Estimasi dari config active exam jika belum terarsip penuh
-                       const exam = userExams.find((e: any) => e.code === s.exam_code);
-                       const timeLimit = exam?.config?.timeLimit || 0;
-                       totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
-                   }
+                    // Cek jika tabel SQL dimodifikasi pengguna dengan custom waktu
+                    const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
+                    if (dbTime) {
+                        totalStudentTimeMins += Number(dbTime);
+                    } else {
+                        const exam = userExams.find((e: any) => e.code === s.exam_code);
+                        const timeLimit = exam?.config?.timeLimit || 60;
+                        totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
+                    }
                 });
                 
-                // Estimate teacher access time (misal 45 menit per ujian dbuat + jumlah view admin)
-                // Mengambil jumlah dari exam aktif dan archived
-                const totalExamsCreated = new Set([...userExamCodes, ...userSummaries.map((s:any) => s.exam_code)]).size;
-                const teacherAccessMins = totalExamsCreated > 0 ? totalExamsCreated * 45 : 'Tidak Tercatat';
+                // Estimate teacher access time (45 menit per ujian + waktu view hasil)
+                const totalExamsCreated = userExams.length; 
+                let teacherAccess = 0;
+                if (totalExamsCreated > 0) {
+                     teacherAccess = (totalExamsCreated * 45) + Math.round(uniqueStudents * 1.5);
+                }
+                const teacherAccessMins = teacherAccess > 0 ? teacherAccess : 'Tidak Tercatat';
                 
                 return {
                     ...user,
