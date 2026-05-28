@@ -37,7 +37,8 @@ export const UserManagementView: React.FC = () => {
             const { data: examsData } = await supabase.from('exams').select('code, author_id, questions, config');
             
             // 3. Fetch Exam Summaries for archived/completed exams to get precise participant count
-            const { data: summariesData } = await supabase.from('exam_summaries').select('exam_code, total_participants');
+            // We use select('*') because the user might have added custom time tracking columns
+            const { data: summariesData } = await supabase.from('exam_summaries').select('*');
             
             // Calculate stats for each user
             const usersWithStats = data.map(user => {
@@ -46,22 +47,35 @@ export const UserManagementView: React.FC = () => {
                 
                 const questionsCount = userExams.reduce((sum: number, e: any) => sum + (Array.isArray(e.questions) ? e.questions.length : 0), 0);
                 
-                // Get summaries related to this user's exams
-                const userSummaries = (summariesData || []).filter((s: any) => userExamCodes.includes(s.exam_code));
+                // Get summaries related to this user's exams OR their school (since archived exams lose author_id)
+                const userSummaries = (summariesData || []).filter((s: any) => {
+                    const isOwnActiveExam = userExamCodes.includes(s.exam_code);
+                    const isOwnSchool = s.school_name && user.school && s.school_name.toLowerCase() === user.school.toLowerCase();
+                    return isOwnActiveExam || isOwnSchool;
+                });
                 
                 // Student counts based on concluded assignments
                 const uniqueStudents = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
                 
-                // Total student access time (Estimated from assigned time limits for completed exams)
+                // Total student access time 
                 let totalStudentTimeMins = 0;
                 userSummaries.forEach((s: any) => {
-                   const exam = userExams.find((e: any) => e.code === s.exam_code);
-                   const timeLimit = exam?.config?.timeLimit || 0;
-                   totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
+                   // Jika data rekap SQL sudah punya kolom waktu, gunakan itu (fallback checking if user added 'total_time', 'access_time', dll)
+                   const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
+                   if (dbTime) {
+                       totalStudentTimeMins += Number(dbTime);
+                   } else {
+                       // Estimasi dari config active exam jika belum terarsip penuh
+                       const exam = userExams.find((e: any) => e.code === s.exam_code);
+                       const timeLimit = exam?.config?.timeLimit || 0;
+                       totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
+                   }
                 });
                 
-                // Estimate teacher access time (misal 45 menit per ujian dbuat)
-                const teacherAccessMins = userExams.length > 0 ? userExams.length * 45 : 'Tidak Tercatat';
+                // Estimate teacher access time (misal 45 menit per ujian dbuat + jumlah view admin)
+                // Mengambil jumlah dari exam aktif dan archived
+                const totalExamsCreated = new Set([...userExamCodes, ...userSummaries.map((s:any) => s.exam_code)]).size;
+                const teacherAccessMins = totalExamsCreated > 0 ? totalExamsCreated * 45 : 'Tidak Tercatat';
                 
                 return {
                     ...user,
@@ -69,7 +83,7 @@ export const UserManagementView: React.FC = () => {
                        questionsCount,
                        uniqueStudents,
                        totalStudentTimeMins,
-                       examsCount: userExams.length,
+                       examsCount: totalExamsCreated,
                        teacherAccessMins
                     }
                 };
