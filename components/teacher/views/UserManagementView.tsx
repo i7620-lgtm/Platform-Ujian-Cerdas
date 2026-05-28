@@ -33,11 +33,11 @@ export const UserManagementView: React.FC = () => {
             // 1. Fetch Users
             const data = await storageService.getAllUsers();
             
-            // 2. Fetch Exams (we need to know author_id)
-            const { data: examsData } = await supabase.from('exams').select('code, author_id, questions');
+            // 2. Fetch Exams (we need to know author_id, config)
+            const { data: examsData } = await supabase.from('exams').select('code, author_id, questions, config');
             
-            // 3. Fetch Results (we need to know exam_code, created_at, updated_at, student_id)
-            const { data: resultsData } = await supabase.from('results').select('exam_code, student_id, created_at, updated_at');
+            // 3. Fetch Exam Summaries for archived/completed exams to get precise participant count
+            const { data: summariesData } = await supabase.from('exam_summaries').select('exam_code, total_participants');
             
             // Calculate stats for each user
             const usersWithStats = data.map(user => {
@@ -46,19 +46,19 @@ export const UserManagementView: React.FC = () => {
                 
                 const questionsCount = userExams.reduce((sum: number, e: any) => sum + (Array.isArray(e.questions) ? e.questions.length : 0), 0);
                 
-                const userResults = (resultsData || []).filter((r: any) => userExamCodes.includes(r.exam_code));
+                // Get summaries related to this user's exams
+                const userSummaries = (summariesData || []).filter((s: any) => userExamCodes.includes(s.exam_code));
                 
-                const uniqueStudents = new Set(userResults.map((r: any) => r.student_id)).size;
+                // Student counts based on concluded assignments
+                const uniqueStudents = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
                 
-                let totalStudentTimeMs = 0;
-                userResults.forEach((r: any) => {
-                   const start = new Date(r.created_at).getTime();
-                   const end = new Date(r.updated_at).getTime();
-                   if (!isNaN(start) && !isNaN(end) && end > start) {
-                       totalStudentTimeMs += (end - start);
-                   }
+                // Total student access time (Estimated from assigned time limits for completed exams)
+                let totalStudentTimeMins = 0;
+                userSummaries.forEach((s: any) => {
+                   const exam = userExams.find((e: any) => e.code === s.exam_code);
+                   const timeLimit = exam?.config?.timeLimit || 0;
+                   totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
                 });
-                const totalStudentTimeMins = Math.round(totalStudentTimeMs / 60000);
                 
                 // Estimate teacher access time (misal 45 menit per ujian dbuat)
                 const teacherAccessMins = userExams.length > 0 ? userExams.length * 45 : 'Tidak Tercatat';
