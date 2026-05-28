@@ -2,9 +2,21 @@ import React, { useState, useEffect } from 'react';
 import type { UserProfile, AccountType } from '../../../types';
 import { storageService } from '../../../services/storage';
 import { UserIcon } from '../../Icons';
+import { supabase } from '../../../lib/supabase';
+
+// Extended type for UI
+interface UserProfileWithStats extends UserProfile {
+    stats?: {
+        questionsCount: number;
+        examsCount: number;
+        uniqueStudents: number;
+        totalStudentTimeMins: number;
+        teacherAccessMins: number | string;
+    };
+}
 
 export const UserManagementView: React.FC = () => {
-    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [users, setUsers] = useState<UserProfileWithStats[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
     const [newRole, setNewRole] = useState<AccountType>('guru');
@@ -18,8 +30,52 @@ export const UserManagementView: React.FC = () => {
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
+            // 1. Fetch Users
             const data = await storageService.getAllUsers();
-            setUsers(data);
+            
+            // 2. Fetch Exams (we need to know author_id)
+            const { data: examsData } = await supabase.from('exams').select('code, author_id, questions');
+            
+            // 3. Fetch Results (we need to know exam_code, created_at, updated_at, student_id)
+            const { data: resultsData } = await supabase.from('results').select('exam_code, student_id, created_at, updated_at');
+            
+            // Calculate stats for each user
+            const usersWithStats = data.map(user => {
+                const userExams = (examsData || []).filter((e: any) => e.author_id === user.id);
+                const userExamCodes = userExams.map((e: any) => e.code);
+                
+                const questionsCount = userExams.reduce((sum: number, e: any) => sum + (Array.isArray(e.questions) ? e.questions.length : 0), 0);
+                
+                const userResults = (resultsData || []).filter((r: any) => userExamCodes.includes(r.exam_code));
+                
+                const uniqueStudents = new Set(userResults.map((r: any) => r.student_id)).size;
+                
+                let totalStudentTimeMs = 0;
+                userResults.forEach((r: any) => {
+                   const start = new Date(r.created_at).getTime();
+                   const end = new Date(r.updated_at).getTime();
+                   if (!isNaN(start) && !isNaN(end) && end > start) {
+                       totalStudentTimeMs += (end - start);
+                   }
+                });
+                const totalStudentTimeMins = Math.round(totalStudentTimeMs / 60000);
+                
+                // Estimate teacher access time (misal 45 menit per ujian dbuat)
+                const teacherAccessMins = userExams.length > 0 ? userExams.length * 45 : 'Tidak Tercatat';
+                
+                return {
+                    ...user,
+                    stats: {
+                       questionsCount,
+                       uniqueStudents,
+                       totalStudentTimeMins,
+                       examsCount: userExams.length,
+                       teacherAccessMins
+                    }
+                };
+            });
+
+            setUsers(usersWithStats);
         } catch (e) {
             console.error("Gagal memuat pengguna:", e);
             alert("Gagal memuat daftar pengguna.");
@@ -56,18 +112,19 @@ export const UserManagementView: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left min-w-[800px]">
+                <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-slate-50/50 dark:bg-slate-700/50">
                         <tr>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Nama / Email</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sekolah</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Role</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Aktivitas Guru</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Aktivitas Siswa</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Role & Sekolah</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
                         {isLoading ? (
-                             <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">Memuat data pengguna...</td></tr>
+                             <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">Memuat data pengguna...</td></tr>
                         ) : users.length > 0 ? (
                             users.map(user => (
                                 <tr key={user.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30">
@@ -75,14 +132,24 @@ export const UserManagementView: React.FC = () => {
                                         <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{user.fullName}</div>
                                         <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{user.email || '-'}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-xs font-medium text-slate-600 dark:text-slate-400">{user.school}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                            user.accountType === 'super_admin' ? 'bg-slate-800 text-white' : 
-                                            user.accountType === 'admin_sekolah' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
-                                        }`}>
-                                            {user.accountType.replace('_', ' ')}
-                                        </span>
+                                        <div className="text-xs text-slate-700 dark:text-slate-300"><span className="font-semibold text-slate-900 dark:text-slate-100">{user.stats?.questionsCount || 0}</span> Soal dibuat</div>
+                                        <div className="text-[10px] text-slate-500 mt-1">Waktu akses: {user.stats?.teacherAccessMins === 'Tidak Tercatat' ? user.stats.teacherAccessMins : `~${user.stats?.teacherAccessMins} menit`}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-xs text-slate-700 dark:text-slate-300"><span className="font-semibold text-emerald-600 dark:text-emerald-400">{user.stats?.uniqueStudents || 0}</span> Siswa mengejakan</div>
+                                        <div className="text-[10px] text-slate-500 mt-1">Total waktu: <span className="font-medium text-slate-700 dark:text-slate-300">{user.stats?.totalStudentTimeMins || 0}</span> menit</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1 items-start">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                                user.accountType === 'super_admin' ? 'bg-slate-800 text-white' : 
+                                                user.accountType === 'admin_sekolah' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                                            }`}>
+                                                {user.accountType.replace('_', ' ')}
+                                            </span>
+                                            <span className="text-[10px] font-medium text-slate-500">{user.school}</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <button onClick={() => handleEditClick(user)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline">Edit</button>
@@ -90,7 +157,7 @@ export const UserManagementView: React.FC = () => {
                                 </tr>
                             ))
                         ) : (
-                            <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">Tidak ada pengguna ditemukan.</td></tr>
+                            <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">Tidak ada pengguna ditemukan.</td></tr>
                         )}
                     </tbody>
                 </table>
