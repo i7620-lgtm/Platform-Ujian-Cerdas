@@ -14,6 +14,7 @@ import { EXAM_TYPES } from '../constants';
 
 interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
+    teacherProfile: { id: string, accountType: string, school: string, fullName: string };
 }
 
 type ArchiveData = {
@@ -202,7 +203,7 @@ interface ArchiveMetadata {
     participantCount?: number;
 }
 
-export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
+export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teacherProfile }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
     const [fixMessage, setFixMessage] = useState<string>('');
@@ -444,6 +445,54 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         } catch(e) {
             console.error(e);
             alert("Gagal mengunggah ke Cloud.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
+    const handleReclaimArchive = async () => {
+        if (!archiveData) return;
+        if (!confirm("Ambil alih arsip ini? Anda akan ditetapkan sebagai pemilik arsip ini dan statistik akan dicatat atas nama Anda.")) return;
+        
+        setIsLoadingCloud(true);
+        setLoadingMessage('Menyimpan ulang arsip...');
+
+        try {
+            const updatedExam: Exam = {
+                ...archiveData.exam,
+                authorId: teacherProfile.id,
+                authorName: teacherProfile.fullName,
+                authorSchool: teacherProfile.school || archiveData.exam.authorSchool,
+            };
+
+            const finalPayload = { ...archiveData, exam: updatedExam };
+            const jsonString = JSON.stringify(finalPayload, null, 2);
+
+            await storageService.uploadArchive(updatedExam.code, jsonString, {
+                school: updatedExam.authorSchool,
+                subject: updatedExam.config.subject,
+                classLevel: updatedExam.config.classLevel,
+                examType: updatedExam.config.examType,
+                targetClasses: updatedExam.config.targetClasses,
+                date: updatedExam.config.date,
+                participantCount: finalPayload.results.length
+            });
+
+            // Re-register stats so that the new author_id takes effect in exam_summaries
+            try {
+                await storageService.registerLegacyArchive(updatedExam, finalPayload.results);
+            } catch (err) {
+                console.warn("Gagal mencatat statistik ulang:", err);
+            }
+
+            const list = await storageService.getArchivedList();
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
+            
+            setArchiveData(fixArchiveDataSorting(finalPayload));
+            alert("Berhasil! Arsip telah diperbarui dan kini menjadi milik Anda.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal mengambil alih arsip.");
         } finally {
             setIsLoadingCloud(false);
         }
@@ -1169,6 +1218,13 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                     <span>Simpan ke Cloud</span>
                                 </button>
                             </>
+                        )}
+                        
+                        {sourceType === 'CLOUD' && (!exam.authorId || exam.authorId.trim() === '') && teacherProfile.accountType !== 'super_admin' && teacherProfile.accountType !== 'admin_sekolah' && (
+                            <button onClick={handleReclaimArchive} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-rose-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-rose-600 transition-all shadow-md shadow-rose-100 dark:shadow-rose-900/30 flex items-center justify-center gap-2">
+                                {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
+                                <span>Klaim Arsip</span>
+                            </button>
                         )}
 
                         <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
