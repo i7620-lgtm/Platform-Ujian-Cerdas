@@ -671,7 +671,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         onArchiveExam={handleArchiveExam}
                     />
                 )}
-                {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} />}
+                {view === 'ARCHIVE_VIEWER' && <ArchiveViewer onReuseExam={handleReuseExam} teacherProfile={teacherProfile} />}
                 {view === 'ADMIN_USERS' && accountType === 'super_admin' && (
                     <Suspense fallback={<div className="text-center p-10 text-slate-400">Memuat Manajemen Pengguna...</div>}>
                         <UserManagementView />
