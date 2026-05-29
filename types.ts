@@ -196,4 +196,5 @@ export interface ExamSummary {
     passing_rate: number;
     question_stats: Record<string, unknown>[]; // JSONB Statistical Snapshot
     region?: string;
+    author_id?: string;
 }
