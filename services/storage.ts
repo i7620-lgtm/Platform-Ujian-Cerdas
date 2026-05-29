@@ -1360,7 +1360,8 @@ class StorageService {
               examType: exam.config.examType,
               targetClasses: exam.config.targetClasses,
               date: exam.config.date,
-              participantCount: examResults.length
+              participantCount: examResults.length,
+              authorId: exam.authorId
           });
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
@@ -2381,7 +2382,8 @@ class StorageService {
                   t: metadata.examType,
                   tc: metadata.targetClasses,
                   d: metadata.date,
-                  p: metadata.participantCount // NEW: Participant Count
+                  p: metadata.participantCount, // NEW: Participant Count
+                  a: metadata.authorId // NEW: Author ID
               };
               // URL-safe Base64 encoding
               const b64 = btoa(JSON.stringify(minMeta))
@@ -2436,7 +2438,8 @@ class StorageService {
                           examType: parsed.t,
                           targetClasses: parsed.tc,
                           date: parsed.d,
-                          participantCount: parsed.p // NEW: Parse Participant Count
+                          participantCount: parsed.p, // NEW: Parse Participant Count
+                          authorId: parsed.a
                       };
                   }
               } catch {
