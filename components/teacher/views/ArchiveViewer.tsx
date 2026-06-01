@@ -25,9 +25,15 @@ type ArchiveData = {
 type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
 
 const EditMetadataModal = ({ exam, onClose, onSave, teacherProfile }: { exam: Exam, onClose: () => void, onSave: (updated: Partial<Exam>) => void, teacherProfile?: any }) => {
+    
+    // Auto-resolve author details based on ID relationship
+    const isOwner = teacherProfile && exam.authorId === teacherProfile.id;
+    const defaultName = isOwner ? teacherProfile.fullName : (exam.authorName || '');
+    const defaultSchool = isOwner ? teacherProfile.school : (exam.authorSchool || '');
+
     const [formData, setFormData] = useState({
-        authorSchool: exam.authorSchool || (teacherProfile ? teacherProfile.school : ''),
-        authorName: exam.authorName || (teacherProfile && exam.authorId === teacherProfile.id ? teacherProfile.fullName : ''),
+        authorSchool: defaultSchool,
+        authorName: defaultName,
         subject: exam.config.subject || '',
         classLevel: exam.config.classLevel || '',
         examType: exam.config.examType || '',
@@ -252,7 +258,36 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
         e.preventDefault(); e.stopPropagation();
     };
 
-    const fixArchiveDataSorting = (data: ArchiveData): ArchiveData => {
+    const fixArchiveDataSorting = (data: ArchiveData, profile?: any): ArchiveData => {
+        // ENRICHMENT: Normalize authorId and author_id to prevent legacy data issues
+        const rawExam: any = data.exam;
+        const normalizedAuthorId = rawExam.authorId || rawExam.author_id || '';
+        if (normalizedAuthorId === 'undefined' || normalizedAuthorId === 'null') {
+            rawExam.authorId = '';
+        } else {
+            rawExam.authorId = normalizedAuthorId;
+        }
+
+        // Normalize authorName and authorSchool
+        let normalizedAuthorName = rawExam.authorName || rawExam.author_name || '';
+        if (normalizedAuthorName === 'Unknown' || normalizedAuthorName === 'undefined' || normalizedAuthorName === 'null' || normalizedAuthorName === 'Pengajar Utama') {
+            normalizedAuthorName = '';
+        }
+        
+        let normalizedAuthorSchool = rawExam.authorSchool || rawExam.author_school || '';
+        if (normalizedAuthorSchool === 'Unknown School' || normalizedAuthorSchool === 'undefined' || normalizedAuthorSchool === 'null' || normalizedAuthorSchool === '-') {
+            normalizedAuthorSchool = '';
+        }
+
+        // Auto-fix if the current user is the owner
+        if (profile && rawExam.authorId === profile.id) {
+            normalizedAuthorName = profile.fullName;
+            normalizedAuthorSchool = profile.school;
+        }
+
+        rawExam.authorName = normalizedAuthorName;
+        rawExam.authorSchool = normalizedAuthorSchool;
+
         const fixedResults = data.results.map(r => {
             const newAnswers = { ...r.answers };
             let changed = false;
@@ -315,7 +350,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
                 if (typeof result === 'string') {
                     const data: ArchiveData = JSON.parse(result);
                     if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
-                        setArchiveData(fixArchiveDataSorting(data));
+                        setArchiveData(fixArchiveDataSorting(data, teacherProfile));
                         setActiveTab('DETAIL');
                         setSourceType('LOCAL');
                         setSelectedClass('ALL');
@@ -338,7 +373,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
         try {
             const data = await storageService.downloadArchive(filename) as ArchiveData | null;
             if (data && data.exam && data.exam.questions) {
-                setArchiveData(fixArchiveDataSorting(data));
+                setArchiveData(fixArchiveDataSorting(data, teacherProfile));
                 setActiveTab('DETAIL');
                 setSourceType('CLOUD');
                 setCurrentCloudFilename(filename);
@@ -453,7 +488,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
             setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             setSourceType('CLOUD'); // Switch mode to cloud
-            setArchiveData(fixArchiveDataSorting(finalPayload)); // Update view with optimized data
+            setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile)); // Update view with optimized data
             setCurrentCloudFilename(newFilename);
             alert("Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.");
         } catch(e) {
@@ -512,7 +547,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
             const list = await storageService.getArchivedList();
             setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
-            setArchiveData(fixArchiveDataSorting(finalPayload));
+            setSourceType('CLOUD');
+            setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile));
             setCurrentCloudFilename(newFilename);
             alert("Berhasil! Arsip telah diperbarui dan kini menjadi milik Anda.");
         } catch (e) {
@@ -879,7 +915,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
                 repairedAt: new Date().toISOString()
             };
 
-            setArchiveData(fixArchiveDataSorting(fixedArchive));
+            setArchiveData(fixArchiveDataSorting(fixedArchive, teacherProfile));
 
             const jsonString = JSON.stringify(fixedArchive, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
@@ -1177,7 +1213,21 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
         return `${Math.floor(s / 60)}m ${s % 60}s`;
     };
 
-    const isNoAuthor = !exam.authorId || String(exam.authorId).trim() === '' || String(exam.authorId) === 'undefined' || String(exam.authorId) === 'null';
+    const checkIsNoAuthor = () => {
+        const fileHasNoAuthor = !exam.authorId || String(exam.authorId).trim() === '' || String(exam.authorId) === 'undefined' || String(exam.authorId) === 'null';
+        if (fileHasNoAuthor) return true;
+
+        if (sourceType === 'CLOUD' && currentCloudFilename) {
+            const match = cloudArchives.find(f => f.name === currentCloudFilename);
+            if (match && match.metadata) {
+                const mdId = match.metadata.authorId;
+                const metadataHasNoAuthor = !mdId || String(mdId).trim() === '' || String(mdId) === 'undefined' || String(mdId) === 'null';
+                if (metadataHasNoAuthor) return true;
+            }
+        }
+        return false;
+    };
+    const isNoAuthor = checkIsNoAuthor();
 
     return (
         <div className="w-full max-w-full mx-auto space-y-6">
@@ -1262,17 +1312,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
                             </>
                         )}
                         
-                        {sourceType === 'CLOUD' && isNoAuthor && teacherProfile.accountType !== 'super_admin' && teacherProfile.accountType !== 'admin_sekolah' && (
+                        <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
+                        <button onClick={handleDownloadQuestionsPDF} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><FilePdfIcon className="w-4 h-4"/> PDF Soal</button>
+                        <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
+                        <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
+                        {isNoAuthor && (
                             <button onClick={handleReclaimArchive} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-rose-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-rose-600 transition-all shadow-md shadow-rose-100 dark:shadow-rose-900/30 flex items-center justify-center gap-2">
                                 {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
                                 <span>Klaim Arsip</span>
                             </button>
                         )}
-
-                        <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
-                        <button onClick={handleDownloadQuestionsPDF} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><FilePdfIcon className="w-4 h-4"/> PDF Soal</button>
-                        <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
-                        <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-4">
@@ -2254,7 +2303,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
                             ...archiveData,
                             exam: { ...archiveData.exam, ...updated }
                         };
-                        setArchiveData(fixArchiveDataSorting(updatedData));
+                        setArchiveData(fixArchiveDataSorting(updatedData, teacherProfile));
                         setShowEditMetadata(false);
                         handleUploadToCloud(updatedData);
                     }} 
