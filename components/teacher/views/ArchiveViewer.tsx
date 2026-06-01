@@ -462,7 +462,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
 
             setLoadingMessage('Mengunggah ke Cloud...');
             const finalPayload = { ...currentData, exam: optimizedExam };
-            const jsonString = JSON.stringify(finalPayload, null, 2);
+            const jsonString = JSON.stringify(finalPayload);
             const newFilename = await storageService.uploadArchive(optimizedExam.code, jsonString, {
                 school: optimizedExam.authorSchool,
                 subject: optimizedExam.config.subject,
@@ -515,7 +515,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
             };
 
             const finalPayload = { ...archiveData, exam: updatedExam };
-            const jsonString = JSON.stringify(finalPayload, null, 2);
+            const jsonString = JSON.stringify(finalPayload);
 
             const newFilename = await storageService.uploadArchive(updatedExam.code, jsonString, {
                 school: updatedExam.authorSchool,
@@ -917,7 +917,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
 
             setArchiveData(fixArchiveDataSorting(fixedArchive, teacherProfile));
 
-            const jsonString = JSON.stringify(fixedArchive, null, 2);
+            const jsonString = JSON.stringify(fixedArchive);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
