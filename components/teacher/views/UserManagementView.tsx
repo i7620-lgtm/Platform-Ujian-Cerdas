@@ -68,45 +68,68 @@ export const UserManagementView: React.FC = () => {
                 // Cloud Archives authored by this user
                 const userCloudArchives = cloudArchives.filter((f: any) => f.metadata && f.metadata.authorId === user.id);
                 
-                // Unique students based on results + max of (summaries, cloud archives)
-                const studentsFromResults = new Set(userResults.map((r: any) => r.student_id)).size;
-                const studentsFromSummaries = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
-                const studentsFromCloudArchives = userCloudArchives.reduce((sum: number, arch: any) => sum + (Number(arch.metadata?.participantCount) || 0), 0);
+                // Track max students & time per exam code
+                const examMaxStudents: Record<string, number> = {};
+                const examTimeMins: Record<string, number> = {};
                 
-                // We use Math.max to avoid double counting between SQL table and Storage bucket
-                const uniqueStudents = studentsFromResults + Math.max(studentsFromSummaries, studentsFromCloudArchives);
-                
-                // Total student access time
-                let totalStudentTimeMins = 0;
-                
-                // From active results:
-                userResults.forEach((r: any) => {
-                    const exam = userExams.find((e: any) => e.code === r.exam_code);
-                    const timeLimit = exam?.config?.timeLimit || 60; // fallback est
-                    totalStudentTimeMins += timeLimit; 
-                });
-
-                // From summaries:
-                let summariesTimeMins = 0;
+                // 1. Accumulate from Summaries (can have multiple per exam)
                 userSummaries.forEach((s: any) => {
-                    // Cek jika tabel SQL dimodifikasi pengguna dengan custom waktu
+                    const code = s.exam_code;
+                    const count = Number(s.total_participants) || 0;
+                    
+                    if (!examMaxStudents[code]) {
+                        examMaxStudents[code] = 0;
+                        examTimeMins[code] = 0;
+                    }
+                    examMaxStudents[code] += count;
+                    
                     const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
                     if (dbTime) {
-                        summariesTimeMins += Number(dbTime);
+                        examTimeMins[code] += Number(dbTime);
                     } else {
-                        const exam = userExams.find((e: any) => e.code === s.exam_code);
+                        const exam = userExams.find((e: any) => e.code === code);
                         const timeLimit = exam?.config?.timeLimit || 60;
-                        summariesTimeMins += (s.total_participants || 0) * timeLimit;
+                        examTimeMins[code] += count * timeLimit;
                     }
                 });
                 
-                // From cloud archives (assume 60 mins fallback)
-                let cloudArchiveTimeMins = 0;
+                // 2. Fallback to Cloud Archives if summary is wiped or has fewer participants
                 userCloudArchives.forEach((arch: any) => {
-                     cloudArchiveTimeMins += (Number(arch.metadata?.participantCount) || 0) * 60;
+                    const code = arch.name.split('_')[0];
+                    const count = Number(arch.metadata?.participantCount) || 0;
+                    
+                    if (!examMaxStudents[code] || examMaxStudents[code] < count) {
+                        examMaxStudents[code] = count;
+                    }
+                    
+                    const archiveTime = count * 60; // fallback est for older archives without time data
+                    if (!examTimeMins[code] || examTimeMins[code] < archiveTime) {
+                        examTimeMins[code] = archiveTime;
+                    }
                 });
                 
-                totalStudentTimeMins += Math.max(summariesTimeMins, cloudArchiveTimeMins);
+                // 3. Sum up all combined values
+                const combinedStudentsCount = Object.values(examMaxStudents).reduce((a, b) => a + b, 0);
+                const combinedTimeMins = Object.values(examTimeMins).reduce((a, b) => a + b, 0);
+                
+                // 4. Add Active Results (for exams not yet archived/summarized)
+                const studentsFromResults = new Set(
+                    userResults
+                        .filter((r: any) => !examMaxStudents[r.exam_code])
+                        .map((r: any) => r.student_id)
+                ).size;
+                
+                const uniqueStudents = studentsFromResults + combinedStudentsCount;
+                
+                let activeStudentTimeMins = 0;
+                userResults.forEach((r: any) => {
+                    if (!examMaxStudents[r.exam_code]) {
+                        const exam = userExams.find((e: any) => e.code === r.exam_code);
+                        activeStudentTimeMins += exam?.config?.timeLimit || 60; 
+                    }
+                });
+                
+                const totalStudentTimeMins = activeStudentTimeMins + combinedTimeMins;
                 
                 // Estimate teacher access time (45 menit per ujian + waktu view hasil)
                 // For exams created count we also include cloud archives, taking the max of distinct codes
