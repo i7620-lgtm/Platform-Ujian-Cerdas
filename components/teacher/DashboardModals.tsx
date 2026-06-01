@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'; 
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Exam, Result, TeacherProfile, Question } from '../../types';
 import { XMarkIcon, LockClosedIcon, CheckCircleIcon, ChartBarIcon, ChevronDownIcon, PlusCircleIcon, ShareIcon, ArrowPathIcon, QrCodeIcon, DocumentDuplicateIcon, UserIcon, TableCellsIcon, ListBulletIcon, ExclamationTriangleIcon, ClockIcon, SignalIcon, TrashIcon, PencilIcon, BookOpenIcon, SparklesIcon, FilePdfIcon, LockOpenIcon } from '../Icons';
@@ -520,153 +520,27 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             alert(`Mempersiapkan ${completedStudents.length} sertifikat. Harap tunggu...`);
 
                                             try {
-                                                const { default: jsPDF } = await import('jspdf');
-                                                const pdf = new jsPDF({
-                                                    orientation: 'landscape',
-                                                    unit: 'mm',
-                                                    format: 'a4'
-                                                });
+                                                const config = displayExam.config.certificateSettings || { enabled: true, backgroundUrl: '' };
+                                                const examDateStr = displayExam.config.startDate || displayExam.config.date || displayExam.createdAt || new Date().toISOString();
+                                                
+                                                const { downloadCertificateAsPdf } = await import('../../utils/certificateExport');
+                                                
+                                                const certDataList = completedStudents.map(r => ({
+                                                    studentName: r.student.fullName,
+                                                    score: r.score,
+                                                    qrLink: `${window.location.origin}/result/${encodeURIComponent(displayExam.code)}/${encodeURIComponent(r.student.studentId)}`,
+                                                    verifyCode: r.id ? r.id.toString(16).toUpperCase().padStart(5, '0') : '0X98A'
+                                                }));
 
-                                                const config = displayExam.config.certificateSettings!;
-                                                const cw = 297, ch = 210; // A4 landscape dimensions in mm
-
-                                                for (let i = 0; i < completedStudents.length; i++) {
-                                                    const r = completedStudents[i];
-                                                    if (i > 0) pdf.addPage();
-                                                    
-                                                    // Add Background if given
-                                                    if (config.backgroundUrl) {
-                                                        // if URL is base64
-                                                        try {
-                                                            pdf.addImage(config.backgroundUrl, 'JPEG', 0, 0, cw, ch);
-                                                        } catch (e) {
-                                                            console.error("Failed to load background image to pdf", e);
-                                                        }
-                                                    } else {
-                                                        // Modern Certificate Default Template
-                                                        
-                                                        // Background
-                                                        pdf.setFillColor(248, 250, 252); // slate-50
-                                                        pdf.rect(0, 0, cw, ch, 'F');
-                                                        
-                                                        // Outer Border
-                                                        pdf.setDrawColor(49, 46, 129); // indigo-900
-                                                        pdf.setLineWidth(4);
-                                                        pdf.rect(10, 10, cw - 20, ch - 20);
-
-                                                        // Inner Border
-                                                        pdf.setDrawColor(165, 180, 252); // indigo-300
-                                                        pdf.setLineWidth(1);
-                                                        pdf.rect(14, 14, cw - 28, ch - 28);
-
-                                                        // Top Left Geometry
-                                                        pdf.setFillColor(79, 70, 229); // indigo-600
-                                                        pdf.triangle(10, 10, 90, 10, 10, 30, 'F');
-                                                        
-                                                        // Bottom Right Geometry
-                                                        pdf.setFillColor(49, 46, 129); // indigo-900
-                                                        pdf.triangle(cw - 10, ch - 10, cw - 120, ch - 10, cw - 10, ch - 35, 'F');
-                                                        
-                                                        // Header text
-                                                        pdf.setTextColor(49, 46, 129); // indigo-900
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(20);
-                                                        pdf.text("PLATFORM UJIAN CERDAS", cw / 2, 28, { align: 'center', charSpace: 2 });
-                                                        
-                                                        pdf.setTextColor(100, 116, 139); // slate-500
-                                                        pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text("LAPORAN HASIL EVALUASI PEMBELAJARAN", cw / 2, 35, { align: 'center', charSpace: 1 });
-                                                        
-                                                        // Line separator
-                                                        pdf.setDrawColor(199, 210, 254); // indigo-200
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.line(cw * 0.25, 43, cw * 0.75, 43);
-
-                                                        pdf.setTextColor(55, 48, 163); // indigo-800
-                                                        pdf.setFontSize(36);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.text("SERTIFIKAT HASIL UJIAN", cw / 2, 53, { align: 'center', charSpace: 1 });
-
-                                                        pdf.setTextColor(71, 85, 105); // slate-600
-                                                        pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(14);
-                                                        pdf.text("Dokumen ini mengkonfirmasi bahwa siswa berikut:", cw / 2, 70, { align: 'center' });
-                                                        
-                                                        const examDateStr = displayExam.config.startDate || displayExam.config.date || displayExam.createdAt || new Date().toISOString();
-                                                        const examDateObj = new Date(examDateStr);
-                                                        const examDay = examDateObj.toLocaleDateString('id-ID', { weekday: 'long' });
-                                                        const examDateFormatted = examDateObj.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
-                                                        
-                                                        pdf.text(`telah menyelesaikan evaluasi ${displayExam.config.examType || 'Ujian'} untuk mata pelajaran ${displayExam.config.subject || 'Mata Pelajaran'} kelas ${displayExam.config.classLevel || r.student.class || '-'} pada ${examDay}, ${examDateFormatted} dan mendapatkan nilai akhir:`, cw / 2, 105, { align: 'center' });
-
-                                                        // Motivation/Context Text
-                                                        const promoText = `"Telah menunjukkan dedikasi, ketekunan, dan semangat pantang menyerah\ndalam menyelesaikan evaluasi.\nSemoga pencapaian ini menjadi langkah awal menuju kesuksesan yang lebih gemilang di masa depan."`;
-                                                        
-                                                        pdf.setFont("times", "italic");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text(promoText, cw / 2, 140, { align: 'center', lineHeightFactor: 1.5 });
-
-                                                        // Signature Line (Centered)
-                                                        pdf.setTextColor(51, 65, 85); // slate-700
-                                                        pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text("Instansi Penyelenggara", cw / 2 - 20, ch - 40, { align: 'center' });
-                                                        
-                                                        pdf.setDrawColor(203, 213, 225); // slate-300
-                                                        pdf.setLineWidth(1);
-                                                        pdf.line(cw / 2 - 50, ch - 26, cw / 2 + 10, ch - 26);
-                                                        
-                                                        pdf.setTextColor(30, 41, 59); // slate-800
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text("Administrator / Guru", cw / 2 - 20, ch - 20, { align: 'center' });
-                                                        
-                                                        pdf.setTextColor(100, 116, 139); // slate-500
-                                                        pdf.setFont("helvetica", "normal");
-                                                        pdf.setFontSize(12);
-                                                        pdf.text("Platform Ujian Cerdas", cw / 2 - 20, ch - 14, { align: 'center' });
-
-                                                        // Fake Barcode (Right Side)
-                                                        const bcx = cw / 2 + 40;
-                                                        pdf.setFillColor(255, 255, 255);
-                                                        pdf.setDrawColor(203, 213, 225); // slate-300
-                                                        pdf.setLineWidth(0.5);
-                                                        pdf.roundedRect(bcx, ch - 48, 28, 28, 2, 2, 'FD');
-                                                        
-                                                        pdf.setFillColor(15, 23, 42); // slate-900
-                                                        // draw a pseudo QR code pattern
-                                                        pdf.rect(bcx + 4, ch - 48 + 4, 20, 20, 'F');
-                                                        pdf.setFillColor(255, 255, 255);
-                                                        pdf.rect(bcx + 6, ch - 48 + 6, 16, 16, 'F');
-                                                        pdf.setFillColor(15, 23, 42);
-                                                        pdf.rect(bcx + 9, ch - 48 + 9, 10, 10, 'F');
-                                                        pdf.setFontSize(12);
-                                                        pdf.setFont("courier", "normal");
-                                                        pdf.setTextColor(148, 163, 184); // slate-400
-                                                        pdf.text("VERIFY-0X98A", bcx + 14, ch - 48 + 27, { align: 'center' });
-                                                    }
-
-                                                    // student name
-                                                    if (config.positions.studentName.visible) {
-                                                        const p = config.positions.studentName;
-                                                        pdf.setTextColor(p.color);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(p.fontSize); 
-                                                        pdf.text(r.student.fullName, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
-                                                    }
-
-                                                    // score
-                                                    if (config.positions.score.visible) {
-                                                        const p = config.positions.score;
-                                                        pdf.setTextColor(p.color);
-                                                        pdf.setFont("helvetica", "bold");
-                                                        pdf.setFontSize(p.fontSize); 
-                                                        pdf.text(`${r.score}`, (p.x / 100) * cw, (p.y / 100) * ch, { align: 'center' });
-                                                    }
-                                                }
-
-                                                pdf.save(`Sertifikat_${displayExam.code}.pdf`);
+                                                await downloadCertificateAsPdf(
+                                                    certDataList,
+                                                    displayExam.config.examType || 'Ujian',
+                                                    displayExam.config.subject || 'Mata Pelajaran',
+                                                    displayExam.config.classLevel || '-',
+                                                    examDateStr,
+                                                    config,
+                                                    `Sertifikat_${displayExam.code}.pdf`
+                                                );
                                             } catch (e) {
                                                 console.error("Gagal mencetak PDF", e);
                                                 alert("Terjadi kesalahan saat memproses PDF.");
