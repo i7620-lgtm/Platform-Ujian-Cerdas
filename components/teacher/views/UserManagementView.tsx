@@ -42,6 +42,9 @@ export const UserManagementView: React.FC = () => {
             // 4. Summaries 
             const { data: summariesData } = await supabase.from('exam_summaries').select('*');
             
+            // 5. Cloud Archives (to cover any files missing from exam_summaries)
+            const cloudArchives = await storageService.getArchivedList();
+            
             // Calculate stats for each user
             const usersWithStats = data.map(user => {
                 const userExams = (examsData || []).filter((e: any) => e.author_id === user.id);
@@ -62,11 +65,16 @@ export const UserManagementView: React.FC = () => {
                      return isOwnActiveExam;
                 });
                 
-                // Unique students based on results + summaries
+                // Cloud Archives authored by this user
+                const userCloudArchives = cloudArchives.filter((f: any) => f.metadata && f.metadata.authorId === user.id);
+                
+                // Unique students based on results + max of (summaries, cloud archives)
                 const studentsFromResults = new Set(userResults.map((r: any) => r.student_id)).size;
                 const studentsFromSummaries = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
+                const studentsFromCloudArchives = userCloudArchives.reduce((sum: number, arch: any) => sum + (Number(arch.metadata?.participantCount) || 0), 0);
                 
-                const uniqueStudents = studentsFromResults + studentsFromSummaries;
+                // We use Math.max to avoid double counting between SQL table and Storage bucket
+                const uniqueStudents = studentsFromResults + Math.max(studentsFromSummaries, studentsFromCloudArchives);
                 
                 // Total student access time
                 let totalStudentTimeMins = 0;
@@ -79,20 +87,30 @@ export const UserManagementView: React.FC = () => {
                 });
 
                 // From summaries:
+                let summariesTimeMins = 0;
                 userSummaries.forEach((s: any) => {
                     // Cek jika tabel SQL dimodifikasi pengguna dengan custom waktu
                     const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
                     if (dbTime) {
-                        totalStudentTimeMins += Number(dbTime);
+                        summariesTimeMins += Number(dbTime);
                     } else {
                         const exam = userExams.find((e: any) => e.code === s.exam_code);
                         const timeLimit = exam?.config?.timeLimit || 60;
-                        totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
+                        summariesTimeMins += (s.total_participants || 0) * timeLimit;
                     }
                 });
                 
+                // From cloud archives (assume 60 mins fallback)
+                let cloudArchiveTimeMins = 0;
+                userCloudArchives.forEach((arch: any) => {
+                     cloudArchiveTimeMins += (Number(arch.metadata?.participantCount) || 0) * 60;
+                });
+                
+                totalStudentTimeMins += Math.max(summariesTimeMins, cloudArchiveTimeMins);
+                
                 // Estimate teacher access time (45 menit per ujian + waktu view hasil)
-                const totalExamsCreated = userExams.length; 
+                // For exams created count we also include cloud archives, taking the max of distinct codes
+                const totalExamsCreated = Math.max(userExams.length, userSummaries.length, userCloudArchives.length); 
                 let teacherAccess = 0;
                 if (totalExamsCreated > 0) {
                      teacherAccess = (totalExamsCreated * 45) + Math.round(uniqueStudents * 1.5);
