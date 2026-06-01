@@ -1334,7 +1334,6 @@ class StorageService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
-                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
@@ -1446,7 +1445,6 @@ class StorageService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
-                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
