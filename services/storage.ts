@@ -2379,15 +2379,18 @@ class StorageService {
               if (!safeAuthorId || String(safeAuthorId).trim() === '' || String(safeAuthorId) === 'undefined' || String(safeAuthorId) === 'null') {
                   safeAuthorId = '';
               }
+              
+              const tc = Array.isArray(metadata.targetClasses) ? metadata.targetClasses.join(',').substring(0, 20) : String(metadata.targetClasses || '').substring(0, 20);
+              
               const minMeta = {
-                  s: metadata.school,
-                  su: metadata.subject,
-                  c: metadata.classLevel,
-                  t: metadata.examType,
-                  tc: metadata.targetClasses,
-                  d: metadata.date,
+                  s: String(metadata.school || '').substring(0, 30),
+                  su: String(metadata.subject || '').substring(0, 30),
+                  c: String(metadata.classLevel || '').substring(0, 15),
+                  t: String(metadata.examType || '').substring(0, 15),
+                  tc: [tc],
+                  d: String(metadata.date || '').substring(0, 15),
                   p: metadata.participantCount, // NEW: Participant Count
-                  a: safeAuthorId // NEW: Author ID
+                  a: String(safeAuthorId).substring(0, 40) // NEW: Author ID
               };
               // URL-safe Base64 encoding
               const b64 = btoa(JSON.stringify(minMeta))
@@ -2395,7 +2398,13 @@ class StorageService {
                   .replace(/\//g, '_')
                   .replace(/=+$/, '');
               
-              filename = `${examCode}_meta_${b64}_${Date.now()}.json`;
+              const potentialFileName = `${String(examCode).substring(0, 30)}_meta_${b64}_${Date.now()}.json`;
+              
+              if (potentialFileName.length > 200) {
+                  filename = `${String(examCode).substring(0, 30)}_${Date.now()}.json`;
+              } else {
+                  filename = potentialFileName;
+              }
           } catch (e) {
               console.warn("Failed to encode metadata into filename, using simple name", e);
           }
