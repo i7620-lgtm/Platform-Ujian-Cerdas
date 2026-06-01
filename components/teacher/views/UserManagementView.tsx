@@ -95,16 +95,23 @@ export const UserManagementView: React.FC = () => {
                 
                 // 2. Fallback to Cloud Archives if summary is wiped or has fewer participants
                 userCloudArchives.forEach((arch: any) => {
-                    const code = arch.name.split('_')[0];
+                    const matchMeta = arch.name.match(/^(.*?)_meta_/);
+                    const matchSimple = arch.name.match(/^(.*?)_\d+\.json$/);
+                    // the code was previously truncated to 30 chars during upload
+                    const code = matchMeta ? matchMeta[1] : (matchSimple ? matchSimple[1] : arch.name.split('_')[0]);
+                    
+                    // Since upload truncated it to 30, we must find the original code from userExamCodes if it was truncated
+                    const originalCode = userExamCodes.find((c: string) => c.substring(0, 30) === code) || code;
+                    
                     const count = Number(arch.metadata?.participantCount) || 0;
                     
-                    if (!examMaxStudents[code] || examMaxStudents[code] < count) {
-                        examMaxStudents[code] = count;
+                    if (!examMaxStudents[originalCode] || examMaxStudents[originalCode] < count) {
+                        examMaxStudents[originalCode] = count;
                     }
                     
                     const archiveTime = count * 60; // fallback est for older archives without time data
-                    if (!examTimeMins[code] || examTimeMins[code] < archiveTime) {
-                        examTimeMins[code] = archiveTime;
+                    if (!examTimeMins[originalCode] || examTimeMins[originalCode] < archiveTime) {
+                        examTimeMins[originalCode] = archiveTime;
                     }
                 });
                 
