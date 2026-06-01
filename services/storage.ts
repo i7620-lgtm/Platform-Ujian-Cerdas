@@ -1276,7 +1276,7 @@ class StorageService {
           exam: fatExam,
           results: examResults
       };
-      const jsonString = JSON.stringify(archivePayload, null, 2);
+      const jsonString = JSON.stringify(archivePayload);
 
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summaries = this.calculateExamStatistics(fatExam, examResults);
@@ -1631,7 +1631,7 @@ class StorageService {
         You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
         
         INPUT DATA (JSON):
-        ${JSON.stringify(simpleData, null, 2)}
+        ${JSON.stringify(simpleData)}
 
         TASK:
         ${customPrompt || defaultTask}
@@ -2375,6 +2375,10 @@ class StorageService {
       // Attempt to encode metadata into filename for list view availability
       if (metadata) {
           try {
+              let safeAuthorId = metadata.authorId;
+              if (!safeAuthorId || String(safeAuthorId).trim() === '' || String(safeAuthorId) === 'undefined' || String(safeAuthorId) === 'null') {
+                  safeAuthorId = '';
+              }
               const minMeta = {
                   s: metadata.school,
                   su: metadata.subject,
@@ -2383,7 +2387,7 @@ class StorageService {
                   tc: metadata.targetClasses,
                   d: metadata.date,
                   p: metadata.participantCount, // NEW: Participant Count
-                  a: metadata.authorId // NEW: Author ID
+                  a: safeAuthorId // NEW: Author ID
               };
               // URL-safe Base64 encoding
               const b64 = btoa(JSON.stringify(minMeta))
@@ -2431,6 +2435,11 @@ class StorageService {
                       while (b64.length % 4) b64 += '=';
                       
                       const parsed = JSON.parse(atob(b64));
+                      let parsedAuthorId = parsed.a;
+                      if (!parsedAuthorId || String(parsedAuthorId).trim() === '' || String(parsedAuthorId) === 'undefined' || String(parsedAuthorId) === 'null') {
+                          parsedAuthorId = '';
+                      }
+                      
                       metadata = {
                           school: parsed.s,
                           subject: parsed.su,
@@ -2439,7 +2448,7 @@ class StorageService {
                           targetClasses: parsed.tc,
                           date: parsed.d,
                           participantCount: parsed.p, // NEW: Parse Participant Count
-                          authorId: parsed.a
+                          authorId: parsedAuthorId
                       };
                   }
               } catch {
