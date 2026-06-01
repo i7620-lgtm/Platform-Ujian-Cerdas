@@ -42,6 +42,9 @@ export const UserManagementView: React.FC = () => {
             // 4. Summaries 
             const { data: summariesData } = await supabase.from('exam_summaries').select('*');
             
+            // 5. Cloud Archives (to cover any files missing from exam_summaries)
+            const cloudArchives = await storageService.getArchivedList();
+            
             // Calculate stats for each user
             const usersWithStats = data.map(user => {
                 const userExams = (examsData || []).filter((e: any) => e.author_id === user.id);
@@ -62,37 +65,82 @@ export const UserManagementView: React.FC = () => {
                      return isOwnActiveExam;
                 });
                 
-                // Unique students based on results + summaries
-                const studentsFromResults = new Set(userResults.map((r: any) => r.student_id)).size;
-                const studentsFromSummaries = userSummaries.reduce((sum: number, s: any) => sum + (s.total_participants || 0), 0);
+                // Cloud Archives authored by this user
+                const userCloudArchives = cloudArchives.filter((f: any) => f.metadata && f.metadata.authorId === user.id);
                 
-                const uniqueStudents = studentsFromResults + studentsFromSummaries;
+                // Track max students & time per exam code
+                const examMaxStudents: Record<string, number> = {};
+                const examTimeMins: Record<string, number> = {};
                 
-                // Total student access time
-                let totalStudentTimeMins = 0;
-                
-                // From active results:
-                userResults.forEach((r: any) => {
-                    const exam = userExams.find((e: any) => e.code === r.exam_code);
-                    const timeLimit = exam?.config?.timeLimit || 60; // fallback est
-                    totalStudentTimeMins += timeLimit; 
-                });
-
-                // From summaries:
+                // 1. Accumulate from Summaries (can have multiple per exam)
                 userSummaries.forEach((s: any) => {
-                    // Cek jika tabel SQL dimodifikasi pengguna dengan custom waktu
+                    const code = s.exam_code;
+                    const count = Number(s.total_participants) || 0;
+                    
+                    if (!examMaxStudents[code]) {
+                        examMaxStudents[code] = 0;
+                        examTimeMins[code] = 0;
+                    }
+                    examMaxStudents[code] += count;
+                    
                     const dbTime = s.total_student_time || s.total_time || s.access_time || s.waktu_akses;
                     if (dbTime) {
-                        totalStudentTimeMins += Number(dbTime);
+                        examTimeMins[code] += Number(dbTime);
                     } else {
-                        const exam = userExams.find((e: any) => e.code === s.exam_code);
+                        const exam = userExams.find((e: any) => e.code === code);
                         const timeLimit = exam?.config?.timeLimit || 60;
-                        totalStudentTimeMins += (s.total_participants || 0) * timeLimit;
+                        examTimeMins[code] += count * timeLimit;
                     }
                 });
                 
+                // 2. Fallback to Cloud Archives if summary is wiped or has fewer participants
+                userCloudArchives.forEach((arch: any) => {
+                    const matchMeta = arch.name.match(/^(.*?)_meta_/);
+                    const matchSimple = arch.name.match(/^(.*?)_\d+\.json$/);
+                    // the code was previously truncated to 30 chars during upload
+                    const code = matchMeta ? matchMeta[1] : (matchSimple ? matchSimple[1] : arch.name.split('_')[0]);
+                    
+                    // Since upload truncated it to 30, we must find the original code from userExamCodes if it was truncated
+                    const originalCode = userExamCodes.find((c: string) => c.substring(0, 30) === code) || code;
+                    
+                    const count = Number(arch.metadata?.participantCount) || 0;
+                    
+                    if (!examMaxStudents[originalCode] || examMaxStudents[originalCode] < count) {
+                        examMaxStudents[originalCode] = count;
+                    }
+                    
+                    const archiveTime = count * 60; // fallback est for older archives without time data
+                    if (!examTimeMins[originalCode] || examTimeMins[originalCode] < archiveTime) {
+                        examTimeMins[originalCode] = archiveTime;
+                    }
+                });
+                
+                // 3. Sum up all combined values
+                const combinedStudentsCount = Object.values(examMaxStudents).reduce((a, b) => a + b, 0);
+                const combinedTimeMins = Object.values(examTimeMins).reduce((a, b) => a + b, 0);
+                
+                // 4. Add Active Results (for exams not yet archived/summarized)
+                const studentsFromResults = new Set(
+                    userResults
+                        .filter((r: any) => !examMaxStudents[r.exam_code])
+                        .map((r: any) => r.student_id)
+                ).size;
+                
+                const uniqueStudents = studentsFromResults + combinedStudentsCount;
+                
+                let activeStudentTimeMins = 0;
+                userResults.forEach((r: any) => {
+                    if (!examMaxStudents[r.exam_code]) {
+                        const exam = userExams.find((e: any) => e.code === r.exam_code);
+                        activeStudentTimeMins += exam?.config?.timeLimit || 60; 
+                    }
+                });
+                
+                const totalStudentTimeMins = activeStudentTimeMins + combinedTimeMins;
+                
                 // Estimate teacher access time (45 menit per ujian + waktu view hasil)
-                const totalExamsCreated = userExams.length; 
+                // For exams created count we also include cloud archives, taking the max of distinct codes
+                const totalExamsCreated = Math.max(userExams.length, userSummaries.length, userCloudArchives.length); 
                 let teacherAccess = 0;
                 if (totalExamsCreated > 0) {
                      teacherAccess = (totalExamsCreated * 45) + Math.round(uniqueStudents * 1.5);
