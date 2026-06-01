@@ -14,6 +14,7 @@ import { EXAM_TYPES } from '../constants';
 
 interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
+    teacherProfile: { id: string, accountType: string, school: string, fullName: string };
 }
 
 type ArchiveData = {
@@ -23,10 +24,16 @@ type ArchiveData = {
 
 type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
 
-const EditMetadataModal = ({ exam, onClose, onSave }: { exam: Exam, onClose: () => void, onSave: (updated: Partial<Exam>) => void }) => {
+const EditMetadataModal = ({ exam, onClose, onSave, teacherProfile }: { exam: Exam, onClose: () => void, onSave: (updated: Partial<Exam>) => void, teacherProfile?: any }) => {
+    
+    // Auto-resolve author details based on ID relationship
+    const isOwner = teacherProfile && exam.authorId === teacherProfile.id;
+    const defaultName = isOwner ? teacherProfile.fullName : (exam.authorName || '');
+    const defaultSchool = isOwner ? teacherProfile.school : (exam.authorSchool || '');
+
     const [formData, setFormData] = useState({
-        authorSchool: exam.authorSchool || '',
-        authorName: exam.authorName || '',
+        authorSchool: defaultSchool,
+        authorName: defaultName,
         subject: exam.config.subject || '',
         classLevel: exam.config.classLevel || '',
         examType: exam.config.examType || '',
@@ -200,9 +207,10 @@ interface ArchiveMetadata {
     targetClasses?: string[];
     date?: string | number;
     participantCount?: number;
+    authorId?: string;
 }
 
-export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => {
+export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teacherProfile }) => {
     const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
     const [error, setError] = useState<string>('');
     const [fixMessage, setFixMessage] = useState<string>('');
@@ -218,6 +226,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
     const [isRegisteringStats, setIsRegisteringStats] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [showEditMetadata, setShowEditMetadata] = useState(false);
+    const [currentCloudFilename, setCurrentCloudFilename] = useState<string | null>(null);
 
     useEffect(() => {
         const loadCloudList = async () => {
@@ -249,7 +258,36 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         e.preventDefault(); e.stopPropagation();
     };
 
-    const fixArchiveDataSorting = (data: ArchiveData): ArchiveData => {
+    const fixArchiveDataSorting = (data: ArchiveData, profile?: any): ArchiveData => {
+        // ENRICHMENT: Normalize authorId and author_id to prevent legacy data issues
+        const rawExam: any = data.exam;
+        const normalizedAuthorId = rawExam.authorId || rawExam.author_id || '';
+        if (normalizedAuthorId === 'undefined' || normalizedAuthorId === 'null') {
+            rawExam.authorId = '';
+        } else {
+            rawExam.authorId = normalizedAuthorId;
+        }
+
+        // Normalize authorName and authorSchool
+        let normalizedAuthorName = rawExam.authorName || rawExam.author_name || '';
+        if (normalizedAuthorName === 'Unknown' || normalizedAuthorName === 'undefined' || normalizedAuthorName === 'null' || normalizedAuthorName === 'Pengajar Utama') {
+            normalizedAuthorName = '';
+        }
+        
+        let normalizedAuthorSchool = rawExam.authorSchool || rawExam.author_school || '';
+        if (normalizedAuthorSchool === 'Unknown School' || normalizedAuthorSchool === 'undefined' || normalizedAuthorSchool === 'null' || normalizedAuthorSchool === '-') {
+            normalizedAuthorSchool = '';
+        }
+
+        // Auto-fix if the current user is the owner
+        if (profile && rawExam.authorId === profile.id) {
+            normalizedAuthorName = profile.fullName;
+            normalizedAuthorSchool = profile.school;
+        }
+
+        rawExam.authorName = normalizedAuthorName;
+        rawExam.authorSchool = normalizedAuthorSchool;
+
         const fixedResults = data.results.map(r => {
             const newAnswers = { ...r.answers };
             let changed = false;
@@ -312,7 +350,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 if (typeof result === 'string') {
                     const data: ArchiveData = JSON.parse(result);
                     if (data && data.exam && data.exam.questions && data.exam.config && Array.isArray(data.results)) {
-                        setArchiveData(fixArchiveDataSorting(data));
+                        setArchiveData(fixArchiveDataSorting(data, teacherProfile));
                         setActiveTab('DETAIL');
                         setSourceType('LOCAL');
                         setSelectedClass('ALL');
@@ -335,9 +373,10 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         try {
             const data = await storageService.downloadArchive(filename) as ArchiveData | null;
             if (data && data.exam && data.exam.questions) {
-                setArchiveData(fixArchiveDataSorting(data));
+                setArchiveData(fixArchiveDataSorting(data, teacherProfile));
                 setActiveTab('DETAIL');
                 setSourceType('CLOUD');
+                setCurrentCloudFilename(filename);
                 setSelectedClass('ALL');
             } else {
                 setError("Data arsip cloud rusak.");
@@ -423,27 +462,98 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
 
             setLoadingMessage('Mengunggah ke Cloud...');
             const finalPayload = { ...currentData, exam: optimizedExam };
-            const jsonString = JSON.stringify(finalPayload, null, 2);
-            await storageService.uploadArchive(optimizedExam.code, jsonString, {
+            const jsonString = JSON.stringify(finalPayload);
+            const newFilename = await storageService.uploadArchive(optimizedExam.code, jsonString, {
                 school: optimizedExam.authorSchool,
                 subject: optimizedExam.config.subject,
                 classLevel: optimizedExam.config.classLevel,
                 examType: optimizedExam.config.examType,
                 targetClasses: optimizedExam.config.targetClasses,
                 date: optimizedExam.config.date,
-                participantCount: currentData.results.length
+                participantCount: currentData.results.length,
+                authorId: optimizedExam.authorId
             });
             
+            // Delete legacy file if uploading an update for an existing cloud archive
+            if (sourceType === 'CLOUD' && currentCloudFilename && currentCloudFilename !== newFilename) {
+                try {
+                    await storageService.deleteArchive(currentCloudFilename);
+                } catch (delErr) {
+                    console.warn("Failed to delete legacy archive on update", delErr);
+                }
+            }
+
             // Refresh list
             const list = await storageService.getArchivedList();
             setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
             
             setSourceType('CLOUD'); // Switch mode to cloud
-            setArchiveData(fixArchiveDataSorting(finalPayload)); // Update view with optimized data
+            setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile)); // Update view with optimized data
+            setCurrentCloudFilename(newFilename);
             alert("Berhasil! Arsip lokal telah dioptimalkan dan disimpan ke Cloud Storage.");
         } catch(e) {
             console.error(e);
             alert("Gagal mengunggah ke Cloud.");
+        } finally {
+            setIsLoadingCloud(false);
+        }
+    };
+
+    const handleReclaimArchive = async () => {
+        if (!archiveData) return;
+        if (!confirm("Ambil alih arsip ini? Anda akan ditetapkan sebagai pemilik arsip ini dan statistik akan dicatat atas nama Anda.")) return;
+        
+        setIsLoadingCloud(true);
+        setLoadingMessage('Menyimpan ulang arsip...');
+
+        try {
+            const updatedExam: Exam = {
+                ...archiveData.exam,
+                authorId: teacherProfile.id,
+                authorName: teacherProfile.fullName,
+                authorSchool: teacherProfile.school || archiveData.exam.authorSchool,
+            };
+
+            const finalPayload = { ...archiveData, exam: updatedExam };
+            const jsonString = JSON.stringify(finalPayload);
+
+            const newFilename = await storageService.uploadArchive(updatedExam.code, jsonString, {
+                school: updatedExam.authorSchool,
+                subject: updatedExam.config.subject,
+                classLevel: updatedExam.config.classLevel,
+                examType: updatedExam.config.examType,
+                targetClasses: updatedExam.config.targetClasses,
+                date: updatedExam.config.date,
+                participantCount: finalPayload.results.length,
+                authorId: updatedExam.authorId
+            });
+
+            // Delete old legacy file if we successfully upload the new one
+            if (currentCloudFilename && currentCloudFilename !== newFilename) {
+                try {
+                    await storageService.deleteArchive(currentCloudFilename);
+                } catch (delErr) {
+                    console.warn("Failed to delete legacy archive during reclaim", delErr);
+                }
+            }
+
+            // Re-register stats so that the new author_id takes effect in exam_summaries
+            try {
+                await storageService.registerLegacyArchive(updatedExam, finalPayload.results);
+            } catch (err) {
+                console.warn("Gagal mencatat statistik ulang:", err);
+            }
+
+            const list = await storageService.getArchivedList();
+            setCloudArchives(list as {name: string, created_at: string, size: number, metadata?: ArchiveMetadata}[]);
+            
+            setSourceType('CLOUD');
+            setArchiveData(fixArchiveDataSorting(finalPayload, teacherProfile));
+            setCurrentCloudFilename(newFilename);
+            alert("Berhasil! Arsip telah diperbarui dan kini menjadi milik Anda.");
+        } catch (e) {
+            console.error(e);
+            alert("Gagal mengambil alih arsip.");
         } finally {
             setIsLoadingCloud(false);
         }
@@ -805,9 +915,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 repairedAt: new Date().toISOString()
             };
 
-            setArchiveData(fixArchiveDataSorting(fixedArchive));
+            setArchiveData(fixArchiveDataSorting(fixedArchive, teacherProfile));
 
-            const jsonString = JSON.stringify(fixedArchive, null, 2);
+            const jsonString = JSON.stringify(fixedArchive);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -995,7 +1105,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                             onClick={() => loadFromCloud(file.name)}
                                             className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
                                         >
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">{file.name}</p>
+                                                {file.metadata && (!((file.metadata as ArchiveMetadata).authorId) || String((file.metadata as ArchiveMetadata).authorId).trim() === '' || String((file.metadata as ArchiveMetadata).authorId) === 'undefined' || String((file.metadata as ArchiveMetadata).authorId) === 'null') && (
+                                                    <span className="shrink-0 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-md border border-rose-200 dark:border-rose-800" title="Arsip ini belum memiliki pemilik dan siap diklaim.">Tanpa Pemilik</span>
+                                                )}
+                                            </div>
                                             
                                             {file.metadata ? (() => {
                                                 const meta = file.metadata as ArchiveMetadata;
@@ -1098,6 +1213,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
         return `${Math.floor(s / 60)}m ${s % 60}s`;
     };
 
+    const checkIsNoAuthor = () => {
+        const fileHasNoAuthor = !exam.authorId || String(exam.authorId).trim() === '' || String(exam.authorId) === 'undefined' || String(exam.authorId) === 'null';
+        if (fileHasNoAuthor) return true;
+
+        if (sourceType === 'CLOUD' && currentCloudFilename) {
+            const match = cloudArchives.find(f => f.name === currentCloudFilename);
+            if (match && match.metadata) {
+                const mdId = match.metadata.authorId;
+                const metadataHasNoAuthor = !mdId || String(mdId).trim() === '' || String(mdId) === 'undefined' || String(mdId) === 'null';
+                if (metadataHasNoAuthor) return true;
+            }
+        }
+        return false;
+    };
+    const isNoAuthor = checkIsNoAuthor();
+
     return (
         <div className="w-full max-w-full mx-auto space-y-6">
             <style>{`
@@ -1138,6 +1269,16 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                 </div>
             )}
 
+            {isNoAuthor && (
+                <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
+                    <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <div className="flex-1">
+                        <p className="text-sm font-bold">Arsip Tanpa Pemilik</p>
+                        <p className="text-xs mt-0.5">Arsip ini belum memiliki data author_id yang valid (Data Legacy). Jika Anda adalah guru pembuat soal ini, klik tombol <strong>Klaim Arsip</strong> di bawah agar seluruh statistik laporan arsip ini terhubung ke akun Anda.</p>
+                    </div>
+                </div>
+            )}
+
             {/* INTERACTIVE HEADER (HIDDEN ON PRINT) */}
             <div className="p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm print:hidden">
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -1152,7 +1293,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                             {sourceType === 'LOCAL' && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase border border-gray-200">Local File</span>}
                             {sourceType === 'CLOUD' && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase border border-blue-100">Cloud Storage</span>}
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-code slashed-zero">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}{exam.authorSchool ? ` • ${exam.authorSchool}` : ''}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-code slashed-zero">{exam.code} • {exam.createdAt ? `Diarsipkan pada ${exam.createdAt}` : 'Tanggal tidak diketahui'}{exam.authorSchool ? ` • ${exam.authorSchool}` : ''} • ID: {exam.authorId ? `"${exam.authorId}"` : 'NONE'} </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto xl:justify-end">
                         <button onClick={resetView} className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Muat Lain</button>
@@ -1170,11 +1311,17 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
                                 </button>
                             </>
                         )}
-
+                        
                         <button onClick={handlePrint} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><PrinterIcon className="w-4 h-4"/> Print Arsip</button>
                         <button onClick={handleDownloadQuestionsPDF} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><FilePdfIcon className="w-4 h-4"/> PDF Soal</button>
                         <button onClick={handleDownloadExcel} className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"><TableCellsIcon className="w-4 h-4"/> Excel Data</button>
                         <button onClick={() => onReuseExam(exam)} className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/30 flex items-center gap-2"><DocumentDuplicateIcon className="w-4 h-4"/> Gunakan Ulang</button>
+                        {isNoAuthor && (
+                            <button onClick={handleReclaimArchive} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-rose-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-rose-600 transition-all shadow-md shadow-rose-100 dark:shadow-rose-900/30 flex items-center justify-center gap-2">
+                                {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
+                                <span>Klaim Arsip</span>
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-4">
@@ -2149,13 +2296,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam }) => 
             {showEditMetadata && archiveData && (
                 <EditMetadataModal 
                     exam={archiveData.exam} 
+                    teacherProfile={teacherProfile}
                     onClose={() => setShowEditMetadata(false)} 
                     onSave={(updated) => {
                         const updatedData = {
                             ...archiveData,
                             exam: { ...archiveData.exam, ...updated }
                         };
-                        setArchiveData(fixArchiveDataSorting(updatedData));
+                        setArchiveData(fixArchiveDataSorting(updatedData, teacherProfile));
                         setShowEditMetadata(false);
                         handleUploadToCloud(updatedData);
                     }} 

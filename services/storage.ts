@@ -1276,7 +1276,7 @@ class StorageService {
           exam: fatExam,
           results: examResults
       };
-      const jsonString = JSON.stringify(archivePayload, null, 2);
+      const jsonString = JSON.stringify(archivePayload);
 
       // 4. Calculate Statistics for SQL Analytics (Transaction Step 1)
       const summaries = this.calculateExamStatistics(fatExam, examResults);
@@ -1334,6 +1334,7 @@ class StorageService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
+                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
@@ -1359,7 +1360,8 @@ class StorageService {
               examType: exam.config.examType,
               targetClasses: exam.config.targetClasses,
               date: exam.config.date,
-              participantCount: examResults.length
+              participantCount: examResults.length,
+              authorId: exam.authorId
           });
           // 7. CLEANUP (Transaction Step 4 - Only if upload success)
           await this.cleanupExamAssets(exam.code);
@@ -1444,6 +1446,7 @@ class StorageService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
+                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
@@ -1543,7 +1546,8 @@ class StorageService {
               lowest_score: min,
               passing_rate: parseFloat(passingRate.toFixed(2)),
               question_stats: questionStats,
-              region: '' 
+              region: '',
+              author_id: exam.authorId 
           });
       }
 
@@ -1627,7 +1631,7 @@ class StorageService {
         You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
         
         INPUT DATA (JSON):
-        ${JSON.stringify(simpleData, null, 2)}
+        ${JSON.stringify(simpleData)}
 
         TASK:
         ${customPrompt || defaultTask}
@@ -2371,14 +2375,22 @@ class StorageService {
       // Attempt to encode metadata into filename for list view availability
       if (metadata) {
           try {
+              let safeAuthorId = metadata.authorId;
+              if (!safeAuthorId || String(safeAuthorId).trim() === '' || String(safeAuthorId) === 'undefined' || String(safeAuthorId) === 'null') {
+                  safeAuthorId = '';
+              }
+              
+              const tc = Array.isArray(metadata.targetClasses) ? metadata.targetClasses.join(',').substring(0, 20) : String(metadata.targetClasses || '').substring(0, 20);
+              
               const minMeta = {
-                  s: metadata.school,
-                  su: metadata.subject,
-                  c: metadata.classLevel,
-                  t: metadata.examType,
-                  tc: metadata.targetClasses,
-                  d: metadata.date,
-                  p: metadata.participantCount // NEW: Participant Count
+                  s: String(metadata.school || '').substring(0, 30),
+                  su: String(metadata.subject || '').substring(0, 30),
+                  c: String(metadata.classLevel || '').substring(0, 15),
+                  t: String(metadata.examType || '').substring(0, 15),
+                  tc: [tc],
+                  d: String(metadata.date || '').substring(0, 15),
+                  p: metadata.participantCount, // NEW: Participant Count
+                  a: String(safeAuthorId).substring(0, 40) // NEW: Author ID
               };
               // URL-safe Base64 encoding
               const b64 = btoa(JSON.stringify(minMeta))
@@ -2386,7 +2398,13 @@ class StorageService {
                   .replace(/\//g, '_')
                   .replace(/=+$/, '');
               
-              filename = `${examCode}_meta_${b64}_${Date.now()}.json`;
+              const potentialFileName = `${String(examCode).substring(0, 30)}_meta_${b64}_${Date.now()}.json`;
+              
+              if (potentialFileName.length > 200) {
+                  filename = `${String(examCode).substring(0, 30)}_${Date.now()}.json`;
+              } else {
+                  filename = potentialFileName;
+              }
           } catch (e) {
               console.warn("Failed to encode metadata into filename, using simple name", e);
           }
@@ -2426,6 +2444,11 @@ class StorageService {
                       while (b64.length % 4) b64 += '=';
                       
                       const parsed = JSON.parse(atob(b64));
+                      let parsedAuthorId = parsed.a;
+                      if (!parsedAuthorId || String(parsedAuthorId).trim() === '' || String(parsedAuthorId) === 'undefined' || String(parsedAuthorId) === 'null') {
+                          parsedAuthorId = '';
+                      }
+                      
                       metadata = {
                           school: parsed.s,
                           subject: parsed.su,
@@ -2433,7 +2456,8 @@ class StorageService {
                           examType: parsed.t,
                           targetClasses: parsed.tc,
                           date: parsed.d,
-                          participantCount: parsed.p // NEW: Parse Participant Count
+                          participantCount: parsed.p, // NEW: Parse Participant Count
+                          authorId: parsedAuthorId
                       };
                   }
               } catch {
