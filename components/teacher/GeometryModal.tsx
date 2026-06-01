@@ -32,8 +32,16 @@ const SHAPES_3D = [
 
 const SHAPES_COMBINED = [
     { id: 'house', name: 'Segiempat + Segitiga' },
-    { id: 'capsule', name: 'Tabung + Setengah Bola' },
-    { id: 'icecream', name: 'Kerucut + Setengah Bola' }
+    { id: 'capsule', name: 'Tabung + Setengah Bola Atas' },
+    { id: 'capsule2', name: 'Kapsul (Tabung + 2 Setengah Bola)' },
+    { id: 'icecream', name: 'Kerucut + Setengah Bola' },
+    { id: 'tube_cone', name: 'Tabung + Kerucut' },
+    { id: 'cone_cone', name: 'Kerucut Ganda (Gasing)' },
+    { id: 'cube_pyramid', name: 'Kubus + Limas Segiempat' },
+    { id: 'block_pyramid', name: 'Balok + Limas Segiempat' },
+    { id: 'block_roof', name: 'Balok + Prisma Segitiga' },
+    { id: 'tube_tubes', name: 'Bertingkat (Tabung)' },
+    { id: 'tube_sphere', name: 'Tabung + Bola (di dalam)' }
 ];
 
 const extractNum = (val: any, defaultVal: number): number => {
@@ -65,22 +73,22 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         let hp = Math.sqrt(Math.max(0, b*b - cp*cp));
 
         let minX = Math.min(0, a, cp);
-        let maxX = Math.max(0, a, cp);
+        const maxX = Math.max(0, a, cp);
         let tw = maxX - minX;
         let th = hp;
         
         // Prevent div by zero
         if(tw === 0 || th === 0) { tw = 140; th = 140; }
         
-        let scale = Math.min(140 / tw, 140 / th);
+        const scale = Math.min(120 / tw, 120 / th);
         a *= scale; cp *= scale; hp *= scale; tw *= scale; th *= scale; minX *= scale;
 
-        let ox = 100 - tw/2 - minX;
-        let oy = 100 + th/2;
+        const ox = 100 - tw/2 - minX;
+        const oy = 100 + th/2;
         
-        let v1x = ox, v1y = oy;
-        let v2x = ox + a, v2y = oy;
-        let v3x = ox + cp, v3y = oy - hp;
+        const v1x = ox, v1y = oy;
+        const v2x = ox + a, v2y = oy;
+        const v3x = ox + cp, v3y = oy - hp;
 
         svgBody = `
             <polygon points="${v1x},${v1y} ${v2x},${v2y} ${v3x},${v3y}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
@@ -95,20 +103,20 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         }
         
         if (showAngles) {
-            let cx = ox + (a + cp) / 3;
-            let cy = oy - hp / 3;
+            const cx = ox + (a + cp) / 3;
+            const cy = oy - hp / 3;
             
-            let d1 = Math.hypot(cx - v1x, cy - v1y) || 1;
-            let a1x = v1x + (cx - v1x) / d1 * 25;
-            let a1y = v1y + (cy - v1y) / d1 * 25;
+            const d1 = Math.hypot(cx - v1x, cy - v1y) || 1;
+            const a1x = v1x + (cx - v1x) / d1 * 25;
+            const a1y = v1y + (cy - v1y) / d1 * 25;
             
-            let d2 = Math.hypot(cx - v2x, cy - v2y) || 1;
-            let a2x = v2x + (cx - v2x) / d2 * 25;
-            let a2y = v2y + (cy - v2y) / d2 * 25;
+            const d2 = Math.hypot(cx - v2x, cy - v2y) || 1;
+            const a2x = v2x + (cx - v2x) / d2 * 25;
+            const a2y = v2y + (cy - v2y) / d2 * 25;
             
-            let d3 = Math.hypot(cx - v3x, cy - v3y) || 1;
-            let a3x = v3x + (cx - v3x) / d3 * 25;
-            let a3y = v3y + (cy - v3y) / d3 * 25;
+            const d3 = Math.hypot(cx - v3x, cy - v3y) || 1;
+            const a3x = v3x + (cx - v3x) / d3 * 25;
+            const a3y = v3y + (cy - v3y) / d3 * 25;
 
             svgBody += `
                 ${labels.angleA ? `<text x="${a1x}" y="${a1y}" ${angleLabelSt}>${labels.angleA}</text>` : ''}
@@ -124,15 +132,15 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             w = extractNum(labels.bottom, w) || extractNum(labels.top, w);
             h = extractNum(labels.left, h) || extractNum(labels.right, h);
             if (shape === 'square') {
-                let s = extractNum(labels.bottom, 0) || extractNum(labels.top, 0) || extractNum(labels.left, 0) || extractNum(labels.right, 0) || 120;
+                const s = extractNum(labels.bottom, 0) || extractNum(labels.top, 0) || extractNum(labels.left, 0) || extractNum(labels.right, 0) || 120;
                 w = s; h = s;
             }
         }
         
-        let scale = Math.min(160 / w, 160 / h);
+        const scale = Math.min(120 / w, 120 / h);
         w *= scale; h *= scale;
         
-        let x = 100 - w/2, y = 100 - h/2;
+        const x = 100 - w/2, y = 100 - h/2;
         
         svgBody = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />`;
         
@@ -153,7 +161,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         if (simulate) {
             base = extractNum(labels.bottom, base) || extractNum(labels.top, base);
             height = extractNum(labels.height, height) || extractNum(labels.left, height) * 0.866; 
-            let sideStr = extractNum(labels.left, 0) || extractNum(labels.right, 0);
+            const sideStr = extractNum(labels.left, 0) || extractNum(labels.right, 0);
             if (sideStr > height) {
                 shift = Math.sqrt(sideStr*sideStr - height*height);
             } else {
@@ -161,10 +169,10 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             }
         }
         let tw = base + shift;
-        let scale = Math.min(160 / (tw || 1), 140 / (height || 1));
+        const scale = Math.min(120 / (tw || 1), 120 / (height || 1));
         base *= scale; height *= scale; shift *= scale; tw *= scale;
         
-        let ox = 100 - tw/2, oy = 100 + height/2;
+        const ox = 100 - tw/2, oy = 100 + height/2;
         
         svgBody = `
             <polygon points="${ox+shift},${oy-height} ${ox+tw},${oy-height} ${ox+base},${oy} ${ox},${oy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
@@ -194,7 +202,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             a = extractNum(labels.bottom, a);
             b = extractNum(labels.top, b);
             h = extractNum(labels.height, h);
-            if (b > a) { let tmp = a; a = b; b = tmp; }
+            if (b > a) { const tmp = a; a = b; b = tmp; }
             if (shape === 'trapezoid_right') {
                 sLeft = 0; sRight = Math.max(0, a - b);
             } else if (shape === 'trapezoid_isosceles') {
@@ -205,10 +213,10 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
                 sRight = Math.max(0, (a - b) * 0.7);
             }
         }
-        let scale = Math.min(160 / a, 140 / h);
+        const scale = Math.min(120 / a, 120 / h);
         a *= scale; b *= scale; h *= scale; sLeft *= scale; sRight *= scale;
         
-        let ox = 100 - a/2, oy = 100 + h/2;
+        const ox = 100 - a/2, oy = 100 + h/2;
         svgBody = `
             <polygon points="${ox},${oy} ${ox+a},${oy} ${ox+a-sRight},${oy-h} ${ox+sLeft},${oy-h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
             <line x1="${ox+sLeft}" y1="${oy-h}" x2="${ox+sLeft}" y2="${oy}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
@@ -241,13 +249,13 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
                 cY = d1 * 0.3;
             }
         }
-        let scale = Math.min(160 / d2, 160 / d1);
+        const scale = Math.min(120 / d2, 120 / d1);
         d1 *= scale; d2 *= scale; cY *= scale;
         if(shape === 'rhombus') cY = d1 / 2;
         
-        let cx = 100, cy = 100 - d1/2 + cY;
-        let vTop = cy - cY, vBot = cy + (d1 - cY);
-        let vLeft = cx - d2/2, vRight = cx + d2/2;
+        const cx = 100, cy = 100 - d1/2 + cY;
+        const vTop = cy - cY, vBot = cy + (d1 - cY);
+        const vLeft = cx - d2/2, vRight = cx + d2/2;
         
         svgBody = `
             <polygon points="${cx},${vTop} ${vRight},${cy} ${cx},${vBot} ${vLeft},${cy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
@@ -275,10 +283,10 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         if (n < 3) n = 3;
         if (n > 20) n = 20;
 
-        let points = [];
-        let cx = 100, cy = 100, r = 80;
+        const points = [];
+        const cx = 100, cy = 100, r = 80;
         for (let i = 0; i < n; i++) {
-            let theta = -Math.PI / 2 + (i * 2 * Math.PI / n);
+            const theta = -Math.PI / 2 + (i * 2 * Math.PI / n);
             points.push(`${cx + r * Math.cos(theta)},${cy + r * Math.sin(theta)}`);
         }
 
@@ -307,14 +315,14 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             h = extractNum(labels.height, h);
             d = extractNum(labels.depth, d);
         }
-        let projectedD = d * 0.5; // cavalier projection factor
+        const projectedD = d * 0.5; // cavalier projection factor
         let dx = projectedD * Math.cos(Math.PI/6), dy = projectedD * Math.sin(Math.PI/6);
         let tw = w + dx, th = h + dy;
-        let scale = Math.min(130 / tw, 140 / th);
+        const scale = Math.min(110 / tw, 110 / th);
         w*=scale; h*=scale; dx*=scale; dy*=scale; tw*=scale; th*=scale;
         
         // Centering
-        let ox = 100 - tw/2 + 25, oy = 100 + th/2;
+        const ox = 100 - tw/2 + 25, oy = 100 + th/2;
         
         svgBody = `
             <polygon points="${ox},${oy} ${ox+w},${oy} ${ox+w},${oy-h} ${ox},${oy-h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
@@ -337,10 +345,10 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         }
         let ry = r * 0.3;
         let tw = r * 2, th = h + ry * 2;
-        let scale = Math.min(140 / tw, 140 / th);
+        const scale = Math.min(120 / tw, 120 / th);
         r*=scale; h*=scale; ry*=scale; tw*=scale; th*=scale;
         
-        let cx = 100, cyTop = 100 - th/2 + ry + 10, cyBot = 100 + th/2 - ry + 10;
+        const cx = 100, cyTop = 100 - th/2 + ry + 10, cyBot = 100 + th/2 - ry + 10;
         
         svgBody = `
             <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
@@ -361,10 +369,10 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         }
         let ry = r * 0.3;
         let tw = r*2, th = h + ry;
-        let scale = Math.min(160/tw, 160/th);
+        const scale = Math.min(120 / tw, 120 / th);
         r*=scale; h*=scale; ry*=scale; tw*=scale; th*=scale;
         
-        let cx = 100, cyTop = 100 - th/2, cyBot = 100 + th/2 - ry;
+        const cx = 100, cyTop = 100 - th/2, cyBot = 100 + th/2 - ry;
         
         svgBody = `
             <ellipse cx="${cx}" cy="${cyBot}" rx="${r}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
@@ -378,7 +386,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             if(labels.side) svgBody += `<text x="${cx + r/2 + 20}" y="${(cyTop+cyBot)/2}" ${labelSt}>${labels.side}</text>`;
         }
     } else if (shape === 'sphere') {
-        let r = 80;
+        const r = 80;
         svgBody = `
             <circle cx="100" cy="100" r="${r}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
             <ellipse cx="100" cy="100" rx="${r}" ry="${r*0.3}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
@@ -400,13 +408,13 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             }
             let dx = d * 0.5, dy = d * 0.3;
             let tw = w + dx, th = h + dy;
-            let scale = Math.min(130/tw, 130/th);
+            const scale = Math.min(110/tw, 110/th);
             w*=scale; d*=scale; h*=scale; dx*=scale; dy*=scale; tw*=scale; th*=scale;
             
-            let ox = 100 - tw/2 + 25, oy = 100 + th/2;
-            let cx = ox + w/2 + dx/2;
-            let cyTop = oy - dy/2 - h;
-            let cyBot = oy - dy/2;
+            const ox = 100 - tw/2 + 25, oy = 100 + th/2;
+            const cx = ox + w/2 + dx/2;
+            const cyTop = oy - dy/2 - h;
+            const cyBot = oy - dy/2;
             
             if (shape === 'pyramid') {
                 svgBody = `
@@ -445,21 +453,22 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             let tw = r * 2, th = h + ry * 2;
             if (shape === 'pyramid') th = h + ry;
             
-            let scale = Math.min(160/tw, 150/th);
+            const scale = Math.min(120/tw, 120/th);
             r*=scale; h*=scale; ry*=scale; tw*=scale; th*=scale;
             
-            let cx = 100, cyTop = 100 - th/2 + ry, cyBot = 100 + th/2 - ry;
+            const cx = 100;
+            let cyTop = 100 - th/2 + ry, cyBot = 100 + th/2 - ry;
             if (shape === 'pyramid') {
                 cyTop = 100 - th/2;
                 cyBot = 100 + th/2 - ry;
             }
 
-            let ptsBot = [], ptsTop = [];
+            const ptsBot = [], ptsTop = [];
             for (let i = 0; i < n; i++) {
-                let theta = (i * 2 * Math.PI) / n + (n % 2 !== 0 ? Math.PI / 2 : Math.PI / n);
+                const theta = (i * 2 * Math.PI) / n + (n % 2 !== 0 ? Math.PI / 2 : Math.PI / n);
 
-                let px = cx + r * Math.cos(theta);
-                let py = ry * Math.sin(theta);
+                const px = cx + r * Math.cos(theta);
+                const py = ry * Math.sin(theta);
                 ptsBot.push({x: px, y: cyBot + py, isBack: Math.sin(theta) < -0.01});
                 ptsTop.push({x: px, y: cyTop + py, isBack: Math.sin(theta) < -0.01});
             }
@@ -469,7 +478,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             if (shape === 'prism') {
                 // Draw back lines
                 ptsBot.forEach((p, i) => {
-                    let pnu = ptsBot[(i+1)%n];
+                    const pnu = ptsBot[(i+1)%n];
                     if (p.isBack || pnu.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${pnu.x}" y2="${pnu.y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
                 });
                 ptsBot.forEach((p, i) => {
@@ -477,12 +486,12 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
                 });
                 
                 // Draw top face
-                let topStr = ptsTop.map(p => `${p.x},${p.y}`).join(' ');
+                const topStr = ptsTop.map(p => `${p.x},${p.y}`).join(' ');
                 svgBody += `<polygon points="${topStr}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />`;
                 
                 // Draw front faces
                 ptsBot.forEach((p, i) => {
-                    let pnu = ptsBot[(i+1)%n];
+                    const pnu = ptsBot[(i+1)%n];
                     if (!p.isBack || !pnu.isBack) {
                         svgBody += `<polygon points="${p.x},${p.y} ${pnu.x},${pnu.y} ${ptsTop[(i+1)%n].x},${ptsTop[(i+1)%n].y} ${ptsTop[i].x},${ptsTop[i].y}" fill="${fillColor}" fill-opacity="0.6" stroke="${strokeColor}" stroke-width="2" />`;
                     }
@@ -490,7 +499,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
             } else {
                 // Draw back lines of base
                 ptsBot.forEach((p, i) => {
-                    let pnu = ptsBot[(i+1)%n];
+                    const pnu = ptsBot[(i+1)%n];
                     if (p.isBack || pnu.isBack) svgBody += `<line x1="${p.x}" y1="${p.y}" x2="${pnu.x}" y2="${pnu.y}" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />`;
                 });
                 // Draw back edges to apex
@@ -503,7 +512,7 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
                 
                 // Draw front faces
                 ptsBot.forEach((p, i) => {
-                    let pnu = ptsBot[(i+1)%n];
+                    const pnu = ptsBot[(i+1)%n];
                     if (!p.isBack || !pnu.isBack) {
                         svgBody += `<polygon points="${p.x},${p.y} ${pnu.x},${pnu.y} ${cx},${cyTop}" fill="${fillColor}" fill-opacity="0.6" stroke="${strokeColor}" stroke-width="2" />`;
                     }
@@ -517,9 +526,8 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         }
     } else if (shape === 'house') {
         svgBody = `
-            <polygon points="50,100 150,100 100,40" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <rect x="50" y="100" width="100" height="80" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <polyline points="50,100 150,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M50,180 L150,180 L150,100 L100,40 L50,100 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="50" y1="100" x2="150" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             ${(showLines && labels.rectWidth) ? `<text x="100" y="195" ${labelSt}>${labels.rectWidth}</text>` : ''}
             ${(showLines && labels.rectHeight) ? `<text x="35" y="145" ${labelSt}>${labels.rectHeight}</text>` : ''}
             ${(showLines && labels.triHeight) ? `<text x="35" y="75" ${labelSt}>${labels.triHeight}</text>` : ''}
@@ -527,30 +535,291 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
         `;
     } else if (shape === 'capsule') {
         svgBody = `
-            <path d="M40,100 A60,60 0 0,1 160,100" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <path d="M40,100 L40,160 A60,20 0 0,0 160,160 L160,100" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <ellipse cx="100" cy="100" rx="60" ry="20" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            <ellipse cx="100" cy="160" rx="60" ry="20" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,100 A60,60 0 0,1 160,100 L160,160 A60,20 0 0,1 40,160 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,1 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,100 A60,20 0 0,0 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,160 A60,20 0 0,0 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,160 A60,20 0 0,1 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
             <line x1="100" y1="100" x2="100" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            ${(showLines && labels.radius) ? `<text x="100" y="32" ${labelSt}>${labels.radius}</text>` : ''}
+            <line x1="100" y1="160" x2="160" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            ${(showLines && labels.radius) ? `<text x="130" y="150" ${labelSt}>${labels.radius}</text>` : ''}
+            ${(showLines && labels.height) ? `<text x="25" y="135" ${labelSt}>${labels.height}</text>` : ''}
+        `;
+    } else if (shape === 'capsule2') {
+        svgBody = `
+            <path d="M40,100 A60,60 0 0,1 160,100 L160,160 A60,60 0 0,1 40,160 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,1 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,100 A60,20 0 0,0 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,160 A60,20 0 0,1 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,160 A60,20 0 0,0 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="100" y1="100" x2="100" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="160" x2="160" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="100" x2="160" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            ${(showLines && labels.radius) ? `<text x="130" y="150" ${labelSt}>${labels.radius}</text>` : ''}
             ${(showLines && labels.height) ? `<text x="25" y="135" ${labelSt}>${labels.height}</text>` : ''}
         `;
     } else if (shape === 'icecream') {
         svgBody = `
-            <path d="M40,80 A60,60 0 0,1 160,80" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <path d="M40,80 A60,20 0 0,0 160,80 L100,180 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
-            <ellipse cx="100" cy="80" rx="60" ry="20" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
-            ${(showLines && labels.radius) ? `<text x="100" y="15" ${labelSt}>${labels.radius}</text>` : ''}
-            ${(showLines && labels.side) ? `<text x="155" y="140" ${labelSt}>${labels.side}</text>` : ''}
-            ${(showLines && labels.height) ? `<text x="80" y="140" ${labelSt}>${labels.height}</text>` : ''}
+            <path d="M40,80 A60,60 0 0,1 160,80 L100,180 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,80 A60,20 0 0,1 160,80" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,80 A60,20 0 0,0 160,80" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="100" y1="80" x2="160" y2="80" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="80" x2="100" y2="180" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            ${(showLines && labels.radius) ? `<text x="130" y="70" ${labelSt}>${labels.radius}</text>` : ''}
+            ${(showLines && labels.side) ? `<text x="145" y="130" ${labelSt}>${labels.side}</text>` : ''}
+            ${(showLines && labels.height) ? `<text x="90" y="140" ${labelSt}>${labels.height}</text>` : ''}
+        `;
+    } else if (shape === 'tube_cone') {
+        svgBody = `
+            <path d="M40,100 L100,30 L160,100 L160,160 A60,20 0 0,1 40,160 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,0 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,1 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M40,160 A60,20 0 0,0 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,160 A60,20 0 0,1 160,160" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="30" x2="100" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="100" x2="100" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="160" x2="160" y2="160" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="100" x2="160" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            ${(showLines && labels.coneHeight) ? `<text x="85" y="65" ${labelSt}>${labels.coneHeight}</text>` : ''}
+            ${(showLines && labels.coneSide) ? `<text x="145" y="60" ${labelSt}>${labels.coneSide}</text>` : ''}
+            ${(showLines && labels.tubeHeight) ? `<text x="25" y="130" ${labelSt}>${labels.tubeHeight}</text>` : ''}
+            ${(showLines && labels.radius) ? `<text x="130" y="90" ${labelSt}>${labels.radius}</text>` : ''}
+        `;
+    } else if (shape === 'cone_cone') {
+        svgBody = `
+            <path d="M100,20 L40,100 L100,180 L160,100 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,0 160,100" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,100 A60,20 0 0,1 160,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="20" x2="100" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="100" x2="100" y2="180" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="100" x2="160" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            ${(showLines && labels.radius) ? `<text x="130" y="90" ${labelSt}>${labels.radius}</text>` : ''}
+            ${(showLines && labels.topHeight) ? `<text x="85" y="60" ${labelSt}>${labels.topHeight}</text>` : ''}
+            ${(showLines && labels.botHeight) ? `<text x="85" y="140" ${labelSt}>${labels.botHeight}</text>` : ''}
+            ${(showLines && labels.topSide) ? `<text x="145" y="60" ${labelSt}>${labels.topSide}</text>` : ''}
+            ${(showLines && labels.botSide) ? `<text x="145" y="140" ${labelSt}>${labels.botSide}</text>` : ''}
+        `;
+    } else if (shape === 'cube_pyramid') {
+        svgBody = `
+            <polygon points="50,110 50,170 120,170 120,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="50,110 80,90 150,90 120,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="120,110 150,90 150,150 120,170" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="50,110 100,30 120,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="120,110 100,30 150,90" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            
+            <polyline points="50,170 80,150 150,150" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="80" y1="90" x2="80" y2="150" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="80" y1="90" x2="100" y2="30" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="30" x2="100" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="50" y1="110" x2="80" y2="90" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <line x1="120" y1="110" x2="120" y2="170" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="120" y1="110" x2="150" y2="90" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="120" y1="110" x2="100" y2="30" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="50" y1="110" x2="120" y2="110" stroke="${strokeColor}" stroke-width="2" />
+            
+            ${(showLines && labels.side) ? `<text x="85" y="180" ${labelSt}>${labels.side}</text>` : ''}
+            ${(showLines && labels.pyramidHeight) ? `<text x="85" y="65" ${labelSt}>${labels.pyramidHeight}</text>` : ''}
+            ${(showLines && labels.pyramidSide) ? `<text x="125" y="65" ${labelSt}>${labels.pyramidSide}</text>` : ''}
+        `;
+    } else if (shape === 'block_pyramid') {
+        svgBody = `
+            <polygon points="40,110 40,150 140,150 140,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="40,110 80,80 180,80 140,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="140,110 180,80 180,120 140,150" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="40,110 110,20 140,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="140,110 110,20 180,80" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            
+            <polyline points="40,150 80,120 180,120" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="80" y1="80" x2="80" y2="120" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="80" y1="80" x2="110" y2="20" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="110" y1="20" x2="110" y2="95" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="40" y1="110" x2="80" y2="80" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <line x1="140" y1="110" x2="140" y2="150" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="140" y1="110" x2="180" y2="80" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="140" y1="110" x2="110" y2="20" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="40" y1="110" x2="140" y2="110" stroke="${strokeColor}" stroke-width="2" />
+            
+            ${(showLines && labels.length) ? `<text x="90" y="160" ${labelSt}>${labels.length}</text>` : ''}
+            ${(showLines && labels.width) ? `<text x="175" y="145" ${labelSt}>${labels.width}</text>` : ''}
+            ${(showLines && labels.height) ? `<text x="25" y="130" ${labelSt}>${labels.height}</text>` : ''}
+            ${(showLines && labels.pyramidHeight) ? `<text x="95" y="60" ${labelSt}>${labels.pyramidHeight}</text>` : ''}
+            ${(showLines && labels.pyramidSide) ? `<text x="135" y="60" ${labelSt}>${labels.pyramidSide}</text>` : ''}
+        `;
+    } else if (shape === 'block_roof') {
+        svgBody = `
+            <polygon points="40,120 140,120 140,160 40,160" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="140,120 170,100 170,140 140,160" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="40,120 90,60 140,120" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <polygon points="140,120 170,100 120,40 90,60" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            
+            <polyline points="40,160 70,140 170,140" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <polyline points="40,120 70,100 170,100" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="70" y1="140" x2="70" y2="100" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="70" y1="100" x2="120" y2="40" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <line x1="140" y1="120" x2="140" y2="160" stroke="${strokeColor}" stroke-width="2" />
+            <line x1="140" y1="120" x2="170" y2="100" stroke="${strokeColor}" stroke-width="2" />
+            
+            ${(showLines && labels.length) ? `<text x="90" y="170" ${labelSt}>${labels.length}</text>` : ''}
+            ${(showLines && labels.width) ? `<text x="165" y="155" ${labelSt}>${labels.width}</text>` : ''}
+            ${(showLines && labels.height) ? `<text x="25" y="140" ${labelSt}>${labels.height}</text>` : ''}
+            ${(showLines && labels.roofHeight) ? `<text x="80" y="70" ${labelSt}>${labels.roofHeight}</text>` : ''}
+        `;
+    } else if (shape === 'tube_tubes') {
+        svgBody = `
+            <path d="M40,140 L40,180 A60,15 0 0,0 160,180 L160,140 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,180 A60,15 0 0,0 160,180" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M40,180 A60,15 0 0,1 160,180" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <ellipse cx="100" cy="140" rx="60" ry="15" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            
+            <path d="M60,80 L60,140 A40,10 0 0,0 140,140 L140,80 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M60,140 A40,10 0 0,0 140,140" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M60,140 A40,10 0 0,1 140,140" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <ellipse cx="100" cy="80" rx="40" ry="10" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            
+            <line x1="100" y1="80" x2="100" y2="140" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="140" x2="100" y2="180" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="180" x2="160" y2="180" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="140" x2="160" y2="140" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="80" x2="140" y2="80" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            ${(showLines && labels.radius1) ? `<text x="130" y="130" ${labelSt}>${labels.radius1}</text>` : ''}
+            ${(showLines && labels.radius2) ? `<text x="120" y="70" ${labelSt}>${labels.radius2}</text>` : ''}
+            ${(showLines && labels.height1) ? `<text x="25" y="160" ${labelSt}>${labels.height1}</text>` : ''}
+            ${(showLines && labels.height2) ? `<text x="45" y="110" ${labelSt}>${labels.height2}</text>` : ''}
+        `;
+    } else if (shape === 'tube_sphere') {
+        svgBody = `
+            <path d="M50,110 L50,170 A50,15 0 0,0 150,170 L150,110 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M50,110 A50,50 0 0,0 150,110" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <path d="M50,110 A50,50 0 0,1 150,110" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M50,110 A50,15 0 0,0 150,110" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M50,110 A50,15 0 0,1 150,110" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <path d="M50,170 A50,15 0 0,0 150,170" fill="none" stroke="${strokeColor}" stroke-width="2" />
+            <path d="M50,170 A50,15 0 0,1 150,170" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            <line x1="100" y1="110" x2="100" y2="170" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="170" x2="150" y2="170" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            <line x1="100" y1="110" x2="150" y2="110" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="4,4" />
+            
+            ${(showLines && labels.tubeHeight) ? `<text x="35" y="140" ${labelSt}>${labels.tubeHeight}</text>` : ''}
+            ${(showLines && labels.radius) ? `<text x="125" y="100" ${labelSt}>${labels.radius}</text>` : ''}
         `;
     }
 
-    // Auto-tighten the vertical box a bit to prevent huge whitespace for text
-    // Most shapes are centered at 100,100 and don't go past y=10 or y=190
-    vMinY = 5; vH = 190;
+    // --- Auto Bounding Box Algorithm ---
+    let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
+
+    const updateBounds = (x: number, y: number) => {
+        if (!isNaN(x) && !isNaN(y)) {
+            if (x < bMinX) bMinX = x;
+            if (x > bMaxX) bMaxX = x;
+            if (y < bMinY) bMinY = y;
+            if (y > bMaxY) bMaxY = y;
+        }
+    };
+
+    // 1. Scan texts
+    const textRegex = /<text[^>]*x="(-?\d+(?:\.\d+)?)"[^>]*y="(-?\d+(?:\.\d+)?)"[^>]*>(.*?)<\/text>/g;
+    let match;
+    while ((match = textRegex.exec(svgBody)) !== null) {
+        const x = parseFloat(match[1]);
+        const y = parseFloat(match[2]);
+        const text = match[3];
+        const halfW = (text.length * 8) / 2 + 15; // approximate text width + padding buffer
+        updateBounds(x - halfW, y - 15);
+        updateBounds(x + halfW, y + 15);
+    }
+
+    // 2. Scan circles, ellipses
+    const circleRegex = /c?x="(-?\d+(?:\.\d+)?)"\s+c?y="(-?\d+(?:\.\d+)?)"(?:\s+r="(-?\d+(?:\.\d+)?)")?(?:\s+rx="(-?\d+(?:\.\d+)?)")?(?:\s+ry="(-?\d+(?:\.\d+)?)")?/g;
+    while ((match = circleRegex.exec(svgBody)) !== null) {
+        const x = parseFloat(match[1]);
+        const y = parseFloat(match[2]);
+        if (!isNaN(x) && !isNaN(y)) {
+            const rx = parseFloat(match[3] || match[4] || '0');
+            const ry = parseFloat(match[3] || match[5] || '0');
+            updateBounds(x - rx, y - ry);
+            updateBounds(x + rx, y + ry);
+        }
+    }
+
+    // 3. Scan polygons and polylines points
+    const pointsRegex = /points="([^"]+)"/g;
+    while ((match = pointsRegex.exec(svgBody)) !== null) {
+        const pts = match[1].split(/[\s,]+/);
+        for (let i = 0; i < pts.length; i += 2) {
+            if (pts[i] && pts[i+1]) {
+                updateBounds(parseFloat(pts[i]), parseFloat(pts[i+1]));
+            }
+        }
+    }
+
+    // 4. Scan regular lines
+    const lineRegex = /x1="(-?\d+(?:\.\d+)?)"\s+y1="(-?\d+(?:\.\d+)?)"\s+x2="(-?\d+(?:\.\d+)?)"\s+y2="(-?\d+(?:\.\d+)?)"/g;
+    while ((match = lineRegex.exec(svgBody)) !== null) {
+        updateBounds(parseFloat(match[1]), parseFloat(match[2]));
+        updateBounds(parseFloat(match[3]), parseFloat(match[4]));
+    }
+
+    // 5. Scan rects
+    const rectRegex = /<rect[^>]*x="(-?\d+(?:\.\d+)?)"[^>]*y="(-?\d+(?:\.\d+)?)"[^>]*width="(-?\d+(?:\.\d+)?)"[^>]*height="(-?\d+(?:\.\d+)?)"/g;
+    while ((match = rectRegex.exec(svgBody)) !== null) {
+        const x = parseFloat(match[1]);
+        const y = parseFloat(match[2]);
+        const w = parseFloat(match[3]);
+        const h = parseFloat(match[4]);
+        updateBounds(x, y);
+        updateBounds(x + w, y + h);
+    }
     
-    const viewBox = `${vMinX} ${vMinY} ${vW} ${vH}`;
+    // 6. Scan paths (simple M and L extraction)
+    const pathRegex = /d="([^"]+)"/g;
+    while ((match = pathRegex.exec(svgBody)) !== null) {
+        const dStr = match[1];
+        const mlRegex = /[ML]\s*(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/gi;
+        let mlMatch;
+        while((mlMatch = mlRegex.exec(dStr)) !== null) {
+            updateBounds(parseFloat(mlMatch[1]), parseFloat(mlMatch[2]));
+        }
+        
+        // rudimentary extraction for curves (A, C, Q)
+        // just extract all numbers and assume they are inside the main bounding box roughly
+        const anyNumRegex = /(-?\d+(?:\.\d+)?)/g;
+        let anyMatch;
+        const nums = [];
+        while((anyMatch = anyNumRegex.exec(dStr)) !== null) {
+             nums.push(parseFloat(anyMatch[1]));
+        }
+        for (let i = 0; i < nums.length - 1; i += 2) {
+             // to avoid rx ry from A commands messing up bounds too much, we only update bounds if they look like reasonable coords
+             if (nums[i] > -100 && nums[i] < 300 && nums[i+1] > -100 && nums[i+1] < 300) {
+                 updateBounds(nums[i], nums[i+1]);
+             }
+        }
+    }
+
+    if (bMinX === Infinity) bMinX = 0;
+    if (bMaxX === -Infinity) bMaxX = 200;
+    if (bMinY === Infinity) bMinY = 0;
+    if (bMaxY === -Infinity) bMaxY = 200;
+
+    // Add extra padding
+    bMinX -= 10;
+    bMaxX += 10;
+    bMinY -= 10;
+    bMaxY += 10;
+
+    vMinX = bMinX;
+    vMinY = bMinY;
+    vW = bMaxX - bMinX;
+    vH = bMaxY - bMinY;
+
+    const viewBox = `${vMinX.toFixed(1)} ${vMinY.toFixed(1)} ${vW.toFixed(1)} ${vH.toFixed(1)}`;
     return `<svg viewBox="${viewBox}" style="width: 100%; max-width: 180px; height: auto; display: inline-block;">${svgBody}</svg>`;
 };
 
@@ -657,7 +926,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({ isOpen, onClose, o
                                 <input type="checkbox" id="showLines" checked={showLines} onChange={(e) => setShowLines(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
                                 <label htmlFor="showLines" className="text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">Tampilkan Panjang Garis</label>
                             </div>
-                            {shape !== 'house' && shape !== 'capsule' && shape !== 'icecream' && (
+                            {shape !== 'house' && !['capsule', 'capsule2', 'icecream'].includes(shape) && (
                                 <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 p-2 rounded border border-indigo-100 dark:border-indigo-800">
                                     <input type="checkbox" id="simulateSize" checked={simulate} onChange={(e) => setSimulate(e.target.checked)} className="w-4 h-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-600" />
                                     <label htmlFor="simulateSize" className="text-sm font-bold text-indigo-700 dark:text-indigo-400 cursor-pointer">Simulasikan Proporsi Garis</label>
@@ -779,11 +1048,66 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({ isOpen, onClose, o
                                         <input type="text" placeholder="Sisi Miring Segitiga" value={labels.triSide || ''} onChange={(e) => handleLabelChange('triSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                     </>
                                 )}
-                                {['capsule', 'icecream'].includes(shape) && (
+                                {['capsule', 'capsule2', 'icecream'].includes(shape) && (
                                     <>
                                         <input type="text" placeholder="Jari-jari (r)" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
-                                        <input type="text" placeholder="Tinggi (t)" value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Tabung/Kerucut (t)" value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                         {shape === 'icecream' && <input type="text" placeholder="Garis Pelukis (s)" value={labels.side || ''} onChange={(e) => handleLabelChange('side', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />}
+                                    </>
+                                )}
+                                {shape === 'tube_cone' && (
+                                    <>
+                                        <input type="text" placeholder="Jari-jari Alas (r)" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Tabung" value={labels.tubeHeight || ''} onChange={(e) => handleLabelChange('tubeHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Kerucut" value={labels.coneHeight || ''} onChange={(e) => handleLabelChange('coneHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Garis Pelukis (s)" value={labels.coneSide || ''} onChange={(e) => handleLabelChange('coneSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'cone_cone' && (
+                                    <>
+                                        <input type="text" placeholder="Jari-jari Alas Tengah (r)" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Kerucut Atas" value={labels.topHeight || ''} onChange={(e) => handleLabelChange('topHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Kerucut Bawah" value={labels.botHeight || ''} onChange={(e) => handleLabelChange('botHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="G. Pelukis Atas" value={labels.topSide || ''} onChange={(e) => handleLabelChange('topSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="G. Pelukis Bawah" value={labels.botSide || ''} onChange={(e) => handleLabelChange('botSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'cube_pyramid' && (
+                                    <>
+                                        <input type="text" placeholder="Sisi Kubus" value={labels.side || ''} onChange={(e) => handleLabelChange('side', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Limas" value={labels.pyramidHeight || ''} onChange={(e) => handleLabelChange('pyramidHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Sisi Miring Limas" value={labels.pyramidSide || ''} onChange={(e) => handleLabelChange('pyramidSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'block_pyramid' && (
+                                    <>
+                                        <input type="text" placeholder="Panjang Balok" value={labels.length || ''} onChange={(e) => handleLabelChange('length', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Lebar Balok" value={labels.width || ''} onChange={(e) => handleLabelChange('width', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Balok" value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Limas" value={labels.pyramidHeight || ''} onChange={(e) => handleLabelChange('pyramidHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Sisi Miring Limas" value={labels.pyramidSide || ''} onChange={(e) => handleLabelChange('pyramidSide', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'block_roof' && (
+                                    <>
+                                        <input type="text" placeholder="Panjang Balok" value={labels.length || ''} onChange={(e) => handleLabelChange('length', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Lebar Balok" value={labels.width || ''} onChange={(e) => handleLabelChange('width', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Balok" value={labels.height || ''} onChange={(e) => handleLabelChange('height', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Atap Prisma" value={labels.roofHeight || ''} onChange={(e) => handleLabelChange('roofHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'tube_tubes' && (
+                                    <>
+                                        <input type="text" placeholder="Jari-jari Bawah (R)" value={labels.radius1 || ''} onChange={(e) => handleLabelChange('radius1', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Tabung Bawah" value={labels.height1 || ''} onChange={(e) => handleLabelChange('height1', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Jari-jari Atas (r)" value={labels.radius2 || ''} onChange={(e) => handleLabelChange('radius2', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Tabung Atas" value={labels.height2 || ''} onChange={(e) => handleLabelChange('height2', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                    </>
+                                )}
+                                {shape === 'tube_sphere' && (
+                                    <>
+                                        <input type="text" placeholder="Jari-jari Bola & Tabung" value={labels.radius || ''} onChange={(e) => handleLabelChange('radius', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
+                                        <input type="text" placeholder="Tinggi Tabung" value={labels.tubeHeight || ''} onChange={(e) => handleLabelChange('tubeHeight', e.target.value)} className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400" />
                                     </>
                                 )}
                             </div>
