@@ -928,7 +928,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
-    }, [archiveData]);
+    }, [archiveData, teacherProfile]);
 
     // SORTING LOGIC: Sort by School, then Class, then by Absent Number (from ID)
     const sortedResults = useMemo(() => {
