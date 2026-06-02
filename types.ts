@@ -186,8 +186,8 @@ export interface ExamSummary {
     school_name: string;
     exam_subject: string;
     exam_code: string;
-    exam_type?: string; // Added for Analisis Daerah
-    class_level?: string; // Added for Analisis Daerah
+    exam_type?: string;
+    class_level?: string;
     exam_date: string;
     total_participants: number;
     average_score: number;
