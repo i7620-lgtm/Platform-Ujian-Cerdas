@@ -502,10 +502,20 @@ const App: React.FC = () => {
 
     if (status === 'completed' || status === 'force_closed') setIsSyncing(true);
     
+    // Add additional safety to ensure duration is populated
+    const finalAnswers = { ...answers };
+    if ((status === 'completed' || status === 'force_closed') && finalAnswers['_startTime']) {
+         const startTime = parseInt(finalAnswers['_startTime']);
+         if (!isNaN(startTime)) {
+              const seconds = Math.floor((Date.now() - startTime) / 1000);
+              finalAnswers['_duration'] = Math.max(0, seconds).toString();
+         }
+    }
+
     const res = await storageService.submitExamResult({
         student: currentStudent,
         examCode: currentExam.code,
-        answers,
+        answers: finalAnswers,
         score: (grading as {score?: number})?.score || 0,
         totalQuestions: (grading as {totalQuestions?: number})?.totalQuestions || currentExam.questions.length,
         correctAnswers: (grading as {correctAnswers?: number})?.correctAnswers || 0,
