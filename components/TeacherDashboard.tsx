@@ -25,7 +25,6 @@ import { storageService } from '../services/storage';
 import { InvitationModal } from './teacher/InvitationModal';
 
 // Lazy Load Admin Views for Super Admin
-const AnalyticsView = React.lazy(() => import('./teacher/AnalyticsView'));
 const UserManagementView = React.lazy(() => import('./teacher/DashboardViews').then(module => ({ default: module.UserManagementView })));
 
 interface TeacherDashboardProps {
@@ -42,7 +41,7 @@ interface TeacherDashboardProps {
     toggleTheme: () => void;
 }
 
-type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER' | 'ANALYTICS';
+type TeacherView = 'UPLOAD' | 'ONGOING' | 'UPCOMING_EXAMS' | 'FINISHED_EXAMS' | 'DRAFTS' | 'ADMIN_USERS' | 'ARCHIVE_VIEWER';
 
 const DEFAULT_CONFIG: ExamConfig = {
     examMode: 'UJIAN',
@@ -640,10 +639,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                     <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                     <span className="hidden sm:inline">Kelola</span>
                                 </button>
-                                <button onClick={() => setView('ANALYTICS')} className={`pb-2 px-1 sm:px-2 flex flex-col items-center justify-center gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all border-b-2 min-w-[40px] sm:min-w-[80px] ${view === 'ANALYTICS' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                                    <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                    <span className="hidden sm:inline">Analisis</span>
-                                </button>
                             </>
                          )}
                     </nav>
@@ -675,11 +670,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 {view === 'ADMIN_USERS' && accountType === 'super_admin' && (
                     <Suspense fallback={<div className="text-center p-10 text-slate-400">Memuat Manajemen Pengguna...</div>}>
                         <UserManagementView />
-                    </Suspense>
-                )}
-                {view === 'ANALYTICS' && accountType === 'super_admin' && (
-                    <Suspense fallback={<div className="text-center p-10 text-slate-400">Memuat Modul Analisis...</div>}>
-                        <AnalyticsView />
                     </Suspense>
                 )}
             </main>
