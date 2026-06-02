@@ -1683,7 +1683,7 @@ class StorageService {
           
           let title = "Layanan Sedang Sibuk";
           let message = "Kuota analisis AI harian/menit tercapai. Mohon tunggu beberapa saat sebelum mencoba lagi.";
-          let alertTipe = "";
+          const alertTipe = "";
 
           if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('exhausted') || (e && typeof e === 'object' && 'status' in e && e.status === 429)) {
               if (errorMsg.includes('per minute') && errorMsg.includes('requests')) {
@@ -1831,7 +1831,9 @@ class StorageService {
         }
 
         const answers = (row.answers as Record<string, string>) || {};
-        const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+        const durationStr = answers['_duration'];
+        const completionTime = durationStr ? parseInt(durationStr) : undefined;
+        const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
 
         return {
             id: row.id as number, // Primary Key
@@ -1848,7 +1850,7 @@ class StorageService {
             score: row.score as number, 
             correctAnswers: row.correct_answers as number,
             totalQuestions: row.total_questions as number, 
-            completionTime: completionTime,
+            completionTime: validCompletionTime,
             status: row.status as ResultStatus, 
             activityLog: row.activity_log as string[],
             timestamp: new Date(row.updated_at as string).getTime(), 
@@ -1905,7 +1907,9 @@ class StorageService {
              throw rpcError;
         }
 
-        const completionTime = resultPayload.answers['_duration'] ? parseInt(resultPayload.answers['_duration']) : undefined;
+        const durationStr = resultPayload.answers['_duration'];
+        const completionTime = durationStr ? parseInt(durationStr) : undefined;
+        const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
 
         // VERIFY SCORE: If the server's score differs significantly from the client's payload, 
         // the RPC might be outdated (e.g. failing on MATCHING, TRUE_FALSE, or markdown math).
@@ -1938,7 +1942,7 @@ class StorageService {
             correctAnswers: finalCorrect,
             totalQuestions: resultPayload.totalQuestions || rpcData.total_questions,
             status: rpcData.status,
-            completionTime: completionTime,
+            completionTime: validCompletionTime,
             isSynced: true
         };
     } catch (error) {
@@ -2162,13 +2166,15 @@ class StorageService {
       }
       
       const answers = data.answers || {};
-      const completionTime = answers['_duration'] ? parseInt(answers['_duration']) : undefined;
+      const durationStr = answers['_duration'];
+      const completionTime = durationStr ? parseInt(durationStr) : undefined;
+      const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
       
       return {
         id: data.id, // Include Primary Key
         student: { studentId: data.student_id, fullName: studentName, class: dbClassName, schoolName: dbSchoolName || undefined, absentNumber: absentNumber },
         examCode: data.exam_code, answers: answers, score: data.score, correctAnswers: data.correct_answers,
-        totalQuestions: data.total_questions, completionTime: completionTime, status: data.status, activityLog: data.activity_log,
+        totalQuestions: data.total_questions, completionTime: validCompletionTime, status: data.status, activityLog: data.activity_log,
         timestamp: new Date(data.updated_at).getTime(), location: data.location
       };
   }
