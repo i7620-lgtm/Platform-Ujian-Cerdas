@@ -559,22 +559,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
         }
     };
 
-    const handleRegisterStats = async () => {
-        if (!archiveData) return;
-        if (!confirm("Konfirmasi Pencatatan Statistik?\n\nSistem akan menghitung ulang data dari arsip ini dan menyimpannya ke Database Analisis Daerah.\n\nPERINGATAN: Pastikan data ini belum pernah tercatat sebelumnya agar tidak terjadi duplikasi data statistik.")) return;
-
-        setIsRegisteringStats(true);
-        try {
-            await storageService.registerLegacyArchive(archiveData.exam, archiveData.results);
-            alert("Berhasil! Statistik ujian telah dicatat dan kini tersedia di menu Analisis Daerah.");
-        } catch (e) {
-            console.error(e);
-            alert(e instanceof Error ? e.message : "Gagal mencatat statistik.");
-        } finally {
-            setIsRegisteringStats(false);
-        }
-    };
-
     const resetView = () => {
         setArchiveData(null); setError(''); setFixMessage(''); setSourceType(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1300,11 +1284,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
                         
                         {sourceType === 'LOCAL' && (
                             <>
-                                <button onClick={handleRegisterStats} disabled={isRegisteringStats} className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-amber-600 transition-all shadow-md shadow-amber-100 dark:shadow-amber-900/30 flex items-center justify-center gap-2">
-                                    {isRegisteringStats ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <ChartBarIcon className="w-4 h-4"/>}
-                                    <span>Catat Statistik</span>
-                                </button>
-
                                 <button onClick={() => handleUploadToCloud()} disabled={isLoadingCloud} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white text-xs font-bold uppercase rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex items-center justify-center gap-2">
                                     {isLoadingCloud ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CloudArrowUpIcon className="w-4 h-4"/>}
                                     <span>Simpan ke Cloud</span>
