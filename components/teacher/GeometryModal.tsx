@@ -820,7 +820,19 @@ export const generateGeometrySVG = (shape: string, labels: any, fillColor: strin
     vH = bMaxY - bMinY;
 
     const viewBox = `${vMinX.toFixed(1)} ${vMinY.toFixed(1)} ${vW.toFixed(1)} ${vH.toFixed(1)}`;
-    return `<svg viewBox="${viewBox}" style="width: 100%; max-width: 180px; height: auto; display: inline-block;">${svgBody}</svg>`;
+    
+    const maxDimension = 160;
+    let actualWidth = maxDimension;
+    let actualHeight = maxDimension;
+    if (vW >= vH) {
+        actualWidth = maxDimension;
+        actualHeight = (vH / vW) * maxDimension;
+    } else {
+        actualHeight = maxDimension;
+        actualWidth = (vW / vH) * maxDimension;
+    }
+
+    return `<svg viewBox="${viewBox}" width="${actualWidth}" height="${actualHeight}" style="max-width: 100%; display: inline-block; vertical-align: middle; margin: 4px; overflow: visible;">${svgBody}</svg>`;
 };
 
 
