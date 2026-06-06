@@ -258,6 +258,72 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
         e.preventDefault(); e.stopPropagation();
     };
 
+const normalizeQuestion = (q: any): any => {
+    if (!q) {
+        return {
+            id: String(Math.random()),
+            questionText: '',
+            questionType: 'MULTIPLE_CHOICE'
+        };
+    }
+    
+    const questionText = q.questionText || q.question_text || '';
+    
+    const questionTypeRaw = q.questionType || q.question_type || 'MULTIPLE_CHOICE';
+    let questionType: any = String(questionTypeRaw).toUpperCase().trim();
+    if (questionType === 'MULTIPLE-CHOICE') questionType = 'MULTIPLE_CHOICE';
+    if (questionType === 'COMPLEX-MULTIPLE-CHOICE') questionType = 'COMPLEX_MULTIPLE_CHOICE';
+    if (questionType === 'TRUE-FALSE') questionType = 'TRUE_FALSE';
+    if (questionType === 'FILL-IN-THE-BLANK') questionType = 'FILL_IN_THE_BLANK';
+
+    const correctAnswer = q.correctAnswer || q.correct_answer || '';
+    const options = q.options || q.choices || [];
+    const optionImages = q.optionImages || q.option_images || [];
+    const optionCharts = q.optionCharts || q.option_charts || [];
+    const imageUrl = q.imageUrl || q.image_url || '';
+    const audioUrl = q.audioUrl || q.audio_url || '';
+
+    const category = q.category || '';
+    const level = q.level || '';
+    const scoreWeight = typeof q.scoreWeight === 'number' ? q.scoreWeight : (typeof q.score_weight === 'number' ? q.score_weight : 1);
+    const kisiKisi = q.kisiKisi || q.kisi_kisi || '';
+
+    let matchingPairs = q.matchingPairs || q.matching_pairs || [];
+    matchingPairs = matchingPairs.map((pair: any) => ({
+        left: pair.left || '',
+        right: pair.right || '',
+        leftChart: pair.leftChart || pair.left_chart,
+        rightChart: pair.rightChart || pair.right_chart
+    }));
+
+    let trueFalseRows = q.trueFalseRows || q.true_false_rows || [];
+    trueFalseRows = trueFalseRows.map((row: any) => ({
+        text: row.text || '',
+        answer: row.answer === true || row.answer === 'true' || row.answer === 'Benar' || row.answer === 'BENAR',
+        chartData: row.chartData || row.chart_data
+    }));
+
+    return {
+        id: String(q.id || Math.random()),
+        questionText,
+        questionType,
+        options,
+        correctAnswer,
+        imageUrl,
+        audioUrl,
+        optionImages,
+        chartData: q.chartData || q.chart_data,
+        optionCharts,
+        correctAnswerChart: q.correctAnswerChart || q.correct_answer_chart,
+        category,
+        level,
+        scoreWeight,
+        kisiKisi,
+        matchingPairs,
+        trueFalseRows
+    };
+};
+
     const fixArchiveDataSorting = (data: ArchiveData, profile?: any): ArchiveData => {
         // ENRICHMENT: Normalize authorId and author_id to prevent legacy data issues
         const rawExam: any = data.exam;
@@ -287,6 +353,11 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({ onReuseExam, teach
 
         rawExam.authorName = normalizedAuthorName;
         rawExam.authorSchool = normalizedAuthorSchool;
+
+        // Standardize list of questions in the exam to standard casing and structures
+        if (rawExam && Array.isArray(rawExam.questions)) {
+            rawExam.questions = rawExam.questions.map((q: any) => normalizeQuestion(q));
+        }
 
         const fixedResults = data.results.map(r => {
             const newAnswers = { ...r.answers };
