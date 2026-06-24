@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
+import { ExamWaitingRoomView } from './components/student/ExamWaitingRoomView';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { ResultNotFoundPage } from './components/ResultNotFoundPage';
@@ -243,6 +244,7 @@ const App: React.FC = () => {
 
               if (!isNaN(startTime.getTime()) && now < startTime) {
                   setWaitingExam(exam);
+                  setCurrentStudent(student);
                   setView('WAITING_ROOM');
                   return;
               }
@@ -791,12 +793,12 @@ const App: React.FC = () => {
         )}
 
         {view === 'WAITING_ROOM' && waitingExam && (
-            <InvitationModal 
-                isOpen={true} 
-                onClose={resetToHome} 
+            <ExamWaitingRoomView 
                 exam={waitingExam}
-                schoolName={waitingExam.authorSchool}
-                // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
+                student={currentStudent || { fullName: 'Siswa', schoolName: '', class: '', absentNumber: '', studentId: '' }}
+                onBack={resetToHome}
+                onStartExam={(code, stud) => handleStudentLoginSuccess(code, stud)}
+                isDarkMode={darkMode}
             />
         )}
 
