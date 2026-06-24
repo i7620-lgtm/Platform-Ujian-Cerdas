@@ -15,7 +15,7 @@ export const downloadCertificateAsPdf = async (
     subject: string, 
     classLevel: string, 
     dateStr: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     certConfig: Record<string, any>,
     fileName: string
 ): Promise<void> => {
@@ -44,7 +44,7 @@ export const downloadCertificateAsPdf = async (
                         // This prevents the SVG cloned image from inheriting fixed top: -9999px and rendering out of bounds (blank).
                         const captureTarget = (div.firstElementChild || div) as HTMLElement;
                         
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                         
                         const renderOptions: any = {
                             pixelRatio: 2.5,
                             cacheBust: true,
