@@ -1,1559 +1,476 @@
+import React, { lazy, Suspense } from "react";
+import type { Question, QuestionType } from "../../types";
+import {
+  TrashIcon,
+  XMarkIcon,
+  PlusCircleIcon,
+  FileTextIcon,
+  ListBulletIcon,
+  CheckCircleIcon,
+  PencilIcon,
+  FileWordIcon,
+  CheckIcon,
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  SignalIcon,
+  WifiIcon,
+  ExclamationTriangleIcon,
+  SparklesIcon,
+} from "../Icons";
+import { parseList, isAnswerMatch } from "./examUtils";
+import { EXAM_TYPES } from "./constants";
+import { useExamEditor } from "./useExamEditor";
+import { QuestionCard } from "./QuestionCard";
+import { ExamConfigSettings } from "./features/exam-editor/components/ExamConfigSettings";
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import type { Question, QuestionType, ExamConfig, ChartData } from '../../types';
-import { 
-    TrashIcon, XMarkIcon, PlusCircleIcon, PhotoIcon, SpeakerWaveIcon,
-    FileTextIcon, ListBulletIcon, CheckCircleIcon, PencilIcon, FileWordIcon, CheckIcon, ArrowLeftIcon,
-    TableCellsIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
-    StrikethroughIcon, SuperscriptIcon, SubscriptIcon, EraserIcon, FunctionIcon,
-    ArrowPathIcon, SignalIcon, WifiIcon, ExclamationTriangleIcon, SparklesIcon, ChartBarIcon
-} from '../Icons';
-import { compressImage, parseList, sanitizeHtml, isAnswerMatch } from './examUtils';
-import { EXAM_TYPES } from './constants';
-import { generateQuestions } from '../services/gemini';
-import { ChartRenderer } from '../ChartRenderer';
-import { ChartConfigModal } from './ChartConfigModal';
-import EmojiPickerModal from './EmojiPickerModal';
-import { GeometryModal } from './GeometryModal';
+import { WysiwygEditor, SelectionModal } from "./WysiwygEditor";
 
-// --- TIPE DATA & KONSTANTA ---
-import { CertificateEditorModal } from './CertificateEditorModal';
+const ChartConfigModal = lazy(() => import("./ChartConfigModal").then(module => ({ default: module.ChartConfigModal })));
+const CertificateEditorModal = lazy(() => import("./CertificateEditorModal").then(module => ({ default: module.CertificateEditorModal })));
 
 interface ExamEditorProps {
-    questions: Question[];
-    setQuestions: React.Dispatch<React.SetStateAction<Question[]>>;
-    config: ExamConfig;
-    setConfig: React.Dispatch<React.SetStateAction<ExamConfig>>;
-    isEditing: boolean;
-    onSave: () => void;
-    onSaveDraft?: () => void;
-    onCancel: () => void;
-    generatedCode: string;
-    onReset: () => void;
-    isPremium?: boolean;
+  isEditing: boolean;
+  onSave: () => void;
+  onSaveDraft?: () => void;
+  onCancel: () => void;
+  generatedCode: string;
+  onReset: () => void;
+  isPremium?: boolean;
 }
 
 const SUBJECTS = [
-    "Agama Buddha", "Agama Hindu", "Agama Islam", "Agama Katolik", "Agama Khonghucu", "Agama Kristen",
-    "Antropologi", "Bahasa Bali", "Bahasa Indonesia", "Bahasa Indonesia Lanjut", "Bahasa Inggris", "Bahasa Inggris Lanjut", 
-    "Bimbingan Konseling (BK)", "Biologi", "Biologi Lanjut", "Ekonomi", "Fisika", "Fisika Lanjut", "Geografi",
-    "Ilmu Pengetahuan Alam (IPA)", "Ilmu Pengetahuan Alam dan Sosial (IPAS)", "Ilmu Pengetahuan Sosial (IPS)", "Informatika",
-    "Kepercayaan", "Kimia", "Kimia Lanjut", "Koding dan Kecerdasan Artifisial (KKA)", "Lainnya",
-    "Matematika", "Matematika Lanjut", "Muatan Lokal", "Pendidikan Jasmani, Olahraga dan Kesehatan (PJOK)",
-    "Pendidikan Pancasila", "Prakarya", "Sejarah", "Seni Budaya", "Sosiologi", "Teknologi Informasi dan Komunikasi (TIK)"
+  "Agama Buddha",
+  "Agama Hindu",
+  "Agama Islam",
+  "Agama Katolik",
+  "Agama Khonghucu",
+  "Agama Kristen",
+  "Antropologi",
+  "Bahasa Bali",
+  "Bahasa Indonesia",
+  "Bahasa Indonesia Lanjut",
+  "Bahasa Inggris",
+  "Bahasa Inggris Lanjut",
+  "Bimbingan Konseling (BK)",
+  "Biologi",
+  "Biologi Lanjut",
+  "Ekonomi",
+  "Fisika",
+  "Fisika Lanjut",
+  "Geografi",
+  "Ilmu Pengetahuan Alam (IPA)",
+  "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
+  "Ilmu Pengetahuan Sosial (IPS)",
+  "Informatika",
+  "Kepercayaan",
+  "Kimia",
+  "Kimia Lanjut",
+  "Koding dan Kecerdasan Artifisial (KKA)",
+  "Lainnya",
+  "Matematika",
+  "Matematika Lanjut",
+  "Muatan Lokal",
+  "Pendidikan Jasmani, Olahraga dan Kesehatan (PJOK)",
+  "Pendidikan Pancasila",
+  "Prakarya",
+  "Sejarah",
+  "Seni Budaya",
+  "Sosiologi",
+  "Teknologi Informasi dan Komunikasi (TIK)",
 ];
 
-const CLASSES = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6", "Kelas 7", "Kelas 8", "Kelas 9", "Kelas 10", "Kelas 11", "Kelas 12", "Mahasiswa", "Umum"];
+const CLASSES = [
+  "Kelas 1",
+  "Kelas 2",
+  "Kelas 3",
+  "Kelas 4",
+  "Kelas 5",
+  "Kelas 6",
+  "Kelas 7",
+  "Kelas 8",
+  "Kelas 9",
+  "Kelas 10",
+  "Kelas 11",
+  "Kelas 12",
+  "Mahasiswa",
+  "Umum",
+];
 
-// --- HELPER FUNCTIONS ---
-const execCmd = (command: string, value: string | undefined = undefined) => {
-    document.execCommand(command, false, value);
-};
+export const ExamEditor: React.FC<ExamEditorProps> = ({
+  isEditing,
+  onSave,
+  onSaveDraft,
+  onCancel,
+  generatedCode,
+  onReset,
+  isPremium,
+}) => {
+  const hookResult = useExamEditor({ isEditing, generatedCode, isPremium });
+  const {
+    questions,
+    config,
+    questionsSectionRef,
+    generatedCodeSectionRef,
+    handleAddClassTag,
+    hasManualGrading,
+    handleGenerateSingleQuestion,
+    handleConfigChange,
+  } = hookResult;
 
-const SelectionModal: React.FC<{
-    isOpen: boolean;
-    title: string;
-    options: string[];
-    selectedValue: string;
-    onClose: () => void;
-    onSelect: (value: string) => void;
-    searchPlaceholder?: string;
-}> = ({ isOpen, title, options, selectedValue, onClose, onSelect, searchPlaceholder = "Cari..." }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const filteredOptions = useMemo(() => options.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())), [searchTerm, options]);
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[85vh]">
-                <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 sticky top-0 z-10">
-                    <div><h3 className="font-bold text-lg text-slate-800 dark:text-white">{title}</h3><p className="text-xs text-slate-500 dark:text-slate-400">Silakan pilih salah satu opsi dari daftar.</p></div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><XMarkIcon className="w-5 h-5"/></button>
-                </div>
-                <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50"><input type="text" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-3 pl-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all shadow-sm" autoFocus /></div>
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                    {filteredOptions.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {filteredOptions.map((opt) => (
-                                <button key={opt} onClick={() => { onSelect(opt); onClose(); }} className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border flex items-center justify-between group ${selectedValue === opt ? 'bg-primary text-white border-primary shadow-md shadow-primary/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-gray-100 dark:border-slate-700 hover:border-primary/30 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-sm'}`}><span>{opt}</span>{selectedValue === opt && <CheckIcon className="w-4 h-4 text-white" />}</button>
-                            ))}
-                        </div>
-                    ) : (<div className="text-center py-10 text-slate-400 dark:text-slate-500"><p className="text-sm">Opsi tidak ditemukan.</p></div>)}
-                </div>
-            </div>
-        </div>
-    );
-};
+  const store = hookResult;
 
-const TableConfigModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (rows: number, cols: number) => void; }> = ({ isOpen, onClose, onInsert }) => {
-    const [rows, setRows] = useState(3); const [cols, setCols] = useState(3);
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-xs border border-gray-100 dark:border-slate-700">
-                <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2"><TableCellsIcon className="w-4 h-4"/> Sisipkan Tabel</h3>
-                <div className="space-y-4">
-                    <div><label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-1">Jumlah Baris</label><input type="number" min="1" max="20" value={rows} onChange={e => setRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-full p-2 border rounded text-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none" /></div>
-                    <div><label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-1">Jumlah Kolom</label><input type="number" min="1" max="10" value={cols} onChange={e => setCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-full p-2 border rounded text-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none" /></div>
-                    <div className="flex gap-2 justify-end pt-2"><button onClick={onClose} className="px-3 py-1.5 text-xs font-bold text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded">Batal</button><button onClick={() => { onInsert(rows, cols); onClose(); }} className="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 shadow">Sisipkan</button></div>
-                </div>
-            </div>
-        </div>
-    );
-};
+  const renderTypeSelectionModal = () => {
+    if (!store.isTypeSelectionModalOpen) return null;
 
-const VisualMathModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (latex: string) => void; }> = ({ isOpen, onClose, onInsert }) => {
-    const [tab, setTab] = useState<'EDITOR' | 'SYMBOLS'>('EDITOR');
-    const [latexInput, setLatexInput] = useState('');
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-    const previewContainerRef = useRef<HTMLDivElement>(null);
-
-    const symbolCategories = {
-        'Basic': [
-            { l: '×', v: '\\times ' }, { l: '÷', v: '\\div ' }, { l: '≠', v: '\\neq ' }, { l: '±', v: '\\pm ' }, 
-            { l: '≤', v: '\\leq ' }, { l: '≥', v: '\\geq ' }, { l: '≈', v: '\\approx ' }, { l: '∞', v: '\\infty ' }
-        ],
-        'Greek': [
-            { l: 'α', v: '\\alpha ' }, { l: 'β', v: '\\beta ' }, { l: 'θ', v: '\\theta ' }, { l: 'π', v: '\\pi ' }, 
-            { l: 'Δ', v: '\\Delta ' }, { l: 'Ω', v: '\\Omega ' }, { l: '∑', v: '\\Sigma ' }
-        ],
-        'Calculus': [
-            { l: '∫', v: '\\int ' }, { l: '∂', v: '\\partial ' }, { l: '∇', v: '\\nabla ' },
-            { l: 'lim', v: '\\lim\\limits_{x \\to \\infty} ' }
-        ],
-        'Symbols': [
-            { l: '∠', v: '\\angle ' }, { l: '°', v: '^\\circ ' }, { l: '∈', v: '\\in ' }, { l: '→', v: '\\rightarrow ' },
-            { l: 'Turus', v: '卌' }
-        ]
-    };
-
-    const templates = [
-        { label: 'Pecahan', code: '\\frac{x}{y}' },
-        { label: 'Akar', code: '\\sqrt{x}' },
-        { label: 'Akar n', code: '\\sqrt[n]{x}' },
-        { label: 'Pangkat', code: 'x^{2}' },
-        { label: 'Subskrip', code: 'x_{i}' },
-        { label: 'Integral', code: '\\int_{a}^{b} x \\,dx' },
-        { label: 'Sigma', code: '\\sum_{i=1}^{n} x_i' },
-        { label: 'Matriks 2x2', code: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
-        { label: 'Matriks nxn', code: '\\begin{pmatrix} a_{11} & \\cdots & a_{1n} \\\\ \\vdots & \\ddots & \\vdots \\\\ a_{n1} & \\cdots & a_{nn} \\end{pmatrix}' },
-        { label: 'Matriks nx1', code: '\\begin{pmatrix} a_{1} \\\\ a_{2} \\\\ \\vdots \\\\ a_{n} \\end{pmatrix}' },
-        { label: 'Matriks 1xn', code: '\\begin{pmatrix} a_{1} & a_{2} & \\cdots & a_{n} \\end{pmatrix}' },
-        { label: 'Limit', code: '\\lim_{x \\to a} f(x)' },
-        { label: 'Logaritma', code: '\\log_{a} x' },
-        { label: 'Kurung Kurawal', code: '\\left\\{ x \\right\\}' },
-        { label: 'Kurung Biasa', code: '\\left( x \\right)' },
-        { label: 'Kurung Siku', code: '\\left[ x \\right]' },
-        { label: 'Permutasi', code: '_{n}P_{r}' },
-        { label: 'Kombinasi', code: '_{n}C_{r}' },
-        { label: 'Vektor', code: '\\vec{v}' },
-        { label: 'Vektor Kolom', code: '\\begin{pmatrix} x \\\\ y \\\\ z \\end{pmatrix}' },
-        { label: 'Nilai Mutlak', code: '\\left| x \\right|' },
-        { label: 'Fungsi Piecewise', code: '\\begin{cases} x, & \\text{jika } x > 0 \\\\ -x, & \\text{jika } x \\leq 0 \\end{cases}' },
-        { label: 'Irisan Himpunan', code: 'A \\cap B' },
-        { label: 'Gabungan Himpunan', code: 'A \\cup B' },
-        { label: 'Turunan (dy/dx)', code: '\\frac{dy}{dx}' }
+    const types: {
+      type: QuestionType;
+      label: string;
+      desc: string;
+      icon: React.FC<{ className?: string }>;
+    }[] = [
+      {
+        type: "INFO",
+        label: "Keterangan / Info",
+        desc: "Hanya teks atau gambar, tanpa pertanyaan.",
+        icon: FileTextIcon,
+      },
+      {
+        type: "MULTIPLE_CHOICE",
+        label: "Pilihan Ganda",
+        desc: "Satu jawaban benar dari beberapa opsi.",
+        icon: ListBulletIcon,
+      },
+      {
+        type: "COMPLEX_MULTIPLE_CHOICE",
+        label: "Pilihan Ganda Kompleks",
+        desc: "Lebih dari satu jawaban benar.",
+        icon: CheckCircleIcon,
+      },
+      {
+        type: "FILL_IN_THE_BLANK",
+        label: "Isian Singkat",
+        desc: "Jawaban teks pendek otomatis dinilai.",
+        icon: PencilIcon,
+      },
+      {
+        type: "ESSAY",
+        label: "Uraian / Esai",
+        desc: "Jawaban panjang dinilai manual.",
+        icon: FileWordIcon,
+      },
+      {
+        type: "TRUE_FALSE",
+        label: "Benar / Salah",
+        desc: "Memilih pernyataan benar atau salah.",
+        icon: CheckIcon,
+      },
+      {
+        type: "MATCHING",
+        label: "Menjodohkan",
+        desc: "Menghubungkan pasangan item kiri dan kanan.",
+        icon: ArrowLeftIcon,
+      },
     ];
 
-    const insertAtCursor = (code: string) => {
-        if (!inputRef.current) return;
-        const textarea = inputRef.current;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        const before = text.substring(0, start);
-        const after = text.substring(end, text.length);
-        const newValue = before + code + after;
-        setLatexInput(newValue);
-        
-        setTimeout(() => {
-            if (inputRef.current) {
-                inputRef.current.focus();
-                inputRef.current.setSelectionRange(start + code.length, start + code.length);
-            }
-        }, 0);
-    };
-
-    // State is reset via React key prop in the parent component when toggled
-
-    useEffect(() => {
-        if (previewContainerRef.current) {
-            const w = window as unknown as { katex?: { render: (tex: string, elem: HTMLElement, opts: any) => void } };
-            if (w.katex && latexInput.trim()) {
-                try {
-                    w.katex.render(latexInput, previewContainerRef.current, { throwOnError: false, displayMode: true });
-                } catch(e) {
-                    previewContainerRef.current.innerText = 'Format tidak valid';
-                }
-            } else {
-                previewContainerRef.current.innerHTML = '<span class="text-gray-400 text-sm">Preview (Ketik untuk melihat hasil)</span>';
-            }
-        }
-    }, [latexInput, tab]);
-
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
-                <div className="bg-gray-50 dark:bg-slate-900 p-4 border-b dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="text-md font-bold text-gray-700 dark:text-slate-200">Math Pro Editor</h3>
-                    <button onClick={onClose}><XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"/></button>
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60] animate-fade-in">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-white dark:border-slate-700">
+          <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
+            <h3 className="font-bold text-lg text-gray-800 dark:text-white">
+              Pilih Tipe Soal
+            </h3>
+            <button
+              onClick={() => store.setTypeSelectionModalOpen(false)}
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700"
+            >
+              <XMarkIcon className="w-5 h-5 text-gray-500 dark:text-slate-400" />
+            </button>
+          </div>
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {types.map((t) => (
+              <button
+                key={t.type}
+                onClick={() => store.handleSelectQuestionType(t.type)}
+                className="flex items-start gap-4 p-4 border dark:border-slate-700 rounded-lg hover:border-primary dark:hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-md transition-all text-left group bg-white dark:bg-slate-800"
+              >
+                <div className="bg-gray-100 dark:bg-slate-700 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors text-gray-500 dark:text-slate-300">
+                  <t.icon className="w-6 h-6" />
                 </div>
-                
-                <div className="flex bg-gray-50 dark:bg-slate-900 border-b dark:border-slate-700 relative z-10 shrink-0">
-                    {['EDITOR', 'SYMBOLS'].map(t => (
-                        <button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 text-xs font-bold tracking-wider ${tab === t ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 bg-white dark:bg-slate-800' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
-                            {t === 'EDITOR' ? 'KODE LATEX' : 'DAFTAR SIMBOL'}
-                        </button>
-                    ))}
+                <div>
+                  <p className="font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary dark:group-hover:text-primary">
+                    {t.label}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    {t.desc}
+                  </p>
                 </div>
-
-                <div className="flex-1 flex flex-col overflow-y-auto w-full relative z-0">
-                    {tab === 'EDITOR' && (
-                        <div className="p-4 flex flex-col gap-4">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">Template Cepat</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {templates.map(t => (
-                                        <button key={t.label} onClick={() => insertAtCursor(t.code)} className="px-3 py-1.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-100 dark:hover:bg-slate-600 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shadow-sm">
-                                            {t.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase">Input LaTeX</label>
-                                <textarea
-                                    ref={inputRef}
-                                    value={latexInput}
-                                    onChange={e => setLatexInput(e.target.value)}
-                                    placeholder="Ketik kode LaTeX di sini (contoh: \sqrt{x^2 + y^2})"
-                                    className="w-full p-4 font-mono text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700 dark:text-slate-200 min-h-[140px] resize-y shadow-inner"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase">Preview KaTeX</label>
-                                <div 
-                                    ref={previewContainerRef}
-                                    className="w-full min-h-[120px] max-h-[250px] p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 overflow-auto shadow-sm text-center"
-                                >
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {tab === 'SYMBOLS' && (
-                        <div className="p-5 space-y-6">
-                            {Object.entries(symbolCategories).map(([cat, syms]) => (
-                                <div key={cat}>
-                                    <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 dark:border-slate-700 pb-2">{cat}</h4>
-                                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                                        {syms.map(s => (
-                                            <button key={s.l} onClick={() => { setTab('EDITOR'); insertAtCursor(s.v); }} className="aspect-square flex items-center justify-center text-lg font-serif bg-gray-50 dark:bg-slate-700/50 border border-gray-100 dark:border-slate-600 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-600 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors shadow-sm">
-                                                {s.l}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-5 py-2.5 font-bold text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">Batal</button>
-                    <button onClick={() => { onInsert(latexInput); onClose(); }} disabled={!latexInput.trim()} className="px-5 py-2.5 font-bold text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
-                        Sisipkan Formula
-                    </button>
-                </div>
-            </div>
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
     );
-};
+  };
 
-const AksaraBaliModal: React.FC<{ isOpen: boolean; onClose: () => void; onInsert: (text: string) => void; }> = ({ isOpen, onClose, onInsert }) => {
-    const [latinText, setLatinText] = useState('');
-    const [aksaraText, setAksaraText] = useState('');
-
-    useEffect(() => {
-        import('../../utils/aksaraBali').then(module => {
-            setAksaraText(module.transliterate(latinText));
-        });
-    }, [latinText]);
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col max-h-[90vh]">
-                <div className="bg-gray-50 dark:bg-slate-900 p-4 border-b dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-gray-700 dark:text-slate-200">Aksara Bali</h3>
-                    <button onClick={onClose}><XMarkIcon className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"/></button>
-                </div>
-                <div className="p-5 overflow-y-auto space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-2">Teks Latin</label>
-                        <textarea 
-                            value={latinText} 
-                            onChange={e => setLatinText(e.target.value)} 
-                            className="w-full p-3 border rounded-lg text-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none min-h-[100px] resize-y"
-                            placeholder="Ketik teks latin di sini..."
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-2">Aksara Bali (Preview)</label>
-                        <div className="w-full p-3 border rounded-lg text-lg bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 min-h-[100px] break-words" style={{ fontFamily: '"Noto Sans Balinese", sans-serif' }}>
-                            {aksaraText || <span className="text-gray-400 dark:text-slate-500 text-sm">Hasil transliterasi akan muncul di sini...</span>}
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button onClick={onClose} className="px-4 py-2 text-xs font-bold text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Batal</button>
-                        <button onClick={() => { onInsert(aksaraText); onClose(); }} disabled={!aksaraText} className="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Sisipkan</button>
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="space-y-10 border-t-2 border-gray-200 dark:border-slate-700 pt-12">
+      <div
+        ref={questionsSectionRef}
+        id="exam-editor-section"
+        className="space-y-4 scroll-mt-32"
+      >
+        <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm">
+          <h2 className="text-xl font-bold text-neutral dark:text-white">
+            {isEditing ? "1. Editor Soal" : "3. Editor Soal"}
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            Gunakan editor teks kaya di bawah untuk membuat konten soal
+            berkualitas.
+          </p>
         </div>
-    );
-};
-
-const Btn: React.FC<{ 
-    cmd?: string; 
-    label?: string; 
-    icon?: React.FC<{ className?: string }>; 
-    active?: boolean; 
-    onClick?: () => void;
-    runCmd?: (cmd: string) => void;
-}> = ({ cmd, label, icon: Icon, active, onClick, runCmd }) => {
-    const handleMouseDown = (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (onClick) {
-            onClick();
-        } else if (cmd && runCmd) {
-            runCmd(cmd);
-        }
-    };
-
-    return (
-        <button 
-            type="button" 
-            onMouseDown={handleMouseDown} 
-            className={`min-w-[28px] h-7 px-1.5 rounded flex items-center justify-center transition-all ${active ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shadow-inner' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400'}`} 
-            title={label}
-        >
-            {Icon ? <Icon className="w-4 h-4"/> : <span className="text-xs font-bold font-serif">{label}</span>}
-        </button>
-    );
-};
-
-const WysiwygEditor: React.FC<{ 
-    value: string; 
-    onChange: (val: string) => void; 
-    placeholder?: string; 
-    minHeight?: string; 
-    showTabs?: boolean;
-    onChartClick?: () => void;
-    chartData?: ChartData;
-}> = ({ value, onChange, placeholder = "Ketik di sini...", minHeight = "120px", showTabs = true, onChartClick, chartData }) => {
-    const editorRef = useRef<HTMLDivElement>(null); 
-    const fileInputRef = useRef<HTMLInputElement>(null); 
-    const audioInputRef = useRef<HTMLInputElement>(null); 
-    const savedRange = useRef<Range | null>(null);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
-    const [activeTab, setActiveTab] = useState<'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH'>(showTabs ? 'FORMAT' : 'INSERT'); 
-    const [activeCmds, setActiveCmds] = useState<string[]>([]); 
-    const [isInsideTable, setIsInsideTable] = useState(false); 
-    const [showMath, setShowMath] = useState(false); 
-    const [showTable, setShowTable] = useState(false);
-    const [showGeometry, setShowGeometry] = useState(false);
-    const [showAksara, setShowAksara] = useState(false);
-    const [showEmoji, setShowEmoji] = useState(false);
-    const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
-    
-    // Sync local state with prop value
-    useEffect(() => {
-        if (editorRef.current) {
-            const isFocused = document.activeElement === editorRef.current;
-            const currentHtml = editorRef.current.innerHTML;
-            
-            // We update the DOM if:
-            // 1. The value from props is different from what's in the DOM
-            // AND
-            // 2. (We are NOT focused OR the current DOM is empty/default)
-            // This ensures initial load works (DOM is empty) and external updates work (not focused)
-            // while preventing cursor jumps when typing (focused).
-            
-            if (value !== currentHtml) {
-                if (!isFocused || !currentHtml || currentHtml === '<p><br></p>') {
-                    let newHtml = value;
-                    if (chartData && !newHtml.includes('data-chart="true"')) {
-                        newHtml += `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
-                    }
-                    editorRef.current.innerHTML = newHtml;
-                }
-            }
-        }
-    }, [value, chartData]);
-
-    useEffect(() => {
-        if (editorRef.current) {
-            const node = editorRef.current.querySelector('[data-chart="true"]');
-            if (node && chartData) {
-                const textSpan = node.querySelector('.chart-placeholder-text') as HTMLElement;
-                if (textSpan) textSpan.style.display = 'none';
-            }
-            setChartNode(node as HTMLElement);
-        }
-    }, [value, chartData]);
-    
-    // Cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, []);
-
-    const handleInput = () => { 
-        if (editorRef.current) { 
-            const clone = editorRef.current.cloneNode(true) as HTMLElement;
-            const chartNodes = clone.querySelectorAll('[data-chart="true"]');
-            chartNodes.forEach(node => {
-                node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
-            });
-            const html = clone.innerHTML;
-
-            // Debounce onChange to prevent heavy re-renders of parent
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-            debounceRef.current = setTimeout(() => {
-                // Sanitize HTML before sending to parent to remove theme-specific styles
-                onChange(sanitizeHtml(html));
-            }, 1000); // Increased debounce time to 1s as requested for performance
-            
-            saveSelection(); 
-            checkActiveFormats(); 
-        } 
-    };
-    
-    const handleBlur = () => {
-        // Flush pending changes on blur
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-            debounceRef.current = null;
-            if (editorRef.current) {
-                const clone = editorRef.current.cloneNode(true) as HTMLElement;
-            const chartNodes = clone.querySelectorAll('[data-chart="true"]');
-            chartNodes.forEach(node => {
-                node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
-            });
-                const html = clone.innerHTML;
-                onChange(sanitizeHtml(html));
-            }
-        }
-        saveSelection();
-    };
-
-    const saveSelection = () => { const sel = window.getSelection(); if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) { savedRange.current = sel.getRangeAt(0).cloneRange(); } };
-    const restoreSelection = () => { 
-        if (editorRef.current) editorRef.current.focus();
-        const sel = window.getSelection(); 
-        if (sel && savedRange.current) { 
-            sel.removeAllRanges(); 
-            sel.addRange(savedRange.current); 
-        } else if (editorRef.current && sel) { 
-            const range = document.createRange(); 
-            range.selectNodeContents(editorRef.current); 
-            range.collapse(false); 
-            sel.removeAllRanges(); 
-            sel.addRange(range); 
-        } 
-    };
-    const checkActiveFormats = () => { saveSelection(); const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList']; const active = cmds.filter(cmd => document.queryCommandState(cmd)); setActiveCmds(active); const selection = window.getSelection(); let inTable = false; if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE' || node.nodeName === 'TD' || node.nodeName === 'TH') { inTable = true; break; } node = node.parentNode; } } setIsInsideTable(inTable); };
-    const handleEditorClick = (e: React.MouseEvent) => {
-        checkActiveFormats();
-        const target = e.target as HTMLElement;
-        if (target.closest('.chart-placeholder') && onChartClick) {
-            onChartClick();
-        }
-    };
-
-    const runCmd = (cmd: string, val?: string) => { 
-        // Only restore selection if the editor lost focus. 
-        // Restoring selection when already focused can reset pending format states (like toggling off superscript).
-        if (document.activeElement !== editorRef.current) {
-            restoreSelection(); 
-        }
-        if(editorRef.current) editorRef.current.focus(); 
-        
-        if (cmd === 'superscript') {
-            if (document.queryCommandState('subscript')) execCmd('subscript');
-            execCmd('superscript');
-        } else if (cmd === 'subscript') {
-            if (document.queryCommandState('superscript')) execCmd('superscript');
-            execCmd('subscript');
-        } else {
-            execCmd(cmd, val); 
-        }
-        
-        // checkActiveFormats calls saveSelection internally
-        checkActiveFormats(); 
-    };
-    const insertTable = (rows: number, cols: number) => { let html = '<div class="overflow-x-auto custom-scrollbar"><table><thead><tr>'; for(let c=0; c<cols; c++) html += `<th>H${c+1}</th>`; html += '</tr></thead><tbody>'; for(let r=0; r<rows; r++) { html += '<tr>'; for(let c=0; c<cols; c++) html += `<td>Data</td>`; html += '</tr>'; } html += '</tbody></table></div><p><br/></p>'; runCmd('insertHTML', html); handleInput(); };
-    const deleteCurrentTable = () => { const selection = window.getSelection(); if (selection && selection.rangeCount > 0) { let node = selection.anchorNode; while (node && node !== editorRef.current) { if (node.nodeName === 'TABLE') { node.parentNode?.removeChild(node); handleInput(); setIsInsideTable(false); return; } node = node.parentNode; } } };
-    const insertMath = (latex: string) => { 
-        if ((window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex) { 
-            const html = (window as unknown as { katex: { renderToString: (latex: string, options: unknown) => string } }).katex.renderToString(latex, { throwOnError: false, displayMode: false }); 
-            
-            if (document.activeElement !== editorRef.current) {
-                restoreSelection();
-            }
-            if (editorRef.current) editorRef.current.focus();
-
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0 && editorRef.current && editorRef.current.contains(sel.anchorNode)) {
-                const range = sel.getRangeAt(0);
-                range.deleteContents();
-                
-                const span = document.createElement('span');
-                span.className = 'math-visual';
-                span.style.display = 'inline-block';
-                span.style.verticalAlign = 'middle';
-                span.contentEditable = 'false';
-                span.setAttribute('data-latex', latex);
-                span.innerHTML = html;
-
-                const zws1 = document.createTextNode('\u200B');
-                const zws2 = document.createTextNode('\u200B');
-                
-                const frag = document.createDocumentFragment();
-                frag.appendChild(zws1);
-                frag.appendChild(span);
-                frag.appendChild(zws2);
-                
-                range.insertNode(frag);
-                
-                range.setStartAfter(zws2);
-                range.setEndAfter(zws2);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                
-                checkActiveFormats();
-            } else {
-                const wrapper = `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}">${html}</span>&#8203;`; 
-                runCmd('insertHTML', wrapper); 
-            }
-            handleInput(); 
-        } 
-    };
-
-    const handlePaste = (e: React.ClipboardEvent) => {
-        e.preventDefault();
-
-        const items = e.clipboardData.items;
-        let imagePasted = false;
-        
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const file = items[i].getAsFile();
-                if (file) {
-                    imagePasted = true;
-                    // Pastikan fokus ke editor agar execCommand bekerja di posisi kursor terakhir
-                    if (document.activeElement !== editorRef.current) {
-                        editorRef.current?.focus();
-                        restoreSelection();
-                    }
-                    const reader = new FileReader();
-                    reader.onload = async (ev) => {
-                        const rawDataUrl = ev.target?.result as string;
-                        try {
-                            const dataUrl = await compressImage(rawDataUrl, 0.7);
-                            const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 8px 0;" />&nbsp;`;
-                            document.execCommand('insertHTML', false, imgTag);
-                            handleInput();
-                        } catch (error) {
-                            console.error("Image compression failed", error);
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                }
-            }
-        }
-        
-        if (imagePasted) return;
-
-        const text = e.clipboardData.getData('text/plain');
-        const html = e.clipboardData.getData('text/html');
-        
-        let content = text;
-        if (html) {
-            // Use the shared sanitizeHtml function for consistent cleaning
-            content = sanitizeHtml(html);
-        }
-        document.execCommand('insertHTML', false, content);
-        handleInput();
-    };
-
-    const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (ev) => { const rawDataUrl = ev.target?.result as string; try { const dataUrl = await compressImage(rawDataUrl, 0.7); const imgTag = `<img src="${dataUrl}" alt="Inserted Image" style="max-width: 100%; max-height: 50vh; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 8px 0;" />&nbsp;`; runCmd('insertHTML', imgTag); handleInput(); } catch (error) { console.error("Image compression failed", error); } }; reader.readAsDataURL(file); } e.target.value = ''; };
-    const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            if (file.size > 1 * 1024 * 1024) { alert("Ukuran file audio terlalu besar (Maks 1MB)"); return; }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const result = ev.target?.result as string;
-                const audioTag = `<br/><audio controls src="${result}" style="max-width: 100%; display: block; margin: 8px 0;"></audio><br/>`;
-                runCmd('insertHTML', audioTag);
-                handleInput();
-            };
-            reader.readAsDataURL(file);
-        }
-        e.target.value = '';
-    };
-    
-    // NOTE: Styles are now handled globally in style.css to ensure consistency between Editor and Preview/Draft View.
-    return (<div className="relative group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 w-full max-w-full"><div className="border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-xl select-none"><div className="flex px-2 pt-1 gap-1 border-b border-gray-200/50 dark:border-slate-700/50 justify-between items-end overflow-x-auto custom-scrollbar">{showTabs && (<div className="flex gap-1 shrink-0">{['FORMAT', 'PARAGRAPH', 'INSERT', 'MATH'].map((t: string) => (<button key={t} onClick={() => setActiveTab(t as 'FORMAT' | 'PARAGRAPH' | 'INSERT' | 'MATH')} className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{t === 'MATH' ? 'RUMUS' : t === 'FORMAT' ? 'FORMAT' : t === 'PARAGRAPH' ? 'PARAGRAF' : 'SISIPKAN'}</button>))}</div>)}{isInsideTable && (<div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[9px] font-bold rounded-t uppercase tracking-widest border-t border-x border-indigo-100 dark:border-indigo-800 shrink-0">Table Active</div>)}</div><div className="p-1.5 flex flex-wrap gap-1 items-center bg-white dark:bg-slate-900 rounded-b-none min-h-[36px]">{activeTab === 'FORMAT' && (<><Btn runCmd={runCmd} cmd="bold" label="B" active={activeCmds.includes('bold')} /><Btn runCmd={runCmd} cmd="italic" label="I" active={activeCmds.includes('italic')} /><Btn runCmd={runCmd} cmd="underline" label="U" active={activeCmds.includes('underline')} /><Btn runCmd={runCmd} cmd="strikethrough" icon={StrikethroughIcon} active={activeCmds.includes('strikethrough')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="superscript" icon={SuperscriptIcon} active={activeCmds.includes('superscript')} /><Btn runCmd={runCmd} cmd="subscript" icon={SubscriptIcon} active={activeCmds.includes('subscript')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="removeFormat" icon={EraserIcon} label="Clear" /></>)}{activeTab === 'PARAGRAPH' && (<><Btn runCmd={runCmd} cmd="justifyLeft" icon={AlignLeftIcon} active={activeCmds.includes('justifyLeft')} /><Btn runCmd={runCmd} cmd="justifyCenter" icon={AlignCenterIcon} active={activeCmds.includes('justifyCenter')} /><Btn runCmd={runCmd} cmd="justifyRight" icon={AlignRightIcon} active={activeCmds.includes('justifyRight')} /><Btn runCmd={runCmd} cmd="justifyFull" icon={AlignJustifyIcon} active={activeCmds.includes('justifyFull')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="insertUnorderedList" icon={ListBulletIcon} active={activeCmds.includes('insertUnorderedList')} /><Btn runCmd={runCmd} cmd="insertOrderedList" label="1." active={activeCmds.includes('insertOrderedList')} /><div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0"></div><Btn runCmd={runCmd} cmd="indent" label="Indent" icon={() => <span className="text-[10px] font-mono">→]</span>} /><Btn runCmd={runCmd} cmd="outdent" label="Outdent" icon={() => <span className="text-[10px] font-mono">[←</span>} /></>)}{activeTab === 'INSERT' && (<><button onMouseDown={(e) => {e.preventDefault(); audioInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><SpeakerWaveIcon className="w-4 h-4"/> Audio</button><button onMouseDown={(e) => {e.preventDefault(); fileInputRef.current?.click();}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"><PhotoIcon className="w-4 h-4"/> Gambar</button><button onMouseDown={(e) => {e.preventDefault(); setShowTable(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"><TableCellsIcon className="w-4 h-4"/> Tabel</button>
-<button onMouseDown={(e) => {e.preventDefault(); setShowGeometry(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap">
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20 M2 12h20"/></svg> Bangun Geometri
-</button>
-{onChartClick && (<button onMouseDown={(e) => { e.preventDefault(); const placeholderHtml = `<span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`; if (editorRef.current && !editorRef.current.innerHTML.includes('data-chart="true"')) { restoreSelection(); document.execCommand('insertHTML', false, placeholderHtml); handleInput(); } onChartClick(); }} className="flex items-center gap-1.5 px-3 py-1 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 rounded text-xs font-bold hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors whitespace-nowrap"><ChartBarIcon className="w-4 h-4"/> Diagram</button>)}<button onMouseDown={(e) => {e.preventDefault(); setShowAksara(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"><span className="font-serif italic">ᬅ</span> Aksara Bali</button><button onMouseDown={(e) => {e.preventDefault(); setShowEmoji(true);}} className="flex items-center gap-1.5 px-3 py-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-xs font-bold hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"><span className="text-[14px]">😀</span> Simbol / Emoji</button><button onMouseDown={(e) => {e.preventDefault(); runCmd('insertHorizontalRule');}} className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">—— Pemisah</button></>)}{activeTab === 'MATH' && (<div className="flex items-center gap-2 w-full"><button onMouseDown={(e) => { e.preventDefault(); setShowMath(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"><FunctionIcon className="w-4 h-4" /> Buka Math Pro</button></div>)}{isInsideTable && (<div className="ml-auto pl-2 border-l border-gray-200 dark:border-slate-700 flex items-center animate-fade-in shrink-0"><button onMouseDown={(e) => { e.preventDefault(); deleteCurrentTable(); }} className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900 transition-colors whitespace-nowrap" title="Hapus Tabel ini"><TrashIcon className="w-3 h-3"/> Hapus</button></div>)}</div></div><div className="relative"><div ref={editorRef} className="wysiwyg-content p-3 sm:p-4 outline-none text-sm text-slate-900 dark:text-slate-200 leading-relaxed overflow-auto break-words" style={{ minHeight }} contentEditable={true} onInput={handleInput} onKeyUp={checkActiveFormats} onMouseUp={checkActiveFormats} onBlur={handleBlur} onClick={handleEditorClick} onPaste={handlePaste} data-placeholder={placeholder} spellCheck={false} suppressContentEditableWarning={true} />{chartNode && chartData && createPortal(<div className="w-full pointer-events-none"><ChartRenderer data={chartData} /></div>, chartNode)}</div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageFileChange} /><input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileChange} />
-<TableConfigModal isOpen={showTable} onClose={() => setShowTable(false)} onInsert={insertTable} />
-<GeometryModal isOpen={showGeometry} onClose={() => setShowGeometry(false)} onInsert={(svgHtml) => { runCmd('insertHTML', svgHtml); handleInput(); }} />
-<VisualMathModal key={showMath ? 'math-open' : 'math-closed'} isOpen={showMath} onClose={() => setShowMath(false)} onInsert={insertMath} /><AksaraBaliModal isOpen={showAksara} onClose={() => setShowAksara(false)} onInsert={(text) => { runCmd('insertHTML', `<span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">${text}</span>&nbsp;`); handleInput(); }} /><EmojiPickerModal isOpen={showEmoji} onClose={() => setShowEmoji(false)} onInsert={(emoji) => { runCmd('insertHTML', emoji); handleInput(); }} /></div>);
-};
-
-const createNewQuestion = (type: QuestionType): Question => {
-    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1 };
-    switch (type) {
-        case 'INFO': return { ...base }; case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; case 'COMPLEX_MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: '' }; case 'TRUE_FALSE': return { ...base, trueFalseRows: [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }], options: undefined, correctAnswer: undefined }; case 'MATCHING': return { ...base, matchingPairs: [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }] }; case 'FILL_IN_THE_BLANK': return { ...base, correctAnswer: '' }; case 'ESSAY': default: return { ...base };
-    }
-};
-
-interface ChartTarget {
-    qId: string;
-    type: 'question' | 'option' | 'tf' | 'matching' | 'correctAnswer';
-    index?: number;
-    subIndex?: 'left' | 'right';
-}
-
-export const ExamEditor: React.FC<ExamEditorProps> = ({ 
-    questions, setQuestions, config, setConfig, isEditing, onSave, onSaveDraft, onCancel, generatedCode, onReset, isPremium 
-}) => {
-    const [classTagInput, setClassTagInput] = useState('');
-
-    const handleAddClassTag = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && classTagInput.trim()) {
-            e.preventDefault();
-            let newTag = classTagInput.trim();
-            
-            // Check if input matches "Class Count" pattern (e.g. "6a 40")
-            const spaceMatch = newTag.match(/^(.+)\s+(\d+)$/);
-            if (spaceMatch) {
-                newTag = `${spaceMatch[1]}(${spaceMatch[2]})`;
-            }
-
-            if (!config.targetClasses?.includes(newTag)) {
-                setConfig(prev => ({
-                    ...prev,
-                    targetClasses: [...(prev.targetClasses || []), newTag]
-                }));
-            }
-            setClassTagInput('');
-        }
-    };
-
-    const removeClassTag = (tag: string) => {
-        setConfig(prev => ({
-            ...prev,
-            targetClasses: prev.targetClasses?.filter(t => t !== tag) || []
-        }));
-    };
-
-    // Check if Essay or Short Answer Exists (Requires Manual Grading)
-    const hasManualGrading = useMemo(() => questions.some(q => q.questionType === 'ESSAY' || q.questionType === 'FILL_IN_THE_BLANK'), [questions]);
-
-    // Force disable automatic result showing if Manual Grading questions exist
-    useEffect(() => {
-        if (hasManualGrading && config.showResultToStudent) {
-            setConfig(prev => ({ ...prev, showResultToStudent: false }));
-        }
-    }, [hasManualGrading, config.showResultToStudent, setConfig]);
-
-    const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
-    const [editingChartTarget, setEditingChartTarget] = useState<ChartTarget | null>(null);
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false); 
-    const [isClassModalOpen, setIsClassModalOpen] = useState(false); 
-    const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false); 
-    const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false); 
-    const [insertIndex, setInsertIndex] = useState<number | null>(null);
-    const [isGeneratingId, setIsGeneratingId] = useState<string | null>(null);
-
-    const handleGenerateSingleQuestion = async (q: Question) => {
-        setIsGeneratingId(q.id);
-        try {
-            const aiConfig = {
-                subject: q.category || config.subject || 'Umum',
-                count: 1,
-                type: q.questionType === 'MULTIPLE_CHOICE' ? 'Pilihan Ganda' :
-                      q.questionType === 'COMPLEX_MULTIPLE_CHOICE' ? 'Pilihan Ganda Kompleks' :
-                      q.questionType === 'TRUE_FALSE' ? 'Benar/Salah' :
-                      q.questionType === 'MATCHING' ? 'Menjodohkan' :
-                      q.questionType === 'FILL_IN_THE_BLANK' ? 'Isian Singkat' : 'Esai',
-                difficulty: q.level || 'Sedang',
-                blueprint: q.kisiKisi || '',
-                includeImages: false
-            };
-            
-            const generatedQuestions = await generateQuestions(aiConfig);
-            if (generatedQuestions && generatedQuestions.length > 0) {
-                const newQ = generatedQuestions[0];
-                setQuestions(prev => prev.map(question => 
-                    question.id === q.id ? { ...question, ...newQ, id: question.id, category: q.category, level: q.level, kisiKisi: q.kisiKisi, scoreWeight: newQ.scoreWeight || q.scoreWeight } : question
-                ));
-            }
-        } catch (error: unknown) {
-            alert(`Gagal membuat soal dengan AI: ${(error as Error).message}`);
-        } finally {
-            setIsGeneratingId(null);
-        }
-    };
-
-    const questionsSectionRef = useRef<HTMLDivElement>(null);
-    const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
-    
-    useEffect(() => { if (!isEditing && !generatedCode) { const timer = setTimeout(() => { if (questionsSectionRef.current) questionsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); return () => clearTimeout(timer); } }, [isEditing, generatedCode]);
-    useEffect(() => { if (generatedCode && generatedCodeSectionRef.current) { setTimeout(() => { generatedCodeSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200); } }, [generatedCode]);
-
-    const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target;
-        if (type === 'checkbox') {
-            const { checked } = e.target as HTMLInputElement;
-            setConfig(prev => {
-                const newConfig = { ...prev, [name]: checked };
-                if (name === 'detectBehavior' && !checked) newConfig.continueWithPermission = false;
-                return newConfig;
-            });
-        } else {
-            setConfig(prev => {
-                const newConfig = { ...prev, [name]: name === 'timeLimit' ? (parseInt(value) || 0) : value };
-                if (name === 'examMode' && value === 'PR') {
-                    newConfig.detectBehavior = false;
-                    newConfig.continueWithPermission = false;
-                    newConfig.trackLocation = false;
-                }
-                return newConfig;
-            });
-        }
-    };
-
-    const handleSubjectSelect = (subject: string) => setConfig(prev => ({ ...prev, subject }));
-    const handleSaveChart = (data: ChartData) => {
-        if (editingChartTarget) {
-            const { qId, type, index, subIndex } = editingChartTarget;
-            setQuestions(prev => prev.map(q => {
-                if (q.id === qId) {
-                    const updated = { ...q };
-                    if (type === 'question') {
-                        updated.chartData = data;
-                    } else if (type === 'option' && index !== undefined) {
-                        const optionCharts = [...(q.optionCharts || [])];
-                        while (optionCharts.length <= index) optionCharts.push(null);
-                        optionCharts[index] = data;
-                        updated.optionCharts = optionCharts;
-                    } else if (type === 'tf' && index !== undefined) {
-                        const trueFalseRows = [...(q.trueFalseRows || [])];
-                        trueFalseRows[index] = { ...trueFalseRows[index], chartData: data };
-                        updated.trueFalseRows = trueFalseRows;
-                    } else if (type === 'matching' && index !== undefined && subIndex) {
-                        const matchingPairs = [...(q.matchingPairs || [])];
-                        if (subIndex === 'left') {
-                            matchingPairs[index] = { ...matchingPairs[index], leftChart: data };
-                        } else {
-                            matchingPairs[index] = { ...matchingPairs[index], rightChart: data };
-                        }
-                        updated.matchingPairs = matchingPairs;
-                    } else if (type === 'correctAnswer') {
-                        updated.correctAnswerChart = data;
-                    }
-                    return updated;
-                }
-                return q;
-            }));
-        }
-    };
-    const handleQuestionTextChange = (id: string, text: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: text } : q));
-    const handleCategoryChange = (id: string, category: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, category } : q));
-    const handleLevelChange = (id: string, level: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, level } : q));
-    const handleKisiKisiChange = (id: string, kisiKisi: string) => setQuestions(prev => prev.map(q => q.id === id ? { ...q, kisiKisi } : q));
-    
-    const handleTypeChange = (qId: string, newType: QuestionType) => {
-        setQuestions(prev => prev.map(q => {
-            if (q.id === qId) {
-                const updated = { ...q, questionType: newType };
-                if (['MULTIPLE_CHOICE', 'COMPLEX_MULTIPLE_CHOICE'].includes(newType) && (!updated.options || updated.options.length === 0)) { updated.options = ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D']; updated.correctAnswer = newType === 'MULTIPLE_CHOICE' ? 'Opsi A' : ''; }
-                if (newType === 'TRUE_FALSE' && (!updated.trueFalseRows || updated.trueFalseRows.length === 0)) { updated.trueFalseRows = [{ text: 'Pernyataan 1', answer: true }, { text: 'Pernyataan 2', answer: false }]; }
-                if (newType === 'MATCHING' && (!updated.matchingPairs || updated.matchingPairs.length === 0)) { updated.matchingPairs = [{ left: 'Item A', right: 'Pasangan A' }, { left: 'Item B', right: 'Pasangan B' }]; }
-                return updated;
-            }
-            return q;
-        }));
-    };
-    const handleOptionTextChange = (qId: string, optIndex: number, text: string) => {
-        setQuestions(prev => prev.map(q => {
-            if (q.id === qId && q.options) {
-                const oldOption = q.options[optIndex]; 
-                const newOptions = [...q.options]; 
-                newOptions[optIndex] = text; 
-                let newCorrectAnswer = q.correctAnswer;
-                
-                if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    if (isAnswerMatch(q.correctAnswer, oldOption, q.questionType)) newCorrectAnswer = text; 
-                } 
-                else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
-                    let answers = parseList(q.correctAnswer);
-                    if (answers.some(a => isAnswerMatch(a, oldOption, q.questionType))) { 
-                        answers = answers.map(a => isAnswerMatch(a, oldOption, q.questionType) ? text : a); 
-                        newCorrectAnswer = JSON.stringify(answers); 
-                    } 
-                }
-                return { ...q, options: newOptions, correctAnswer: newCorrectAnswer };
-            }
-            return q;
-        }));
-    };
-    const handleCorrectAnswerChange = (questionId: string, answer: string) => setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, correctAnswer: answer } : q));
-    
-    const handleComplexCorrectAnswerChange = (questionId: string, option: string, isChecked: boolean) => {
-        setQuestions(prev => prev.map(q => {
-            if (q.id === questionId) { 
-                const currentAnswers = parseList(q.correctAnswer);
-                // Clean up currentAnswers to only include valid options from q.options
-                const currentlyCheckedOptions = (q.options || []).filter(o => 
-                    currentAnswers.some(a => isAnswerMatch(a, o, q.questionType))
-                );
-                
-                let newKeys;
-                if (isChecked) { 
-                    newKeys = currentlyCheckedOptions.includes(option) ? currentlyCheckedOptions : [...currentlyCheckedOptions, option];
-                } else { 
-                    newKeys = currentlyCheckedOptions.filter(o => o !== option);
-                } 
-                newKeys.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
-                return { ...q, correctAnswer: JSON.stringify(newKeys) }; 
-            }
-            return q;
-        }));
-    };
-
-    const handleDeleteQuestion = (id: string) => { if (window.confirm("Apakah Anda yakin ingin menghapus soal ini?")) { setQuestions(prev => prev.filter(q => q.id !== id)); } };
-    const openTypeSelectionModal = (index: number | null = null) => { setInsertIndex(index); setIsTypeSelectionModalOpen(true); };
-    const handleSelectQuestionType = (type: QuestionType) => {
-        const newQuestion = createNewQuestion(type);
-        if (insertIndex === null) { setQuestions(prev => [...prev, newQuestion]); setTimeout(() => { document.getElementById(newQuestion.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); } 
-        else { const newQuestions = [...questions]; newQuestions.splice(insertIndex + 1, 0, newQuestion); setQuestions(newQuestions); }
-        setIsTypeSelectionModalOpen(false); setInsertIndex(null);
-    };
-    const handleAddOption = (questionId: string) => { setQuestions(prev => prev.map(q => { if (q.id === questionId && q.options) { const nextChar = String.fromCharCode(65 + q.options.length); const newOptions = [...q.options, `Opsi ${nextChar}`]; const newOptionImages = q.optionImages ? [...q.optionImages, null] : undefined; const newOptionCharts = q.optionCharts ? [...q.optionCharts, null] : undefined; return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts }; } return q; })); };
-    
-    const handleDeleteOption = (questionId: string, indexToRemove: number) => { 
-        setQuestions(prev => prev.map(q => { 
-            if (q.id === questionId && q.options && q.options.length > 1) { 
-                const optionToRemove = q.options[indexToRemove]; 
-                const newOptions = q.options.filter((_, i) => i !== indexToRemove); 
-                const newOptionImages = q.optionImages ? q.optionImages.filter((_, i) => i !== indexToRemove) : undefined; 
-                const newOptionCharts = q.optionCharts ? q.optionCharts.filter((_, i) => i !== indexToRemove) : undefined; 
-                let newCorrectAnswer = q.correctAnswer; 
-                
-                if (q.questionType === 'MULTIPLE_CHOICE') { 
-                    if (isAnswerMatch(q.correctAnswer, optionToRemove, q.questionType)) newCorrectAnswer = newOptions[0] || ''; 
-                } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
-                    let answers = parseList(q.correctAnswer);
-                    answers = answers.filter(a => !isAnswerMatch(a, optionToRemove, q.questionType)); 
-                    newCorrectAnswer = JSON.stringify(answers); 
-                } 
-                return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts, correctAnswer: newCorrectAnswer }; 
-            } 
-            return q; 
-        })); 
-    };
-    
-    const handleTrueFalseRowTextChange = (qId: string, idx: number, val: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], text: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
-    const handleTrueFalseRowAnswerChange = (qId: string, idx: number, val: boolean) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const newRows = [...q.trueFalseRows]; newRows[idx] = { ...newRows[idx], answer: val }; return { ...q, trueFalseRows: newRows }; } return q; })); };
-    const handleAddTrueFalseRow = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows) { const nextNum = q.trueFalseRows.length + 1; return { ...q, trueFalseRows: [...q.trueFalseRows, { text: `Pernyataan ${nextNum}`, answer: true }] }; } return q; })); };
-    const handleDeleteTrueFalseRow = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.trueFalseRows && q.trueFalseRows.length > 1) { const newRows = q.trueFalseRows.filter((_, i) => i !== idx); return { ...q, trueFalseRows: newRows }; } return q; })); };
-
-    const handleMatchingPairChange = (qId: string, idx: number, field: 'left' | 'right', value: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) { const newPairs = [...q.matchingPairs]; newPairs[idx] = { ...newPairs[idx], [field]: value }; return { ...q, matchingPairs: newPairs }; } return q; })); };
-    const handleAddMatchingPair = (qId: string) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs) return { ...q, matchingPairs: [...q.matchingPairs, { left: '', right: '' }] }; return q; })); };
-    const handleDeleteMatchingPair = (qId: string, idx: number) => { setQuestions(prev => prev.map(q => { if (q.id === qId && q.matchingPairs && q.matchingPairs.length > 1) { const newPairs = q.matchingPairs.filter((_, i) => i !== idx); return { ...q, matchingPairs: newPairs }; } return q; })); };
-
-    const renderTypeSelectionModal = () => { if (!isTypeSelectionModalOpen) return null; const types: {type: QuestionType, label: string, desc: string, icon: React.FC<{ className?: string }>}[] = [{ type: 'INFO', label: 'Keterangan / Info', desc: 'Hanya teks atau gambar, tanpa pertanyaan.', icon: FileTextIcon }, { type: 'MULTIPLE_CHOICE', label: 'Pilihan Ganda', desc: 'Satu jawaban benar dari beberapa opsi.', icon: ListBulletIcon }, { type: 'COMPLEX_MULTIPLE_CHOICE', label: 'Pilihan Ganda Kompleks', desc: 'Lebih dari satu jawaban benar.', icon: CheckCircleIcon }, { type: 'FILL_IN_THE_BLANK', label: 'Isian Singkat', desc: 'Jawaban teks pendek otomatis dinilai.', icon: PencilIcon }, { type: 'ESSAY', label: 'Uraian / Esai', desc: 'Jawaban panjang dinilai manual.', icon: FileWordIcon }, { type: 'TRUE_FALSE', label: 'Benar / Salah', desc: 'Memilih pernyataan benar atau salah.', icon: CheckIcon }, { type: 'MATCHING', label: 'Menjodohkan', desc: 'Menghubungkan pasangan item kiri dan kanan.', icon: ArrowLeftIcon },]; return (<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60] animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-white dark:border-slate-700"><div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900"><h3 className="font-bold text-lg text-gray-800 dark:text-white">Pilih Tipe Soal</h3><button onClick={() => setIsTypeSelectionModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700"><XMarkIcon className="w-5 h-5 text-gray-500 dark:text-slate-400"/></button></div><div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">{types.map((t) => (<button key={t.type} onClick={() => handleSelectQuestionType(t.type)} className="flex items-start gap-4 p-4 border dark:border-slate-700 rounded-lg hover:border-primary dark:hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-md transition-all text-left group bg-white dark:bg-slate-800"><div className="bg-gray-100 dark:bg-slate-700 p-2.5 rounded-full group-hover:bg-primary group-hover:text-white transition-colors text-gray-500 dark:text-slate-300"><t.icon className="w-6 h-6" /></div><div><p className="font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary dark:group-hover:text-primary">{t.label}</p><p className="text-xs text-gray-500 dark:text-slate-400 mt-1">{t.desc}</p></div></button>))}</div></div></div>); };
-
-    return (
-        <div className="space-y-10 border-t-2 border-gray-200 dark:border-slate-700 pt-12">
-            <div ref={questionsSectionRef} id="exam-editor-section" className="space-y-4 scroll-mt-32">
-                 <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm">
-                    <h2 className="text-xl font-bold text-neutral dark:text-white">{isEditing ? '1. Editor Soal' : '3. Editor Soal'}</h2>
-                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gunakan editor teks kaya di bawah untuk membuat konten soal berkualitas.</p>
-                </div>
-                <div className="space-y-6">
-                    {questions.length > 0 && (
-                        <div className="relative py-2 group/insert">
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 transition-colors"></div></div>
-                            <div className="relative flex justify-center"><button onClick={() => openTypeSelectionModal(-1)} className="bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Sisipkan Soal Di Awal</button></div>
-                        </div>
-                    )}
-                    {questions.map((q, index) => {
-                        const questionNumber = questions.slice(0, index).filter(i => i.questionType !== 'INFO').length + 1;
-                        return (
-                            <React.Fragment key={q.id}>
-                                <div id={q.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-visible">
-                                     <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity z-20">
-                                         {q.questionType !== 'INFO' && (
-                                             <>
-                                                 <button 
-                                                     type="button" 
-                                                     onClick={(e) => { e.stopPropagation(); handleGenerateSingleQuestion(q); }} 
-                                                     disabled={isGeneratingId === q.id}
-                                                     className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800`} 
-                                                     title={"Buat dengan AI"}
-                                                 >
-                                                     {isGeneratingId === q.id ? (
-                                                         <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                                                     ) : (
-                                                         <SparklesIcon className="w-4 h-4" />
-                                                     )}
-                                                     <span className="text-[10px] font-bold uppercase tracking-wider">AI</span>
-                                                 </button>
-                                             </>
-                                         )}
-                                         <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-                                            <select value={q.questionType} onChange={(e) => handleTypeChange(q.id, e.target.value as QuestionType)} className="appearance-none bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white dark:hover:bg-slate-600 hover:border-gray-300 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
-                                                <option value="MULTIPLE_CHOICE">Pilihan Ganda</option><option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option><option value="TRUE_FALSE">Benar / Salah</option><option value="MATCHING">Menjodohkan</option><option value="ESSAY">Esai / Uraian</option><option value="FILL_IN_THE_BLANK">Isian Singkat</option><option value="INFO">Info / Teks</option>
-                                            </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 dark:text-slate-400"><svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
-                                        </div>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteQuestion(q.id); }} className="p-1.5 bg-white dark:bg-slate-700 text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 border border-gray-200 dark:border-slate-600 transition-colors shadow-sm" title="Hapus Soal"><TrashIcon className="w-4 h-4" /></button>
-                                    </div>
-                                    <div className="p-6 md:p-8">
-                                        <div className="flex items-start gap-4 md:gap-6">
-                                            <div className="flex-shrink-0 mt-1 hidden md:block select-none">{q.questionType === 'INFO' ? <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">i</div> : <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">{String.fromCharCode(48 + Math.floor(questionNumber / 10)) + String.fromCharCode(48 + (questionNumber % 10))}</span>}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="md:hidden mb-2">{q.questionType !== 'INFO' && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{questionNumber}. Soal</span>}</div>
-                                                
-                                                {q.questionType !== 'INFO' && (
-                                                    <>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                                            <div>
-                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kategori Soal</label>
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={q.category || ''} 
-                                                                    onChange={(e) => handleCategoryChange(q.id, e.target.value)}
-                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                                    placeholder="Contoh: Aljabar, Teks Prosedur"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Level Soal</label>
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={q.level || ''} 
-                                                                    onChange={(e) => handleLevelChange(q.id, e.target.value)}
-                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                                    placeholder="Contoh: 1, 2, HOTS, LOTS"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Bobot Nilai</label>
-                                                                <input 
-                                                                    type="number" 
-                                                                    min="1"
-                                                                    value={q.scoreWeight || 1} 
-                                                                    onChange={(e) => {
-                                                                        const val = parseInt(e.target.value) || 1;
-                                                                        setQuestions(prev => prev.map(item => item.id === q.id ? { ...item, scoreWeight: val } : item));
-                                                                    }}
-                                                                    className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                                                    placeholder="Default: 1"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-4">
-                                                            <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Kisi-Kisi Materi</label>
-                                                            <textarea 
-                                                                value={q.kisiKisi || ''} 
-                                                                onChange={(e) => handleKisiKisiChange(q.id, e.target.value)}
-                                                                className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[60px] resize-y"
-                                                                placeholder="Contoh: Peserta didik dapat menentukan hasil operasi hitung campuran bilangan cacah"
-                                                            />
-                                                        </div>
-                                                    </>
-                                                )}
-
-                                                <WysiwygEditor 
-                                                    value={q.questionText} 
-                                                    onChange={(val) => handleQuestionTextChange(q.id, val)} 
-                                                    placeholder={q.questionType === 'INFO' ? "Tulis informasi atau teks bacaan di sini..." : "Tulis pertanyaan di sini..."} 
-                                                    minHeight="80px"
-                                                    onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'question' })}
-                                                    chartData={q.chartData}
-                                                />
-                                                
-                                                {q.questionType === 'MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="mt-6 space-y-3">
-                                                        {q.options.map((option, i) => {
-                                                            const isSelected = isAnswerMatch(q.correctAnswer, option, q.questionType);
-                                                            return (
-                                                                <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/20' : ''}`}>
-                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleCorrectAnswerChange(q.id, option)}>
-                                                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-emerald-300 dark:group-hover/opt:border-emerald-500'}`}>
-                                                                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <WysiwygEditor 
-                                                                            value={option} 
-                                                                            onChange={(val) => handleOptionTextChange(q.id, i, val)} 
-                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
-                                                                            minHeight="40px" 
-                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
-                                                                            chartData={q.optionCharts?.[i] || undefined}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2"><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button></div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                        <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
-                                                    </div>
-                                                )}
-
-                                                {q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.options && (
-                                                    <div className="mt-6 space-y-3">
-                                                        {q.options.map((option, i) => {
-                                                            const currentAnswers = parseList(q.correctAnswer);
-                                                            const isSelected = currentAnswers.some(ans => isAnswerMatch(ans, option, q.questionType));
-                                                            return (
-                                                                <div key={i} className={`group/opt relative flex items-start p-1 rounded-xl transition-all ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
-                                                                    <div className="flex items-center h-full pt-4 pl-2 pr-4 cursor-pointer" onClick={() => handleComplexCorrectAnswerChange(q.id, option, !isSelected)}>
-                                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'border-indigo-500 bg-indigo-500 dark:border-indigo-400 dark:bg-indigo-400' : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover/opt:border-indigo-300 dark:group-hover/opt:border-indigo-500'}`}>
-                                                                            {isSelected && <CheckIcon className="w-3.5 h-3.5 text-white" />}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <WysiwygEditor 
-                                                                            value={option} 
-                                                                            onChange={(val) => handleOptionTextChange(q.id, i, val)} 
-                                                                            placeholder={`Opsi ${String.fromCharCode(65 + i)}`} 
-                                                                            minHeight="40px" 
-                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'option', index: i })}
-                                                                            chartData={q.optionCharts?.[i] || undefined}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity px-2 pt-2">
-                                                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOption(q.id, i); }} className="text-gray-300 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                        <button onClick={() => handleAddOption(q.id)} className="ml-12 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Opsi</button>
-                                                    </div>
-                                                )}
-
-                                                {q.questionType === 'TRUE_FALSE' && q.trueFalseRows && (
-                                                    <div className="mt-6 space-y-4">
-                                                        <div className="grid grid-cols-12 gap-4 mb-2 px-2">
-                                                            <div className="col-span-12 sm:col-span-8 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pernyataan (Dukung Rumus & Gambar)</div>
-                                                            <div className="hidden sm:block sm:col-span-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Jawaban Benar</div>
-                                                        </div>
-                                                        {q.trueFalseRows.map((row, i) => (
-                                                            <div key={i} className="group/row relative flex flex-col sm:grid sm:grid-cols-12 gap-4 items-start p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all">
-                                                                <div className="w-full sm:col-span-8 min-w-0">
-                                                                    <WysiwygEditor 
-                                                                        value={row.text} 
-                                                                        onChange={(val) => handleTrueFalseRowTextChange(q.id, i, val)} 
-                                                                        minHeight="80px" 
-                                                                        placeholder={`Pernyataan ${i+1}`}
-                                                                        onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'tf', index: i })}
-                                                                        chartData={row.chartData}
-                                                                    />
-                                                                </div>
-                                                                <div className="w-full sm:col-span-4 flex items-center justify-center gap-2 h-full pt-2">
-                                                                    <button 
-                                                                        onClick={() => handleTrueFalseRowAnswerChange(q.id, i, true)}
-                                                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${row.answer ? 'bg-emerald-500 text-white shadow-emerald-100 dark:shadow-emerald-900/50' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                    >
-                                                                        Benar
-                                                                    </button>
-                                                                    <button 
-                                                                        onClick={() => handleTrueFalseRowAnswerChange(q.id, i, false)}
-                                                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${!row.answer ? 'bg-rose-500 text-white shadow-rose-100 dark:shadow-rose-900/50' : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                    >
-                                                                        Salah
-                                                                    </button>
-                                                                    <button onClick={() => handleDeleteTrueFalseRow(q.id, i)} className="ml-2 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all"><TrashIcon className="w-4 h-4"/></button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                        <button onClick={() => handleAddTrueFalseRow(q.id)} className="ml-2 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Pernyataan</button>
-                                                    </div>
-                                                )}
-
-                                                {q.questionType === 'MATCHING' && q.matchingPairs && (
-                                                    <div className="mt-6 space-y-4">
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2 px-2">
-                                                            <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kolom Kiri (Premis)</div>
-                                                            <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kolom Kanan (Jawaban)</div>
-                                                        </div>
-                                                        {q.matchingPairs.map((pair, i) => (
-                                                            <div key={i} className="group/pair relative flex flex-col md:flex-row items-center gap-4 p-4 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all">
-                                                                <div className="flex-1 min-w-0 w-full">
-                                                                    <WysiwygEditor 
-                                                                        value={pair.left} 
-                                                                        onChange={(val) => handleMatchingPairChange(q.id, i, 'left', val)} 
-                                                                        minHeight="120px" 
-                                                                        placeholder="Item Kiri"
-                                                                        onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'matching', index: i, subIndex: 'left' })}
-                                                                        chartData={pair.leftChart}
-                                                                    />
-                                                                </div>
-                                                                <div className="text-slate-300 dark:text-slate-600 hidden md:block select-none">→</div>
-                                                                <div className="flex-1 min-w-0 w-full flex items-center gap-3">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <WysiwygEditor 
-                                                                            value={pair.right} 
-                                                                            onChange={(val) => handleMatchingPairChange(q.id, i, 'right', val)} 
-                                                                            minHeight="120px" 
-                                                                            placeholder="Pasangan Kanan"
-                                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'matching', index: i, subIndex: 'right' })}
-                                                                            chartData={pair.rightChart}
-                                                                        />
-                                                                    </div>
-                                                                    <button onClick={() => handleDeleteMatchingPair(q.id, i)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all shrink-0"><TrashIcon className="w-4 h-4"/></button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                        <button onClick={() => handleAddMatchingPair(q.id)} className="ml-2 mt-2 text-xs font-bold text-primary dark:text-indigo-400 hover:text-primary-focus flex items-center gap-1 opacity-60 hover:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Tambah Pasangan</button>
-                                                    </div>
-                                                )}
-
-                                                 {(q.questionType === 'FILL_IN_THE_BLANK' || q.questionType === 'ESSAY') && (
-                                                    <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-700">
-                                                        <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3 block">{q.questionType === 'ESSAY' ? 'Rubrik / Poin Jawaban' : 'Kunci Jawaban Singkat'}</label>
-                                                        <WysiwygEditor 
-                                                            value={q.correctAnswer || ''} 
-                                                            onChange={(val) => handleCorrectAnswerChange(q.id, val)} 
-                                                            placeholder="Tulis kunci jawaban..." 
-                                                            minHeight="60px" 
-                                                            onChartClick={() => setEditingChartTarget({ qId: q.id, type: 'correctAnswer' })}
-                                                            chartData={q.correctAnswerChart}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="relative py-2 group/insert">
-                                    <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 transition-colors"></div></div>
-                                    <div className="relative flex justify-center"><button onClick={() => openTypeSelectionModal(index)} className="bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 group-hover/insert:text-primary dark:group-hover/insert:text-primary group-hover/insert:bg-primary/5 dark:group-hover/insert:bg-primary/20 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"><PlusCircleIcon className="w-4 h-4" /> Sisipkan Soal</button></div>
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
-                </div>
-                 <div className="mt-12 mb-20 text-center"><button onClick={() => openTypeSelectionModal(null)} className="flex items-center gap-2 text-sm text-primary dark:text-indigo-400 font-bold hover:text-primary-focus mx-auto transition-all bg-white dark:bg-slate-800 border border-primary/20 dark:border-indigo-500/30 px-8 py-4 rounded-2xl hover:bg-primary dark:hover:bg-indigo-600 hover:text-white shadow-sm hover:shadow-lg active:scale-95 group"><PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" /> Tambah Soal Baru</button></div>
-             </div>
-             
-             <div className="pt-10">
-                 <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm mb-6">
-                    <h2 className="text-xl font-bold text-neutral dark:text-white">{isEditing ? '2. Konfigurasi' : '4. Konfigurasi'}</h2>
-                     <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pengaturan waktu dan keamanan ujian.</p>
-                </div>
-                
-                <div className="bg-white dark:bg-slate-800 p-8 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-                        <div className="md:col-span-2 pb-2 border-b border-gray-100 dark:border-slate-700 mb-2"><h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Informasi Umum</h4></div>
-                        
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Mata Pelajaran</label><div onClick={() => setIsSubjectModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.subject ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.subject || 'Pilih Mata Pelajaran...'}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Kelas</label><div onClick={() => setIsClassModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.classLevel && config.classLevel !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.classLevel === 'Lainnya' || !config.classLevel ? 'Pilih Kelas...' : config.classLevel}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
-
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jenis Evaluasi</label><div onClick={() => setIsExamTypeModalOpen(true)} className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"><span className={config.examType && config.examType !== 'Lainnya' ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}>{config.examType === 'Lainnya' || !config.examType ? 'Pilih Jenis...' : config.examType}</span><ArrowPathIcon className="w-4 h-4 text-gray-400 rotate-90" /></div></div>
-
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">KKM (Opsional)</label><input type="number" name="kkm" value={config.kkm || ''} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" placeholder="Contoh: 75" /></div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Target Kelas (Opsional)</label>
-                            <div className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl min-h-[56px] flex flex-wrap gap-2 items-center">
-                                {config.targetClasses?.map(tag => (
-                                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold rounded-lg border border-indigo-200 dark:border-indigo-800">
-                                        {tag}
-                                        <button onClick={() => removeClassTag(tag)} className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full transition-colors"><XMarkIcon className="w-3 h-3"/></button>
-                                    </span>
-                                ))}
-                                <input 
-                                    type="text" 
-                                    value={classTagInput}
-                                    onChange={(e) => setClassTagInput(e.target.value)}
-                                    onKeyDown={handleAddClassTag}
-                                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-400 min-w-[150px]"
-                                    placeholder="Ketik kelas (contoh: 6A) atau kelas & jumlah (contoh: 6A 40)..."
-                                />
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Biarkan kosong agar siswa bebas mengisi kelas. Ketik "6A" untuk membatasi kelas, atau "6A 40" untuk membatasi kelas dan jumlah siswa (otomatis menjadi "6A(40)").</p>
-                        </div>
-
-                         <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Instruksi Pengerjaan</label><textarea name="description" value={config.description || ''} onChange={handleConfigChange} className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm min-h-[100px] shadow-inner text-slate-800 dark:text-slate-200" placeholder="Contoh: Baca doa sebelum mengerjakan, dilarang menoleh ke belakang..." /></div>
-                    </div>
-
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 pt-8 border-t border-gray-100 dark:border-slate-700">
-                         <div className="md:col-span-2 pb-2 border-b border-gray-100 dark:border-slate-700 mb-2"><h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Waktu & Keamanan</h4></div>
-
-                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div 
-                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'UJIAN' }))}
-                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === 'UJIAN' || !config.examMode ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/30'}`}
-                            >
-                                <div className="flex items-center gap-2 mb-1">
-                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.examMode === 'UJIAN' || !config.examMode ? 'border-primary' : 'border-slate-400'}`}>
-                                        {(config.examMode === 'UJIAN' || !config.examMode) && <div className="w-2 h-2 bg-primary rounded-full" />}
-                                    </div>
-                                    <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Ujian</span>
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-                                    Dikerjakan pada rentang tanggal dan waktu yang ketat.
-                                </p>
-                            </div>
-
-                            <div 
-                                onClick={() => setConfig(prev => ({ ...prev, examMode: 'PR', detectBehavior: false, continueWithPermission: false, trackLocation: false }))}
-                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === 'PR' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-200'}`}
-                            >
-                                <div className="flex items-center gap-2 mb-1">
-                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.examMode === 'PR' ? 'border-amber-500' : 'border-slate-400'}`}>
-                                        {config.examMode === 'PR' && <div className="w-2 h-2 bg-amber-500 rounded-full" />}
-                                    </div>
-                                    <span className="font-bold text-sm text-slate-800 dark:text-white">Mode PR / Latihan</span>
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-                                    Dapat dikerjakan kapan saja sebelum tenggat waktu.
-                                </p>
-                            </div>
-                        </div>
-
-                        {(config.examMode === 'UJIAN' || !config.examMode) && (
-                            <>
-                                <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tanggal Mulai</label><input type="date" name="startDate" value={config.startDate || config.date || new Date().toLocaleDateString('en-CA')} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                                <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jam Mulai</label><input type="time" name="startTime" value={config.startTime} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                                <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Jam Selesai</label><input type="time" name="endTime" value={config.endTime || '10:00'} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                            </>
-                        )}
-                        <div><label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Tenggat Waktu / Tanggal Selesai</label><input type="date" name="endDate" value={config.endDate || config.date || new Date().toLocaleDateString('en-CA')} onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" /></div>
-                        {(config.examMode === 'UJIAN' || !config.examMode) && (
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Durasi Pengerjaan (Menit)</label>
-                                <input type="number" name="timeLimit" value={config.timeLimit || ''} placeholder="0" onChange={handleConfigChange} className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" />
-                                <p className="text-xs text-slate-500 mt-1">Isi 0 untuk tanpa batas waktu.</p>
-                            </div>
-                        )}
-                        
-                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleQuestions" checked={config.shuffleQuestions} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Soal</span></label>
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="shuffleAnswers" checked={config.shuffleAnswers} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Acak Opsi</span></label>
-                           <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="allowRetakes" checked={config.allowRetakes} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Izinkan Kerjakan Ulang</span></label>
-                           {config.examMode !== 'PR' && (
-                               <>
-                                   <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="detectBehavior" checked={config.detectBehavior} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Deteksi Kecurangan</span></label>
-                                   {config.detectBehavior && (
-                                    <label className="flex items-center ml-6 p-2 rounded-lg transition-colors cursor-pointer group bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">
-                                        <input 
-                                            type="checkbox" 
-                                            name="continueWithPermission" 
-                                            checked={config.continueWithPermission} 
-                                            onChange={handleConfigChange} 
-                                            className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500" 
-                                        />
-                                        <span className="ml-2 text-xs font-bold uppercase tracking-tight">Kunci Akses Jika Melanggar</span>
-                                    </label>
-                                   )}
-                               </>
-                           )}
-                        </div>
-
-                        <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
-                             <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Bank Soal</h4>
-                             <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                                <label className="flex items-center cursor-pointer group mb-2">
-                                    <input type="checkbox" name="useBankSoal" checked={config.useBankSoal || false} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" />
-                                    <span className="ml-3 text-sm font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary transition-colors">Gunakan Sistem Bank Soal</span>
-                                </label>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 pl-8 leading-relaxed">
-                                    Fitur ini akan mengacak dan memilih soal secara otomatis dari total soal yang Anda buat, berdasarkan proporsi tingkat kesulitan.
-                                    <div className="mt-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                                        <strong className="text-slate-700 dark:text-slate-300 block mb-1">Panduan Level Soal:</strong>
-                                        Sistem akan mengenali level soal yang Anda ketik di editor sebagai berikut:
-                                        <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                                            <li><span className="font-semibold text-emerald-600 dark:text-emerald-400">Mudah:</span> "mudah", "lots", "1", "easy", "rendah"</li>
-                                            <li><span className="font-semibold text-amber-600 dark:text-amber-400">Sedang:</span> "sedang", "mots", "2", "medium", "menengah"</li>
-                                            <li><span className="font-semibold text-rose-600 dark:text-rose-400">Sulit:</span> "sulit", "hots", "3", "hard", "tinggi"</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                
-                                {config.useBankSoal && (
-                                    <div className="space-y-4 pl-8 border-l-2 border-primary/20 ml-2 animate-fade-in">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Jumlah Soal yang Ditampilkan ke Siswa</label>
-                                            <input 
-                                                type="number" 
-                                                name="bankSoalCount" 
-                                                value={config.bankSoalCount || 10} 
-                                                onChange={handleConfigChange} 
-                                                className="w-full max-w-[200px] p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200" 
-                                            />
-                                            <p className="text-[10px] text-slate-500 mt-1">Total soal di editor: {questions.length}</p>
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">Proporsi Tingkat Kesulitan (%)</label>
-                                            <div className="flex flex-wrap gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 w-12">Mudah</span>
-                                                    <input 
-                                                        type="number" 
-                                                        value={config.bankSoalProportions?.mudah || 30} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, mudah: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
-                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
-                                                    />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 w-12">Sedang</span>
-                                                    <input 
-                                                        type="number" 
-                                                        value={config.bankSoalProportions?.sedang || 50} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sedang: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
-                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
-                                                    />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-medium text-rose-600 dark:text-rose-400 w-12">Sulit</span>
-                                                    <input 
-                                                        type="number" 
-                                                        value={config.bankSoalProportions?.sulit || 20} 
-                                                        onChange={(e) => setConfig(prev => ({ ...prev, bankSoalProportions: { ...prev.bankSoalProportions, sulit: parseInt(e.target.value) || 0 } as { mudah: number; sedang: number; sulit: number } }))} 
-                                                        className="w-16 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-primary text-xs text-center" 
-                                                    />
-                                                </div>
-                                            </div>
-                                            <p className="text-[10px] text-slate-500 mt-2 italic">Pastikan Anda telah mengisi "Level Soal" pada masing-masing soal di editor sesuai dengan panduan level di atas.</p>
-                                        </div>
-                                    </div>
-                                )}
-                             </div>
-                        </div>
-
-                        <div className="md:col-span-2 space-y-4 pt-6 mt-2 border-t border-gray-100 dark:border-slate-700">
-                             <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pengaturan Hasil & Monitor</h4>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className={`flex flex-col p-3 rounded-xl border transition-colors shadow-sm ${hasManualGrading ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 opacity-80' : 'border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer group'}`}>
-                                    <label className={`flex items-center ${hasManualGrading ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input type="checkbox" name="showResultToStudent" checked={config.showResultToStudent} onChange={handleConfigChange} disabled={hasManualGrading} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400" />
-                                        <span className={`ml-3 text-sm font-medium ${hasManualGrading ? 'text-gray-500 dark:text-slate-500' : 'text-gray-700 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-primary'}`}>Umumkan Nilai Otomatis</span>
-                                    </label>
-                                    {hasManualGrading && <div className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Dinonaktifkan otomatis karena terdapat soal Esai atau Isian Singkat.</div>}
-                                </div>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="showCorrectAnswer" checked={config.showCorrectAnswer} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Tampilkan Kunci (Review)</span></label>
-                                <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="enableCertificate" checked={config.enableCertificate} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Berikan Akses Sertifikat</span></label>
-                                {config.examMode !== 'PR' && (
-                                    <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm"><input type="checkbox" name="trackLocation" checked={config.trackLocation} onChange={handleConfigChange} className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300" /><span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">Lacak Lokasi (GPS)</span></label>
-                                )}
-                             </div>
-                             
-                             <div className="mt-4 flex flex-wrap items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm relative overflow-hidden group gap-4">
-                                 <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-200/40 via-transparent to-transparent z-0 group-hover:from-amber-200/60 transition-colors"></div>
-                                 <div className="flex items-start sm:items-center gap-3 z-10 flex-1 min-w-[200px]">
-                                     <SparklesIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5 sm:mt-0" />
-                                     <div>
-                                         <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">Sertifikat Kelulusan Otomatis {!isPremium && <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1"><SparklesIcon className="w-3 h-3"/> Premium</span>}</h5>
-                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-full sm:max-w-xs leading-relaxed mt-0.5">Berikan e-Certificate otomatis untuk siswa. Bisa diunduh secara massal di Dasbor Guru.</p>
-                                     </div>
-                                 </div>
-                                 <button 
-                                     onClick={() => isPremium && setIsCertificateModalOpen(true)}
-                                     disabled={!isPremium}
-                                     className={`z-10 px-4 py-2 text-xs font-bold whitespace-nowrap rounded-xl transition-all shadow-sm ${isPremium ? 'text-amber-600 bg-amber-50 border border-amber-200 dark:border-amber-800/30 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/30 active:scale-95' : 'text-gray-400 bg-gray-50 border border-gray-200 dark:border-slate-700 dark:bg-slate-800/50 cursor-not-allowed'}`}
-                                 >
-                                     {config.certificateSettings?.enabled ? 'Ubah Desain' : 'Buat Sertifikat'}
-                                 </button>
-                             </div>
-
-                             <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mode Operasi</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div 
-                                        onClick={() => setConfig(prev => ({ ...prev, disableRealtime: true, enablePublicStream: false }))}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200'}`}
-                                    >
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${config.disableRealtime ? 'border-emerald-500' : 'border-slate-400'}`}>
-                                                {config.disableRealtime && <div className="w-2 h-2 bg-emerald-500 rounded-full" />}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <WifiIcon className={`w-4 h-4 ${config.disableRealtime ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                                                <span className="font-bold text-sm text-slate-800 dark:text-white">Mode Normal</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-                                            Menonaktifkan fitur pantauan orang tua dan progres ujian untuk menghemat kuota koneksi.
-                                        </p>
-                                    </div>
-
-                                    <div 
-                                        onClick={() => isPremium && setConfig(prev => ({ ...prev, disableRealtime: false, enablePublicStream: true }))}
-                                        className={`p-4 rounded-xl border-2 transition-all relative ${!isPremium ? 'opacity-70 cursor-not-allowed bg-gray-50 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700' : !config.disableRealtime ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 cursor-pointer' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200 cursor-pointer'}`}
-                                    >
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? 'border-indigo-500' : 'border-slate-400'}`}>
-                                                {!config.disableRealtime && <div className="w-2 h-2 bg-indigo-500 rounded-full" />}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <SignalIcon className={`w-4 h-4 ${!config.disableRealtime ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
-                                                <span className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">Mode Realtime {!isPremium && <span className="text-[9px] bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm flex items-center gap-1"><SparklesIcon className="w-3 h-3"/> Premium</span>}</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-                                            Pantauan orang tua dan progres ujian akan aktif namun menghabiskan lebih banyak kuota koneksi.
-                                        </p>
-                                    </div>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-                </div>
+        <div className="space-y-6">
+          {questions.length > 0 && (
+            <div className="relative py-2 group/insert">
+              <div
+                className="absolute inset-0 flex items-center"
+                aria-hidden="true"
+              >
+                <div className="w-full border-t border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 transition-colors"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <button
+                  onClick={() => {
+                    store.setInsertIndex(-1);
+                    store.setTypeSelectionModalOpen(true);
+                  }}
+                  className="bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 group-hover/insert:text-primary group-hover/insert:bg-primary/5 px-4 py-1 text-xs font-semibold rounded-full border border-gray-200 dark:border-slate-700 group-hover/insert:border-primary/30 shadow-sm transition-all transform hover:scale-105 flex items-center gap-1 opacity-0 group-hover/insert:opacity-100 focus:opacity-100"
+                >
+                  <PlusCircleIcon className="w-4 h-4" /> Sisipkan Soal Di Awal
+                </button>
+              </div>
             </div>
-            
-            <div className="text-center pt-10 pb-20">
-                {isEditing ? (
-                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto px-4 sm:px-0">
-                        <button onClick={onCancel} className="w-full sm:w-auto bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-95">Batal</button>
-                        {onSaveDraft && <button onClick={onSaveDraft} className="w-full sm:w-auto bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95"><PencilIcon className="w-5 h-5" /> Perbarui Draf</button>}
-                        <button onClick={onSave} className="w-full sm:w-auto bg-primary dark:bg-indigo-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus dark:hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900/30 transform hover:-translate-y-1 active:scale-95">Simpan Perubahan</button>
-                    </div>
-                ) : (
-                    <>
-                        <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
-                            {onSaveDraft && <button onClick={onSaveDraft} className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95"><PencilIcon className="w-5 h-5" /> Simpan Draf</button>}
-                            <button onClick={onSave} className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95"><CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang</button>
-                        </div>
-                        {generatedCode && (
-                            <div ref={generatedCodeSectionRef} className="mt-12 p-1 rounded-3xl animate-fade-in text-center max-w-md mx-auto bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-2xl">
-                                <div className="bg-white dark:bg-slate-900 p-8 rounded-[1.4rem] text-center">
-                                    <h4 className="font-black text-2xl text-slate-800 dark:text-white mb-2">Ujian Aktif!</h4>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">Berikan kode unik ini kepada siswa Anda agar mereka dapat mulai mengerjakan.</p>
-                                    <div className="flex flex-col gap-4">
-                                        <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-2xl border-2 border-emerald-50 dark:border-emerald-900/30 shadow-inner group transition-all hover:bg-emerald-50/30 dark:hover:bg-emerald-900/20"><span className="text-4xl font-black tracking-[0.3em] text-emerald-600 dark:text-emerald-400 font-mono block">{generatedCode}</span></div>
-                                        <button onClick={() => {navigator.clipboard.writeText(generatedCode); alert("Kode berhasil disalin!");}} className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors py-2">Salin Kode Akses</button>
-                                    </div>
-                                    <button onClick={onReset} className="mt-8 w-full bg-slate-900 dark:bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg active:scale-95">Selesai & Tutup</button>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
+          )}
+          {questions.map((q, index) => {
+            const questionNumber =
+              questions.slice(0, index).filter((i) => i.questionType !== "INFO")
+                .length + 1;
+            return (
+              <QuestionCard
+                key={q.id}
+                q={q}
+                index={index}
+                questionNumber={questionNumber}
+                isGenerating={store.isGeneratingId === q.id}
+                onGenerate={handleGenerateSingleQuestion}
+              />
+            );
+          })}
+        </div>
+        <div className="mt-12 mb-20 text-center">
+          <button
+            onClick={() => {
+              store.setInsertIndex(null);
+              store.setTypeSelectionModalOpen(true);
+            }}
+            className="flex items-center gap-2 text-sm text-primary dark:text-indigo-400 font-bold hover:text-primary-focus mx-auto transition-all bg-white dark:bg-slate-800 border border-primary/20 dark:border-indigo-500/30 px-8 py-4 rounded-2xl hover:bg-primary dark:hover:bg-indigo-600 hover:text-white shadow-sm hover:shadow-lg active:scale-95 group"
+          >
+            <PlusCircleIcon className="w-5 h-5 group-hover:text-white transition-colors" />{" "}
+            Tambah Soal Baru
+          </button>
+        </div>
+      </div>
 
-            {renderTypeSelectionModal()}
-            <SelectionModal key={isSubjectModalOpen ? 'subject-open' : 'subject-closed'} isOpen={isSubjectModalOpen} title="Pilih Mata Pelajaran" options={SUBJECTS} selectedValue={config.subject || ''} onClose={() => setIsSubjectModalOpen(false)} onSelect={handleSubjectSelect} searchPlaceholder="Cari mata pelajaran..." />
-            <SelectionModal key={isClassModalOpen ? 'class-open' : 'class-closed'} isOpen={isClassModalOpen} title="Pilih Kelas" options={CLASSES} selectedValue={config.classLevel || ''} onClose={() => setIsClassModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, classLevel: val }))} searchPlaceholder="Cari kelas..." />
-            <SelectionModal key={isExamTypeModalOpen ? 'exam-type-open' : 'exam-type-closed'} isOpen={isExamTypeModalOpen} title="Pilih Jenis Evaluasi" options={EXAM_TYPES} selectedValue={config.examType || ''} onClose={() => setIsExamTypeModalOpen(false)} onSelect={(val) => setConfig(prev => ({ ...prev, examType: val }))} searchPlaceholder="Cari jenis evaluasi..." />
-            
-            {editingChartTarget && (
-                <ChartConfigModal 
-                    isOpen={!!editingChartTarget}
-                    onClose={() => setEditingChartTarget(null)}
-                    onSave={handleSaveChart}
-                    onDelete={() => {
-                        if (editingChartTarget) {
-                            const { qId, type, index, subIndex } = editingChartTarget;
-                            setQuestions(prev => prev.map(q => {
-                                if (q.id === qId) {
-                                    const updated = { ...q };
-                                    let fieldToUpdate = '';
-                                    if (type === 'question') fieldToUpdate = q.questionText;
-                                    else if (type === 'option' && index !== undefined && q.options) fieldToUpdate = q.options[index];
-                                    else if (type === 'tf' && index !== undefined && q.trueFalseRows) fieldToUpdate = q.trueFalseRows[index].text;
-                                    else if (type === 'matching' && index !== undefined && q.matchingPairs) {
-                                        fieldToUpdate = subIndex === 'left' ? q.matchingPairs[index].left : q.matchingPairs[index].right;
-                                    } else if (type === 'correctAnswer') fieldToUpdate = q.correctAnswer || '';
+      <div className="pt-10">
+        <div className="p-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm mb-6">
+          <h2 className="text-xl font-bold text-neutral dark:text-white">
+            {isEditing ? "2. Konfigurasi" : "4. Konfigurasi"}
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            Pengaturan waktu dan keamanan ujian.
+          </p>
+        </div>
 
-                                    const parser = new DOMParser();
-                                    const doc = parser.parseFromString(fieldToUpdate, 'text/html');
-                                    const chartNode = doc.querySelector('[data-chart="true"]');
-                                    if (chartNode) {
-                                        chartNode.remove();
-                                    }
-                                    const newHtml = doc.body.innerHTML;
+        <ExamConfigSettings
+          config={config}
+          store={store}
+          handleConfigChange={handleConfigChange}
+          handleAddClassTag={handleAddClassTag}
+          hasManualGrading={hasManualGrading}
+          isPremium={isPremium}
+        />
+      </div>
 
-                                    if (type === 'question') {
-                                        updated.questionText = newHtml;
-                                        updated.chartData = undefined;
-                                    } else if (type === 'option' && index !== undefined && q.options) {
-                                        const newOptions = [...q.options];
-                                        newOptions[index] = newHtml;
-                                        updated.options = newOptions;
-                                        const newOptionCharts = [...(q.optionCharts || [])];
-                                        if (newOptionCharts[index]) newOptionCharts[index] = null;
-                                        updated.optionCharts = newOptionCharts;
-                                    } else if (type === 'tf' && index !== undefined && q.trueFalseRows) {
-                                        const newRows = [...q.trueFalseRows];
-                                        newRows[index] = { ...newRows[index], text: newHtml, chartData: undefined };
-                                        updated.trueFalseRows = newRows;
-                                    } else if (type === 'matching' && index !== undefined && q.matchingPairs) {
-                                        const newPairs = [...q.matchingPairs];
-                                        if (subIndex === 'left') {
-                                            newPairs[index] = { ...newPairs[index], left: newHtml, leftChart: undefined };
-                                        } else {
-                                            newPairs[index] = { ...newPairs[index], right: newHtml, rightChart: undefined };
-                                        }
-                                        updated.matchingPairs = newPairs;
-                                    } else if (type === 'correctAnswer') {
-                                        updated.correctAnswer = newHtml;
-                                        updated.correctAnswerChart = undefined;
-                                    }
-                                    return updated;
-                                }
-                                return q;
-                            }));
-                        }
-                    }}
-                    initialData={(() => {
-                        if (!editingChartTarget) return undefined;
-                        const { qId, type, index, subIndex } = editingChartTarget;
-                        const q = questions.find(item => item.id === qId);
-                        if (!q) return undefined;
-                        if (type === 'question') return q.chartData;
-                        if (type === 'option' && index !== undefined) return q.optionCharts?.[index] || undefined;
-                        if (type === 'tf' && index !== undefined) return q.trueFalseRows?.[index].chartData;
-                        if (type === 'matching' && index !== undefined) {
-                            return subIndex === 'left' ? q.matchingPairs?.[index].leftChart : q.matchingPairs?.[index].rightChart;
-                        }
-                        if (type === 'correctAnswer') return q.correctAnswerChart;
-                        return undefined;
-                    })()}
-                />
+      <div className="text-center pt-10 pb-20">
+        {isEditing ? (
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto px-4 sm:px-0">
+            <button
+              onClick={onCancel}
+              className="w-full sm:w-auto bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-95"
+            >
+              Batal
+            </button>
+            {onSaveDraft && (
+              <button
+                onClick={onSaveDraft}
+                className="w-full sm:w-auto bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold py-4 px-10 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95"
+              >
+                <PencilIcon className="w-5 h-5" /> Perbarui Draf
+              </button>
             )}
+            <button
+              onClick={onSave}
+              className="w-full sm:w-auto bg-primary dark:bg-indigo-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-primary-focus dark:hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900/30 transform hover:-translate-y-1 active:scale-95"
+            >
+              Simpan Perubahan
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
+              {onSaveDraft && (
+                <button
+                  onClick={onSaveDraft}
+                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 font-bold py-4 px-10 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <PencilIcon className="w-5 h-5" /> Simpan Draf
+                </button>
+              )}
+              <button
+                onClick={onSave}
+                className="w-full sm:w-auto bg-emerald-600 text-white font-bold py-4 px-14 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-3 active:scale-95"
+              >
+                <CheckCircleIcon className="w-6 h-6" /> Publikasikan Sekarang
+              </button>
+            </div>
+            {generatedCode && (
+              <div
+                ref={generatedCodeSectionRef}
+                className="mt-12 p-1 rounded-3xl animate-fade-in text-center max-w-md mx-auto bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-2xl"
+              >
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[1.4rem] text-center">
+                  <h4 className="font-black text-2xl text-slate-800 dark:text-white mb-2">
+                    Ujian Aktif!
+                  </h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">
+                    Berikan kode unik ini kepada siswa Anda agar mereka dapat
+                    mulai mengerjakan.
+                  </p>
+                  <div className="flex flex-col gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-2xl border-2 border-emerald-50 dark:border-emerald-900/30 shadow-inner group transition-all hover:bg-emerald-50/30 dark:hover:bg-emerald-900/20">
+                      <span className="text-4xl font-black tracking-[0.3em] text-emerald-600 dark:text-emerald-400 font-mono block">
+                        {generatedCode}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedCode);
+                        alert("Kode berhasil disalin!");
+                      }}
+                      className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors py-2"
+                    >
+                      Salin Kode Akses
+                    </button>
+                  </div>
+                  <button
+                    onClick={onReset}
+                    className="mt-8 w-full bg-slate-900 dark:bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
+                  >
+                    Selesai & Tutup
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-            <CertificateEditorModal 
-                isOpen={isCertificateModalOpen}
-                onClose={() => setIsCertificateModalOpen(false)}
-                settings={config.certificateSettings as any}
-                onSave={(newSettings) => setConfig(prev => ({ ...prev, certificateSettings: newSettings }))}
-                subjectPlaceholder={config.subject || 'Mata Pelajaran'}
-                examTypePlaceholder={config.examType || 'Ujian'}
-                classLevelPlaceholder={config.classLevel || '10'}
-                datePlaceholder={config.startDate || config.date || undefined}
-            />
-        </div>
-    );
+      {renderTypeSelectionModal()}
+      <SelectionModal
+        key={store.isSubjectModalOpen ? "subject-open" : "subject-closed"}
+        isOpen={store.isSubjectModalOpen}
+        title="Pilih Mata Pelajaran"
+        options={SUBJECTS}
+        selectedValue={config.subject || ""}
+        onClose={() => store.setSubjectModalOpen(false)}
+        onSelect={(val) => store.handleSubjectSelect(val)}
+        searchPlaceholder="Cari mata pelajaran..."
+      />
+      <SelectionModal
+        key={store.isClassModalOpen ? "class-open" : "class-closed"}
+        isOpen={store.isClassModalOpen}
+        title="Pilih Kelas"
+        options={CLASSES}
+        selectedValue={config.classLevel || ""}
+        onClose={() => store.setClassModalOpen(false)}
+        onSelect={(val) =>
+          store.handleConfigChangeManual((prev) => ({
+            ...prev,
+            classLevel: val,
+          }))
+        }
+        searchPlaceholder="Cari kelas..."
+      />
+      <SelectionModal
+        key={store.isExamTypeModalOpen ? "exam-type-open" : "exam-type-closed"}
+        isOpen={store.isExamTypeModalOpen}
+        title="Pilih Jenis Evaluasi"
+        options={EXAM_TYPES}
+        selectedValue={config.examType || ""}
+        onClose={() => store.setExamTypeModalOpen(false)}
+        onSelect={(val) =>
+          store.handleConfigChangeManual((prev) => ({ ...prev, examType: val }))
+        }
+        searchPlaceholder="Cari jenis evaluasi..."
+      />
+
+      {store.editingChartTarget && (
+        <Suspense fallback={<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"><div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex items-center gap-4"><div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-primary animate-spin"></div><div className="text-slate-600 dark:text-slate-300 font-medium">Memuat Editor Grafik...</div></div></div>}>
+          <ChartConfigModal
+            isOpen={!!store.editingChartTarget}
+            onClose={() => store.setEditingChartTarget(null)}
+            onSave={(data) => store.handleSaveChart(data)}
+            onDelete={() => store.handleDeleteChart()}
+            initialData={(() => {
+              if (!store.editingChartTarget) return undefined;
+              const { qId, type, index, subIndex } = store.editingChartTarget;
+              const q = questions.find((item) => item.id === qId);
+              if (!q) return undefined;
+              if (type === "question") return q.chartData;
+              if (type === "option" && index !== undefined)
+                return q.optionCharts?.[index] || undefined;
+              if (type === "tf" && index !== undefined)
+                return q.trueFalseRows?.[index].chartData;
+              if (type === "matching" && index !== undefined) {
+                return subIndex === "left"
+                  ? q.matchingPairs?.[index].leftChart
+                  : q.matchingPairs?.[index].rightChart;
+              }
+              if (type === "correctAnswer") return q.correctAnswerChart;
+              return undefined;
+            })()}
+          />
+        </Suspense>
+      )}
+
+      {store.isCertificateModalOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"><div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex items-center gap-4"><div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-primary animate-spin"></div><div className="text-slate-600 dark:text-slate-300 font-medium">Memuat Editor Sertifikat...</div></div></div>}>
+          <CertificateEditorModal
+            isOpen={store.isCertificateModalOpen}
+            onClose={() => store.setCertificateModalOpen(false)}
+            settings={config.certificateSettings as any}
+            onSave={(newSettings) =>
+              store.handleConfigChangeManual((prev) => ({
+                ...prev,
+                certificateSettings: newSettings,
+              }))
+            }
+            subjectPlaceholder={config.subject || "Mata Pelajaran"}
+            examTypePlaceholder={config.examType || "Ujian"}
+            classLevelPlaceholder={config.classLevel || "10"}
+            datePlaceholder={config.startDate || config.date || undefined}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
 };

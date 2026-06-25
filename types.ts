@@ -10,31 +10,40 @@ export interface QuizConfig {
   includeImages: boolean;
 }
 
+export interface CartesianConfig {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  xStep: number;
+  yStep: number;
+}
+
+export interface ChartPoint {
+  x: number;
+  y: number;
+}
+
+export interface ChartDataset {
+  label: string;
+  data: (number | string | ChartPoint)[];
+  backgroundColor?: string[];
+  borderColor?: string[];
+  showLine?: boolean;
+  fill?: boolean;
+  isFunction?: boolean;
+  functionStr?: string;
+  icon?: string;
+}
+
 export interface ChartData {
   type: 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian';
   title?: string;
   labels: string[];
-  datasets: {
-    label: string;
-    data: (number | string | any)[];
-    backgroundColor?: string[];
-    borderColor?: string[];
-    showLine?: boolean;
-    fill?: boolean;
-    isFunction?: boolean;
-    functionStr?: string;
-    icon?: string;
-  }[];
+  datasets: ChartDataset[];
   showTooltip?: boolean;
   showLegend?: boolean;
-  cartesianConfig?: {
-    xMin: number;
-    xMax: number;
-    yMin: number;
-    yMax: number;
-    xStep: number;
-    yStep: number;
-  };
+  cartesianConfig?: CartesianConfig;
 }
 
 export interface Question {
@@ -197,4 +206,29 @@ export interface ExamSummary {
     question_stats: Record<string, unknown>[]; // JSONB Statistical Snapshot
     region?: string;
     author_id?: string;
+}
+
+export type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
+
+export interface ArchiveMetadata {
+    school?: string;
+    subject?: string;
+    classLevel?: string;
+    examType?: string;
+    targetClasses?: string[];
+    date?: string | number;
+    participantCount?: number;
+    authorId?: string;
+}
+
+export interface ArchiveData {
+    exam: Exam;
+    results: Result[];
+    version?: string;
+    repairedAt?: string;
+}
+
+export interface ArchiveViewerProps {
+    onReuseExam: (exam: Exam) => void;
+    teacherProfile: any;
 }
