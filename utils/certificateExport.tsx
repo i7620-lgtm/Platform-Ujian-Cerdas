@@ -17,7 +17,8 @@ export const downloadCertificateAsPdf = async (
     dateStr: string,
      
     certConfig: Record<string, any>,
-    fileName: string
+    fileName: string,
+    schoolName?: string
 ): Promise<void> => {
         const { jsPDF } = await import('jspdf');
         const { CertificateDOM } = await import('../components/CertificateDOM');
@@ -81,6 +82,7 @@ export const downloadCertificateAsPdf = async (
                         qrLink={data.qrLink}
                         verifyCode={data.verifyCode}
                         config={certConfig}
+                        schoolName={schoolName}
                         onRendered={handleRendered}
                     />
                 );
