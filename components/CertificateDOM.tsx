@@ -14,6 +14,7 @@ export interface CertificateDOMProps {
   verifyCode: string;
   config: Record<string, any>;
   onRendered: () => void;
+  schoolName?: string;
 }
 
 export const CertificateDOM: React.FC<CertificateDOMProps> = ({
@@ -27,31 +28,102 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
   verifyCode,
   config,
   onRendered,
+  schoolName = "Platform Ujian Cerdas",
 }) => {
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!config.backgroundUrl) {
-      // Give a tiny delay for React to render the DOM then callback
-      const timer = setTimeout(() => {
-        onRendered();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+  const [processedSignature, setProcessedSignature] = useState<string | null>(null);
 
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
+  useEffect(() => {
+    const loadImages = async () => {
+      const promises: Promise<void>[] = [];
+
+      // Process background image
+      if (config.backgroundUrl) {
+        promises.push(
+          new Promise((resolve) => {
+            const img = new window.Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve();
+            img.onerror = () => {
+              console.error("Failed to load background certificate image");
+              resolve();
+            };
+            img.src = config.backgroundUrl;
+          })
+        );
+      }
+
+      // Process signature image
+      if (config.signatureUrl) {
+        if (config.signatureTransparent) {
+          promises.push(
+            new Promise((resolve) => {
+              const img = new window.Image();
+              img.crossOrigin = "anonymous";
+              img.onload = () => {
+                try {
+                  const canvas = document.createElement("canvas");
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  const ctx = canvas.getContext("2d");
+                  if (ctx) {
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    // Make white/light-grey pixels transparent
+                    // Also use a luminance based alpha to make it look smoother
+                    for (let i = 0; i < data.length; i += 4) {
+                      const r = data[i];
+                      const g = data[i + 1];
+                      const b = data[i + 2];
+                      
+                      // Calculate luminance
+                      const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                      
+                      if (luminance > 220) {
+                        data[i + 3] = 0; // Transparent
+                      } else {
+                        // Smooth alpha for anti-aliased edges
+                        const alpha = Math.min(255, (255 - luminance) * 1.5);
+                        data[i + 3] = alpha;
+                        // Darken the colors a bit to simulate ink multiplying
+                        data[i] = Math.max(0, r - 50);
+                        data[i + 1] = Math.max(0, g - 50);
+                        data[i + 2] = Math.max(0, b - 50);
+                      }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    setProcessedSignature(canvas.toDataURL("image/png"));
+                  } else {
+                    setProcessedSignature(config.signatureUrl);
+                  }
+                } catch (err) {
+                  console.error("Failed to process signature transparency", err);
+                  setProcessedSignature(config.signatureUrl);
+                }
+                resolve();
+              };
+              img.onerror = () => {
+                setProcessedSignature(config.signatureUrl);
+                resolve();
+              };
+              img.src = config.signatureUrl;
+            })
+          );
+        } else {
+          setProcessedSignature(config.signatureUrl);
+        }
+      }
+
+      await Promise.all(promises);
+      
       setImagesLoaded(true);
-      setTimeout(onRendered, 100); // Wait for the state to render
+      setTimeout(onRendered, 150);
     };
-    img.onerror = () => {
-      console.error("Failed to load background certificate image");
-      setImagesLoaded(true); // render anyway
-      setTimeout(onRendered, 100);
-    };
-    img.src = config.backgroundUrl;
-  }, [config.backgroundUrl, onRendered]);
+
+    loadImages();
+  }, [config.backgroundUrl, config.signatureUrl, config.signatureTransparent, onRendered]);
 
   const examTypePlaceholder = examType || "Ujian Akhir Semester";
   const subjectPlaceholder = subject || "Matematika";
@@ -137,10 +209,8 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
             <div className="absolute top-[66%] w-full px-[15%] text-center z-10">
               <p className="text-[11px] italic text-slate-600 leading-relaxed font-serif">
                 "Telah menunjukkan dedikasi, ketekunan, dan semangat pantang
-                menyerah dalam menyelesaikan evaluasi.
-                <br />
-                Semoga pencapaian ini menjadi langkah awal menuju kesuksesan
-                yang lebih gemilang di masa depan."
+                menyerah dalam menyelesaikan evaluasi. Semoga pencapaian ini menjadi langkah
+                awal menuju kesuksesan yang lebih gemilang di masa depan."
               </p>
             </div>
 
@@ -155,7 +225,7 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                   Administrator / Guru
                 </p>
                 <p className="text-[10px] text-slate-500">
-                  Platform Ujian Cerdas
+                  {schoolName}
                 </p>
               </div>
 
@@ -166,7 +236,7 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                   className="w-full h-full opacity-90"
                 />
                 <span className="text-[9px] font-mono text-slate-400 mt-1">
-                  {verifyCode || "0X98A"}
+                  VERIFY-{verifyCode || "0X98A"}
                 </span>
               </div>
             </div>
@@ -181,16 +251,23 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
             visible: true,
             x: 50,
             y: 36,
-            fontSize: 36,
+            fontSize: 50,
             color: "#1e3a8a",
           },
           score: {
             visible: true,
             x: 50,
             y: 57,
-            fontSize: 48,
+            fontSize: 40,
             color: "#ef4444",
           },
+          signature: {
+            visible: false,
+            x: 70,
+            y: 78,
+            fontSize: 16,
+            color: "#000000",
+          }
         };
 
         return (
@@ -203,7 +280,7 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                   top: `${positions.studentName.y}%`,
                   fontSize: `${positions.studentName.fontSize * 1.188}px`,
                   color: positions.studentName.color,
-                  fontWeight: "700",
+                  fontWeight: "bold",
                   fontFamily: '"Playfair Display", "Times New Roman", serif',
                   letterSpacing: "0.02em",
                   zIndex: 10,
@@ -220,13 +297,33 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                   top: `${positions.score.y}%`,
                   fontSize: `${positions.score.fontSize * 1.188}px`,
                   color: positions.score.color,
-                  fontWeight: "700",
+                  fontWeight: "bold",
                   fontFamily: '"JetBrains Mono", "Courier New", monospace',
                   letterSpacing: "0.05em",
                   zIndex: 10,
                 }}
               >
                 {score}
+              </div>
+            )}
+            {positions.signature?.visible && (processedSignature || config?.signatureUrl) && (
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${positions.signature.x}%`,
+                  top: `${positions.signature.y}%`,
+                  zIndex: 10,
+                }}
+              >
+                <img
+                  src={processedSignature || config?.signatureUrl}
+                  alt="Signature"
+                  style={{
+                    height: `${positions.signature.fontSize * 4}px`, // match the scaling in editor
+                    objectFit: "contain",
+                    mixBlendMode: config.signatureTransparent ? "multiply" : "normal",
+                  }}
+                />
               </div>
             )}
           </>
