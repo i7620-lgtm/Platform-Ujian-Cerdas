@@ -36,6 +36,7 @@ interface ExamEditorProps {
   generatedCode: string;
   onReset: () => void;
   isPremium?: boolean;
+  teacherSchoolName?: string;
 }
 
 const SUBJECTS = [
@@ -104,6 +105,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
   generatedCode,
   onReset,
   isPremium,
+  teacherSchoolName,
 }) => {
   const hookResult = useExamEditor({ isEditing, generatedCode, isPremium });
   const {
@@ -468,6 +470,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
             examTypePlaceholder={config.examType || "Ujian"}
             classLevelPlaceholder={config.classLevel || "10"}
             datePlaceholder={config.startDate || config.date || undefined}
+            schoolNamePlaceholder={teacherSchoolName || "Platform Ujian Cerdas"}
           />
         </Suspense>
       )}
