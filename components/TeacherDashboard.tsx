@@ -280,6 +280,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 generatedCode={generatedCode}
                 onReset={resetForm}
                 isPremium={teacherProfile.isPremium || false}
+                teacherSchoolName={teacherProfile.school}
               />
             )}
           </>

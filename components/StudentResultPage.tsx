@@ -140,6 +140,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
         examDateStr,
         certConfig,
         `Sertifikat_${exam.code}_${result.student.fullName}.pdf`,
+        exam.authorSchool
       );
     } catch (error) {
       console.error("Gagal mencetak PDF", error);
