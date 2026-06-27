@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { XMarkIcon, PhotoIcon, SparklesIcon, AcademicCapIcon } from "../Icons";
+import { XMarkIcon, PhotoIcon, SparklesIcon, AcademicCapIcon, DocumentArrowUpIcon } from "../Icons";
 import { QRCodeSVG } from "qrcode.react";
 import {
   useCertificateEditorModal,
@@ -16,6 +16,7 @@ interface Props {
   examTypePlaceholder?: string;
   classLevelPlaceholder?: string;
   datePlaceholder?: string;
+  schoolNamePlaceholder?: string;
 }
 
 export const CertificateEditorModal: React.FC<Props> = ({
@@ -27,6 +28,7 @@ export const CertificateEditorModal: React.FC<Props> = ({
   examTypePlaceholder = "Ujian Akhir Semester",
   classLevelPlaceholder = "Semester 1",
   datePlaceholder = new Date().toISOString(),
+  schoolNamePlaceholder = "Nama Instansi / Sekolah",
 }) => {
   const {
     current,
@@ -36,6 +38,7 @@ export const CertificateEditorModal: React.FC<Props> = ({
     containerRef,
     wrapperRef,
     handleImageUpload,
+    handleSignatureUpload,
     handleDragStart,
     handleDrag,
     handleDragEnd,
@@ -113,14 +116,68 @@ export const CertificateEditorModal: React.FC<Props> = ({
                   </label>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Tanda Tangan Guru
+                  </label>
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 dark:border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors relative overflow-hidden group">
+                    {current.signatureUrl ? (
+                      <>
+                        <div className="absolute inset-0 z-0 flex items-center justify-center p-2 bg-white dark:bg-slate-800">
+                          <img
+                            src={current.signatureUrl}
+                            alt="Signature Preview"
+                            className="w-full h-full object-contain"
+                            style={{ mixBlendMode: current.signatureTransparent ? "multiply" : "normal" }}
+                          />
+                        </div>
+                        <div className="flex flex-col items-center justify-center pt-3 pb-4 z-10 relative px-4 bg-white/80 dark:bg-slate-900/80 w-full h-full backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100">
+                          <DocumentArrowUpIcon className="w-6 h-6 mb-2 text-slate-600 dark:text-slate-300" />
+                          <p className="text-xs text-center text-slate-600 dark:text-slate-300 font-medium">
+                            Klik untuk ubah gambar
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center pt-3 pb-4 z-10 relative px-4 w-full h-full">
+                        <DocumentArrowUpIcon className="w-6 h-6 mb-2 text-slate-400 dark:text-slate-500" />
+                        <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                          <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                            Klik untuk unggah
+                          </span>{" "}
+                          tanda tangan
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png, image/jpeg"
+                      onChange={handleSignatureUpload}
+                    />
+                  </label>
+                  {current.signatureUrl && (
+                    <label className="flex items-center space-x-2 mt-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={current.signatureTransparent || false}
+                        onChange={(e) => updateCurrent({ signatureTransparent: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-slate-600 dark:text-slate-300">Buat background transparan (Blend)</span>
+                    </label>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">
                     Elemen Cetak
                   </h3>
-                  {(["studentName", "score"] as const).map((key) => {
+                  {(["studentName", "score", "signature"] as const).map((key) => {
                     const lables = {
                       studentName: "Nama Siswa",
                       score: "Nilai/Skor",
+                      signature: "Tanda Tangan Guru",
                     };
                     return (
                       <div
@@ -347,7 +404,7 @@ export const CertificateEditorModal: React.FC<Props> = ({
                                 Administrator / Guru
                               </p>
                               <p className="text-[10px] text-slate-500">
-                                Platform Ujian Cerdas
+                                {schoolNamePlaceholder}
                               </p>
                             </div>
 
@@ -366,13 +423,48 @@ export const CertificateEditorModal: React.FC<Props> = ({
                       </div>
                     )}
                     {/* Draggable items */}
-                    {(["studentName", "score"] as const).map((key) => {
+                    {(["studentName", "score", "signature"] as const).map((key) => {
                       const item = current.positions[key];
                       if (!item.visible) return null;
+                      
                       const labels = {
                         studentName: "Budi Santoso",
                         score: "100",
+                        signature: "Tanda Tangan",
                       };
+
+                      if (key === "signature") {
+                        return (
+                          <div
+                            key={key}
+                            onMouseDown={() => handleDragStart(key)}
+                            onTouchStart={() => handleDragStart(key)}
+                            className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none p-1 border-2 border-dashed touch-none ${activeItem === key ? "border-sky-500 bg-sky-500/10" : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"}`}
+                            style={{
+                              left: `${item.x}%`,
+                              top: `${item.y}%`,
+                              zIndex: 10,
+                            }}
+                          >
+                            {current.signatureUrl ? (
+                              <img
+                                src={current.signatureUrl}
+                                alt="Signature"
+                                style={{
+                                  height: `${item.fontSize * 4}px`, // Arbitrary scaling based on font size for control
+                                  objectFit: "contain",
+                                  mixBlendMode: current.signatureTransparent ? "multiply" : "normal",
+                                }}
+                                draggable={false}
+                              />
+                            ) : (
+                              <div style={{ fontSize: `${item.fontSize}px`, color: item.color }}>
+                                [ {labels[key]} ]
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
 
                       return (
                         <div

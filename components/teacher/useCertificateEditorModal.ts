@@ -11,9 +11,12 @@ export interface PositionDef {
 export interface CertificateSettings {
   enabled: boolean;
   backgroundUrl: string;
+  signatureUrl?: string;
+  signatureTransparent?: boolean;
   positions: {
     studentName: PositionDef;
     score: PositionDef;
+    signature: PositionDef;
   };
 }
 
@@ -25,9 +28,12 @@ interface UseCertificateEditorModalProps {
 const defaultSettings: CertificateSettings = {
   enabled: true,
   backgroundUrl: "",
+  signatureUrl: "",
+  signatureTransparent: true,
   positions: {
     studentName: { x: 50, y: 36, fontSize: 50, color: "#1e3a8a", visible: true },
     score: { x: 50, y: 57, fontSize: 40, color: "#ef4444", visible: true },
+    signature: { x: 33.7, y: 81.5, fontSize: 16, color: "#000000", visible: true },
   },
 };
 
@@ -35,9 +41,30 @@ export const useCertificateEditorModal = ({
   isOpen,
   settings,
 }: UseCertificateEditorModalProps) => {
-  const [current, setCurrent] = useState<CertificateSettings | null>(
-    settings ? JSON.parse(JSON.stringify(settings)) : JSON.parse(JSON.stringify(defaultSettings))
-  );
+  const [current, setCurrent] = useState<CertificateSettings | null>(() => {
+    if (settings) {
+      const parsed = JSON.parse(JSON.stringify(settings));
+      if (!parsed.positions.signature) {
+        parsed.positions.signature = JSON.parse(JSON.stringify(defaultSettings.positions.signature));
+      } else if (parsed.positions.signature.x === 35 && parsed.positions.signature.y === 84) {
+        // Auto-fix old offset issue
+        parsed.positions.signature.x = 33.7;
+        parsed.positions.signature.y = 81.5;
+      } else if (parsed.positions.signature.x === 38 && parsed.positions.signature.y === 84) {
+        // Auto-fix older offset issue
+        parsed.positions.signature.x = 33.7;
+        parsed.positions.signature.y = 81.5;
+      }
+      if (parsed.signatureUrl === undefined) {
+        parsed.signatureUrl = defaultSettings.signatureUrl;
+      }
+      if (parsed.signatureTransparent === undefined) {
+        parsed.signatureTransparent = defaultSettings.signatureTransparent;
+      }
+      return parsed;
+    }
+    return JSON.parse(JSON.stringify(defaultSettings));
+  });
   const [activeItem, setActiveItem] = useState<
     keyof CertificateSettings["positions"] | null
   >(null);
@@ -76,6 +103,22 @@ export const useCertificateEditorModal = ({
       img.src = backgroundUrl;
     }
   }, [backgroundUrl]);
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1 * 1024 * 1024) {
+        alert("Ukuran gambar tanda tangan maksimal 1MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        setCurrent((prev) => (prev ? { ...prev, signatureUrl: url } : null));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -190,6 +233,7 @@ export const useCertificateEditorModal = ({
     containerRef,
     wrapperRef,
     handleImageUpload,
+    handleSignatureUpload,
     handleDragStart,
     handleDrag,
     handleDragEnd,
