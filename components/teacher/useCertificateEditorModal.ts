@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { processTransparentImage } from "../../utils/imageProcessor";
 
 export interface PositionDef {
   x: number;
@@ -33,7 +34,7 @@ const defaultSettings: CertificateSettings = {
   positions: {
     studentName: { x: 50, y: 36, fontSize: 50, color: "#1e3a8a", visible: true },
     score: { x: 50, y: 57, fontSize: 40, color: "#ef4444", visible: true },
-    signature: { x: 33.7, y: 81.5, fontSize: 16, color: "#000000", visible: true },
+    signature: { x: 37.4, y: 81, fontSize: 16, color: "#000000", visible: true },
   },
 };
 
@@ -46,14 +47,10 @@ export const useCertificateEditorModal = ({
       const parsed = JSON.parse(JSON.stringify(settings));
       if (!parsed.positions.signature) {
         parsed.positions.signature = JSON.parse(JSON.stringify(defaultSettings.positions.signature));
-      } else if (parsed.positions.signature.x === 35 && parsed.positions.signature.y === 84) {
+      } else if (parsed.positions.signature.x === 33.7 || parsed.positions.signature.x === 35 || parsed.positions.signature.x === 38 || parsed.positions.signature.y === 85.7 || parsed.positions.signature.x === 50 || parsed.positions.signature.y === 84.6 || parsed.positions.signature.y === 85.5) {
         // Auto-fix old offset issue
-        parsed.positions.signature.x = 33.7;
-        parsed.positions.signature.y = 81.5;
-      } else if (parsed.positions.signature.x === 38 && parsed.positions.signature.y === 84) {
-        // Auto-fix older offset issue
-        parsed.positions.signature.x = 33.7;
-        parsed.positions.signature.y = 81.5;
+        parsed.positions.signature.x = 37.4;
+        parsed.positions.signature.y = 81;
       }
       if (parsed.signatureUrl === undefined) {
         parsed.signatureUrl = defaultSettings.signatureUrl;
@@ -91,6 +88,24 @@ export const useCertificateEditorModal = ({
     observer.observe(wrapperRef.current);
     return () => observer.disconnect();
   }, [isOpen]);
+
+  const [processedSignatureUrl, setProcessedSignatureUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (current?.signatureUrl) {
+      if (current.signatureTransparent) {
+        processTransparentImage(current.signatureUrl).then(url => {
+          if (isMounted) setProcessedSignatureUrl(url);
+        });
+      } else {
+        setProcessedSignatureUrl(current.signatureUrl);
+      }
+    } else {
+      setProcessedSignatureUrl(null);
+    }
+    return () => { isMounted = false; };
+  }, [current?.signatureUrl, current?.signatureTransparent]);
 
   const backgroundUrl = current?.backgroundUrl;
 
@@ -226,6 +241,7 @@ export const useCertificateEditorModal = ({
 
   return {
     current,
+    processedSignatureUrl,
     activeItem,
     bgImageSize,
     scale,
