@@ -32,6 +32,7 @@ export const CertificateEditorModal: React.FC<Props> = ({
 }) => {
   const {
     current,
+    processedSignatureUrl,
     activeItem,
     scale,
     updateCurrent,
@@ -76,10 +77,10 @@ export const CertificateEditorModal: React.FC<Props> = ({
                 type="checkbox"
                 checked={current.enabled}
                 onChange={(e) =>
-                  updateCurrent((prev) => ({
+                  updateCurrent((prev) => prev ? {
                     ...prev,
                     enabled: e.target.checked,
-                  }))
+                  } : prev)
                 }
                 className="rounded border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-700 text-indigo-600 focus:ring-indigo-500"
               />
@@ -123,12 +124,11 @@ export const CertificateEditorModal: React.FC<Props> = ({
                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 dark:border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors relative overflow-hidden group">
                     {current.signatureUrl ? (
                       <>
-                        <div className="absolute inset-0 z-0 flex items-center justify-center p-2 bg-white dark:bg-slate-800">
+                        <div className="absolute inset-0 z-0 flex items-center justify-center p-2 bg-white">
                           <img
-                            src={current.signatureUrl}
+                            src={current.signatureTransparent && processedSignatureUrl ? processedSignatureUrl : current.signatureUrl}
                             alt="Signature Preview"
                             className="w-full h-full object-contain"
-                            style={{ mixBlendMode: current.signatureTransparent ? "multiply" : "normal" }}
                           />
                         </div>
                         <div className="flex flex-col items-center justify-center pt-3 pb-4 z-10 relative px-4 bg-white/80 dark:bg-slate-900/80 w-full h-full backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100">
@@ -161,7 +161,7 @@ export const CertificateEditorModal: React.FC<Props> = ({
                       <input 
                         type="checkbox" 
                         checked={current.signatureTransparent || false}
-                        onChange={(e) => updateCurrent({ signatureTransparent: e.target.checked })}
+                        onChange={(e) => updateCurrent(prev => prev ? { ...prev, signatureTransparent: e.target.checked } : prev)}
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                       />
                       <span className="text-sm text-slate-600 dark:text-slate-300">Buat background transparan (Blend)</span>
@@ -448,12 +448,11 @@ export const CertificateEditorModal: React.FC<Props> = ({
                           >
                             {current.signatureUrl ? (
                               <img
-                                src={current.signatureUrl}
+                                src={current.signatureTransparent && processedSignatureUrl ? processedSignatureUrl : current.signatureUrl}
                                 alt="Signature"
                                 style={{
                                   height: `${item.fontSize * 4}px`, // Arbitrary scaling based on font size for control
                                   objectFit: "contain",
-                                  mixBlendMode: current.signatureTransparent ? "multiply" : "normal",
                                 }}
                                 draggable={false}
                               />
