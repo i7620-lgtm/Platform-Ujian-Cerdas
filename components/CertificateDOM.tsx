@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { AcademicCapIcon } from "./Icons";
 
 import { QRCodeSVG } from "qrcode.react";
+import { processTransparentImage } from "../utils/imageProcessor";
 
 export interface CertificateDOMProps {
   studentName: string;
@@ -58,57 +59,8 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
       if (config.signatureUrl) {
         if (config.signatureTransparent) {
           promises.push(
-            new Promise((resolve) => {
-              const img = new window.Image();
-              img.crossOrigin = "anonymous";
-              img.onload = () => {
-                try {
-                  const canvas = document.createElement("canvas");
-                  canvas.width = img.width;
-                  canvas.height = img.height;
-                  const ctx = canvas.getContext("2d");
-                  if (ctx) {
-                    ctx.drawImage(img, 0, 0);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const data = imageData.data;
-                    // Make white/light-grey pixels transparent
-                    // Also use a luminance based alpha to make it look smoother
-                    for (let i = 0; i < data.length; i += 4) {
-                      const r = data[i];
-                      const g = data[i + 1];
-                      const b = data[i + 2];
-                      
-                      // Calculate luminance
-                      const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-                      
-                      if (luminance > 220) {
-                        data[i + 3] = 0; // Transparent
-                      } else {
-                        // Smooth alpha for anti-aliased edges
-                        const alpha = Math.min(255, (255 - luminance) * 1.5);
-                        data[i + 3] = alpha;
-                        // Darken the colors a bit to simulate ink multiplying
-                        data[i] = Math.max(0, r - 50);
-                        data[i + 1] = Math.max(0, g - 50);
-                        data[i + 2] = Math.max(0, b - 50);
-                      }
-                    }
-                    ctx.putImageData(imageData, 0, 0);
-                    setProcessedSignature(canvas.toDataURL("image/png"));
-                  } else {
-                    setProcessedSignature(config.signatureUrl);
-                  }
-                } catch (err) {
-                  console.error("Failed to process signature transparency", err);
-                  setProcessedSignature(config.signatureUrl);
-                }
-                resolve();
-              };
-              img.onerror = () => {
-                setProcessedSignature(config.signatureUrl);
-                resolve();
-              };
-              img.src = config.signatureUrl;
+            processTransparentImage(config.signatureUrl).then(url => {
+              setProcessedSignature(url);
             })
           );
         } else {
@@ -263,8 +215,8 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
           },
           signature: {
             visible: false,
-            x: 70,
-            y: 78,
+            x: 37.4,
+            y: 81,
             fontSize: 16,
             color: "#000000",
           }
@@ -306,7 +258,7 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                 {score}
               </div>
             )}
-            {positions.signature?.visible && (processedSignature || config?.signatureUrl) && (
+            {positions.signature?.visible && (
               <div
                 className="absolute -translate-x-1/2 -translate-y-1/2"
                 style={{
@@ -315,15 +267,16 @@ export const CertificateDOM: React.FC<CertificateDOMProps> = ({
                   zIndex: 10,
                 }}
               >
-                <img
-                  src={processedSignature || config?.signatureUrl}
-                  alt="Signature"
-                  style={{
-                    height: `${positions.signature.fontSize * 4}px`, // match the scaling in editor
-                    objectFit: "contain",
-                    mixBlendMode: config.signatureTransparent ? "multiply" : "normal",
-                  }}
-                />
+                {config?.signatureUrl && (!config.signatureTransparent || processedSignature) && (
+                  <img
+                    src={config.signatureTransparent ? processedSignature! : config.signatureUrl}
+                    alt="Signature"
+                    style={{
+                      height: `${positions.signature.fontSize * 4}px`, // match the scaling in editor
+                      objectFit: "contain",
+                    }}
+                  />
+                )}
               </div>
             )}
           </>
