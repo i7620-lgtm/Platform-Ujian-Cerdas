@@ -279,7 +279,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
 
   const classAnalysisData = useMemo(() => {
     if (!archiveData) return [];
-    const results = archiveData.results;
+    const results = filteredResults;
 
     const schools = Array.from(
       new Set(results.map((r) => r.student.schoolName || "Tanpa Sekolah")),
@@ -347,7 +347,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     });
 
     return finalDetails;
-  }, [archiveData]);
+  }, [archiveData, filteredResults]);
 
   const isNoAuthor = checkIsNoAuthor();
 
@@ -619,6 +619,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             uniqueSchools={uniqueSchools}
             selectedSchool={selectedSchool}
             exam={exam}
+            results={filteredResults}
+            teacherProfile={teacherProfile}
           />
         )}
       </div>
