@@ -203,7 +203,7 @@ export const UserManagementView: React.FC = () => {
                     <input
                       type="radio"
                       name="premium_tier"
-                      checked={!isPremium}
+                      checked={isPremium === false}
                       onChange={() => setIsPremium(false)}
                       className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
@@ -215,7 +215,7 @@ export const UserManagementView: React.FC = () => {
                     <input
                       type="radio"
                       name="premium_tier"
-                      checked={isPremium}
+                      checked={isPremium === true}
                       onChange={() => setIsPremium(true)}
                       className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
