@@ -77,6 +77,7 @@ export class ArchiveService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
+                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
@@ -88,7 +89,7 @@ export class ArchiveService {
 
       if (summaryError) {
           console.error("Summary Insert Failed:", summaryError);
-          throw new Error("Gagal menyimpan ringkasan statistik. Arsip dibatalkan.");
+          throw new Error("Gagal menyimpan ringkasan statistik. Arsip dibatalkan. Detail: " + JSON.stringify(summaryError));
       }
 
       let backupUrl: string | undefined;
@@ -172,6 +173,7 @@ export class ArchiveService {
                   delete fallback.region;
                   delete fallback.exam_type;
                   delete fallback.class_level;
+                  delete fallback.author_id;
                   return fallback;
               });
               const { error: fallbackError } = await supabase.from('exam_summaries').insert(fallbackSummaries);
@@ -183,7 +185,7 @@ export class ArchiveService {
 
       if (summaryError) {
           console.error("Legacy Stats Insert Failed:", summaryError);
-          throw new Error("Gagal menyimpan statistik ke database: " + summaryError.message);
+          throw new Error("Gagal menyimpan statistik ke database: " + JSON.stringify(summaryError));
       }
   }
 
@@ -257,7 +259,7 @@ export class ArchiveService {
               exam_code: exam.code,
               exam_type: exam.config.examType, 
               class_level: classLevelStr, 
-              exam_date: exam.config.date,
+              exam_date: exam.config.date || exam.config.startDate || new Date().toISOString().split('T')[0],
               total_participants: total,
               average_score: parseFloat(avg.toFixed(2)),
               highest_score: max,
@@ -370,7 +372,9 @@ export class ArchiveService {
             
         3. PERBANDINGAN DAN REKOMENDASI:
            - Jika ada >1 sekolah, bandingkan secara singkat perbedaan/kesenjangan performa.
-           - Berikan rekomendasi konkrit dan spesifik untuk perbaikan pembelajaran untuk masing-masing masalah yang diidentifikasi.
+           - Evaluasi Butir Soal: Berikan evaluasi singkat mengenai tingkat kesulitan dan validitas butir soal berdasarkan pola jawaban siswa.
+           - Rekomendasi Remedial: Berikan rekomendasi konkrit dan spesifik untuk perbaikan pembelajaran dan remedial bagi siswa yang belum memenuhi kriteria.
+           - Rekomendasi Pengayaan: Berikan juga rekomendasi pengayaan atau tantangan lebih lanjut untuk siswa/kelas yang sudah melampaui standar atau mendapatkan nilai tinggi.
 
         TONE:
         - Professional, analytical, yet accessible to teachers and policymakers.
@@ -456,7 +460,11 @@ export class ArchiveService {
                   a: String(safeAuthorId).substring(0, 40)
               };
 
-              const b64 = btoa(JSON.stringify(minMeta))
+              const jsonStr = JSON.stringify(minMeta);
+              const encodedStr = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g,
+                  (match, p1) => String.fromCharCode(Number('0x' + p1))
+              );
+              const b64 = btoa(encodedStr)
                   .replace(/\+/g, '-')
                   .replace(/\//g, '_')
                   .replace(/=+$/, '');
@@ -502,7 +510,11 @@ export class ArchiveService {
                       b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
                       while (b64.length % 4) b64 += '=';
                       
-                      const parsed = JSON.parse(atob(b64));
+                      const byteString = atob(b64);
+                      const decodedStr = decodeURIComponent(
+                          Array.prototype.map.call(byteString, (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+                      );
+                      const parsed = JSON.parse(decodedStr);
                       let parsedAuthorId = parsed.a;
                       if (!parsedAuthorId || String(parsedAuthorId).trim() === '' || String(parsedAuthorId) === 'undefined' || String(parsedAuthorId) === 'null') {
                           parsedAuthorId = '';
@@ -565,6 +577,7 @@ export class ArchiveService {
               delete fallbackUpdates.region;
               delete fallbackUpdates.exam_type;
               delete fallbackUpdates.class_level;
+              delete fallbackUpdates.author_id;
               
               const { data: fallbackData, error: fallbackError } = await supabase
                   .from('exam_summaries')
