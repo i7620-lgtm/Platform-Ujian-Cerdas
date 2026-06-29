@@ -204,7 +204,7 @@ export const useUserManagementView = () => {
     setEditingUser(user);
     setNewRole(user.accountType);
     setNewSchool(user.school || "");
-    setIsPremium(user.isPremium || false);
+    setIsPremium(user.isPremium === true || (user.isPremium as any) === "true");
   };
 
   const handleSaveUser = async () => {
