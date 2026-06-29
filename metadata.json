@@ -1,5 +1,6 @@
 {
-  "name": "Platform Ujian Cerdas",
+  "name": "Remix: Platform Ujian Cerdas Supabase DB",
   "description": "Sebuah platform ujian online yang elegan dan modern untuk guru dan siswa. Didukung oleh AI untuk pembuatan soal otomatis dari PDF dan dirancang agar tetap berfungsi bahkan dengan koneksi internet yang buruk.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
