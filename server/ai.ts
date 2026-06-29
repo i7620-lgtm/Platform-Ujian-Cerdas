@@ -18,7 +18,7 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     try {
         const ai = getAI();
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
+            model: 'gemini-3.5-flash', 
             contents: prompt
         });
 
