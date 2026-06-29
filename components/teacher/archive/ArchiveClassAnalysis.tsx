@@ -1,7 +1,9 @@
-import React from "react";
-import type { Exam } from "../../../types";
-import { ChartBarIcon } from "../../Icons";
+import React, { useState } from "react";
+import type { Exam, Result, TeacherProfile, ExamSummary } from "../../../types";
+import { ChartBarIcon, SparklesIcon } from "../../Icons";
 import { formatDuration } from "./archiveUtils";
+import { archiveService } from "../../../services/archive";
+import Markdown from "react-markdown";
 
 interface QuestionTypeStat {
   type: string;
@@ -27,6 +29,8 @@ interface ArchiveClassAnalysisProps {
   uniqueSchools: string[];
   selectedSchool: string;
   exam: Exam;
+  results?: Result[];
+  teacherProfile?: TeacherProfile | null;
 }
 
 export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
@@ -34,18 +38,82 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   uniqueSchools,
   selectedSchool,
   exam,
+  results = [],
+  teacherProfile,
 }) => {
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
+
+  const handleGenerateAI = async () => {
+    if (!teacherProfile?.isPremium) {
+      alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
+      return;
+    }
+    
+    setIsGeneratingAI(true);
+    setAiAnalysisResult(null);
+    try {
+      const summaries = archiveService.calculateExamStatistics(exam, results) as ExamSummary[];
+      const analysis = await archiveService.generateAIAnalysis(summaries);
+      setAiAnalysisResult(analysis);
+    } catch (error: any) {
+      setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const handlePrintAI = () => {
+    const printContent = document.getElementById("ai-analysis-print-content");
+    if (printContent) {
+      const originalContents = document.body.innerHTML;
+      document.body.innerHTML = `
+        <div style="padding: 24px; font-family: system-ui, -apple-system, sans-serif;">
+          <h1 style="text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px;">Laporan Analisis AI - ${exam.config.subject}</h1>
+          ${printContent.innerHTML}
+        </div>
+      `;
+      window.print();
+      document.body.innerHTML = originalContents;
+      window.location.reload(); // Reload to restore React state cleanly
+    }
+  };
+
+  const analysisSchools = Array.from(new Set(classAnalysisData.map(c => c.schoolName)));
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 dark:border-slate-700">
-        <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-          <ChartBarIcon className="w-5 h-5 text-indigo-500" /> Analisis Umum Per
-          Kelas
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Ringkasan performa dan ketuntasan belajar siswa dikelompokkan
-          berdasarkan kelas.
-        </p>
+      <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+            <ChartBarIcon className="w-5 h-5 text-indigo-500" /> Analisis Umum Per
+            Kelas
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Ringkasan performa dan ketuntasan belajar siswa dikelompokkan
+            berdasarkan kelas.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGenerateAI}
+            disabled={isGeneratingAI}
+            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-70"
+          >
+            {isGeneratingAI ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Menganalisis...
+              </>
+            ) : (
+              <>
+                <SparklesIcon className="w-4 h-4" />
+                Buat Analisis AI
+              </>
+            )}
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left min-w-[800px]">
@@ -80,7 +148,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-            {uniqueSchools.map((school) => {
+            {analysisSchools.map((school) => {
               const schoolAnalysis = classAnalysisData.filter(
                 (c) => c.schoolName === school,
               );
@@ -172,6 +240,28 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
           </tbody>
         </table>
       </div>
+      
+      {/* AI Analysis Section */}
+      {aiAnalysisResult && (
+        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 relative">
+          <button
+            onClick={handlePrintAI}
+            className="absolute top-8 right-8 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors z-10 print:hidden"
+            title="Cetak Laporan AI"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+          </button>
+          <div id="ai-analysis-print-content" className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-amber-100 dark:border-amber-900/30 shadow-inner">
+            <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+              <div className="markdown-body">
+                <Markdown>{aiAnalysisResult}</Markdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
