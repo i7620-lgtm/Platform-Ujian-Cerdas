@@ -31,6 +31,7 @@ interface ArchiveClassAnalysisProps {
   exam: Exam;
   results?: Result[];
   teacherProfile?: TeacherProfile | null;
+  aiAnalysisResult?: string | null;
 }
 
 export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
@@ -40,29 +41,8 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   exam,
   results = [],
   teacherProfile,
+  aiAnalysisResult,
 }) => {
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
-
-  const handleGenerateAI = async () => {
-    if (!teacherProfile?.isPremium) {
-      alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
-      return;
-    }
-    
-    setIsGeneratingAI(true);
-    setAiAnalysisResult(null);
-    try {
-      const summaries = archiveService.calculateExamStatistics(exam, results) as ExamSummary[];
-      const analysis = await archiveService.generateAIAnalysis(summaries);
-      setAiAnalysisResult(analysis);
-    } catch (error: any) {
-      setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
-    } finally {
-      setIsGeneratingAI(false);
-    }
-  };
-
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
     if (printContent) {
@@ -83,7 +63,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-6 border-b border-slate-100 dark:border-slate-700">
         <div>
           <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
             <ChartBarIcon className="w-5 h-5 text-indigo-500" /> Analisis Umum Per
@@ -93,26 +73,6 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
             Ringkasan performa dan ketuntasan belajar siswa dikelompokkan
             berdasarkan kelas.
           </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleGenerateAI}
-            disabled={isGeneratingAI}
-            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-70"
-          >
-            {isGeneratingAI ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Menganalisis...
-              </>
-            ) : (
-              <>
-                <SparklesIcon className="w-4 h-4" />
-                Buat Analisis AI
-              </>
-            )}
-          </button>
         </div>
       </div>
       <div className="overflow-x-auto custom-scrollbar">

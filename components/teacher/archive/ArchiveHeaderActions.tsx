@@ -7,6 +7,7 @@ import {
   FilePdfIcon,
   TableCellsIcon,
   DocumentDuplicateIcon,
+  SparklesIcon,
 } from "../../Icons";
 
 interface ArchiveHeaderActionsProps {
@@ -26,6 +27,8 @@ interface ArchiveHeaderActionsProps {
   activeTab: ArchiveTab;
   setActiveTab: (tab: ArchiveTab) => void;
   totalStudents: number;
+  isGeneratingAI?: boolean;
+  onGenerateAI?: () => void;
 }
 
 export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
@@ -45,6 +48,8 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
   activeTab,
   setActiveTab,
   totalStudents,
+  isGeneratingAI,
+  onGenerateAI,
 }) => {
   return (
     <div className="p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm print:hidden">
@@ -148,28 +153,49 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
           )}
         </div>
       </div>
-      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-2">
-        {(
-          ["DETAIL", "STUDENTS", "ANALYSIS", "CLASS_ANALYSIS"] as ArchiveTab[]
-        ).map((tab) => {
-          const label =
-            tab === "DETAIL"
-              ? "Detail Ujian"
-              : tab === "STUDENTS"
-                ? `Rekap Siswa (${totalStudents})`
-                : tab === "ANALYSIS"
-                  ? "Analisis Soal"
-                  : "Analisis Kelas";
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-            >
-              {label}
-            </button>
-          );
-        })}
+      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-wrap gap-2">
+          {(
+            ["DETAIL", "STUDENTS", "ANALYSIS", "CLASS_ANALYSIS"] as ArchiveTab[]
+          ).map((tab) => {
+            const label =
+              tab === "DETAIL"
+                ? "Detail Ujian"
+                : tab === "STUDENTS"
+                  ? `Rekap Siswa (${totalStudents})`
+                  : tab === "ANALYSIS"
+                    ? "Analisis Soal"
+                    : "Analisis Kelas";
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {activeTab === "CLASS_ANALYSIS" && onGenerateAI && (
+          <button
+            onClick={onGenerateAI}
+            disabled={isGeneratingAI}
+            className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-70"
+          >
+            {isGeneratingAI ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Menganalisis...
+              </>
+            ) : (
+              <>
+                <SparklesIcon className="w-4 h-4" />
+                Buat Analisis AI
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
