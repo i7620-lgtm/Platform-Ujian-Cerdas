@@ -18,12 +18,16 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     try {
         const ai = getAI();
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash', 
+            model: 'gemini-2.5-flash', 
             contents: prompt
         });
 
         return response.text || "Gagal menghasilkan analisis.";
     } catch (e: any) {
+        if (e.status === 503 || e.message?.includes('503') || e.message?.includes('high demand')) {
+            console.warn("Gemini Warning:", "Layanan AI Gemini sedang mengalami antrean tinggi (503).");
+            throw new Error("Layanan AI Gemini sedang mengalami antrean tinggi. Harap tunggu beberapa menit lalu coba kembali.");
+        }
         console.error("Gemini Error:", e);
         throw e;
     }
@@ -91,6 +95,11 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
           }
           throw new Error("QUOTA_EXCEEDED_GENERAL");
         }
+        if (err?.status === 503 || errorMessage.includes('503') || errorMessage.includes('high demand')) {
+            console.warn("Gemini Warning:", "Layanan AI Gemini sedang mengalami antrean tinggi (503).");
+            throw new Error("Layanan AI Gemini sedang mengalami antrean tinggi. Harap tunggu beberapa menit lalu coba kembali.");
+        }
+        console.error("Gemini Error:", err);
         throw new Error(`API Error: ${err?.message || "Terjadi kesalahan jaringan/server."}`);
     }
   
