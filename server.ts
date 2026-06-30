@@ -22,7 +22,7 @@ async function startServer() {
       const responseText = await generateQuestionsOnServer(prompt, systemInstruction, modelsToTry, properties);
       res.json({ success: true, text: responseText });
     } catch (error: any) {
-      console.error("API error generating questions:", error);
+      console.warn("API warning generating questions:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -33,7 +33,7 @@ async function startServer() {
       const responseText = await generateAIAnalysisOnServer(prompt);
       res.json({ success: true, text: responseText });
     } catch (error: any) {
-      console.error("API error generating analysis:", error);
+      console.warn("API warning generating analysis:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
