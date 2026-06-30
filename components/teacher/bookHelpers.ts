@@ -248,7 +248,10 @@ export const generateBookHtml = ({
   let chartCounter = 0;
   let chartScripts = "";
 
-  const injectChart = (chartData: ChartData | undefined | null, html: string): string => {
+  const injectChart = (
+    chartData: ChartData | undefined | null,
+    html: string,
+  ): string => {
     let processedHtml = html || "";
     if (chartData) {
       chartCounter++;
@@ -580,7 +583,7 @@ export const generateBookHtml = ({
                     width: 210mm !important;
                     height: auto !important;
                     min-height: 296.5mm !important;
-                    padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding} !important;
+                    padding: ${computedPadding} !important;
                     margin: 0 !important;
                     border: none !important;
                     box-sizing: border-box !important;
@@ -593,7 +596,7 @@ export const generateBookHtml = ({
                 .page-container-flow {
                     width: 210mm !important;
                     min-height: 296.5mm !important;
-                    padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding} !important;
+                    padding: ${computedPadding} !important;
                     margin: 0 !important;
                     box-shadow: none !important;
                     border: none !important;
@@ -603,7 +606,7 @@ export const generateBookHtml = ({
                 }
                 .page-cover {
                     border: none !important;
-                    padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding} !important;
+                    padding: ${computedPadding} !important;
                     height: 296.5mm !important;
                 }
                 .keys-grid {
@@ -631,7 +634,7 @@ export const generateBookHtml = ({
                 width: 210mm;
                 height: auto;
                 min-height: 296.5mm;
-                padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding};
+                padding: ${computedPadding};
                 box-sizing: border-box;
                 background: white;
                 display: flex;
@@ -644,7 +647,7 @@ export const generateBookHtml = ({
                 position: relative;
                 width: 210mm;
                 min-height: 296.5mm;
-                padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding};
+                padding: ${computedPadding};
                 box-sizing: border-box;
                 background: white;
                 page-break-after: always;
@@ -686,11 +689,6 @@ export const generateBookHtml = ({
         </style>
     </head>
     <body>
-        <div class="no-print" style="position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; gap: 12px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 9999px; box-shadow: 0 10px 20px rgba(0,0,0,0.25);">
-            <button onclick="window.print()" style="background-color: #10b981; color: white; border: none; padding: 8px 18px; border-radius: 9999px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;"><span style="font-size: 15px;">🖨️</span> Cetak / Simpan PDF</button>
-            <button onclick="window.close()" style="background-color: transparent; color: #cbd5e1; border: 1px solid #475569; padding: 8px 18px; border-radius: 9999px; font-weight: bold; font-size: 13px; cursor: pointer;">Tutup Halaman</button>
-        </div>
-
         <div class="book-canvas">
             <!-- Cover Page -->
             <div class="page-container page-cover" style="page-break-after: always; break-after: page;">
@@ -799,7 +797,7 @@ export const generateBookHtml = ({
             ${chartScripts}
         </script>
         <script>
-            window.onload = () => {
+            setTimeout(() => {
                 if (window.katex) {
                     document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
                         try {
@@ -831,16 +829,16 @@ export const generateBookHtml = ({
                     function createNewPage() {
                         const page = document.createElement('div');
                         page.className = 'page-container pdf-render-page';
-                        page.style = 'width: 210mm; min-height: 296.5mm; height: 296.5mm; padding: calc(${computedPadding} - 54px) ${computedPadding} calc(${computedPadding} + 54px) ${computedPadding}; box-sizing: border-box; background: white; display: flex; flex-direction: column; position: relative; margin: 0 auto; overflow: hidden;';
+                        page.setAttribute('style', 'width: 210mm; min-height: 296.5mm; height: 296.5mm; padding: ' + computedPadding + '; box-sizing: border-box; background: white; display: flex; flex-direction: column; position: relative; margin: 0 auto; overflow: hidden;');
                         
                         const content = document.createElement('div');
                         content.className = 'page-content';
-                        content.style = 'flex: 1; display: flex; flex-direction: column; overflow: hidden; gap: 8px;';
+                        content.setAttribute('style', 'flex: 1; display: flex; flex-direction: column; overflow: hidden; gap: 8px;');
                         page.appendChild(content);
 
                         const footer = document.createElement('div');
                         footer.className = 'page-footer';
-                        footer.style = 'border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-family: sans-serif; position: absolute; bottom: ${computedPadding}; left: ${computedPadding}; right: ${computedPadding};';
+                        footer.setAttribute('style', 'border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-family: sans-serif; position: absolute; bottom: 12mm; left: ' + computedPadding + '; right: ' + computedPadding + ';');
                         footer.innerHTML = '<div style="font-weight: bold; text-transform: uppercase;">HALAMAN ' + pageIdx + '</div><div style="font-weight: 900; letter-spacing: 0.1em;">KUMPULAN SOAL RESMI</div>';
                         page.appendChild(footer);
                         
@@ -872,7 +870,7 @@ export const generateBookHtml = ({
                 }
 
                 const overlay = document.createElement('div');
-                overlay.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#f8fafc;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;';
+                overlay.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;background:#f8fafc;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;');
                 overlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #4f46e5;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:24px;"></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Memproses PDF Resmi</h2><p style="color:#64748b;margin:0;font-size:15px;max-width:300px;">Mohon tunggu, dokumen sedang disusun dan dirender dengan presisi tinggi...</p><style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>';
                 document.body.appendChild(overlay);
 
@@ -888,7 +886,7 @@ export const generateBookHtml = ({
                             overlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #4f46e5;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:24px;"></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Memproses PDF Resmi</h2><p style="color:#64748b;margin:0;font-size:15px;max-width:300px;">Merender halaman ' + (i + 1) + ' dari ' + pages.length + '...</p><style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>';
                             await new Promise(r => setTimeout(r, 50));
                             
-                            const canvas = await html2canvas(page as HTMLElement, {
+                            const canvas = await html2canvas(page, {
                                 scale: 2,
                                 useCORS: true,
                                 logging: false
@@ -907,7 +905,7 @@ export const generateBookHtml = ({
                             pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
                         }
                         
-                        (window as any).__pdf = pdf;
+                        window.__pdf = pdf;
                         
                         overlay.innerHTML = '<div style="width:56px;height:56px;border-radius:50%;background:#10b981;color:white;display:flex;align-items:center;justify-content:center;margin-bottom:24px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Render Selesai!</h2><p style="color:#64748b;margin:0 0 24px 0;font-size:15px;max-width:350px;">Dokumen PDF Anda telah berhasil dibuat. Silakan klik tombol di bawah untuk mengunduhnya.</p><button id="auto-download-btn" onclick="window.__pdf.save(&quot;Buku_Soal_Resmi.pdf&quot;)" style="display:inline-block;padding:14px 28px;background-color:#4f46e5;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;border:none;cursor:pointer;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">⬇ Unduh Buku PDF Sekarang</button><p style="color:#94a3b8;font-size:13px;margin-top:24px;">Anda dapat menutup halaman ini setelah dokumen terunduh.</p>';
                         
@@ -919,7 +917,7 @@ export const generateBookHtml = ({
                         overlay.innerHTML = '<div style="color:#ef4444;margin-bottom:16px;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;">Gagal Merender PDF</h2><p style="color:#64748b;margin:0;font-size:15px;">Terjadi kesalahan: ' + err + '</p><button onclick="window.close()" style="margin-top:24px;padding:8px 16px;background:#0f172a;color:white;border:none;border-radius:6px;cursor:pointer;">Tutup Halaman</button>';
                     }
                 }, 1000);
-            };
+            }, 500);
         </script>
     </body>
     </html>

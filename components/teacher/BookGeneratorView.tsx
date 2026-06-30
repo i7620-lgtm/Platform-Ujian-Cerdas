@@ -1,12 +1,68 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { TeacherProfile } from "../../types";
 import { BookOpenIcon, MagnifyingGlassIcon } from "../Icons";
+import { ChartRenderer } from "../ChartRenderer";
 import {
   normalizeQuestion,
   isLongQuestion,
   getFormattedAnswerText,
 } from "./bookHelpers";
 import { useBookGenerator } from "./useBookGenerator";
+
+const renderQuestionTextWithChart = (
+  html: string,
+  chartData: any,
+  className: string = "",
+) => {
+  if (!chartData) {
+    return (
+      <div
+        className={className}
+        dangerouslySetInnerHTML={{ __html: html }}
+      ></div>
+    );
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const chartNode = doc.querySelector('[data-chart="true"]');
+
+  if (!chartNode) {
+    return (
+      <>
+        <div
+          className={className}
+          dangerouslySetInnerHTML={{ __html: html }}
+        ></div>
+        <div className="mb-4 w-full max-w-3xl mx-auto">
+          <ChartRenderer data={chartData} />
+        </div>
+      </>
+    );
+  }
+
+  const marker = "___CHART_MARKER___";
+  chartNode.insertAdjacentText("beforebegin", marker);
+  chartNode.remove();
+
+  const newHtml = doc.body.innerHTML;
+  const parts = newHtml.split(marker);
+
+  return (
+    <div className={className}>
+      {parts.map((part, index) => (
+        <React.Fragment key={index}>
+          <div dangerouslySetInnerHTML={{ __html: part }}></div>
+          {index < parts.length - 1 && (
+            <div className="my-4 w-full max-w-3xl mx-auto">
+              <ChartRenderer data={chartData} />
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
 
 const PrinterIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg
@@ -66,6 +122,35 @@ interface BookGeneratorViewProps {
 export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
   profile,
 }) => {
+  useEffect(() => {
+    const renderMath = () => {
+      // @ts-ignore
+      if (typeof window !== "undefined" && window.katex) {
+        const mathElements = document.querySelectorAll(
+          ".math-visual, [data-latex]",
+        );
+        mathElements.forEach((el) => {
+          const latex = el.getAttribute("data-latex") || el.textContent;
+          if (latex) {
+            try {
+              // @ts-ignore
+              window.katex.render(latex, el, {
+                throwOnError: false,
+                displayMode: false,
+              });
+            } catch (e) {
+              console.error("KaTeX error:", e);
+            }
+          }
+        });
+      }
+    };
+
+    // Slight delay to allow DOM to update
+    const timeout = setTimeout(renderMath, 300);
+    return () => clearTimeout(timeout);
+  });
+
   const {
     selectedExams,
     isLoading,
@@ -339,36 +424,36 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
         {/* Live Book Page Preview Section */}
         {selectedExams.length > 0 && (
           <div className="mt-12 bg-slate-100 dark:bg-slate-950/40 rounded-2xl p-4 sm:p-8 border border-slate-200 dark:border-slate-800 print:bg-transparent print:p-0 print:m-0 print:border-none">
-            <div className="max-w-5xl mx-auto mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800/60 print:hidden">
-              <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                  <span>📖</span> Pratinjau Buku Cetak (Live Preview)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Halaman di bawah memuat margin & tata letak yang 100% sama
-                  dengan hasil cetak PDF.
-                </p>
-              </div>
-              <button
-                onClick={handleDownload}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow transition-all hover:shadow-md active:scale-[0.98]"
-              >
-                <PrinterIcon className="w-4 h-4" />
-                Cetak / Unduh PDF
-              </button>
-            </div>
-
             <div className="overflow-x-auto py-4 flex flex-col items-center">
               <div
                 id="pdf-book-container"
                 className="print:block font-serif w-full max-w-none text-black bg-slate-100 print:bg-white !m-0 !p-0 flex flex-col items-center gap-8 print:gap-0 select-none print:select-text"
               >
                 <style>{`
+                                    .html-content table {
+                                        width: 100%;
+                                        border-collapse: collapse;
+                                        margin: 1rem 0;
+                                        font-family: inherit;
+                                    }
+                                    .html-content th, .html-content td {
+                                        border: 1px solid #cbd5e1;
+                                        padding: 0.5rem;
+                                        text-align: left;
+                                    }
+                                    .html-content th {
+                                        background-color: #f1f5f9;
+                                        font-weight: 600;
+                                    }
+                                    .html-content p:last-child {
+                                        margin-bottom: 0;
+                                    }
+                                    
                                     .page-container {
                                         width: 210mm !important;
                                         height: auto !important;
                                         min-height: 296.5mm !important;
-                                        padding: calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} - 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} + 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
+                                        padding: ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
                                         box-sizing: border-box !important;
                                         background-color: white !important;
                                         box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
@@ -384,7 +469,7 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                     .page-container-flow {
                                         width: 210mm !important;
                                         min-height: 296.5mm !important;
-                                        padding: calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} - 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} + 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
+                                        padding: ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
                                         box-sizing: border-box !important;
                                         background-color: white !important;
                                         box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
@@ -426,7 +511,7 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                             width: 210mm !important;
                                             height: auto !important;
                                             min-height: 296.5mm !important;
-                                            padding: calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} - 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} + 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
+                                            padding: ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
                                             margin: 0 !important;
                                             box-shadow: none !important;
                                             border: none !important;
@@ -437,7 +522,7 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                         .page-container-flow {
                                             width: 210mm !important;
                                             min-height: 296.5mm !important;
-                                            padding: calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} - 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} calc(${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} + 54px) ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
+                                            padding: ${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} !important;
                                             margin: 0 !important;
                                             box-shadow: none !important;
                                             border: none !important;
@@ -702,12 +787,11 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                           : "1.55",
                                   }}
                                 >
-                                  <div
-                                    className="text-justify whitespace-pre-wrap mb-3 font-serif text-slate-950"
-                                    dangerouslySetInnerHTML={{
-                                      __html: normalized.questionText,
-                                    }}
-                                  ></div>
+                                  {renderQuestionTextWithChart(
+                                    normalized.questionText,
+                                    normalized.chartData,
+                                    "html-content text-justify whitespace-pre-wrap mb-3 font-serif text-slate-950",
+                                  )}
 
                                   {normalized.imageUrl && (
                                     <div className="my-3 max-w-[80%] border border-slate-300 rounded-lg p-1 inline-block bg-white shadow-sm">
@@ -757,7 +841,13 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                                 )}
                                               </span>
                                               <div className="pt-0.5 flex-1 leading-normal font-sans">
-                                                <span>{opt}</span>
+                                                {renderQuestionTextWithChart(
+                                                  opt,
+                                                  normalized.optionCharts?.[
+                                                    oIndex
+                                                  ],
+                                                  "html-content inline-block max-w-full break-words",
+                                                )}
                                                 {normalized.optionImages &&
                                                   normalized.optionImages[
                                                     oIndex
@@ -816,8 +906,12 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                                 key={rIdx}
                                                 className="border-b border-slate-950 last:border-b-0 hover:bg-slate-50"
                                               >
-                                                <td className="py-2 px-3 text-left border-r border-slate-300 font-medium">
-                                                  {row.text}
+                                                <td className="py-2 px-3 text-left border-r border-slate-300 font-medium align-top">
+                                                  {renderQuestionTextWithChart(
+                                                    row.text,
+                                                    row.chartData,
+                                                    "html-content",
+                                                  )}
                                                 </td>
                                                 <td className="py-2 border-r border-slate-300 text-center">
                                                   <div className="w-4 h-4 rounded border border-slate-400 mx-auto bg-slate-50 shadow-inner flex items-center justify-center text-[9px] font-bold text-slate-400 leading-none pb-[1px]">
@@ -834,6 +928,29 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
                                           )}
                                         </tbody>
                                       </table>
+                                    </div>
+                                  ) : normalized.questionType === "MATCHING" ? (
+                                    <div className="mt-3 ml-2 space-y-2 mb-4 pb-4 border-b border-dashed border-slate-200">
+                                      {normalized.matchingPairs?.map(
+                                        (pair: any, pIdx: number) => (
+                                          <div
+                                            key={pIdx}
+                                            className="flex items-center gap-3"
+                                          >
+                                            <div className="flex-1 p-2 border border-slate-300 rounded-md bg-slate-50 text-[10.5pt]">
+                                              {renderQuestionTextWithChart(
+                                                pair.left,
+                                                pair.leftChart,
+                                                "html-content",
+                                              )}
+                                            </div>
+                                            <div className="font-bold text-slate-500">
+                                              ......
+                                            </div>
+                                            <div className="flex-1 border-b border-slate-600 h-5" />
+                                          </div>
+                                        ),
+                                      )}
                                     </div>
                                   ) : normalized.questionType === "ESSAY" ? (
                                     <div className="mt-3 border-2 border-slate-300 p-3 rounded-lg bg-slate-50/20 avoid-break">

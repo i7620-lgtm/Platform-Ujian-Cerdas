@@ -63,12 +63,13 @@ export const useBookGenerator = ({ profile }: UseBookGeneratorParams) => {
   }, [profile]);
 
   const filteredExams = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
     return exams.filter(
       (e) =>
-        e.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.examType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.school.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.code.toLowerCase().includes(searchTerm.toLowerCase()),
+        (e.subject?.toLowerCase() || "").includes(searchLower) ||
+        (e.examType?.toLowerCase() || "").includes(searchLower) ||
+        (e.school?.toLowerCase() || "").includes(searchLower) ||
+        (e.code?.toLowerCase() || "").includes(searchLower),
     );
   }, [exams, searchTerm]);
 
