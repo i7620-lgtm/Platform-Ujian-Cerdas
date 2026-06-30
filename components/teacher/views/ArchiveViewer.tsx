@@ -10,6 +10,7 @@ import {
   calculateAggregateStats,
   analyzeQuestionTypePerformance,
 } from "../examUtils";
+import { archiveService } from "../../../services/archive";
 import { ExclamationTriangleIcon } from "../../Icons";
 
 // Subcomponents
@@ -36,6 +37,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
   onReuseExam,
   teacherProfile,
 }) => {
+  const [isGeneratingAI, setIsGeneratingAI] = React.useState(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = React.useState<string | null>(null);
+
   const archiveViewer = useArchiveViewer({ teacherProfile });
   const {
     archiveData,
@@ -203,7 +207,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
       );
     }
     if (selectedClass !== "ALL") {
-      results = results.filter((r) => r.student.class === selectedClass);
+      results = results.filter((r) => String(r.student.class || "Tanpa Kelas") === selectedClass);
     }
     return results;
   }, [sortedResults, selectedSchool, selectedClass]);
@@ -428,6 +432,25 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         )
       : 0;
 
+  const handleGenerateAI = async () => {
+    if (!teacherProfile?.isPremium) {
+      alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
+      return;
+    }
+    
+    setIsGeneratingAI(true);
+    setAiAnalysisResult(null);
+    try {
+      const summaries = archiveService.calculateExamStatistics(archiveData!.exam, filteredResults) as any[];
+      const analysis = await archiveService.generateAIAnalysis(summaries);
+      setAiAnalysisResult(analysis);
+    } catch (error: any) {
+      setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-full mx-auto space-y-6">
       <style>{`
@@ -499,6 +522,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         totalStudents={totalStudentsDisplay}
+        isGeneratingAI={isGeneratingAI}
+        onGenerateAI={handleGenerateAI}
       />
 
       <div className="animate-fade-in print:hidden">
@@ -565,7 +590,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
                           {
                             sortedResults.filter(
                               (r) =>
-                                r.student.class === c &&
+                                String(r.student.class || "Tanpa Kelas") === c &&
                                 (selectedSchool === "ALL" ||
                                   (r.student.schoolName || "Tanpa Sekolah") ===
                                     selectedSchool),
@@ -621,6 +646,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             exam={exam}
             results={filteredResults}
             teacherProfile={teacherProfile}
+            aiAnalysisResult={aiAnalysisResult}
           />
         )}
       </div>
