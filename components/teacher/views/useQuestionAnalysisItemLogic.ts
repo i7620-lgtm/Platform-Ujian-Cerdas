@@ -19,7 +19,7 @@ export const useQuestionAnalysisItemLogic = ({
   const [isEditingKey, setIsEditingKey] = useState(false);
 
   // Initialize tempKey based on question type
-  const getInitialKey = React.useCallback(() => {
+  const getInitialKey = useCallback(() => {
     if (q.questionType === "TRUE_FALSE") {
       if (q.trueFalseRows && q.trueFalseRows.length > 0)
         return JSON.stringify(q.trueFalseRows);
