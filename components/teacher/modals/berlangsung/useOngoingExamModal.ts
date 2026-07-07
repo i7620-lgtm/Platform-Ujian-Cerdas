@@ -40,6 +40,10 @@ export const useOngoingExamModal = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean; message: string; onConfirm: () => void}>({ isOpen: false, message: '', onConfirm: () => {} });
+  const [alertDialog, setAlertDialog] = useState<{isOpen: boolean; message: string}>({ isOpen: false, message: '' });
+
   const [generatedTokenData, setGeneratedTokenData] = useState<{
     name: string;
     token: string;
@@ -421,7 +425,7 @@ export const useOngoingExamModal = ({
       );
       setGeneratedTokenData({ name: studentName, token });
     } catch {
-      alert("Gagal membuat token akses.");
+      setAlertDialog({ isOpen: true, message: "Gagal membuat token akses." });
     } finally {
       setTimeout(() => processingIdsRef.current.delete(studentId), 1000);
     }
@@ -437,67 +441,70 @@ export const useOngoingExamModal = ({
       });
       fetchLatest(true);
       setEditingStudent(null);
-      alert("Data siswa berhasil diperbarui.");
+      setAlertDialog({ isOpen: true, message: "Data siswa berhasil diperbarui." });
     } catch (e) {
       console.error(e);
-      alert("Gagal memperbarui data siswa.");
+      setAlertDialog({ isOpen: true, message: "Gagal memperbarui data siswa." });
     }
   };
 
-  const handleDeleteStudent = async (
+  const handleDeleteStudent = (
     studentId: string,
     studentName: string,
   ) => {
-    if (
-      !window.confirm(
-        `Apakah Anda yakin ingin menghapus data siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
-      )
-    )
-      return;
-
-    try {
-      await storageService.deleteStudentResult(
-        displayExam?.code || "",
-        studentId,
-      );
-      fetchLatest(true);
-      alert("Data siswa berhasil dihapus.");
-    } catch (e) {
-      console.error(e);
-      alert("Gagal menghapus data siswa.");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      message: `Apakah Anda yakin ingin menghapus data siswa "${studentName}"? Data yang dihapus tidak dapat dikembalikan.`,
+      onConfirm: async () => {
+        try {
+          await storageService.deleteStudentResult(
+            displayExam?.code || "",
+            studentId,
+          );
+          fetchLatest(true);
+          setAlertDialog({ isOpen: true, message: "Data siswa berhasil dihapus." });
+        } catch (e) {
+          console.error(e);
+          setAlertDialog({ isOpen: true, message: "Gagal menghapus data siswa." });
+        }
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleFinishStudentExam = async (
     studentId: string,
     studentName: string,
   ) => {
-    if (
-      !window.confirm(
-        `Apakah Anda yakin ingin menghentikan ujian untuk "${studentName}"? Siswa tidak akan bisa melanjutkan lagi.`,
-      )
-    )
-      return;
-    try {
-      await storageService.finishStudentExam(
-        displayExam?.code || "",
-        studentId,
-      );
-      fetchLatest(true);
-      alert("Ujian siswa berhasil dihentikan.");
-    } catch (e) {
-      console.error(e);
-      alert("Gagal menghentikan ujian.");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      message: `Apakah Anda yakin ingin menghentikan ujian untuk "${studentName}"? Siswa tidak akan bisa melanjutkan lagi.`,
+      onConfirm: async () => {
+        try {
+          await storageService.finishStudentExam(
+            displayExam?.code || "",
+            studentId,
+          );
+          fetchLatest(true);
+          setAlertDialog({ isOpen: true, message: "Ujian siswa berhasil dihentikan." });
+        } catch (e) {
+          console.error(e);
+          setAlertDialog({ isOpen: true, message: "Gagal menghentikan ujian." });
+        }
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
-  const handleFinishAllExams = async () => {
+  const handleFinishAllExams = () => {
     if (!displayExam?.code) return;
+
     const activeCount = localResults.filter(
       (r) => r.status === "in_progress" || r.status === "force_closed",
     ).length;
 
     let confirmMsg = `Apakah Anda yakin ingin menghentikan ujian secara keseluruhan? SEMUA (${activeCount}) siswa akan dipaksa selesai dan ujian ini akan dipindahkan ke tab 'Ujian Selesai'.`;
+    
     if (activeCount === 0) {
       confirmMsg =
         "Semua siswa telah selesai. Apakah Anda yakin ingin menutup ujian ini dan memindahkannya ke tab 'Ujian Selesai'?";
@@ -505,19 +512,24 @@ export const useOngoingExamModal = ({
       confirmMsg = `PERHATIAN: Masih ada ${activeCount} siswa yang sedang mengerjakan atau sesi terkunci. Menghentikan ujian akan memaksa pengumpulan jawaban mereka secara otomatis. Lanjutkan?`;
     }
 
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      setIsRefreshing(true);
-      await storageService.stopExamOverall(displayExam.code);
-      alert("Ujian berhasil dihentikan secara keseluruhan.");
-      onClose();
-    } catch (e) {
-      console.error(e);
-      alert("Gagal menghentikan ujian.");
-    } finally {
-      setIsRefreshing(false);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      message: confirmMsg,
+      onConfirm: async () => {
+        try {
+          setIsRefreshing(true);
+          await storageService.stopExamOverall(displayExam.code);
+          setAlertDialog({ isOpen: true, message: "Ujian berhasil dihentikan secara keseluruhan." });
+          onClose();
+        } catch (e) {
+          console.error(e);
+          setAlertDialog({ isOpen: true, message: "Gagal menghentikan ujian." });
+        } finally {
+          setIsRefreshing(false);
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const handleAddTimeSubmit = async () => {
@@ -529,7 +541,7 @@ export const useOngoingExamModal = ({
       setIsAddTimeOpen(false);
       setAddTimeValue("");
     } catch {
-      alert("Gagal.");
+      setAlertDialog({ isOpen: true, message: "Gagal." });
     }
   };
 
@@ -675,6 +687,12 @@ export const useOngoingExamModal = ({
     setEditingStudent,
     setGeneratedTokenData,
 
+    isPrintModalOpen,
+    setIsPrintModalOpen,
+    confirmDialog,
+    setConfirmDialog,
+    alertDialog,
+    setAlertDialog,
     // Async / Actions functions
     fetchLatest,
     handleGenerateToken,
