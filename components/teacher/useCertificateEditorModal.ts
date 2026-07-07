@@ -99,10 +99,15 @@ export const useCertificateEditorModal = ({
           if (isMounted) setProcessedSignatureUrl(url);
         });
       } else {
-        setProcessedSignatureUrl(current.signatureUrl);
+        // use a microtask to avoid synchronous setState warning
+        Promise.resolve().then(() => {
+          if (isMounted) setProcessedSignatureUrl(current.signatureUrl);
+        });
       }
     } else {
-      setProcessedSignatureUrl(null);
+      Promise.resolve().then(() => {
+        if (isMounted) setProcessedSignatureUrl(null);
+      });
     }
     return () => { isMounted = false; };
   }, [current?.signatureUrl, current?.signatureTransparent]);

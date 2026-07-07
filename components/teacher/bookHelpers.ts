@@ -278,12 +278,20 @@ export const generateBookHtml = ({
           "<div class='chart-wrapper' style='height: 280px; width: 100%; max-width: 550px; margin: 15px auto;'><canvas id='" +
           canvasId +
           "'></canvas></div>";
-        processedHtml = processedHtml.includes("chart-placeholder")
-          ? processedHtml.replace(
+          
+        if (processedHtml.includes("chart-placeholder")) {
+            processedHtml = processedHtml.replace(
               /<span[^>]*class="[^"]*chart-placeholder[^"]*"[^>]*>.*?<\/span>/g,
               canvasHtml,
-            )
-          : processedHtml + canvasHtml;
+            );
+        } else if (processedHtml.includes("data-chart=\"true\"") || processedHtml.includes("data-chart='true'")) {
+            processedHtml = processedHtml.replace(
+              /<[^>]+data-chart=['"]true['"][^>]*>.*?<\/[a-zA-Z0-9]+>/g,
+              canvasHtml,
+            );
+        } else {
+            processedHtml = processedHtml + canvasHtml;
+        }
 
         const labelsStr = JSON.stringify(typedData.labels || []);
         const datasetsStr = JSON.stringify(
@@ -314,8 +322,9 @@ export const generateBookHtml = ({
     );
   };
 
-  let questionsHtmlStr = '<div id="questions-source" style="display: none;">';
+  let questionsHtmlStr = "";
   selectedExams.forEach((exam, examIndex) => {
+    questionsHtmlStr += '<div class="page-container-flow">';
     questionsHtmlStr += `
             <div class="printable-item exam-header" style="page-break-after: avoid; break-after: avoid;">
                 <div class="border-b-4 border-black pb-3 mb-6 flex justify-between items-end font-sans" style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 4px solid black; padding-bottom: 8px; margin-bottom: 16px; margin-top: 16px;">
@@ -347,12 +356,12 @@ export const generateBookHtml = ({
             : "1.55";
 
       questionsHtmlStr += `
-                <div class="printable-item question-part" style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 8px;">
+                <div class="printable-item question-part" style="page-break-inside: auto; break-inside: auto; margin-bottom: 16px;">
                     <div class="question-container bg-white text-black">
                         <div style="display: flex; gap: 12px;">
                             <div style="font-weight: 955; font-size: 16px; min-width: 24px;">${originalIndex}.</div>
                             <div style="flex: 1; font-size: ${qFontSize}; line-height: ${qLineHeight}; color: #0f172a;">
-                                <div style="text-align: justify; margin-bottom: 4px;">${cleanedText}</div>
+                                <div class="html-content" style="text-align: justify; margin-bottom: 4px;">${cleanedText}</div>
                                 
                                 ${
                                   q.imageUrl
@@ -388,7 +397,7 @@ export const generateBookHtml = ({
           }
           const isLastOption = oIndex === (q.options?.length || 0) - 1;
           const optionStyle = isLastOption
-            ? "margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0;"
+            ? "margin-bottom: 24px; padding-bottom: 16px;"
             : "margin-bottom: 8px;";
           questionsHtmlStr += `
                         <div class="printable-item option-part" style="page-break-inside: avoid; break-inside: avoid; margin-left: 36px; ${optionStyle} font-size: ${optFontSize};">
@@ -396,7 +405,7 @@ export const generateBookHtml = ({
                                 <span style="font-weight: 955; border: 1.5px solid #0f172a; border-radius: ${borderRadius}; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; background-color: #f8fafc; color: #0f172a; box-sizing: border-box; padding: 0 0 1px 0; margin-top: 4px; vertical-align: middle;">
                                     ${String.fromCharCode(65 + oIndex)}
                                 </span>
-                                <div style="padding-top: 2px; flex: 1; word-wrap: break-word; overflow-wrap: break-word;">
+                                <div class="html-content" style="padding-top: 2px; flex: 1; word-wrap: break-word; overflow-wrap: break-word;">
                                     <span style="display: inline-block; max-width: 100%; white-space: normal; line-height: 1.4;">${optText}</span>
                                     ${
                                       q.optionImages && q.optionImages[oIndex]
@@ -414,7 +423,7 @@ export const generateBookHtml = ({
         });
       } else if (q.questionType === "TRUE_FALSE") {
         questionsHtmlStr += `
-                    <div class="printable-item tf-part" style="margin-top: 8px; margin-left: 36px; margin-bottom: 24px; width: calc(100% - 36px); page-break-inside: avoid; break-inside: avoid;">
+                    <div class="printable-item tf-part" style="margin-top: 8px; margin-left: 36px; margin-bottom: 24px; width: calc(100% - 36px); page-break-inside: auto; break-inside: auto;">
                         <table style="width: 100%; table-layout: fixed; word-wrap: break-word; border-collapse: collapse; border: 1.5px solid #0f172a; font-size: 10pt;">
                             <thead>
                                 <tr style="background-color: #f1f5f9;">
@@ -432,7 +441,7 @@ export const generateBookHtml = ({
           }
           questionsHtmlStr += `
                         <tr style="border-bottom: 1px solid #cbd5e1;">
-                            <td style="padding: 6px 10px; text-align: left; border-right: 1px solid #cbd5e1; font-weight: 500;">${rText}</td>
+                            <td class="html-content" style="padding: 6px 10px; text-align: left; border-right: 1px solid #cbd5e1; font-weight: 500;">${rText}</td>
                             <td style="padding: 6px; text-align: center; border-right: 1px solid #cbd5e1;">
                                 <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">B</div>
                             </td>
@@ -448,7 +457,7 @@ export const generateBookHtml = ({
                     </div>
                 `;
       } else if (q.questionType === "MATCHING") {
-        questionsHtmlStr += `<div class="printable-item match-part" style="margin-left: 36px; margin-top: 10px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0; width: calc(100% - 36px); display: flex; flex-direction: column; gap: 8px; page-break-inside: avoid; break-inside: avoid;">`;
+        questionsHtmlStr += `<div class="printable-item match-part" style="margin-left: 36px; margin-top: 10px; margin-bottom: 24px; padding-bottom: 16px; width: calc(100% - 36px); display: flex; flex-direction: column; gap: 8px; page-break-inside: auto; break-inside: auto;">`;
         q.matchingPairs?.forEach((pair) => {
           let leftItem = pair.left || "";
           if (pair.leftChart) {
@@ -456,7 +465,7 @@ export const generateBookHtml = ({
           }
           questionsHtmlStr += `
                         <div style="display: flex; align-items: center; gap: 12px; page-break-inside: avoid; break-inside: avoid;">
-                            <div style="flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; font-size: 10.5pt;">${leftItem}</div>
+                            <div class="html-content" style="flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; font-size: 10.5pt;">${leftItem}</div>
                             <div style="font-weight: bold; color: #475569;">......</div>
                             <div style="flex: 1; border-bottom: 1px solid #475569; height: 18px;"></div>
                         </div>
@@ -468,7 +477,7 @@ export const generateBookHtml = ({
         q.questionType === "FILL_IN_THE_BLANK"
       ) {
         questionsHtmlStr += `
-                    <div class="printable-item essay-part" style="margin-left: 36px; margin-top: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; background-color: #f8fafc; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0; width: calc(100% - 36px); page-break-inside: avoid; break-inside: avoid;">
+                    <div class="printable-item essay-part" style="margin-left: 36px; margin-top: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; background-color: #f8fafc; margin-bottom: 24px; padding-bottom: 16px; width: calc(100% - 36px); page-break-inside: auto; break-inside: auto;">
                         <p style="font-size: 8.5pt; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6px 0;">Jawaban Uraian:</p>
                         <div style="border-bottom: 1px dashed #cbd5e1; height: 18px; margin-bottom: 6px;"></div>
                         <div style="border-bottom: 1px dashed #cbd5e1; height: 18px; margin-bottom: 6px;"></div>
@@ -477,8 +486,8 @@ export const generateBookHtml = ({
                 `;
       }
     });
+    questionsHtmlStr += `</div>`;
   });
-  questionsHtmlStr += `</div><div id="paginated-questions"></div>`;
 
   const examChunks: Exam[][] = [];
   const examsPerPage = 2;
@@ -535,6 +544,55 @@ export const generateBookHtml = ({
         `;
   });
 
+  let kisiKisiHtmlStr = "";
+  selectedExams.forEach((exam, index) => {
+    let rowsHtml = "";
+    exam.questions.forEach((q, qIndex) => {
+      rowsHtml += `
+        <tr>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${qIndex + 1}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px;">${q.kisiKisi || "-"}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px;">${q.category || "-"}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${q.level || "-"}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; text-transform: capitalize;">${q.questionType.replace(/_/g, ' ').toLowerCase()}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${q.scoreWeight || 1}</td>
+        </tr>
+      `;
+    });
+
+    kisiKisiHtmlStr += `
+      <div class="page-container-flow" style="page-break-after: always; break-after: page; display: flex; flex-direction: column; min-height: calc(296.5mm - (${paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm"} * 2));">
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start; width: 100%; box-sizing: border-box;">
+            <div style="text-align: center; padding-bottom: 8px; margin-bottom: 16px; border-bottom: 4px solid black;">
+                <p style="font-weight: 900; letter-spacing: 0.2em; font-size: 10px; color: #475569; text-transform: uppercase; margin: 0 0 4px 0;">LAMPIRAN DOKUMEN</p>
+                <h1 style="font-family: serif; font-size: 20px; font-weight: 900; text-transform: uppercase; margin: 0;">KISI-KISI MATERI SOAL</h1>
+                <p style="font-size: 10px; text-transform: uppercase; font-weight: bold; margin: 4px 0 0 0; color: #64748b;">MODUL ${index + 1}: ${exam.config.subject || "UMUM"}</p>
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'Inter', sans-serif; margin-bottom: 24px;">
+                <thead>
+                    <tr style="background-color: #f1f5f9; color: #0f172a;">
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 5%;">No</th>
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 40%;">Materi / Kisi-Kisi</th>
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 20%;">Kategori</th>
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 10%;">Level</th>
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 15%;">Jenis Soal</th>
+                        <th style="border: 1px solid #cbd5e1; padding: 8px; width: 10%;">Bobot</th>
+                    </tr>
+                </thead>
+                <tbody style="color: #334155;">
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+        <div style="border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-family: sans-serif; margin-top: auto; width: 100%;">
+            <div style="font-weight: bold; text-transform: uppercase;">KISI-KISI MATERI SOAL</div>
+            <div style="font-weight: 900; letter-spacing: 0.1em;">PLATFORM UJIAN CERDAS</div>
+        </div>
+      </div>
+    `;
+  });
+
   const computedPadding =
     paperMargin === "thin" ? "15mm" : paperMargin === "thick" ? "25mm" : "20mm";
 
@@ -550,7 +608,7 @@ export const generateBookHtml = ({
         <style>
             @page {
                 size: A4 portrait !important;
-                margin: 0 !important;
+                margin: ${computedPadding} !important;
             }
             @media print {
                 body {
@@ -572,18 +630,18 @@ export const generateBookHtml = ({
                     break-inside: ${keepTogether === "never" ? "auto" : "avoid"} !important;
                 }
                 .book-canvas {
-                    width: 210mm !important;
-                    max-width: 210mm !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     box-shadow: none !important;
                     background: white !important;
                 }
                 .page-container {
-                    width: 210mm !important;
-                    height: auto !important;
-                    min-height: 296.5mm !important;
-                    padding: ${computedPadding} !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    min-height: 0 !important;
+                    padding: 0 !important;
                     margin: 0 !important;
                     border: none !important;
                     box-sizing: border-box !important;
@@ -594,9 +652,9 @@ export const generateBookHtml = ({
                     break-after: page !important;
                 }
                 .page-container-flow {
-                    width: 210mm !important;
-                    min-height: 296.5mm !important;
-                    padding: ${computedPadding} !important;
+                    width: 100% !important;
+                    min-height: 0 !important;
+                    padding: 0 !important;
                     margin: 0 !important;
                     box-shadow: none !important;
                     border: none !important;
@@ -606,8 +664,8 @@ export const generateBookHtml = ({
                 }
                 .page-cover {
                     border: none !important;
-                    padding: ${computedPadding} !important;
-                    height: 296.5mm !important;
+                    padding: 0 !important;
+                    height: calc(296.5mm - (${computedPadding} * 2)) !important;
                 }
                 .keys-grid {
                     grid-template-columns: repeat(5, 1fr) !important;
@@ -619,6 +677,8 @@ export const generateBookHtml = ({
                 color: #0f172a;
                 margin: 0;
                 padding: 30px 0;
+                orphans: 3;
+                widows: 3;
             }
             .book-canvas {
                 background-color: white;
@@ -692,7 +752,7 @@ export const generateBookHtml = ({
         <div class="book-canvas">
             <!-- Cover Page -->
             <div class="page-container page-cover" style="page-break-after: always; break-after: page;">
-                <div style="border: 12px double #000000; padding: 12mm; flex: 1; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
+                <div style="border: 12px double #000000; padding: 12mm; flex: 1; height: 100%; min-height: calc(296.5mm - (${computedPadding} * 2)); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid black; padding-bottom: 12px;">
                         <div style="border: 2px solid black; padding: 6px 14px 6px 14px; font-size: 12px; font-weight: 600; display: inline-block; background-color: white; line-height: 1;">Dokumen Negara</div>
                         <div style="text-align: center;">
@@ -756,30 +816,34 @@ export const generateBookHtml = ({
                         <p style="font-weight: 600; margin: 0; color: #64748b;">Dicetak: ${new Date().toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" })}</p>
                     </div>
                 </div>
-            </div>
-
-            <!-- Petunjuk Umum Page -->
-            <div class="page-container" style="page-break-after: always; break-after: page;">
-                <div style="border: 12px double #000000; padding: 12mm; flex: 1; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
-                    <div>
+            </div>            <!-- Petunjuk Umum Page -->
+            <div class="page-container page-cover" style="page-break-after: always; break-after: page;">
+                <div style="border: 12px double #000000; padding: 12mm; flex: 1; height: 100%; min-height: calc(296.5mm - (${computedPadding} * 2)); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start;">
                         <div style="border-bottom: 4px solid black; padding-bottom: 12px; margin-bottom: 20px; text-align: center;">
                             <h2 style="font-family: serif; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">PETUNJUK UMUM</h2>
                             <p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 0 0;">ASESMEN KOMPETENSI MINIMUM & EVALUASI BELAJAR GURU</p>
                         </div>
-
                         <div style="font-size: 13px; line-height: 1.6; text-align: justify; color: #334155;">
                             <p style="font-weight: bold; color: #0f172a; margin-bottom: 14px;">Sebelum menguji atau membagikan soal-soal di dalam buku ini, mohon diperhatikan beberapa pedoman penting berikut:</p>
                             <ol style="padding-left: 20px; display: flex; flex-direction: column; gap: 12px; margin: 0;">
                                 <li><strong>Pembacaan Doa:</strong> Awali pelaksanaan kegiatan mengkaji ataupun pengujian ujian evaluasi dengan berdoa setulus hati demi kesuksesan bersama.</li>
                                 <li><strong>Verifikasi Modul:</strong> Periksa keselarasan semua modul materi (${selectedExams.length} Modul) dalam kumpulan soal ini sebelum didistribusikan secara cetak fisik atau digital.</li>
-                                <li><strong>Pilihan Ganda Resmi:</strong> Pilihan ganda tunggal dan kompleks tersaji dengan visual huruf lingkaran tebal (A, B, C, D, E) untuk menjamin kerapihan tata letak halaman saat diprint.</li>
-                                <li><strong>Soal Isian & Benar-Salah:</strong> Untuk soal berpola Benar/Salah (True-False), siswa dapat memberi tanda checklist atau lingkaran langsung pada kolom pilihan tabel yang tertera.</li>
-                                <li><strong>Lembar Jawaban Esai:</strong> Buku printout ini melampirkan lembar garis putus-putus elegan di bawah soal esai agar memudahkan siswa menjabarkan rincian rumus atau argumen tulisan tangan secara rapi.</li>
+                                <li><strong>Soal Pilihan Ganda:</strong> Pilihan ganda tunggal tersaji dengan visual huruf lingkaran tebal (A, B, C, D, E) untuk menjamin kerapihan tata letak halaman saat diprint.</li>
+                                <li><strong>Soal Pilihan Ganda Kompleks:</strong> Pilihan ganda kompleks mengizinkan siswa memilih lebih dari satu jawaban yang benar dengan memberi tanda silang atau checklist pada opsi yang tersedia.</li>
+                                <li><strong>Soal Benar-Salah:</strong> Untuk soal berpola Benar/Salah (True-False), siswa dapat memberi tanda checklist atau lingkaran langsung pada kolom pilihan tabel yang tertera.</li>
+                                <li><strong>Soal Menjodohkan:</strong> Untuk soal menjodohkan, siswa dapat menarik garis lurus dari kotak kiri (premis) ke kotak kanan (respons) yang merupakan pasangan yang sesuai.</li>
+                                <li><strong>Soal Isian Singkat:</strong> Pada soal isian singkat, siswa dapat menuliskan jawaban pendek langsung pada kotak atau titik-titik yang disediakan dengan jelas dan rapi.</li>
+                                <li><strong>Soal Uraian / Esai:</strong> Buku printout ini melampirkan lembar garis putus-putus elegan di bawah soal esai agar memudahkan siswa menjabarkan rincian rumus atau argumen tulisan tangan secara rapi.</li>
                                 <li><strong>Kunci Jawaban:</strong> Lembar Kunci Jawaban Resmi telah dilampirkan pada bagian halaman penutup buku. Pisahkan lembar penutup ini saat mendistribusikan soal kepada peserta didik Anda.</li>
+                                <li><strong>Kisi-Kisi Materi:</strong> Lampiran kisi-kisi lengkap untuk seluruh modul soal dapat Anda temukan pada halaman terakhir dokumen ini untuk keperluan analisis dan rekapitulasi.</li>
                             </ol>
                         </div>
                     </div>
-                    <div style="border-top: 2px solid #000000; padding-top: 10px; text-align: center; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;">SELAMAT BEKERJA • PRESTASI PENTING JUJUR UTAMA</div>
+                    
+                    <div style="margin-top: 32px;">
+                        <div style="border-top: 2px solid #000000; padding-top: 10px; text-align: center; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 24px;">SELAMAT BEKERJA • PRESTASI PENTING JUJUR UTAMA</div>
+                    </div>
                 </div>
             </div>
 
@@ -788,16 +852,24 @@ export const generateBookHtml = ({
 
             <!-- Kunci Jawaban Page -->
             ${answerKeyHtmlStr}
+
+            <!-- Kisi Kisi Page -->
+            ${kisiKisiHtmlStr}
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <script>
             ${chartScripts}
         </script>
         <script>
-            setTimeout(() => {
+            const checkAndRun = () => {
+                const images = Array.from(document.images);
+                const isLoaded = images.every(img => img.complete);
+                if (!isLoaded) {
+                    setTimeout(checkAndRun, 100);
+                    return;
+                }
+                
                 if (window.katex) {
                     document.querySelectorAll('.math-visual[data-latex]').forEach(el => {
                         try {
@@ -815,109 +887,11 @@ export const generateBookHtml = ({
                     });
                 }
                 
-                const sourceDiv = document.getElementById('questions-source');
-                const targetDiv = document.getElementById('paginated-questions');
-                
-                if (sourceDiv && targetDiv) {
-                    sourceDiv.style.display = 'block';
-                    sourceDiv.style.visibility = 'hidden';
-                    sourceDiv.style.position = 'absolute';
-                    
-                    const items = Array.from(sourceDiv.children);
-                    let pageIdx = 1;
-                    
-                    function createNewPage() {
-                        const page = document.createElement('div');
-                        page.className = 'page-container pdf-render-page';
-                        page.setAttribute('style', 'width: 210mm; min-height: 296.5mm; height: 296.5mm; padding: ' + computedPadding + '; box-sizing: border-box; background: white; display: flex; flex-direction: column; position: relative; margin: 0 auto; overflow: hidden;');
-                        
-                        const content = document.createElement('div');
-                        content.className = 'page-content';
-                        content.setAttribute('style', 'flex: 1; display: flex; flex-direction: column; overflow: hidden; gap: 8px;');
-                        page.appendChild(content);
-
-                        const footer = document.createElement('div');
-                        footer.className = 'page-footer';
-                        footer.setAttribute('style', 'border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-family: sans-serif; position: absolute; bottom: 12mm; left: ' + computedPadding + '; right: ' + computedPadding + ';');
-                        footer.innerHTML = '<div style="font-weight: bold; text-transform: uppercase;">HALAMAN ' + pageIdx + '</div><div style="font-weight: 900; letter-spacing: 0.1em;">KUMPULAN SOAL RESMI</div>';
-                        page.appendChild(footer);
-                        
-                        return page;
-                    }
-                    
-                    let currentPage = createNewPage();
-                    let pageContent = currentPage.querySelector('.page-content');
-                    targetDiv.appendChild(currentPage);
-
-                    for (let i = 0; i < items.length; i++) {
-                        const item = items[i];
-                        if (pageContent) {
-                            pageContent.appendChild(item);
-                            if (pageContent.scrollHeight > pageContent.clientHeight) {
-                                if (pageContent.children.length === 1) {
-                                    continue; 
-                                }
-                                pageContent.removeChild(item);
-                                pageIdx++;
-                                currentPage = createNewPage();
-                                pageContent = currentPage.querySelector('.page-content');
-                                targetDiv.appendChild(currentPage);
-                                if (pageContent) pageContent.appendChild(item);
-                            }
-                        }
-                    }
-                    if (sourceDiv.parentNode) sourceDiv.parentNode.removeChild(sourceDiv);
-                }
-
-                const overlay = document.createElement('div');
-                overlay.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;background:#f8fafc;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;');
-                overlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #4f46e5;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:24px;"></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Memproses PDF Resmi</h2><p style="color:#64748b;margin:0;font-size:15px;max-width:300px;">Mohon tunggu, dokumen sedang disusun dan dirender dengan presisi tinggi...</p><style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>';
-                document.body.appendChild(overlay);
-
-                setTimeout(async () => {
-                    try {
-                        const { jsPDF } = window.jspdf;
-                        const pdf = new jsPDF('p', 'mm', 'a4');
-                        const pages = document.querySelectorAll('.page-container'); 
-                        
-                        for (let i = 0; i < pages.length; i++) {
-                            const page = pages[i];
-                            
-                            overlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #4f46e5;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:24px;"></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Memproses PDF Resmi</h2><p style="color:#64748b;margin:0;font-size:15px;max-width:300px;">Merender halaman ' + (i + 1) + ' dari ' + pages.length + '...</p><style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>';
-                            await new Promise(r => setTimeout(r, 50));
-                            
-                            const canvas = await html2canvas(page, {
-                                scale: 2,
-                                useCORS: true,
-                                logging: false
-                            });
-                            
-                            const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                            
-                            if (i > 0) {
-                                pdf.addPage();
-                            }
-                            
-                            const imgProps = pdf.getImageProperties(imgData);
-                            const pdfWidth = pdf.internal.pageSize.getWidth();
-                            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                            
-                            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                        }
-                        
-                        window.__pdf = pdf;
-                        
-                        overlay.innerHTML = '<div style="width:56px;height:56px;border-radius:50%;background:#10b981;color:white;display:flex;align-items:center;justify-content:center;margin-bottom:24px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Render Selesai!</h2><p style="color:#64748b;margin:0 0 24px 0;font-size:15px;max-width:350px;">Dokumen PDF Anda telah berhasil dibuat. Silakan klik tombol di bawah untuk mengunduhnya.</p><button id="auto-download-btn" onclick="window.__pdf.save(&quot;Buku_Soal_Resmi.pdf&quot;)" style="display:inline-block;padding:14px 28px;background-color:#4f46e5;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;border:none;cursor:pointer;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">⬇ Unduh Buku PDF Sekarang</button><p style="color:#94a3b8;font-size:13px;margin-top:24px;">Anda dapat menutup halaman ini setelah dokumen terunduh.</p>';
-                        
-                        setTimeout(() => {
-                            const btn = document.getElementById('auto-download-btn');
-                            if(btn) btn.click();
-                        }, 500);
-                    } catch (err) {
-                        overlay.innerHTML = '<div style="color:#ef4444;margin-bottom:16px;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div><h2 style="color:#0f172a;margin:0 0 8px 0;font-size:24px;font-weight:700;">Gagal Merender PDF</h2><p style="color:#64748b;margin:0;font-size:15px;">Terjadi kesalahan: ' + err + '</p><button onclick="window.close()" style="margin-top:24px;padding:8px 16px;background:#0f172a;color:white;border:none;border-radius:6px;cursor:pointer;">Tutup Halaman</button>';
-                    }
-                }, 1000);
-            }, 500);
+                setTimeout(() => {
+                    window.print();
+                }, 500);
+            };
+            setTimeout(checkAndRun, 500);
         </script>
     </body>
     </html>
