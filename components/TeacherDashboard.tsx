@@ -354,7 +354,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         <OngoingExamModal
           exam={selectedOngoingExam}
           teacherProfile={teacherProfile}
-          onClose={() => setSelectedOngoingExam(null)}
+          onClose={() => {
+            setSelectedOngoingExam(null);
+            onRefreshExams();
+          }}
           isPremium={teacherProfile.isPremium || false}
         />
       )}
@@ -363,7 +366,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         <FinishedExamModal
           exam={selectedFinishedExam}
           teacherProfile={teacherProfile}
-          onClose={() => setSelectedFinishedExam(null)}
+          onClose={() => {
+            setSelectedFinishedExam(null);
+            onRefreshExams();
+          }}
         />
       )}
 
