@@ -50,7 +50,18 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     activeTab, setActiveTab, selectedSchool, setSelectedSchool, selectedClass,
     setSelectedClass, isPrinting, setIsPrinting, printRef, handlePrint,
     handleDownloadExcel, isEditingMetadata, setIsEditingMetadata, handleUpdateMetadata,
-    selectedResult, setSelectedResult
+    selectedResult, setSelectedResult,
+    sourceType,
+    currentCloudFilename,
+    resetView,
+    showEditMetadata,
+    setShowEditMetadata,
+    handleDownloadQuestionsPDF,
+    handleUploadToCloud,
+    handleReclaimArchive,
+    expandedStudent,
+    setExpandedStudent,
+    handleUpdateKey,
   } = archiveViewerInstance;
   const {
     archiveData,
@@ -63,8 +74,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     setArchiveData,
     setSourceType,
     error,
-    setError
+    setError,
+    fixMessage,
   } = archiveViewerInstance;
+
+  const exam = archiveData?.exam;
+  const results = archiveData?.results || [];
 
   if (!archiveData) {
     return (
