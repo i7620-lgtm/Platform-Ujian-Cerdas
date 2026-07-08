@@ -29,13 +29,40 @@ import { TutorialPage } from "./TutorialPage";
 import { InvitationModal } from "./teacher/InvitationModal";
 import { useTeacherDashboard } from "./teacher/useTeacherDashboard";
 
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error("Gagal memuat komponen dinamis, memuat ulang halaman...", error);
+      const isChunkLoadFailed = 
+        error instanceof TypeError ||
+        (error as any)?.name === "ChunkLoadError" ||
+        /Failed to fetch dynamically imported module|chunk/i.test(String(error));
+        
+      if (isChunkLoadFailed) {
+        const lastReload = sessionStorage.getItem("last-chunk-reload-dashboard");
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+          sessionStorage.setItem("last-chunk-reload-dashboard", String(now));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+
 // Lazy Load Admin Views for Super Admin
-const UserManagementView = React.lazy(() =>
+const UserManagementView = lazyWithRetry(() =>
   import("./teacher/DashboardViews").then((module) => ({
     default: module.UserManagementView,
   })),
 );
-const BookGeneratorView = React.lazy(() =>
+const BookGeneratorView = lazyWithRetry(() =>
   import("./teacher/BookGeneratorView").then((module) => ({
     default: module.BookGeneratorView,
   })),
