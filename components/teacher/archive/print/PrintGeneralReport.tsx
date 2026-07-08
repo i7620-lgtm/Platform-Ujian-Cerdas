@@ -1,5 +1,6 @@
 import React from "react";
-import { formatDuration } from "../archiveUtils";
+import { formatDuration, getCalculatedStats } from "../archiveUtils";
+import type { Result, Exam } from "../../../../types";
 
 interface PrintGeneralReportProps {
   averageScore: number;
@@ -11,6 +12,8 @@ interface PrintGeneralReportProps {
   levelStats: { name: string; percentage: number }[];
   questionTypeStats: { type: string; typeName: string; percentage: number }[];
   uniqueSchools: string[];
+  results: Result[];
+  exam: Exam;
 }
 
 export const PrintGeneralReport: React.FC<PrintGeneralReportProps> = ({
@@ -23,6 +26,8 @@ export const PrintGeneralReport: React.FC<PrintGeneralReportProps> = ({
   levelStats,
   questionTypeStats,
   uniqueSchools,
+  results,
+  exam,
 }) => {
   return (
       <div className="mb-8 avoid-break-inside">
