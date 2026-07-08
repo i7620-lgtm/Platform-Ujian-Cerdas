@@ -9,7 +9,14 @@ export function getAI(): GoogleGenAI {
       console.warn("API key is missing. AI features will not work.");
       throw new Error("API key is missing. Please set GEMINI_API_KEY or API_KEY.");
     }
-    aiInstance = new GoogleGenAI({ apiKey });
+    aiInstance = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
   return aiInstance;
 }
@@ -18,7 +25,7 @@ export async function generateAIAnalysisOnServer(prompt: string): Promise<string
     try {
         const ai = getAI();
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash', 
+            model: 'gemini-3.5-flash', 
             contents: prompt
         });
 
