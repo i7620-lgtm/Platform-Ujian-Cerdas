@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import type { ArchiveData, TeacherProfile, Result, Exam, Question } from "../../../types";
 import { getCalculatedStats, formatDuration, checkAnswerStatus } from "../archive/archiveUtils";
 import { calculateAggregateStats, analyzeQuestionTypePerformance } from "../examUtils";
 import { archiveService } from "../../../services/archive";
+import { storageService } from "../../../services/storage";
 import { useArchiveViewer } from "../useArchiveViewer";
 
 interface UseArchiveViewerLogicProps {
@@ -55,7 +56,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     setLoadingMessage,
   } = archiveViewer;
 
-  useEffect(() => {
+  React.useEffect(() => {
     loadCloudList();
     storageService
       .getCurrentUser()
@@ -64,7 +65,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   }, []);
 
   // Auto fix mismatches on load (enrich and repair)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!archiveData) return;
 
     let mismatchCount = 0;
@@ -125,7 +126,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   }, [archiveData, teacherProfile, setFixMessage, setArchiveData]);
 
   // Sorting & filters memoized
-  const sortedResults = useMemo(() => {
+  const sortedResults = React.useMemo(() => {
     if (!archiveData) return [];
     return [...archiveData.results].sort((a, b) => {
       const schoolA = a.student.schoolName || "";
@@ -149,7 +150,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     });
   }, [archiveData]);
 
-  const uniqueSchools = useMemo<string[]>(() => {
+  const uniqueSchools = React.useMemo<string[]>(() => {
     if (!archiveData) return [];
     const schools = new Set(
       archiveData.results.map((r) => r.student.schoolName || "Tanpa Sekolah"),
@@ -157,7 +158,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     return Array.from(schools).sort() as string[];
   }, [archiveData]);
 
-  const uniqueClasses = useMemo<string[]>(() => {
+  const uniqueClasses = React.useMemo<string[]>(() => {
     if (!archiveData) return [];
     let results = archiveData.results;
     if (selectedSchool !== "ALL") {
@@ -173,7 +174,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     );
   }, [archiveData, selectedSchool]);
 
-  const filteredResults = useMemo(() => {
+  const filteredResults = React.useMemo(() => {
     let results = sortedResults;
     if (selectedSchool !== "ALL") {
       results = results.filter(
@@ -187,7 +188,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
   }, [sortedResults, selectedSchool, selectedClass]);
 
   // Statistics aggregates memoized
-  const questionAnalysisData = useMemo(() => {
+  const questionAnalysisData = React.useMemo(() => {
     if (!archiveData) return [];
     const { exam } = archiveData;
     const totalStudents = filteredResults.length;
@@ -224,7 +225,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       });
   }, [archiveData, filteredResults]);
 
-  const questionStats = useMemo(() => {
+  const questionStats = React.useMemo(() => {
     if (!archiveData) return [];
     return archiveData.exam.questions
       .filter((q) => q.questionType !== "INFO")
@@ -245,17 +246,17 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
       });
   }, [archiveData, filteredResults]);
 
-  const { categoryStats, levelStats } = useMemo(() => {
+  const { categoryStats, levelStats } = React.useMemo(() => {
     if (!archiveData) return { categoryStats: [], levelStats: [] };
     return calculateAggregateStats(archiveData.exam, filteredResults);
   }, [archiveData, filteredResults]);
 
-  const questionTypeStats = useMemo(() => {
+  const questionTypeStats = React.useMemo(() => {
     if (!archiveData) return [];
     return analyzeQuestionTypePerformance(archiveData.exam, filteredResults);
   }, [archiveData, filteredResults]);
 
-  const classAnalysisData = useMemo(() => {
+  const classAnalysisData = React.useMemo(() => {
     if (!archiveData) return [];
     const results = filteredResults;
 
