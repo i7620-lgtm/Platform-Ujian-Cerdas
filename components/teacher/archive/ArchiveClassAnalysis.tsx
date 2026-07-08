@@ -68,6 +68,49 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     }));
   }, [filteredResults]);
 
+  const stats = useMemo(() => {
+    if (filteredResults.length === 0) return { mean: 0, stdDev: 0, count: 0 };
+    const scores = filteredResults.map(r => Number(r.score) || 0);
+    const n = scores.length;
+    const mean = scores.reduce((sum, val) => sum + val, 0) / n;
+    const variance = scores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (n > 1 ? n - 1 : 1);
+    const stdDev = Math.sqrt(variance);
+    return {
+      mean: Math.round(mean * 10) / 10,
+      stdDev: Math.round(stdDev * 10) / 10 || 5,
+      count: n
+    };
+  }, [filteredResults]);
+
+  const normalCurveData = useMemo(() => {
+    if (filteredResults.length === 0) return [];
+
+    const scores = filteredResults.map(r => Number(r.score) || 0);
+    const n = scores.length;
+    const mean = stats.mean;
+    const stdDev = stats.stdDev || 5;
+
+    const points = Array.from({ length: 11 }, (_, i) => i * 10);
+    
+    return points.map(x => {
+      const minVal = x === 0 ? 0 : x - 5;
+      const maxVal = x === 100 ? 100 : x + 4.99;
+      
+      const actualCount = scores.filter(s => s >= minVal && s <= maxVal).length;
+
+      const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2));
+      const pdf = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+      const theoreticalFrequency = Number((pdf * n * 10).toFixed(2));
+
+      return {
+        score: x,
+        label: `Nilai ${x}`,
+        "Frekuensi Aktual": actualCount,
+        "Kurva Normal": theoreticalFrequency,
+      };
+    });
+  }, [filteredResults, stats]);
+
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
     if (printContent) {
@@ -85,6 +128,95 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   };
 
   const analysisSchools = Array.from(new Set(classAnalysisData.map(c => c.schoolName)));
+
+  let splitAnalysis = { before: "", after: "", splitFound: false };
+  if (aiAnalysisResult) {
+    const regex = /(?:^|\n)(#{1,6}\s+.*Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional.*|\*\*(?:Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional|Evaluasi Nilai Rata-Rata)\*\*:?)/i;
+    const match = aiAnalysisResult.match(regex);
+    if (match && match.index !== undefined) {
+      const matchIndex = match.index;
+      splitAnalysis = {
+        before: aiAnalysisResult.substring(0, matchIndex),
+        after: aiAnalysisResult.substring(matchIndex),
+        splitFound: true
+      };
+    } else {
+      splitAnalysis = { before: aiAnalysisResult, after: "", splitFound: false };
+    }
+  }
+
+  const renderClassPerformanceChart = () => {
+    if (filteredResults.length === 0) return null;
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="h-[380px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={normalCurveData}
+              margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+              <XAxis
+                dataKey="score"
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                label={{ value: 'Nilai Ujian', position: 'insideBottomRight', offset: -5, fill: '#64748b', fontSize: 10 }}
+              />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                label={{ value: 'Frekuensi (Siswa)', angle: -90, position: 'insideLeft', offset: 10, fill: '#64748b', fontSize: 10 }}
+              />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg text-xs">
+                        <p className="font-bold text-slate-800 dark:text-slate-100 mb-2">Rentang Nilai Sekitar: {label}</p>
+                        <div className="space-y-1">
+                          <p className="flex justify-between gap-4 text-slate-600 dark:text-slate-300">
+                            <span>Frekuensi Aktual:</span>
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{data["Frekuensi Aktual"]} siswa</span>
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Legend verticalAlign="top" height={36} />
+              
+              {exam.config.kkm && (
+                <ReferenceLine
+                  x={exam.config.kkm}
+                  stroke="#f43f5e"
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Batas KKM (${exam.config.kkm})`,
+                    fill: '#f43f5e',
+                    fontSize: 9,
+                    position: 'insideTopRight',
+                    offset: 5
+                  }}
+                />
+              )}
+
+              <Line
+                type="monotone"
+                dataKey="Frekuensi Aktual"
+                stroke="#4f46e5"
+                strokeWidth={2.5}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+                dot={{ fill: '#4f46e5', r: 3, strokeWidth: 0 }}
+                name="Frekuensi Aktual (Siswa)"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -226,95 +358,6 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
         </table>
       </div>
       
-      {/* Visualisasi Performa Kelas Section */}
-      {filteredResults.length > 0 && (
-        <div className="p-6 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-700">
-          <div className="mb-6">
-            <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              Visualisasi Performa Kelas (Diagram Garis)
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Menampilkan sebaran nilai seluruh siswa yang dianalisis. Garis putus-putus merah menunjukkan batas KKM ({exam.config.kkm || 75}).
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-            <div className="h-[380px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: '#64748b', fontSize: 9 }}
-                    angle={chartData.length > 8 ? -45 : 0}
-                    textAnchor={chartData.length > 8 ? "end" : "middle"}
-                    height={chartData.length > 8 ? 80 : 30}
-                    interval={0}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fill: '#64748b', fontSize: 10 }}
-                    label={{ value: 'Nilai', angle: -90, position: 'insideLeft', offset: 10, fill: '#64748b', fontSize: 10 }}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        const isTuntas = data.nilai >= (exam.config.kkm || 75);
-                        return (
-                          <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg text-xs">
-                            <p className="font-bold text-slate-800 dark:text-slate-100 mb-1">{label}</p>
-                            <p className="text-slate-500 dark:text-slate-400">Kelas: <span className="font-semibold text-slate-700 dark:text-slate-300">{data.kelas}</span></p>
-                            <p className="mt-1 flex items-center gap-1.5 font-bold">
-                              <span>Nilai: {data.nilai}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] ${isTuntas ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400'}`}>
-                                {isTuntas ? 'Tuntas' : 'Remedial'}
-                              </span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend verticalAlign="top" height={36} />
-                  {exam.config.kkm && (
-                    <ReferenceLine
-                      y={exam.config.kkm}
-                      stroke="#f43f5e"
-                      strokeDasharray="4 4"
-                      strokeWidth={1.5}
-                      label={{
-                        value: `Batas KKM (${exam.config.kkm})`,
-                        fill: '#f43f5e',
-                        fontSize: 9,
-                        position: 'insideBottomRight',
-                        offset: 5
-                      }}
-                    />
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="nilai"
-                    stroke="#4f46e5"
-                    strokeWidth={2.5}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                    dot={{ fill: '#4f46e5', r: 3, strokeWidth: 0 }}
-                    name="Nilai Siswa"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* AI Analysis Section */}
       {aiAnalysisResult && (
         <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 relative">
@@ -328,11 +371,54 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
             </svg>
           </button>
           <div id="ai-analysis-print-content" className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-amber-100 dark:border-amber-900/30 shadow-inner">
-            <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
-              <div className="markdown-body">
-                <Markdown>{aiAnalysisResult}</Markdown>
+            {splitAnalysis.splitFound ? (
+              <div className="space-y-6">
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+                  <div className="markdown-body">
+                    <Markdown>{splitAnalysis.before}</Markdown>
+                  </div>
+                </div>
+
+                <div className="border-t border-b border-slate-100 dark:border-slate-800 py-6 my-6 bg-slate-50/30 dark:bg-slate-900/10 rounded-xl p-4">
+                  <div className="mb-4">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      Visualisasi Sebaran Performa Kelas
+                    </h4>
+                  </div>
+                  {renderClassPerformanceChart()}
+                </div>
+
+                {splitAnalysis.after && (
+                  <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+                    <div className="markdown-body">
+                      <Markdown>{splitAnalysis.after}</Markdown>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
+                  <div className="mb-4">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      Visualisasi Sebaran Performa Kelas
+                    </h4>
+                  </div>
+                  {renderClassPerformanceChart()}
+                </div>
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+                  <div className="markdown-body">
+                    <Markdown>{aiAnalysisResult}</Markdown>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
