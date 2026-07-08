@@ -32,7 +32,34 @@ import {
 } from "../archive/archiveUtils";
 import { useArchiveViewer } from "../useArchiveViewer";
 
-const ArchivePrintLayout = React.lazy(() => import("../archive/ArchivePrintLayout").then(module => ({ default: module.ArchivePrintLayout })));
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error("Gagal memuat komponen dinamis, memuat ulang halaman...", error);
+      const isChunkLoadFailed = 
+        error instanceof TypeError ||
+        (error as any)?.name === "ChunkLoadError" ||
+        /Failed to fetch dynamically imported module|chunk/i.test(String(error));
+        
+      if (isChunkLoadFailed) {
+        const lastReload = sessionStorage.getItem("last-chunk-reload-print");
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+          sessionStorage.setItem("last-chunk-reload-print", String(now));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+
+const ArchivePrintLayout = lazyWithRetry(() => import("../archive/ArchivePrintLayout").then(module => ({ default: module.ArchivePrintLayout })));
 
 export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
   onReuseExam,
