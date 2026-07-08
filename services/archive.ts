@@ -392,6 +392,28 @@ export class ArchiveService {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ prompt })
           });
+
+          if (!res.ok) {
+              const text = await res.text().catch(() => "");
+              let serverError = "Gagal menghubungi server analisis AI.";
+              try {
+                  const parsed = JSON.parse(text);
+                  serverError = parsed.error || serverError;
+              } catch {
+                  if (text.includes("API key is missing") || text.includes("api key is missing")) {
+                      serverError = "API Key Gemini belum dikonfigurasi di server.";
+                  } else if (text.length > 0 && text.length < 200) {
+                      serverError = `Error Server (${res.status}): ${text}`;
+                  }
+              }
+              throw new Error(serverError);
+          }
+
+          const contentType = res.headers.get("Content-Type") || "";
+          if (!contentType.includes("application/json")) {
+              throw new Error("Respon server tidak valid (bukan JSON).");
+          }
+
           const data = await res.json();
           if (!data.success) {
               throw new Error(data.error || "Gagal menghasilkan analisis.");
