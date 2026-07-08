@@ -1,9 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import type { Exam, Result, TeacherProfile, ExamSummary } from "../../../types";
 import { ChartBarIcon, SparklesIcon } from "../../Icons";
 import { formatDuration } from "./archiveUtils";
 import { archiveService } from "../../../services/archive";
 import Markdown from "react-markdown";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Legend,
+} from "recharts";
 
 interface QuestionTypeStat {
   type: string;
@@ -43,6 +54,20 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   teacherProfile,
   aiAnalysisResult,
 }) => {
+  const filteredResults = useMemo(() => {
+    if (!results) return [];
+    if (selectedSchool === "ALL") return results;
+    return results.filter(r => (r.student.schoolName || exam.authorSchool || 'Unknown School') === selectedSchool);
+  }, [results, selectedSchool, exam.authorSchool]);
+
+  const chartData = useMemo(() => {
+    return filteredResults.map(r => ({
+      name: r.student.fullName || "Siswa",
+      nilai: Number(r.score) || 0,
+      kelas: r.student.class || "Tanpa Kelas",
+    }));
+  }, [filteredResults]);
+
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
     if (printContent) {
@@ -200,6 +225,95 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
           </tbody>
         </table>
       </div>
+      
+      {/* Visualisasi Performa Kelas Section */}
+      {filteredResults.length > 0 && (
+        <div className="p-6 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-700">
+          <div className="mb-6">
+            <h4 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Visualisasi Performa Kelas (Diagram Garis)
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Menampilkan sebaran nilai seluruh siswa yang dianalisis. Garis putus-putus merah menunjukkan batas KKM ({exam.config.kkm || 75}).
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="h-[380px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: '#64748b', fontSize: 9 }}
+                    angle={chartData.length > 8 ? -45 : 0}
+                    textAnchor={chartData.length > 8 ? "end" : "middle"}
+                    height={chartData.length > 8 ? 80 : 30}
+                    interval={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fill: '#64748b', fontSize: 10 }}
+                    label={{ value: 'Nilai', angle: -90, position: 'insideLeft', offset: 10, fill: '#64748b', fontSize: 10 }}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const isTuntas = data.nilai >= (exam.config.kkm || 75);
+                        return (
+                          <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg text-xs">
+                            <p className="font-bold text-slate-800 dark:text-slate-100 mb-1">{label}</p>
+                            <p className="text-slate-500 dark:text-slate-400">Kelas: <span className="font-semibold text-slate-700 dark:text-slate-300">{data.kelas}</span></p>
+                            <p className="mt-1 flex items-center gap-1.5 font-bold">
+                              <span>Nilai: {data.nilai}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] ${isTuntas ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                                {isTuntas ? 'Tuntas' : 'Remedial'}
+                              </span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={36} />
+                  {exam.config.kkm && (
+                    <ReferenceLine
+                      y={exam.config.kkm}
+                      stroke="#f43f5e"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                      label={{
+                        value: `Batas KKM (${exam.config.kkm})`,
+                        fill: '#f43f5e',
+                        fontSize: 9,
+                        position: 'insideBottomRight',
+                        offset: 5
+                      }}
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="nilai"
+                    stroke="#4f46e5"
+                    strokeWidth={2.5}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    dot={{ fill: '#4f46e5', r: 3, strokeWidth: 0 }}
+                    name="Nilai Siswa"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* AI Analysis Section */}
       {aiAnalysisResult && (
