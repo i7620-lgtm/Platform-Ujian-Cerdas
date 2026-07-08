@@ -25,7 +25,7 @@ export class ResultService {
             const student = row.student as Record<string, string> | undefined;
             absentNumber = student?.absentNumber || '00';
             if (absentNumber === '00' && typeof studentIdStr === 'string') {
-                const parts = studentIdStr.split('-');
+                const parts = studentIdStr.includes('_') ? studentIdStr.split('_') : studentIdStr.split('-');
                 if (parts.length >= 2) {
                     const lastPart = parts[parts.length - 1];
                     if (!isNaN(parseInt(lastPart))) {
@@ -264,7 +264,7 @@ export class ResultService {
               dbClassName = parts[1];
           }
           if (typeof studentId === 'string') {
-              const parts = studentId.split('-');
+              const parts = studentId.includes('_') ? studentId.split('_') : studentId.split('-');
               if (parts.length >= 2) {
                   const lastPart = parts[parts.length - 1];
                   if (!isNaN(parseInt(lastPart))) {
