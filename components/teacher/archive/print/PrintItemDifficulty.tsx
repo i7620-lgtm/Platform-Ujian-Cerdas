@@ -1,9 +1,11 @@
 import React from "react";
-import type { Exam } from "../../../../types";
+import type { Exam, Result } from "../../../../types";
 import { checkAnswerStatus } from "../archiveUtils";
+import { isAnswerMatch, parseList } from "../../examUtils";
 
 interface PrintItemDifficultyProps {
   exam: Exam;
+  results: Result[];
   questionAnalysisData: {
     id: string;
     correctRate: number;
@@ -14,6 +16,7 @@ interface PrintItemDifficultyProps {
 
 export const PrintItemDifficulty: React.FC<PrintItemDifficultyProps> = ({
   exam,
+  results,
   questionAnalysisData,
 }) => {
   return (
