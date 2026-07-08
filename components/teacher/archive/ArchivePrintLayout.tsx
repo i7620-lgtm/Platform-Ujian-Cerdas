@@ -38,6 +38,7 @@ export const ArchivePrintLayout: React.FC<ArchivePrintLayoutProps> = ({
   levelStats,
   questionTypeStats,
   uniqueSchools,
+  sortedResults,
   questionAnalysisData,
 }) => {
   return (
@@ -86,12 +87,15 @@ export const ArchivePrintLayout: React.FC<ArchivePrintLayoutProps> = ({
         levelStats={levelStats}
         questionTypeStats={questionTypeStats}
         uniqueSchools={uniqueSchools}
+        results={results}
+        exam={exam}
       />
 
       <PrintSchoolClassReport uniqueSchools={uniqueSchools} results={results} sortedResults={sortedResults} exam={exam} />
 
       <PrintItemDifficulty
         exam={exam}
+        results={results}
         questionAnalysisData={questionAnalysisData}
       />
 
