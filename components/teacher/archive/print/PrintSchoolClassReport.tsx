@@ -29,7 +29,7 @@ export const PrintSchoolClassReport: React.FC<PrintSchoolClassReportProps> = ({
                   (r) =>
                     (r.student.schoolName || "Tanpa Sekolah") === schoolName,
                 )
-                .map((r) => r.student.studentClass || "Tanpa Kelas")
+                .map((r) => r.student.class || "Tanpa Kelas")
             )
           );
           
@@ -43,7 +43,7 @@ export const PrintSchoolClassReport: React.FC<PrintSchoolClassReportProps> = ({
                 const classResults = sortedResults.filter(
                   (r) =>
                     (r.student.schoolName || "Tanpa Sekolah") === schoolName &&
-                    (r.student.studentClass || "Tanpa Kelas") === className
+                    (r.student.class || "Tanpa Kelas") === className
                 );
                 
                 const avgScore = classResults.length > 0 
