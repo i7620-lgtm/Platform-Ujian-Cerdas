@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { generateQuestionsOnServer, generateAIAnalysisOnServer } from "../server/ai";
+import { generateQuestionsOnServer, generateAIAnalysisOnServer } from "../server/ai.js";
 
 const app = express();
 
