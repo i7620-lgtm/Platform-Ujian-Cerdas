@@ -2,9 +2,7 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
-    { "source": "/manifest.json", "destination": "/manifest.json" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|api/|manifest.json|favicon.ico).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
