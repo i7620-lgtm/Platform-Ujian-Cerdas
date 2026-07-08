@@ -368,7 +368,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     setAiAnalysisResult(null);
     try {
       const summaries = archiveService.calculateExamStatistics(archiveData!.exam, filteredResults) as any[];
-      const analysis = await archiveService.generateAIAnalysis(summaries);
+      const analysis = await archiveService.generateAIAnalysis(summaries, undefined, archiveData!.exam.questions);
       setAiAnalysisResult(analysis);
     } catch (error: any) {
       setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
