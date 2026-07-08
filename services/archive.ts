@@ -220,7 +220,7 @@ export class ArchiveService {
 
           const questionStats: Record<string, unknown>[] = exam.questions
               .filter(q => q.questionType !== 'INFO')
-              .map(q => {
+              .map((q, idx) => {
                   let correctCount = 0;
                   const answerDist: Record<string, number> = {};
                   
@@ -242,6 +242,7 @@ export class ArchiveService {
 
                   return {
                       id: q.id,
+                      number: idx + 1,
                       type: q.questionType,
                       correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
                       top_wrong_answer: this.getTopWrongAnswer(answerDist, q)
@@ -325,7 +326,7 @@ export class ArchiveService {
   }
 
   // --- PROMPT GENERATOR (NO AI CALL) ---
-  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string): string {
+  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[]): string {
       const simpleData = summaries.map(s => ({
           school: s.school_name,
           region: s.region,
@@ -337,9 +338,22 @@ export class ArchiveService {
           weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 50).length,
           top_difficulty_questions: s.question_stats
               .filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 40)
-              .map((qs: Record<string, unknown>) => `Q${(qs.id as string).split('-')[1] || qs.id}: ${qs.correct_rate}%`)
+              .map((qs: Record<string, unknown>) => `Soal ${qs.number || 1}: ${qs.correct_rate}%`)
               .slice(0, 3)
       }));
+
+      // Map examQuestions to a structured list for the AI to understand the exam content and formulate exact remedial/enrichment questions
+      const questionDetails = examQuestions
+          ? examQuestions
+              .filter(q => q.questionType !== 'INFO')
+              .map((q, idx) => ({
+                  number: idx + 1,
+                  text: q.questionText,
+                  type: q.questionType,
+                  options: q.options || [],
+                  correctAnswer: q.correctAnswer || ""
+              }))
+          : [];
 
       const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
@@ -349,6 +363,9 @@ export class ArchiveService {
         INPUT DATA (JSON):
         ${JSON.stringify(simpleData)}
 
+        EXAM QUESTIONS LIST (Use this to read question texts and generate concrete similar questions for remedial and enrichment):
+        ${JSON.stringify(questionDetails)}
+
         TASK:
         ${customPrompt || defaultTask}
         
@@ -357,24 +374,29 @@ export class ArchiveService {
         - DO NOT use HTML tags.
         - Jika terdapat lebih dari 1 sekolah, buat sub-bagian terpisah (Heading 2) untuk SETIAP sekolah.
         
+        CRITICAL RULES:
+        1. JANGAN PERNAH menyebutkan atau menampilkan ID soal internal mentah seperti "Soal Q1770787225501", "Q1770787225501", atau "id-soal". Anda WAJIB langsung menyebutnya dengan "Soal [nomor]" (misalnya: "Soal 1", "Soal 2", "Soal 3") sesuai dengan urutan 'number' di daftar soal.
+        2. JANGAN menggunakan progress bar tekstual atau diagram ASCII (seperti "[||||||||||] 53%") untuk visualisasi performa kelas. Cukup sebutkan persentase angka rata-rata performanya saja dalam bentuk teks, karena visualisasi diagram garis interaktif yang indah sudah disediakan langsung secara dinamis di antarmuka web.
+        3. Rekomendasi Remedial: Anda WAJIB membuat minimal 2 contoh soal latihan remedial konkret, baru, dan mirip (setara indikator pencapaian kompetensi) dengan soal-soal tersulit di ujian (soal dengan 'correct_rate' rendah). Tuliskan soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya atau menyalinnya.
+        4. Rekomendasi Pengayaan: Anda WAJIB membuat minimal 2 contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS - Higher Order Thinking Skills) berdasarkan topik utama ujian ini. Tuliskan soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya.
+
         STRUCTURE:
 
         1. RINGKASAN EKSEKUTIF:
            - Berikan ringkasan performa secara keseluruhan.
-           - Highlight temuan utama.
+           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).
 
         2. ANALISIS PER SEKOLAH (Wajib dipisah per sekolah jika > 1 sekolah):
            - Untuk SETIAP sekolah, sebutkan nama sekolahnya, lalu berikan:
              * Rata-rata nilai dan tingkat ketuntasan.
-             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions).
+             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions, dan rujuk sebagai "Soal [nomor]").
              * Karakteristik kelas atau pola jawaban.
-           - Gunakan ASCII diagram (contoh: [||||||||||] 80%) jika relevan.
             
         3. PERBANDINGAN DAN REKOMENDASI:
            - Jika ada >1 sekolah, bandingkan secara singkat perbedaan/kesenjangan performa.
-           - Evaluasi Butir Soal: Berikan evaluasi singkat mengenai tingkat kesulitan dan validitas butir soal berdasarkan pola jawaban siswa.
-           - Rekomendasi Remedial: Berikan rekomendasi konkrit dan spesifik untuk perbaikan pembelajaran dan remedial bagi siswa yang belum memenuhi kriteria.
-           - Rekomendasi Pengayaan: Berikan juga rekomendasi pengayaan atau tantangan lebih lanjut untuk siswa/kelas yang sudah melampaui standar atau mendapatkan nilai tinggi.
+           - Evaluasi Butir Soal: Berikan evaluasi singkat mengenai tingkat kesulitan dan validitas butir soal berdasarkan pola jawaban siswa (gunakan penomoran "Soal [nomor]").
+           - Rekomendasi Remedial & CONTOH SOAL: Berikan rekomendasi konkrit untuk remedial, dilanjutkan dengan minimal 2 contoh soal remedial baru lengkap dengan pilihan jawaban dan kunci jawaban.
+           - Rekomendasi Pengayaan & CONTOH SOAL: Berikan rekomendasi pengayaan untuk siswa nilai tinggi, dilanjutkan dengan minimal 2 contoh soal pengayaan HOTS baru lengkap dengan pilihan jawaban dan kunci jawaban.
 
         TONE:
         - Professional, analytical, yet accessible to teachers and policymakers.
@@ -383,9 +405,9 @@ export class ArchiveService {
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
-  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string): Promise<string> {
+  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[]): Promise<string> {
       try {
-          const prompt = this.generateAnalysisPrompt(summaries, customPrompt);
+          const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions);
           
           const res = await fetch("/api/generate-analysis", {
               method: "POST",
