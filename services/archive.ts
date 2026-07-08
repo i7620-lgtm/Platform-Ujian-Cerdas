@@ -240,12 +240,20 @@ export class ArchiveService {
                       }
                   });
 
+                  const topWrongAns = this.getTopWrongAnswer(answerDist, q);
+                  let topWrongCount = 0;
+                  if (topWrongAns && answerDist[topWrongAns]) {
+                      topWrongCount = answerDist[topWrongAns];
+                  }
+                  const topWrongRate = total > 0 ? Math.round((topWrongCount / total) * 100) : 0;
+
                   return {
                       id: q.id,
                       number: idx + 1,
                       type: q.questionType,
                       correct_rate: total > 0 ? Math.round((correctCount / total) * 100) : 0,
-                      top_wrong_answer: this.getTopWrongAnswer(answerDist, q)
+                      top_wrong_answer: topWrongAns,
+                      top_wrong_rate: topWrongRate
                   };
               });
 
@@ -327,6 +335,11 @@ export class ArchiveService {
 
   // --- PROMPT GENERATOR (NO AI CALL) ---
   generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[]): string {
+      const stripBase64 = (str: string): string => {
+          if (typeof str !== 'string') return str;
+          return str.replace(/data:image\/[a-zA-Z+-]+;base64,[^\s"']+/g, '[Gambar]');
+      };
+
       const simpleData = summaries.map(s => ({
           school: s.school_name,
           region: s.region,
@@ -338,7 +351,7 @@ export class ArchiveService {
           weakness_count: s.question_stats.filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 50).length,
           top_difficulty_questions: s.question_stats
               .filter((qs: Record<string, unknown>) => (qs.correct_rate as number) < 40)
-              .map((qs: Record<string, unknown>) => `Soal ${qs.number || 1}: ${qs.correct_rate}%`)
+              .map((qs: Record<string, unknown>) => `Soal nomor ${qs.number || 1}: ${qs.correct_rate}%`)
               .slice(0, 3)
       }));
 
@@ -346,13 +359,32 @@ export class ArchiveService {
       const questionDetails = examQuestions
           ? examQuestions
               .filter(q => q.questionType !== 'INFO')
-              .map((q, idx) => ({
-                  number: idx + 1,
-                  text: q.questionText,
-                  type: q.questionType,
-                  options: q.options || [],
-                  correctAnswer: q.correctAnswer || ""
-              }))
+              .map((q, idx) => {
+                  let correctRate: number | undefined;
+                  let topWrongAnswer: string | null = null;
+                  let topWrongRate: number | undefined;
+
+                  for (const s of summaries) {
+                      const qs = s.question_stats?.find((item: any) => item.id === q.id || item.number === idx + 1);
+                      if (qs) {
+                          correctRate = qs.correct_rate as number;
+                          topWrongAnswer = qs.top_wrong_answer as string | null;
+                          topWrongRate = qs.top_wrong_rate as number;
+                          break;
+                      }
+                  }
+
+                  return {
+                      number: idx + 1,
+                      text: stripBase64(q.questionText || ""),
+                      type: q.questionType,
+                      options: (q.options || []).map(o => stripBase64(o || "")),
+                      correctAnswer: q.correctAnswer || "",
+                      correct_rate: correctRate,
+                      top_wrong_answer: topWrongAnswer,
+                      top_wrong_rate: topWrongRate
+                  };
+              })
           : [];
 
       const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
@@ -363,7 +395,7 @@ export class ArchiveService {
         INPUT DATA (JSON):
         ${JSON.stringify(simpleData)}
 
-        EXAM QUESTIONS LIST (Use this to read question texts and generate concrete similar questions for remedial and enrichment):
+        EXAM QUESTIONS LIST WITH PERFORMANCE STATS (Use correct_rate, top_wrong_answer, and top_wrong_rate to diagnose understanding levels and check for potential answer key errors):
         ${JSON.stringify(questionDetails)}
 
         TASK:
@@ -375,28 +407,39 @@ export class ArchiveService {
         - Jika terdapat lebih dari 1 sekolah, buat sub-bagian terpisah (Heading 2) untuk SETIAP sekolah.
         
         CRITICAL RULES:
-        1. JANGAN PERNAH menyebutkan atau menampilkan ID soal internal mentah seperti "Soal Q1770787225501", "Q1770787225501", atau "id-soal". Anda WAJIB langsung menyebutnya dengan "Soal [nomor]" (misalnya: "Soal 1", "Soal 2", "Soal 3") sesuai dengan urutan 'number' di daftar soal.
+        1. JANGAN PERNAH menyebutkan atau menampilkan ID soal internal mentah seperti "Soal Q1770787225501", "Q1770787225501", atau "id-soal". Anda WAJIB langsung menyebutnya dengan format "soal nomor [nomor]" (misalnya: "soal nomor 1", "soal nomor 2", "soal nomor 3") sesuai dengan urutan 'number' di daftar soal. Hindari penggunaan kata "Soal [nomor]" tanpa kata "nomor".
         2. JANGAN menggunakan progress bar tekstual atau diagram ASCII (seperti "[||||||||||] 53%") untuk visualisasi performa kelas. Cukup sebutkan persentase angka rata-rata performanya saja dalam bentuk teks, karena visualisasi diagram garis interaktif yang indah sudah disediakan langsung secara dinamis di antarmuka web.
-        3. Rekomendasi Remedial: Anda WAJIB membuat minimal 2 contoh soal latihan remedial konkret, baru, dan mirip (setara indikator pencapaian kompetensi) dengan soal-soal tersulit di ujian (soal dengan 'correct_rate' rendah). Tuliskan soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya atau menyalinnya.
-        4. Rekomendasi Pengayaan: Anda WAJIB membuat minimal 2 contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS - Higher Order Thinking Skills) berdasarkan topik utama ujian ini. Tuliskan soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya.
+        3. Rekomendasi Remedial: Anda WAJIB membuat minimal 5 (lima) contoh soal latihan remedial konkret, baru, dan mirip (setara indikator pencapaian kompetensi) dengan soal-soal tersulit di ujian (soal dengan 'correct_rate' rendah). Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya atau menyalinnya secara utuh.
+        4. Rekomendasi Pengayaan: Anda WAJIB membuat minimal 5 (lima) contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS - Higher Order Thinking Skills) berdasarkan topik utama ujian ini. Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya.
+        5. PERSAMAAN MATEMATIKA TANPA LATEX: JANGAN PERNAH menggunakan sintaks matematika LaTeX seperti \\frac, \\div, \\times, $ atau $$ pada teks laporan maupun pada contoh soal remedial/pengayaan. Selalu gunakan penulisan teks biasa atau simbol Unicode standar yang bersih dan mudah dibaca (contoh: '1/5' atau '1 per 5', '240 : 6 + 15 = 55', simbol '÷' or ':' untuk pembagian, '×' atau '*' untuk perkalian, dsb.). Hal ini penting agar seluruh formula matematika tampak rapi dan dapat dibaca dengan mudah tanpa rendering MathJax/KaTeX.
+        6. STANDAR EVALUASI NILAI RATA-RATA: Pada bagian RINGKASAN EKSEKUTIF, evaluasi nilai rata-rata harus ditulis dalam sub-bagian khusus dengan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional". Evaluasi ini harus mengacu pada standar berikut:
+           - Untuk Ujian Biasa/Umum: Nilai rata-rata ideal mengacu pada rentang 70-75. Bandingkan rata-rata kelas dengan rentang tersebut secara deskriptif.
+           - Khusus untuk Ujian TKA (Tes Kemampuan Akademik / UTBK TKA): Bandingkan nilai rata-rata siswa secara spesifik dengan rerata skor TKA nasional di Indonesia yang terbaru (sekitar 500-550 poin atau setara dengan 50%-55% ketuntasan pada skala penilaian nasional terbaru) agar analisis ringkasan eksekutif terlihat lebih faktual, realistis, dan berbobot akademis tinggi.
+           - ATURAN KEPADATAN INFORMASI TKA: JANGAN PERNAH menulis penjelasan yang bertele-tele atau tidak penting seperti "Berbeda dengan ujian sekolah biasa yang menargetkan Kriteria Ketuntasan Minimal (KKM) di rentang 70-75, ujian berjenis TKA (Tes Kemampuan Akademik) memiliki karakteristik soal selektif dengan tingkat kesulitan tinggi (HOTS)." jika Anda sudah tahu bahwa yang dibahas adalah ujian TKA. Hindari penjelasan teori HOTS yang tidak bernilai guna praktis bagi guru. Tulis analisis yang langsung, faktual, padat, penting, dan mudah dipahami saja.
+        7. DETEKSI KESALAHAN KUNCI JAWABAN (CRITICAL BIAS ANALYSIS):
+           - Anda WAJIB secara aktif mendeteksi potensi kesalahan kunci jawaban ujian (guru salah input kunci).
+           - Skenario utama deteksi: Jika persentase siswa menjawab benar ('correct_rate') sangat rendah (< 35%) DAN ada satu jawaban salah terpopuler ('top_wrong_answer') yang dipilih oleh mayoritas siswa ('top_wrong_rate' > 45%).
+           - Lakukan analisis terhadap teks soal, pilihan jawaban ('options'), kunci jawaban saat ini ('correctAnswer'), dan opsi terpopuler tersebut.
+           - Jika secara logis/akademis opsi terpopuler tersebut sebenarnya adalah jawaban yang benar, atau jika soal tersebut membingungkan/memiliki beberapa opsi yang sama-sama benar, laporkan ini dengan sangat jelas dan berani sebagai "Indikasi Kesalahan Kunci Jawaban" dalam evaluasi butir soal Anda. Jelaskan penalaran logisnya dan berikan saran kunci koreksi agar guru mengetahuinya.
 
         STRUCTURE:
 
         1. RINGKASAN EKSEKUTIF:
            - Berikan ringkasan performa secara keseluruhan.
+           - Sub-bagian "### Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional": Berisi evaluasi nilai rata-rata kelas sesuai standar di atas. JANGAN gunakan pengantar panjang lebar, langsung ke poin evaluasinya saja.
            - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).
 
         2. ANALISIS PER SEKOLAH (Wajib dipisah per sekolah jika > 1 sekolah):
            - Untuk SETIAP sekolah, sebutkan nama sekolahnya, lalu berikan:
              * Rata-rata nilai dan tingkat ketuntasan.
-             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions, dan rujuk sebagai "Soal [nomor]").
+             * Analisis topik/materi yang belum dikuasai (lihat dari weakness_count atau top_difficulty_questions, dan rujuk sebagai "soal nomor [nomor]").
              * Karakteristik kelas atau pola jawaban.
             
         3. PERBANDINGAN DAN REKOMENDASI:
            - Jika ada >1 sekolah, bandingkan secara singkat perbedaan/kesenjangan performa.
-           - Evaluasi Butir Soal: Berikan evaluasi singkat mengenai tingkat kesulitan dan validitas butir soal berdasarkan pola jawaban siswa (gunakan penomoran "Soal [nomor]").
-           - Rekomendasi Remedial & CONTOH SOAL: Berikan rekomendasi konkrit untuk remedial, dilanjutkan dengan minimal 2 contoh soal remedial baru lengkap dengan pilihan jawaban dan kunci jawaban.
-           - Rekomendasi Pengayaan & CONTOH SOAL: Berikan rekomendasi pengayaan untuk siswa nilai tinggi, dilanjutkan dengan minimal 2 contoh soal pengayaan HOTS baru lengkap dengan pilihan jawaban dan kunci jawaban.
+           - Evaluasi Butir Soal & Analisis Validitas: Berikan evaluasi singkat mengenai tingkat kesulitan, pengecoh (distractor) yang terlalu kuat, dan validitas butir soal berdasarkan pola jawaban siswa (gunakan penomoran "soal nomor [nomor]"). Masukkan bagian khusus analisis potensi kesalahan kunci jawaban jika terdeteksi di langkah kritis nomor 7 di atas.
+           - Rekomendasi Remedial & CONTOH SOAL: Berikan rekomendasi konkrit untuk remedial, dilanjutkan dengan minimal 5 contoh soal remedial baru lengkap dengan pilihan jawaban dan kunci jawaban.
+           - Rekomendasi Pengayaan & CONTOH SOAL: Berikan rekomendasi pengayaan untuk siswa nilai tinggi, dilanjutkan dengan minimal 5 contoh soal pengayaan HOTS baru lengkap dengan pilihan jawaban dan kunci jawaban.
 
         TONE:
         - Professional, analytical, yet accessible to teachers and policymakers.
