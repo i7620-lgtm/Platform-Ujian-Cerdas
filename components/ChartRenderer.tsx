@@ -201,8 +201,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={10}
-            minHeight={10}
+            minWidth={0}
+            minHeight={0}
           >
             <BarChart
               data={chartData}
@@ -263,8 +263,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={10}
-            minHeight={10}
+            minWidth={0}
+            minHeight={0}
           >
             <LineChart data={chartData} margin={BAR_CHART_MARGIN}>
               <CartesianGrid
@@ -329,8 +329,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={10}
-            minHeight={10}
+            minWidth={0}
+            minHeight={0}
           >
             <PieChart margin={pieChartMargin}>
               <Pie
