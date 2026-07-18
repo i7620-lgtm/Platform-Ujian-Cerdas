@@ -13,7 +13,7 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
       </h3>
       <div className="space-y-4">
         {exam.questions.filter(q => q.questionType !== "INFO").map((q, index) => (
-          <div key={q.id} className="p-4 border border-slate-200 rounded avoid-break-inside mb-4">
+          <div key={q.id} className="avoid-break-inside mb-6">
             <h4 className="font-bold text-md mb-2">Soal {index + 1}</h4>
             <div dangerouslySetInnerHTML={{ __html: q.questionText }} className="prose prose-sm max-w-none text-slate-800 mb-2" />
             
