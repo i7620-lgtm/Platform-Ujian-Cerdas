@@ -25,10 +25,12 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
             
             <div dangerouslySetInnerHTML={{ __html: q.questionText }} className="prose prose-sm max-w-none text-slate-800 mb-4" />
             
-            {q.questionType === "MULTIPLE_CHOICE" && q.options && (
+            {(q.questionType === "MULTIPLE_CHOICE" || q.questionType === "COMPLEX_MULTIPLE_CHOICE") && q.options && (
               <div className="space-y-2">
                 {q.options.map((opt, i) => {
-                  const isCorrect = q.correctAnswer === opt;
+                  const isCorrect = q.questionType === "COMPLEX_MULTIPLE_CHOICE" 
+                    ? (q.correctAnswer || "").split("|||").includes(opt)
+                    : q.correctAnswer === opt;
                   return (
                     <div 
                       key={i} 
