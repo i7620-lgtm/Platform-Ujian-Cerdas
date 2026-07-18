@@ -69,7 +69,7 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
               width={600}
               height={250}
               data={normalCurveData}
-              margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+              margin={{ top: 30, right: 30, left: 0, bottom: 10 }}
               style={{ width: "100%", height: "100%" }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
@@ -89,13 +89,13 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
                 label={{
                   value: "Frekuensi (Siswa)",
                   angle: -90,
-                  position: "insideLeft",
-                  offset: 10,
+                  position: "insideTopLeft",
+                  offset: -10,
                   fill: "#64748b",
                   fontSize: 10,
                 }}
               />
-              <Legend verticalAlign="top" height={36} />
+              <Legend verticalAlign="top" height={36} wrapperStyle={{ top: -10 }} />
               {exam.config.kkm && (
                 <ReferenceLine
                   x={exam.config.kkm}
@@ -140,6 +140,15 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
     splitAnalysis = { before: content, after: "", splitFound: false };
   }
 
+  const markdownComponents = {
+    h1: ({node, ...props}: any) => <h1 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
+    h4: ({node, ...props}: any) => <h4 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
+    p: ({node, ...props}: any) => <p className="avoid-break-inside mb-2" {...props} />,
+    li: ({node, ...props}: any) => <li className="avoid-break-inside mb-1" {...props} />,
+  };
+
   return (
     <div className="mb-6 page-break-after-auto">
       <h3 className="font-bold text-sm uppercase tracking-wider mb-3 border-l-4 border-slate-800 pl-2 break-after-avoid">
@@ -149,12 +158,12 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
         {splitAnalysis.splitFound ? (
           <>
             <div className="markdown-body">
-              <Markdown>{splitAnalysis.before}</Markdown>
+              <Markdown components={markdownComponents}>{splitAnalysis.before}</Markdown>
             </div>
             {renderChart()}
             {splitAnalysis.after && (
               <div className="markdown-body mt-4">
-                <Markdown>{splitAnalysis.after}</Markdown>
+                <Markdown components={markdownComponents}>{splitAnalysis.after}</Markdown>
               </div>
             )}
           </>
@@ -162,7 +171,7 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
           <>
             {renderChart()}
             <div className="markdown-body mt-4">
-              <Markdown>{content}</Markdown>
+              <Markdown components={markdownComponents}>{content}</Markdown>
             </div>
           </>
         )}
