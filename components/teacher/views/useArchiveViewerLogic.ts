@@ -358,6 +358,23 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
         )
       : 0;
 
+  const getCurrentAnalysisKey = React.useCallback(() => {
+    if (selectedSchool === "ALL" && selectedClass === "ALL") {
+      return "OVERALL";
+    }
+    return `school_${selectedSchool}_class_${selectedClass}`;
+  }, [selectedSchool, selectedClass]);
+
+  React.useEffect(() => {
+    if (!archiveData) {
+      setAiAnalysisResult(null);
+      return;
+    }
+    const key = getCurrentAnalysisKey();
+    const saved = archiveData.ai_analyses?.[key] || null;
+    setAiAnalysisResult(saved);
+  }, [archiveData, selectedSchool, selectedClass, getCurrentAnalysisKey]);
+
   const handleGenerateAI = async () => {
     if (!teacherProfile?.isPremium) {
       alert("Fitur ini khusus untuk akun Premium. Silakan upgrade akun Anda.");
@@ -368,8 +385,65 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     setAiAnalysisResult(null);
     try {
       const summaries = archiveService.calculateExamStatistics(archiveData!.exam, filteredResults) as any[];
-      const analysis = await archiveService.generateAIAnalysis(summaries, undefined, archiveData!.exam.questions);
+      
+      const key = getCurrentAnalysisKey();
+      // Incremental approach: if overall analysis is requested, send existing per-class analyses
+      const existing = key === "OVERALL" ? archiveData!.ai_analyses : undefined;
+      
+      const analysis = await archiveService.generateAIAnalysis(summaries, undefined, archiveData!.exam.questions, existing);
+      
+      const updatedAnalyses = {
+        ...(archiveData!.ai_analyses || {}),
+        [key]: analysis
+      };
+
+      const updatedData: ArchiveData = {
+        ...archiveData!,
+        ai_analyses: updatedAnalyses
+      };
+
+      setArchiveData(updatedData);
       setAiAnalysisResult(analysis);
+      archiveViewer.setActiveTab("AI_ANALYSIS");
+
+      if (sourceType === "CLOUD" && currentCloudFilename) {
+        try {
+          const jsonString = JSON.stringify(updatedData);
+          const newFilename = await storageService.uploadArchive(
+            archiveData!.exam.code,
+            jsonString,
+            {
+              school: archiveData!.exam.authorSchool,
+              subject: archiveData!.exam.config.subject,
+              classLevel: archiveData!.exam.config.classLevel,
+              examType: archiveData!.exam.config.examType,
+              targetClasses: archiveData!.exam.config.targetClasses,
+              date: archiveData!.exam.config.date,
+              participantCount: archiveData!.results.length,
+              authorId: archiveData!.exam.authorId,
+              hasAiAnalysis: updatedAnalyses && Object.keys(updatedAnalyses).length > 0,
+            }
+          );
+          if (newFilename !== currentCloudFilename) {
+            try {
+              await storageService.deleteArchive(currentCloudFilename);
+            } catch (delErr) {
+              console.warn("Failed to delete legacy archive on update", delErr);
+            }
+            if (archiveViewer.setCurrentCloudFilename) {
+              archiveViewer.setCurrentCloudFilename(newFilename);
+            }
+            if (archiveViewer.loadCloudList) {
+              archiveViewer.loadCloudList();
+            }
+          }
+        } catch (cloudSaveErr) {
+          console.warn("Failed to silently auto-save AI analysis to cloud:", cloudSaveErr);
+        }
+      } else if (sourceType === "LOCAL") {
+        // Since we can't write to the local file system automatically, we just update the in-memory state.
+        // The user will need to re-download the archive manually if they want to save it locally.
+      }
     } catch (error: any) {
       setAiAnalysisResult("Gagal menghasilkan analisis AI: " + (error.message || "Terjadi kesalahan."));
     } finally {
@@ -377,5 +451,62 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     }
   };
 
-  return { isGeneratingAI, aiAnalysisResult, archiveViewer, sortedResults, uniqueSchools, uniqueClasses, filteredResults, questionAnalysisData, questionStats, categoryStats, levelStats, questionTypeStats, classAnalysisData, isNoAuthor, totalStudentsDisplay, realStudentCount, averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI };
+  const handleDeleteAIAnalysis = async () => {
+    if (!archiveData) return;
+    const key = getCurrentAnalysisKey();
+    if (!archiveData.ai_analyses?.[key]) return;
+
+    if (!confirm("Apakah Anda yakin ingin menghapus analisis AI ini dari arsip?")) return;
+
+    const updatedAnalyses = { ...archiveData.ai_analyses };
+    delete updatedAnalyses[key];
+
+    const updatedData: ArchiveData = {
+      ...archiveData,
+      ai_analyses: updatedAnalyses
+    };
+
+    setArchiveData(updatedData);
+    setAiAnalysisResult(null);
+    if (archiveViewer.activeTab === "AI_ANALYSIS") {
+      archiveViewer.setActiveTab("CLASS_ANALYSIS");
+    }
+
+    if (sourceType === "CLOUD" && currentCloudFilename) {
+      try {
+        const jsonString = JSON.stringify(updatedData);
+        const newFilename = await storageService.uploadArchive(
+          archiveData.exam.code,
+          jsonString,
+          {
+            school: archiveData.exam.authorSchool,
+            subject: archiveData.exam.config.subject,
+            classLevel: archiveData.exam.config.classLevel,
+            examType: archiveData.exam.config.examType,
+            targetClasses: archiveData.exam.config.targetClasses,
+            date: archiveData.exam.config.date,
+            participantCount: archiveData.results.length,
+            authorId: archiveData.exam.authorId,
+          }
+        );
+        if (newFilename !== currentCloudFilename) {
+          try {
+            await storageService.deleteArchive(currentCloudFilename);
+          } catch (delErr) {
+            console.warn("Failed to delete legacy archive on update", delErr);
+          }
+          if (archiveViewer.setCurrentCloudFilename) {
+            archiveViewer.setCurrentCloudFilename(newFilename);
+          }
+          if (archiveViewer.loadCloudList) {
+            archiveViewer.loadCloudList();
+          }
+        }
+      } catch (cloudSaveErr) {
+        console.warn("Failed to silently auto-save archive update on deletion:", cloudSaveErr);
+      }
+    }
+  };
+
+  return { isGeneratingAI, aiAnalysisResult, archiveViewer, sortedResults, uniqueSchools, uniqueClasses, filteredResults, questionAnalysisData, questionStats, categoryStats, levelStats, questionTypeStats, classAnalysisData, isNoAuthor, totalStudentsDisplay, realStudentCount, averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI, handleDeleteAIAnalysis };
 };

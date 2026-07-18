@@ -71,7 +71,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     uniqueSchools, uniqueClasses, filteredResults, questionAnalysisData,
     questionStats, categoryStats, levelStats, questionTypeStats,
     classAnalysisData, isNoAuthor, totalStudentsDisplay, realStudentCount,
-    averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI
+    averageScore, highestScore, lowestScore, averageCompletionTime, handleGenerateAI, handleDeleteAIAnalysis
   } = useArchiveViewerLogic({ archiveViewer: archiveViewerInstance, teacherProfile });
   const {
     activeTab, setActiveTab, selectedSchool, setSelectedSchool, selectedClass,
@@ -107,6 +107,20 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
 
   const exam = archiveData?.exam;
   const results = archiveData?.results || [];
+
+  const handleDownloadJSON = React.useCallback(() => {
+    if (!archiveData) return;
+    const jsonString = JSON.stringify(archiveData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${archiveData.exam.code}_archived.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [archiveData]);
 
   if (!archiveData) {
     return (
@@ -221,12 +235,14 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
         onDownloadExcel={handleDownloadExcel}
         onReuseExam={onReuseExam}
         onUploadToCloud={handleUploadToCloud}
+        onDownloadJSON={handleDownloadJSON}
         onReclaimArchive={handleReclaimArchive}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         totalStudents={totalStudentsDisplay}
         isGeneratingAI={isGeneratingAI}
         onGenerateAI={handleGenerateAI}
+        hasAiAnalysis={!!aiAnalysisResult}
       />
 
       <div className="animate-fade-in print:hidden">
@@ -350,6 +366,22 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             results={filteredResults}
             teacherProfile={teacherProfile}
             aiAnalysisResult={aiAnalysisResult}
+            onDeleteAIAnalysis={handleDeleteAIAnalysis}
+            viewMode="CLASS_ONLY"
+          />
+        )}
+
+        {activeTab === "AI_ANALYSIS" && (
+          <ArchiveClassAnalysis
+            classAnalysisData={classAnalysisData}
+            uniqueSchools={uniqueSchools}
+            selectedSchool={selectedSchool}
+            exam={exam}
+            results={filteredResults}
+            teacherProfile={teacherProfile}
+            aiAnalysisResult={aiAnalysisResult}
+            onDeleteAIAnalysis={handleDeleteAIAnalysis}
+            viewMode="AI_ONLY"
           />
         )}
       </div>
@@ -370,6 +402,7 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
           uniqueSchools={uniqueSchools}
           sortedResults={sortedResults}
           questionAnalysisData={questionAnalysisData}
+          ai_analyses={archiveData?.ai_analyses}
         />
       </React.Suspense>
 
