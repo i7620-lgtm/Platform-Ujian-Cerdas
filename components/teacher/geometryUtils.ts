@@ -9,13 +9,14 @@ export const extractNum = (val: any, defaultVal: number): number => {
 
 export const generateGeometrySVG = (
   shape: string,
-  labels: any,
+  labels: any = {},
   fillColor: string,
   strokeColor: string,
   showAngles: boolean = false,
   simulate: boolean = false,
   showLines: boolean = true,
 ) => {
+  if (!labels) labels = {};
   const vMinX = 0,
     vMinY = 0,
     vW = 200,
@@ -417,6 +418,199 @@ export const generateGeometrySVG = (
         svgBody += `<text x="${ox + w / 2}" y="${oy + 15}" ${labelSt}>${labels.side}</text>`;
       if (labels.height)
         svgBody += `<text x="${ox + w + d / 2 + 10}" y="${oy - d / 2}" ${labelSt}>${labels.height}</text>`;
+    }
+  } else if (shape === "combined_cuboid_pyramid") {
+    // A cuboid base with a pyramid on top
+    const ox = 60, oy = 140, w = 80, d = 40, h1 = 40, h2 = 60;
+    
+    // Bottom Cuboid
+    svgBody += `<polygon points="${ox},${oy} ${ox + d},${oy - d} ${ox + w + d},${oy - d} ${ox + w},${oy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox},${oy} ${ox + w},${oy} ${ox + w},${oy - h1} ${ox},${oy - h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox + w},${oy} ${ox + w + d},${oy - d} ${ox + w + d},${oy - d - h1} ${ox + w},${oy - h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox},${oy - h1} ${ox + w},${oy - h1} ${ox + w + d},${oy - h1 - d} ${ox + d},${oy - h1 - d}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    // Top Pyramid
+    const apexX = ox + w/2 + d/2;
+    const apexY = oy - h1 - d/2 - h2;
+    svgBody += `<polygon points="${ox},${oy - h1} ${ox + w},${oy - h1} ${apexX},${apexY}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox + w},${oy - h1} ${ox + w + d},${oy - h1 - d} ${apexX},${apexY}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.bottom_width) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.bottom_width}</text>`;
+      if (labels.bottom_depth) svgBody += `<text x="${ox + w + d/2 + 10}" y="${oy - d/2 + 10}" ${labelSt}>${labels.bottom_depth}</text>`;
+      if (labels.bottom_height) svgBody += `<text x="${ox - 15}" y="${oy - h1/2}" ${labelSt}>${labels.bottom_height}</text>`;
+      if (labels.top_height) {
+        svgBody += `<line x1="${apexX}" y1="${apexY}" x2="${apexX}" y2="${oy - h1 - d/2}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+        svgBody += `<text x="${apexX + 10}" y="${apexY + h2/2}" ${labelSt}>${labels.top_height}</text>`;
+      }
+    }
+  } else if (shape === "combined_cuboid_cube") {
+    // Cuboid base with a cube on top
+    const ox = 60, oy = 150, w1 = 80, d1 = 40, h1 = 30; // base
+    const w2 = 40, d2 = 40, h2 = 40; // top cube
+    const ox2 = ox + (w1-w2)/2, oy2 = oy - h1; // center top
+    
+    // Bottom Cuboid
+    svgBody += `<polygon points="${ox},${oy} ${ox + d1},${oy - d1} ${ox + w1 + d1},${oy - d1} ${ox + w1},${oy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox},${oy} ${ox + w1},${oy} ${ox + w1},${oy - h1} ${ox},${oy - h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox + w1},${oy} ${ox + w1 + d1},${oy - d1} ${ox + w1 + d1},${oy - d1 - h1} ${ox + w1},${oy - h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox},${oy - h1} ${ox + w1},${oy - h1} ${ox + w1 + d1},${oy - h1 - d1} ${ox + d1},${oy - h1 - d1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    // Top Cube
+    svgBody += `<polygon points="${ox2},${oy2} ${ox2 + d2},${oy2 - d2} ${ox2 + w2 + d2},${oy2 - d2} ${ox2 + w2},${oy2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox2},${oy2} ${ox2 + w2},${oy2} ${ox2 + w2},${oy2 - h2} ${ox2},${oy2 - h2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox2 + w2},${oy2} ${ox2 + w2 + d2},${oy2 - d2} ${ox2 + w2 + d2},${oy2 - d2 - h2} ${ox2 + w2},${oy2 - h2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<polygon points="${ox2},${oy2 - h2} ${ox2 + w2},${oy2 - h2} ${ox2 + w2 + d2},${oy2 - h2 - d2} ${ox2 + d2},${oy2 - h2 - d2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.bottom_width) svgBody += `<text x="${ox + w1/2}" y="${oy + 15}" ${labelSt}>${labels.bottom_width}</text>`;
+      if (labels.bottom_depth) svgBody += `<text x="${ox + w1 + d1/2 + 10}" y="${oy - d1/2 + 10}" ${labelSt}>${labels.bottom_depth}</text>`;
+      if (labels.bottom_height) svgBody += `<text x="${ox - 15}" y="${oy - h1/2}" ${labelSt}>${labels.bottom_height}</text>`;
+      if (labels.top_side) svgBody += `<text x="${ox2 - 15}" y="${oy2 - h2/2}" ${labelSt}>${labels.top_side}</text>`;
+    }
+  } else if (shape === "combined_cylinder_cone") {
+    // Cylinder base with cone on top
+    const ox = 100, oy = 140, rx = 40, ry = 15, h1 = 60, h2 = 60;
+    // Base Cylinder
+    svgBody += `<path d="M ${ox - rx} ${oy} A ${rx} ${ry} 0 0 0 ${ox + rx} ${oy}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<path d="M ${ox - rx} ${oy} A ${rx} ${ry} 0 0 1 ${ox + rx} ${oy}" fill="none" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+    svgBody += `<path d="M ${ox - rx} ${oy} L ${ox - rx} ${oy - h1} M ${ox + rx} ${oy} L ${ox + rx} ${oy - h1}" stroke="${strokeColor}" stroke-width="2"/>`;
+    svgBody += `<ellipse cx="${ox}" cy="${oy - h1}" rx="${rx}" ry="${ry}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    // Top Cone
+    svgBody += `<path d="M ${ox - rx} ${oy - h1} L ${ox} ${oy - h1 - h2} L ${ox + rx} ${oy - h1}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.radius) {
+        svgBody += `<line x1="${ox}" y1="${oy}" x2="${ox + rx}" y2="${oy}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+        svgBody += `<text x="${ox + rx/2}" y="${oy - 10}" ${labelSt}>${labels.radius}</text>`;
+      }
+      if (labels.bottom_height) svgBody += `<text x="${ox + rx + 20}" y="${oy - h1/2}" ${labelSt}>${labels.bottom_height}</text>`;
+      if (labels.top_height) {
+        svgBody += `<line x1="${ox}" y1="${oy - h1}" x2="${ox}" y2="${oy - h1 - h2}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+        svgBody += `<text x="${ox + 15}" y="${oy - h1 - h2/2}" ${labelSt}>${labels.top_height}</text>`;
+      }
+    }
+  } else if (shape === "combined_rect_triangle") {
+    // Rectangle with triangle on top (House shape)
+    const ox = 60, oy = 140, w = 80, h1 = 60, h2 = 50;
+    
+    // Rectangle
+    svgBody += `<rect x="${ox}" y="${oy - h1}" width="${w}" height="${h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    // Triangle
+    svgBody += `<polygon points="${ox},${oy - h1} ${ox + w},${oy - h1} ${ox + w/2},${oy - h1 - h2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.width) svgBody += `<text x="${ox + w/2}" y="${oy + 15}" ${labelSt}>${labels.width}</text>`;
+      if (labels.bottom_height) svgBody += `<text x="${ox - 15}" y="${oy - h1/2}" ${labelSt}>${labels.bottom_height}</text>`;
+      if (labels.top_height) {
+        svgBody += `<line x1="${ox + w/2}" y1="${oy - h1}" x2="${ox + w/2}" y2="${oy - h1 - h2}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+        svgBody += `<text x="${ox + w/2 + 15}" y="${oy - h1 - h2/2}" ${labelSt}>${labels.top_height}</text>`;
+      }
+    }
+  } else if (shape === "combined_rect_semicircle") {
+    const pos = labels.position || "right"; // "top", "bottom", "left", "right"
+    const ratioStr = labels.ratio || "1"; // e.g. "0.5" for half the side
+    const ratio = parseFloat(ratioStr) || 1;
+    
+    const ox = 60, oy = 60; 
+    const w = 80, h = 60;
+    
+    // Rectangle
+    svgBody += `<rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    let r = 0;
+    let cx = 0, cy = 0;
+    
+    if (pos === "right") {
+      r = (h / 2) * ratio;
+      cx = ox + w;
+      cy = oy + h/2;
+      svgBody += `<path d="M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+      svgBody += `<line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+      if (showLines) {
+        if (labels.width) svgBody += `<text x="${ox + w/2}" y="${oy - 15}" ${labelSt}>${labels.width}</text>`;
+        if (labels.height) svgBody += `<text x="${ox - 20}" y="${oy + h/2}" ${labelSt}>${labels.height}</text>`;
+        if (labels.radius) svgBody += `<text x="${cx + r/2 + 10}" y="${cy}" ${labelSt}>${labels.radius}</text>`;
+        if (labels.diameter) svgBody += `<text x="${cx + r/2 + 10}" y="${cy}" ${labelSt}>${labels.diameter}</text>`;
+      }
+    } else if (pos === "left") {
+      r = (h / 2) * ratio;
+      cx = ox;
+      cy = oy + h/2;
+      svgBody += `<path d="M ${cx} ${cy + r} A ${r} ${r} 0 0 1 ${cx} ${cy - r}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+      svgBody += `<line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+      if (showLines) {
+        if (labels.width) svgBody += `<text x="${ox + w/2}" y="${oy - 15}" ${labelSt}>${labels.width}</text>`;
+        if (labels.height) svgBody += `<text x="${ox + w + 20}" y="${oy + h/2}" ${labelSt}>${labels.height}</text>`;
+        if (labels.radius) svgBody += `<text x="${cx - r/2 - 10}" y="${cy}" ${labelSt}>${labels.radius}</text>`;
+        if (labels.diameter) svgBody += `<text x="${cx - r/2 - 10}" y="${cy}" ${labelSt}>${labels.diameter}</text>`;
+      }
+    } else if (pos === "bottom") {
+      r = (w / 2) * ratio;
+      cx = ox + w/2;
+      cy = oy + h;
+      svgBody += `<path d="M ${cx + r} ${cy} A ${r} ${r} 0 0 1 ${cx - r} ${cy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+      svgBody += `<line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+      if (showLines) {
+        if (labels.width) svgBody += `<text x="${ox + w/2}" y="${oy - 15}" ${labelSt}>${labels.width}</text>`;
+        if (labels.height) svgBody += `<text x="${ox - 20}" y="${oy + h/2}" ${labelSt}>${labels.height}</text>`;
+        if (labels.radius) svgBody += `<text x="${cx}" y="${cy + r/2 + 20}" ${labelSt}>${labels.radius}</text>`;
+        if (labels.diameter) svgBody += `<text x="${cx}" y="${cy + r/2 + 20}" ${labelSt}>${labels.diameter}</text>`;
+      }
+    } else if (pos === "top") {
+      r = (w / 2) * ratio;
+      cx = ox + w/2;
+      cy = oy;
+      svgBody += `<path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+      svgBody += `<line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="4"/>`;
+      if (showLines) {
+        if (labels.width) svgBody += `<text x="${ox + w/2}" y="${oy + h + 20}" ${labelSt}>${labels.width}</text>`;
+        if (labels.height) svgBody += `<text x="${ox - 20}" y="${oy + h/2}" ${labelSt}>${labels.height}</text>`;
+        if (labels.radius) svgBody += `<text x="${cx}" y="${cy - r/2 - 15}" ${labelSt}>${labels.radius}</text>`;
+        if (labels.diameter) svgBody += `<text x="${cx}" y="${cy - r/2 - 15}" ${labelSt}>${labels.diameter}</text>`;
+      }
+    }
+  } else if (shape === "combined_rect_rect") {
+    // Two rectangles combined (like a T or L, we'll do an L-shape but let's call it rect_rect)
+    // Actually we have combined_l_shape. Let's make this a T shape inverted.
+    const ox = 70, oy = 80, w1 = 60, h1 = 80, w2 = 140, h2 = 40;
+    const ox2 = ox - (w2-w1)/2;
+    const oy2 = oy + h1;
+    
+    // Top rect
+    svgBody += `<rect x="${ox}" y="${oy}" width="${w1}" height="${h1}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    // Bottom rect
+    svgBody += `<rect x="${ox2}" y="${oy2}" width="${w2}" height="${h2}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    // remove the overlapping line by drawing lines individually or just overlapping fill is fine since fill is solid
+    // actually, stroke will show the overlapping line. Let's just remove the overlapping line by drawing a path.
+    svgBody += `<path d="M ${ox} ${oy} L ${ox+w1} ${oy} L ${ox+w1} ${oy2} L ${ox2+w2} ${oy2} L ${ox2+w2} ${oy2+h2} L ${ox2} ${oy2+h2} L ${ox2} ${oy2} L ${ox} ${oy2} Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.top_width) svgBody += `<text x="${ox + w1/2}" y="${oy - 15}" ${labelSt}>${labels.top_width}</text>`;
+      if (labels.top_height) svgBody += `<text x="${ox - 15}" y="${oy + h1/2}" ${labelSt}>${labels.top_height}</text>`;
+      if (labels.bottom_width) svgBody += `<text x="${ox2 + w2/2}" y="${oy2 + h2 + 15}" ${labelSt}>${labels.bottom_width}</text>`;
+      if (labels.bottom_height) svgBody += `<text x="${ox2 - 15}" y="${oy2 + h2/2}" ${labelSt}>${labels.bottom_height}</text>`;
+    }
+  } else if (shape === "combined_l_shape") {
+    // L-shaped polygon
+    const ox = 60, oy = 160, w1 = 80, h1 = 40, w2 = 40, h2 = 100;
+    
+    const p1 = `${ox},${oy}`;
+    const p2 = `${ox + w1},${oy}`;
+    const p3 = `${ox + w1},${oy - h1}`;
+    const p4 = `${ox + w2},${oy - h1}`;
+    const p5 = `${ox + w2},${oy - h2}`;
+    const p6 = `${ox},${oy - h2}`;
+    
+    svgBody += `<polygon points="${p1} ${p2} ${p3} ${p4} ${p5} ${p6}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
+    
+    if (showLines) {
+      if (labels.bottom) svgBody += `<text x="${ox + w1/2}" y="${oy + 15}" ${labelSt}>${labels.bottom}</text>`;
+      if (labels.left) svgBody += `<text x="${ox - 15}" y="${oy - h2/2}" ${labelSt}>${labels.left}</text>`;
+      if (labels.right_bottom) svgBody += `<text x="${ox + w1 + 15}" y="${oy - h1/2}" ${labelSt}>${labels.right_bottom}</text>`;
+      if (labels.top) svgBody += `<text x="${ox + w2/2}" y="${oy - h2 - 15}" ${labelSt}>${labels.top}</text>`;
     }
   } else {
     svgBody += `<rect x="50" y="50" width="100" height="100" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>`;
