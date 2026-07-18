@@ -208,7 +208,7 @@ export interface ExamSummary {
     author_id?: string;
 }
 
-export type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS';
+export type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS' | 'AI_ANALYSIS';
 
 export interface ArchiveMetadata {
     school?: string;
@@ -226,6 +226,7 @@ export interface ArchiveData {
     results: Result[];
     version?: string;
     repairedAt?: string;
+    ai_analyses?: Record<string, string>;
 }
 
 export interface ArchiveViewerProps {
