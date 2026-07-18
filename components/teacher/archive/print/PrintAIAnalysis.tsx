@@ -69,7 +69,7 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
               width={600}
               height={250}
               data={normalCurveData}
-              margin={{ top: 30, right: 30, left: 0, bottom: 10 }}
+              margin={{ top: 30, right: 30, left: 15, bottom: 10 }}
               style={{ width: "100%", height: "100%" }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
@@ -89,10 +89,11 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
                 label={{
                   value: "Frekuensi (Siswa)",
                   angle: -90,
-                  position: "insideTopLeft",
-                  offset: -10,
+                  position: "insideLeft",
+                  offset: 5,
                   fill: "#64748b",
                   fontSize: 10,
+                  style: { textAnchor: 'middle' }
                 }}
               />
               <Legend verticalAlign="top" height={36} wrapperStyle={{ top: -10 }} />
@@ -141,12 +142,18 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
   }
 
   const markdownComponents = {
-    h1: ({node, ...props}: any) => <h1 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
-    h2: ({node, ...props}: any) => <h2 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
-    h3: ({node, ...props}: any) => <h3 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
-    h4: ({node, ...props}: any) => <h4 className="break-after-avoid avoid-break-inside mt-4 mb-2" {...props} />,
-    p: ({node, ...props}: any) => <p className="avoid-break-inside mb-2" {...props} />,
-    li: ({node, ...props}: any) => <li className="avoid-break-inside mb-1" {...props} />,
+    h1: ({node, ...props}: any) => <h1 className="break-after-avoid avoid-break-inside mt-4 mb-2 font-bold text-lg text-slate-900" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="break-after-avoid avoid-break-inside mt-4 mb-2 font-bold text-md text-slate-800" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="break-after-avoid avoid-break-inside mt-3 mb-1 font-bold text-slate-800" {...props} />,
+    h4: ({node, ...props}: any) => <h4 className="break-after-avoid avoid-break-inside mt-3 mb-1 font-bold text-slate-800" {...props} />,
+    p: ({node, children, ...props}: any) => {
+      // If the paragraph only contains a strong tag (like a school name), keep it with the next element
+      const isSubheading = node?.children?.length === 1 && node?.children[0]?.tagName === 'strong';
+      return <p className={`avoid-break-inside mb-2 ${isSubheading ? 'break-after-avoid font-bold' : ''}`} {...props}>{children}</p>;
+    },
+    ul: ({node, ...props}: any) => <ul className="mb-3 pl-4 list-disc" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="mb-3 pl-4 list-decimal" {...props} />,
+    li: ({node, ...props}: any) => <li className="avoid-break-inside mb-1 pl-1" {...props} />,
   };
 
   return (
