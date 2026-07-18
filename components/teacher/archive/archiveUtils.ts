@@ -16,6 +16,7 @@ export type ArchiveMetadata = {
   date?: string | number;
   participantCount?: number;
   authorId?: string;
+    hasAiAnalysis?: boolean;
 };
 
 export const checkAnswerStatus = (

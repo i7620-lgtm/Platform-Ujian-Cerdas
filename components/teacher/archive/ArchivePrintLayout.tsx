@@ -4,6 +4,7 @@ import { PrintGeneralReport } from "./print/PrintGeneralReport";
 import { PrintSchoolClassReport } from "./print/PrintSchoolClassReport";
 import { PrintItemDifficulty } from "./print/PrintItemDifficulty";
 import { PrintQuestionBank } from "./print/PrintQuestionBank";
+import Markdown from "react-markdown";
 
 interface ArchivePrintLayoutProps {
   exam: Exam;
@@ -24,6 +25,7 @@ interface ArchivePrintLayoutProps {
     options?: string[];
     distribution: Record<string, number>;
   }[];
+  ai_analyses?: Record<string, string>;
 }
 
 export const ArchivePrintLayout: React.FC<ArchivePrintLayoutProps> = ({
@@ -40,6 +42,7 @@ export const ArchivePrintLayout: React.FC<ArchivePrintLayoutProps> = ({
   uniqueSchools,
   sortedResults,
   questionAnalysisData,
+  ai_analyses,
 }) => {
   return (
     <div className="hidden print:block text-slate-900 bg-white">
@@ -100,6 +103,37 @@ export const ArchivePrintLayout: React.FC<ArchivePrintLayoutProps> = ({
       />
 
       <PrintQuestionBank exam={exam} />
+
+      {ai_analyses && Object.keys(ai_analyses).length > 0 && (
+        <div className="page-break mt-10 border-t-2 border-slate-900 pt-6">
+          <h2 className="text-xl font-black uppercase tracking-tight mb-4">
+            ✨ Laporan Analisis Lanjutan AI
+          </h2>
+          {Object.entries(ai_analyses).map(([key, content]) => {
+            let title = "Analisis Keseluruhan";
+            if (key !== "OVERALL") {
+              const match = key.match(/school_(.*)_class_(.*)/);
+              if (match) {
+                title = `Analisis Kelas: ${match[2]} (${match[1]})`;
+              } else {
+                title = `Analisis: ${key}`;
+              }
+            }
+            return (
+              <div key={key} className="mb-8 avoid-break-inside">
+                <h3 className="text-lg font-bold text-slate-800 border-b border-slate-300 pb-1 mb-3">
+                  {title}
+                </h3>
+                <div className="prose prose-sm max-w-none print-question-text">
+                  <div className="markdown-body">
+                    <Markdown>{content}</Markdown>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

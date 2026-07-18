@@ -50,6 +50,14 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                         Tanpa Pemilik
                       </span>
                     )}
+                  {file.metadata && file.metadata.hasAiAnalysis && (
+                      <span
+                        className="shrink-0 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md border border-indigo-200 dark:border-indigo-800"
+                        title="Arsip ini memiliki analisis AI."
+                      >
+                        AI
+                      </span>
+                  )}
                 </div>
 
                 {file.metadata ? (
@@ -79,13 +87,17 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                       </span>
                     </div>
                     {file.metadata.targetClasses &&
-                      file.metadata.targetClasses.length > 0 && (
+                      (Array.isArray(file.metadata.targetClasses)
+                        ? file.metadata.targetClasses.length > 0
+                        : String(file.metadata.targetClasses).trim() !== "") && (
                         <div className="grid grid-cols-3 gap-1">
                           <span className="font-bold text-slate-400">
                             Target
                           </span>
                           <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                            : {file.metadata.targetClasses.join(", ")}
+                            : {Array.isArray(file.metadata.targetClasses)
+                              ? file.metadata.targetClasses.join(", ")
+                              : String(file.metadata.targetClasses)}
                           </span>
                         </div>
                       )}
@@ -93,7 +105,7 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                       <span className="font-bold text-slate-400">Tanggal</span>
                       <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
                         :{" "}
-                        {file.metadata.date
+                        {file.metadata.date && !isNaN(Date.parse(String(file.metadata.date)))
                           ? new Date(file.metadata.date).toLocaleDateString(
                               "id-ID",
                               {
@@ -131,11 +143,13 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                       <span className="font-bold text-slate-400">Tanggal</span>
                       <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
                         :{" "}
-                        {new Date(file.created_at).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {file.created_at && !isNaN(Date.parse(String(file.created_at)))
+                          ? new Date(file.created_at).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "-"}
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1">

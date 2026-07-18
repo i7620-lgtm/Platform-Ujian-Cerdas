@@ -23,12 +23,14 @@ interface ArchiveHeaderActionsProps {
   onDownloadExcel: () => void;
   onReuseExam: (exam: Exam) => void;
   onUploadToCloud?: () => Promise<void> | void;
+  onDownloadJSON?: () => void;
   onReclaimArchive?: () => Promise<void> | void;
   activeTab: ArchiveTab;
   setActiveTab: (tab: ArchiveTab) => void;
   totalStudents: number;
   isGeneratingAI?: boolean;
   onGenerateAI?: () => void;
+  hasAiAnalysis?: boolean;
 }
 
 export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
@@ -44,12 +46,14 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
   onDownloadExcel,
   onReuseExam,
   onUploadToCloud,
+  onDownloadJSON,
   onReclaimArchive,
   activeTab,
   setActiveTab,
   totalStudents,
   isGeneratingAI,
   onGenerateAI,
+  hasAiAnalysis,
 }) => {
   return (
     <div className="p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm print:hidden">
@@ -112,6 +116,19 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
             </button>
           )}
 
+          {onDownloadJSON && (
+            <button
+              onClick={onDownloadJSON}
+              className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"
+              title="Unduh file JSON terbaru (dengan hasil AI)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Unduh Arsip JSON</span>
+            </button>
+          )}
+
           <button
             onClick={onPrint}
             className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 shadow-sm"
@@ -156,7 +173,7 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap gap-2">
           {(
-            ["DETAIL", "STUDENTS", "ANALYSIS", "CLASS_ANALYSIS"] as ArchiveTab[]
+            (hasAiAnalysis ? ["DETAIL", "STUDENTS", "ANALYSIS", "CLASS_ANALYSIS", "AI_ANALYSIS"] : ["DETAIL", "STUDENTS", "ANALYSIS", "CLASS_ANALYSIS"]) as ArchiveTab[]
           ).map((tab) => {
             const label =
               tab === "DETAIL"
@@ -165,7 +182,9 @@ export const ArchiveHeaderActions: React.FC<ArchiveHeaderActionsProps> = ({
                   ? `Rekap Siswa (${totalStudents})`
                   : tab === "ANALYSIS"
                     ? "Analisis Soal"
-                    : "Analisis Kelas";
+                    : tab === "CLASS_ANALYSIS"
+                      ? "Analisis Kelas"
+                      : "Analisis Lanjutan";
             return (
               <button
                 key={tab}

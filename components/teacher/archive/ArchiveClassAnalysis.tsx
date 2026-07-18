@@ -43,6 +43,8 @@ interface ArchiveClassAnalysisProps {
   results?: Result[];
   teacherProfile?: TeacherProfile | null;
   aiAnalysisResult?: string | null;
+  onDeleteAIAnalysis?: () => void;
+  viewMode?: "CLASS_ONLY" | "AI_ONLY" | "BOTH";
 }
 
 export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
@@ -53,6 +55,8 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   results = [],
   teacherProfile,
   aiAnalysisResult,
+  onDeleteAIAnalysis,
+  viewMode = "BOTH",
 }) => {
   const filteredResults = useMemo(() => {
     if (!results) return [];
@@ -150,7 +154,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
         <div className="h-[380px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <LineChart
               data={normalCurveData}
               margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
@@ -220,20 +224,22 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 dark:border-slate-700">
-        <div>
-          <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-            <ChartBarIcon className="w-5 h-5 text-indigo-500" /> Analisis Umum Per
-            Kelas
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Ringkasan performa dan ketuntasan belajar siswa dikelompokkan
-            berdasarkan kelas.
-          </p>
-        </div>
-      </div>
-      <div className="overflow-x-auto custom-scrollbar">
-        <table className="w-full text-left min-w-[800px]">
+      {(viewMode === "BOTH" || viewMode === "CLASS_ONLY") && (
+        <>
+          <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+            <div>
+              <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                <ChartBarIcon className="w-5 h-5 text-indigo-500" /> Analisis Umum Per
+                Kelas
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Ringkasan performa dan ketuntasan belajar siswa dikelompokkan
+                berdasarkan kelas.
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left min-w-[800px]">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
               <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase">
@@ -357,19 +363,34 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
           </tbody>
         </table>
       </div>
+      </>
+      )}
       
       {/* AI Analysis Section */}
-      {aiAnalysisResult && (
+      {(viewMode === "BOTH" || viewMode === "AI_ONLY") && aiAnalysisResult && (
         <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 relative">
-          <button
-            onClick={handlePrintAI}
-            className="absolute top-8 right-8 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors z-10 print:hidden"
-            title="Cetak Laporan AI"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-          </button>
+          <div className="absolute top-8 right-8 flex items-center gap-2 print:hidden z-10">
+            {onDeleteAIAnalysis && (
+              <button
+                onClick={onDeleteAIAnalysis}
+                className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 transition-colors"
+                title="Hapus Analisis AI"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={handlePrintAI}
+              className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+              title="Cetak Laporan AI"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+            </button>
+          </div>
           <div id="ai-analysis-print-content" className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-amber-100 dark:border-amber-900/30 shadow-inner">
             {splitAnalysis.splitFound ? (
               <div className="space-y-6">
