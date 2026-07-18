@@ -334,7 +334,7 @@ export class ArchiveService {
   }
 
   // --- PROMPT GENERATOR (NO AI CALL) ---
-  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[]): string {
+  generateAnalysisPrompt(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[], existingAnalyses?: Record<string, string>): string {
       const stripBase64 = (str: string): string => {
           if (typeof str !== 'string') return str;
           return str.replace(/data:image\/[a-zA-Z+-]+;base64,[^\s"']+/g, '[Gambar]');
@@ -389,6 +389,22 @@ export class ArchiveService {
 
       const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
+      let existingAnalysesText = "";
+      if (existingAnalyses && Object.keys(existingAnalyses).length > 0) {
+          const relevantAnalyses = Object.entries(existingAnalyses).filter(([key]) => key !== "OVERALL");
+          if (relevantAnalyses.length > 0) {
+              existingAnalysesText = "\n\nBERIKUT ADALAH ANALISIS PER KELAS YANG SUDAH DILAKUKAN SEBELUMNYA. Gunakan ini sebagai referensi penting dan JANGAN melakukan analisis ulang terpisah untuk kelas-kelas ini. Cukup buat analisis kelas yang belum ada (bila ada), lalu sintesiskan menjadi laporan analisis keseluruhan:\n" + 
+                  relevantAnalyses.map(([key, content]) => {
+                      let title = "Kelas";
+                      const match = key.match(/school_(.*)_class_(.*)/);
+                      if (match) {
+                          title = `Kelas: ${match[2]} (${match[1]})`;
+                      }
+                      return `--- ${title} ---\n${content}\n`;
+                  }).join("\n");
+          }
+      }
+
       return `
         You are a Senior Education Data Consultant specializing in Competency-Based Curriculum Analysis.
         
@@ -397,6 +413,8 @@ export class ArchiveService {
 
         EXAM QUESTIONS LIST WITH PERFORMANCE STATS (Use correct_rate, top_wrong_answer, and top_wrong_rate to diagnose understanding levels and check for potential answer key errors):
         ${JSON.stringify(questionDetails)}
+
+        ${existingAnalysesText}
 
         TASK:
         ${customPrompt || defaultTask}
@@ -420,7 +438,7 @@ export class ArchiveService {
            - Anda WAJIB secara aktif mendeteksi potensi kesalahan kunci jawaban ujian (guru salah input kunci).
            - Skenario utama deteksi: Jika persentase siswa menjawab benar ('correct_rate') sangat rendah (< 35%) DAN ada satu jawaban salah terpopuler ('top_wrong_answer') yang dipilih oleh mayoritas siswa ('top_wrong_rate' > 45%).
            - Lakukan analisis terhadap teks soal, pilihan jawaban ('options'), kunci jawaban saat ini ('correctAnswer'), dan opsi terpopuler tersebut.
-           - Jika secara logis/akademis opsi terpopuler tersebut sebenarnya adalah jawaban yang benar, atau jika soal tersebut membingungkan/memiliki beberapa opsi yang sama-sama benar, laporkan ini dengan sangat jelas dan berani sebagai "Indikasi Kesalahan Kunci Jawaban" dalam evaluasi butir soal Anda. Jelaskan penalaran logisnya dan berikan saran kunci koreksi agar guru mengetahuinya.
+           - Jika secara logis/akademis opsi terpopuler tersebut sebenarnya adalah jawaban yang benar, atau jika soal tersebut membingungkan/memiliki beberapa opsi yang sama-sama benar, laporkan ini dengan sangat jelas and berani sebagai "Indikasi Kesalahan Kunci Jawaban" dalam evaluasi butir soal Anda. Jelaskan penalaran logisnya dan berikan saran kunci koreksi agar guru mengetahuinya.
 
         STRUCTURE:
 
@@ -448,9 +466,9 @@ export class ArchiveService {
   }
 
   // --- GEMINI AI ANALYTICS (GENERATIVE VISUALIZATION) ---
-  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[]): Promise<string> {
+  async generateAIAnalysis(summaries: ExamSummary[], customPrompt?: string, examQuestions?: Question[], existingAnalyses?: Record<string, string>): Promise<string> {
       try {
-          const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions);
+          const prompt = this.generateAnalysisPrompt(summaries, customPrompt, examQuestions, existingAnalyses);
           
           const res = await fetch("/api/generate-analysis", {
               method: "POST",
@@ -525,26 +543,30 @@ export class ArchiveService {
 
   async uploadArchive(examCode: string, jsonString: string, metadata?: Record<string, unknown>): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
-      let filename = `${examCode}_${Date.now()}.json`;
+      let filename = `${String(examCode).substring(0, 10)}_${Date.now()}.json`;
       
       if (metadata) {
           try {
               let safeAuthorId = metadata.authorId;
               if (!safeAuthorId || String(safeAuthorId).trim() === '' || String(safeAuthorId) === 'undefined' || String(safeAuthorId) === 'null') {
                   safeAuthorId = '';
+              } else {
+                  // Remove hyphens to compress UUID from 36 to 32 chars
+                  safeAuthorId = String(safeAuthorId).replace(/-/g, '');
               }
               
-              const tc = Array.isArray(metadata.targetClasses) ? metadata.targetClasses.join(',').substring(0, 20) : String(metadata.targetClasses || '').substring(0, 20);
+              const tc = Array.isArray(metadata.targetClasses) ? metadata.targetClasses.join(',').substring(0, 10) : String(metadata.targetClasses || '').substring(0, 10);
               
               const minMeta = {
-                  s: String(metadata.school || '').substring(0, 30),
-                  su: String(metadata.subject || '').substring(0, 30),
-                  c: String(metadata.classLevel || '').substring(0, 15),
+                  s: String(metadata.school || '').substring(0, 20),
+                  su: String(metadata.subject || '').substring(0, 20),
+                  c: String(metadata.classLevel || '').substring(0, 10),
                   t: String(metadata.examType || '').substring(0, 15),
                   tc: [tc],
-                  d: String(metadata.date || '').substring(0, 15),
+                  d: String(metadata.date || '').substring(0, 10),
                   p: metadata.participantCount,
-                  a: String(safeAuthorId).substring(0, 40)
+                  a: safeAuthorId,
+                  ai: metadata.hasAiAnalysis ? 1 : 0
               };
 
               const jsonStr = JSON.stringify(minMeta);
@@ -556,10 +578,12 @@ export class ArchiveService {
                   .replace(/\//g, '_')
                   .replace(/=+$/, '');
               
-              const potentialFileName = `${String(examCode).substring(0, 30)}_meta_${b64}_${Date.now()}.json`;
+              // Use dot (.) as a delimiter before the timestamp to avoid collision with base64 underscores
+              const potentialFileName = `${String(examCode).substring(0, 10)}_meta_${b64}.${Date.now()}.json`;
               
-              if (potentialFileName.length > 200) {
-                  filename = `${String(examCode).substring(0, 30)}_${Date.now()}.json`;
+              // Standard Linux filename limit is 255 characters, let's keep it strictly under 250.
+              if (potentialFileName.length > 250) {
+                  filename = `${String(examCode).substring(0, 10)}_${Date.now()}.json`;
               } else {
                   filename = potentialFileName;
               }
@@ -576,7 +600,7 @@ export class ArchiveService {
       return data?.path || filename;
   }
 
-  async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: Record<string, unknown>}[]> {
+   async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: Record<string, unknown>}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
           limit: 100,
           sortBy: { column: 'created_at', order: 'desc' },
@@ -587,13 +611,30 @@ export class ArchiveService {
           return [];
       }
       
+      if (!data || !Array.isArray(data)) {
+          return [];
+      }
+      
       return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
           let metadata = null;
-          if (typeof f.name === 'string' && f.name.includes('_meta_')) {
+          if (f && typeof f.name === 'string' && f.name.includes('_meta_')) {
               try {
                   const parts = f.name.split('_meta_');
                   if (parts.length > 1) {
-                      let b64 = parts[1].split('_')[0];
+                      const cleanStr = parts[1].replace(/\.json$/i, '');
+                      let b64 = "";
+                      
+                      // Check if it's the new format (where timestamp is separated by a dot, e.g. base64.timestamp)
+                      if (cleanStr.includes('.')) {
+                          const lastDotIdx = cleanStr.lastIndexOf('.');
+                          b64 = cleanStr.substring(0, lastDotIdx);
+                      } else {
+                          // Old format (separated by underscore, e.g. base64_timestamp)
+                          // The timestamp is always the last segment, so we split at the last underscore.
+                          const lastUnderscoreIndex = cleanStr.lastIndexOf('_');
+                          b64 = lastUnderscoreIndex !== -1 ? cleanStr.substring(0, lastUnderscoreIndex) : cleanStr;
+                      }
+                      
                       b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
                       while (b64.length % 4) b64 += '=';
                       
@@ -605,17 +646,43 @@ export class ArchiveService {
                       let parsedAuthorId = parsed.a;
                       if (!parsedAuthorId || String(parsedAuthorId).trim() === '' || String(parsedAuthorId) === 'undefined' || String(parsedAuthorId) === 'null') {
                           parsedAuthorId = '';
+                      } else {
+                          // Restore hyphens if author UUID was compressed
+                          const raw = String(parsedAuthorId).trim();
+                          if (raw.length === 32 && !raw.includes('-')) {
+                              parsedAuthorId = `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
+                          } else {
+                              parsedAuthorId = raw;
+                          }
                       }
+                      
+                      let parsedTc: string[] = [];
+                      if (parsed.tc) {
+                          if (Array.isArray(parsed.tc)) {
+                              parsedTc = parsed.tc;
+                          } else {
+                              parsedTc = String(parsed.tc).split(',').map((item: string) => item.trim());
+                          }
+                      }
+                      
+                      const hasAiAnalysis = !!(
+                          parsed.ai === 1 || 
+                          parsed.ai === true || 
+                          parsed.hasAiAnalysis === true || 
+                          String(parsed.ai) === '1' || 
+                          parsed.has_ai_analysis === true
+                      );
                       
                       metadata = {
                           school: parsed.s,
                           subject: parsed.su,
                           classLevel: parsed.c,
                           examType: parsed.t,
-                          targetClasses: parsed.tc,
+                          targetClasses: parsedTc,
                           date: parsed.d,
                           participantCount: parsed.p,
-                          authorId: parsedAuthorId
+                          authorId: parsedAuthorId,
+                          hasAiAnalysis
                       };
                   }
               } catch {
@@ -624,9 +691,9 @@ export class ArchiveService {
           }
           
           return {
-              name: f.name as string,
-              created_at: f.created_at as string,
-              size: (f.metadata as {size?: number})?.size || 0,
+              name: f ? f.name as string : "",
+              created_at: f ? f.created_at as string : "",
+              size: f ? ((f.metadata as {size?: number})?.size || 0) : 0,
               metadata
           };
       });
