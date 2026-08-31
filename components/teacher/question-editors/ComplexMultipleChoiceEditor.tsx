@@ -29,9 +29,13 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
       </label>
       <div className="space-y-3">
         {q.options.map((opt, optIndex) => {
+          const letter = String.fromCharCode(65 + optIndex);
           const currentAnswers = parseList(q.correctAnswer);
           const isSelected = currentAnswers.some((ans) =>
-            isAnswerMatch(ans, opt, q.questionType),
+            ans === letter ||
+            ans === opt ||
+            isAnswerMatch(ans, opt, q.questionType) ||
+            (typeof ans === "string" && ans.trim().toUpperCase() === letter)
           );
           return (
             <div
