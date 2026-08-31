@@ -12,6 +12,7 @@ export interface EditorState {
   showGeometry: boolean;
   showAksara: boolean;
   showEmoji: boolean;
+  showAiImage: boolean;
 }
 
 const execCmd = (command: string, value: string | undefined = undefined) => {
@@ -50,6 +51,7 @@ export const useWysiwygEditor = ({
     showGeometry: false,
     showAksara: false,
     showEmoji: false,
+    showAiImage: false,
   });
 
   const setEditorSubState = (
@@ -373,6 +375,13 @@ export const useWysiwygEditor = ({
     e.target.value = "";
   };
 
+  const insertAiImage = (imageUrl: string, caption?: string) => {
+    const cleanCaption = caption ? caption.replace(/"/g, "&quot;") : "Stimulus Visual AI";
+    const imgTag = `<p style="text-align: center; margin: 12px auto;"><img src="${imageUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0;" /><br/><span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">🎨 Stimulus Visual AI (${cleanCaption})</span></p>&nbsp;`;
+    runCmd("insertHTML", imgTag);
+    handleInput();
+  };
+
   return {
     editorRef,
     fileInputRef,
@@ -387,6 +396,7 @@ export const useWysiwygEditor = ({
     insertTable,
     deleteCurrentTable,
     insertMath,
+    insertAiImage,
     handlePaste,
     handleImageFileChange,
     handleAudioFileChange,
