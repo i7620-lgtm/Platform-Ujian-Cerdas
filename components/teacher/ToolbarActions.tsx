@@ -1,4 +1,5 @@
 import React from "react";
+import { Sparkles } from "lucide-react";
 import {
   TrashIcon,
   PhotoIcon,
@@ -56,6 +57,7 @@ interface ToolbarActionsProps {
   runCmd: (cmd: string, val?: string) => void;
   onAudioClick: () => void;
   onImageClick: () => void;
+  onAiImageClick?: () => void;
   onTableClick: () => void;
   onGeometryClick: () => void;
   onChartClick?: () => void;
@@ -75,6 +77,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   runCmd,
   onAudioClick,
   onImageClick,
+  onAiImageClick,
   onTableClick,
   onGeometryClick,
   onChartClick,
@@ -216,8 +219,21 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
           }}
           className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"
         >
-          <PhotoIcon className="w-4 h-4" /> Gambar
+          <PhotoIcon className="w-4 h-4" /> Upload Gambar
         </button>
+        {onAiImageClick && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onAiImageClick();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded text-xs font-bold hover:from-purple-600 hover:to-indigo-700 shadow-sm transition-all whitespace-nowrap"
+            title="Generate Gambar Stimulus dengan AI Gratis"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> AI Gambar
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={(e) => {
