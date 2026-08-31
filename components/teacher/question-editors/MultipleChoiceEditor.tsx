@@ -4,6 +4,7 @@ import { TrashIcon, PlusCircleIcon } from "../../Icons";
 import { WysiwygEditor } from "../WysiwygEditor";
 import { useExamEditorStore } from "../../../stores/examEditorStore";
 import { useExamEditorUIStore } from "../../../stores/examEditorUIStore";
+import { isAnswerMatch } from "../examUtils";
 
 interface MultipleChoiceEditorProps {
   q: Question;
@@ -23,59 +24,67 @@ export const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({ q })
       <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex justify-between items-center">
         <span>Pilihan Jawaban</span>
         <span className="text-primary font-medium tracking-normal text-xs animate-pulse opacity-70">
-          Klik Opsi untuk Set Jawaban Benar
+          Klik huruf opsi (A/B/C/D) untuk menandai kunci jawaban benar
         </span>
       </label>
       <div className="space-y-3">
-        {q.options.map((opt, optIndex) => (
-          <div
-            key={`mc-${q.id}-${optIndex}`}
-            className="flex gap-2 items-start"
-          >
-            <button
-              type="button"
-              onClick={() =>
-                handleCorrectAnswerChange(q.id, String.fromCharCode(65 + optIndex))
-              }
-              className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all mt-6 ${
-                q.correctAnswer === String.fromCharCode(65 + optIndex)
-                  ? "bg-primary border-primary text-white shadow-md transform scale-110"
-                  : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-primary/50 hover:bg-primary/5"
-              }`}
-              title="Tandai sebagai jawaban benar"
+        {q.options.map((opt, optIndex) => {
+          const letter = String.fromCharCode(65 + optIndex);
+          const isSelected =
+            q.correctAnswer === letter ||
+            q.correctAnswer === opt ||
+            isAnswerMatch(q.correctAnswer, opt, q.questionType) ||
+            (typeof q.correctAnswer === "string" &&
+              q.correctAnswer.trim().toUpperCase() === letter);
+
+          return (
+            <div
+              key={`mc-${q.id}-${optIndex}`}
+              className="flex gap-2 items-start"
             >
-              <span className="font-bold text-sm">
-                {String.fromCharCode(65 + optIndex)}
-              </span>
-            </button>
-            <div className="flex-1">
-              <WysiwygEditor
-                value={opt}
-                onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
-                placeholder={`Pilihan ${String.fromCharCode(65 + optIndex)}`}
-                minHeight="50px"
-                onChartClick={() =>
-                  setEditingChartTarget({
-                    qId: q.id,
-                    type: "option",
-                    index: optIndex,
-                  })
-                }
-                chartData={q.optionCharts?.[optIndex]}
-              />
-            </div>
-            {q.options!.length > 2 && (
               <button
                 type="button"
-                onClick={() => handleDeleteOption(q.id, optIndex)}
-                className="mt-6 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                title="Hapus opsi"
+                onClick={() => handleCorrectAnswerChange(q.id, opt)}
+                className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all mt-6 ${
+                  isSelected
+                    ? "bg-primary border-primary text-white shadow-md transform scale-110 ring-4 ring-primary/20"
+                    : "bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-primary/50 hover:bg-primary/5"
+                }`}
+                title={isSelected ? "Kunci jawaban benar saat ini" : "Klik untuk menandai sebagai kunci jawaban benar"}
               >
-                <TrashIcon className="w-4 h-4" />
+                <span className="font-bold text-sm">
+                  {letter}
+                </span>
               </button>
-            )}
-          </div>
-        ))}
+              <div className="flex-1">
+                <WysiwygEditor
+                  value={opt}
+                  onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
+                  placeholder={`Pilihan ${letter}`}
+                  minHeight="50px"
+                  onChartClick={() =>
+                    setEditingChartTarget({
+                      qId: q.id,
+                      type: "option",
+                      index: optIndex,
+                    })
+                  }
+                  chartData={q.optionCharts?.[optIndex]}
+                />
+              </div>
+              {q.options!.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteOption(q.id, optIndex)}
+                  className="mt-6 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  title="Hapus opsi"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
       {q.options.length < 5 && (
         <button
