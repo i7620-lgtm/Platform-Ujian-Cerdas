@@ -15,10 +15,12 @@ export type InputMethod = "ai" | "upload";
 const DEFAULT_AI_CONFIG: QuizConfig = {
   count: 5,
   type: "Pilihan Ganda",
+  types: ["Pilihan Ganda"],
   subject: "",
-  difficulty: "C3 - Mengaplikasikan",
+  difficulty: "Level 3 - Penalaran (Reasoning / HOTS)",
+  difficulties: ["Level 3 - Penalaran (Reasoning / HOTS)"],
   blueprint: "",
-  includeImages: false,
+  includeImages: true,
 };
 
 export const useCreationView = ({
@@ -72,6 +74,15 @@ export const useCreationView = ({
       if (inputMethod === "ai") {
         if (!aiConfig.subject.trim()) {
           throw new Error("Silakan isi mata pelajaran/materi terlebih dahulu.");
+        }
+        if (!aiConfig.types || aiConfig.types.length === 0) {
+          throw new Error("Silakan pilih minimal 1 (satu) jenis soal.");
+        }
+        if (!aiConfig.difficulties || aiConfig.difficulties.length === 0) {
+          throw new Error("Silakan pilih minimal 1 (satu) tingkat kognitif.");
+        }
+        if (!aiConfig.count || aiConfig.count < 1) {
+          throw new Error("Jumlah soal minimal adalah 1 butir.");
         }
         const generatedQuestions = await generateQuestions(aiConfig);
         if (generatedQuestions.length === 0) {
