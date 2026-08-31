@@ -160,24 +160,30 @@ export const useExamEditor = ({
     async (q: Question) => {
       setIsGeneratingId(q.id);
       try {
+        const questionTypeLabel =
+          q.questionType === "MULTIPLE_CHOICE"
+            ? "Pilihan Ganda"
+            : q.questionType === "COMPLEX_MULTIPLE_CHOICE"
+              ? "Pilihan Ganda Kompleks"
+              : q.questionType === "TRUE_FALSE"
+                ? "Benar/Salah"
+                : q.questionType === "MATCHING"
+                  ? "Menjodohkan"
+                  : q.questionType === "FILL_IN_THE_BLANK"
+                    ? "Uraian Singkat"
+                    : "Esai";
+
+        const cognitiveLevel = q.level || "Level 3 - Penalaran (Reasoning / HOTS)";
+
         const aiConfig = {
           subject: q.category || config.subject || "Umum",
           count: 1,
-          type:
-            q.questionType === "MULTIPLE_CHOICE"
-              ? "Pilihan Ganda"
-              : q.questionType === "COMPLEX_MULTIPLE_CHOICE"
-                ? "Pilihan Ganda Kompleks"
-                : q.questionType === "TRUE_FALSE"
-                  ? "Benar/Salah"
-                  : q.questionType === "MATCHING"
-                    ? "Menjodohkan"
-                    : q.questionType === "FILL_IN_THE_BLANK"
-                      ? "Isian Singkat"
-                      : "Esai",
-          difficulty: q.level || "Sedang",
+          type: questionTypeLabel,
+          types: [questionTypeLabel],
+          difficulty: cognitiveLevel,
+          difficulties: [cognitiveLevel],
           blueprint: q.kisiKisi || "",
-          includeImages: false,
+          includeImages: config.includeImages ?? true,
         };
 
         const generatedQuestions = await generateQuestions(aiConfig);
@@ -191,9 +197,9 @@ export const useExamEditor = ({
                     ...question,
                     ...newQ,
                     id: question.id,
-                    category: q.category,
-                    level: q.level,
-                    kisiKisi: q.kisiKisi,
+                    category: newQ.category || q.category,
+                    level: newQ.level || q.level,
+                    kisiKisi: newQ.kisiKisi || q.kisiKisi,
                     scoreWeight: newQ.scoreWeight || q.scoreWeight,
                   }
                 : question,
@@ -206,7 +212,7 @@ export const useExamEditor = ({
         setIsGeneratingId(null);
       }
     },
-    [config.subject, setQuestions, setIsGeneratingId],
+    [config.subject, config.includeImages, setQuestions, setIsGeneratingId],
   );
 
   // Cascading configurations on manual configuration changes
