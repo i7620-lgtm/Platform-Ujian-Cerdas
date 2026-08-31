@@ -11,9 +11,11 @@ import {
 import { ChartRenderer } from "../ChartRenderer";
 import EmojiPickerModal from "./EmojiPickerModal";
 import { GeometryModal } from "./GeometryModal";
+import { AiImageModal } from "./AiImageModal";
 import { ToolbarActions } from "./ToolbarActions";
 import { EquationEditorTab as VisualMathModal } from "./EquationEditorTab";
 import { useWysiwygEditor } from "./useWysiwygEditor";
+import { transliterate } from "../../utils/aksaraBali";
 
 export const SelectionModal: React.FC<{
   isOpen: boolean;
@@ -175,9 +177,7 @@ export const AksaraBaliModal: React.FC<{
   const [aksaraText, setAksaraText] = useState("");
 
   useEffect(() => {
-    import("../../utils/aksaraBali").then((module) => {
-      setAksaraText(module.transliterate(latinText));
-    });
+    setAksaraText(transliterate(latinText));
   }, [latinText]);
 
   if (!isOpen) return null;
@@ -275,6 +275,7 @@ export const WysiwygEditor: React.FC<{
     insertTable,
     deleteCurrentTable,
     insertMath,
+    insertAiImage,
     handlePaste,
     handleImageFileChange,
     handleAudioFileChange,
@@ -290,6 +291,7 @@ export const WysiwygEditor: React.FC<{
     showGeometry,
     showAksara,
     showEmoji,
+    showAiImage,
   } = state;
 
   const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
@@ -360,6 +362,7 @@ export const WysiwygEditor: React.FC<{
             runCmd={runCmd}
             onAudioClick={() => audioInputRef.current?.click()}
             onImageClick={() => fileInputRef.current?.click()}
+            onAiImageClick={() => setEditorSubState({ showAiImage: true })}
             onTableClick={() => setEditorSubState({ showTable: true })}
             onGeometryClick={() => setEditorSubState({ showGeometry: true })}
             onChartClick={onChartClick}
@@ -483,6 +486,12 @@ export const WysiwygEditor: React.FC<{
           runCmd("insertHTML", emoji);
           handleInput();
         }}
+      />
+      <AiImageModal
+        key={showAiImage ? "ai-image-open" : "ai-image-closed"}
+        isOpen={showAiImage}
+        onClose={() => setEditorSubState({ showAiImage: false })}
+        onInsert={insertAiImage}
       />
     </div>
   );
