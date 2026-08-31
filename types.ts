@@ -3,9 +3,11 @@ export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE
 
 export interface QuizConfig {
   count: number;
-  type: string;
+  type?: string;
+  types?: string[];
   subject: string;
-  difficulty: string;
+  difficulty?: string;
+  difficulties?: string[];
   blueprint: string;
   includeImages: boolean;
 }
@@ -64,6 +66,7 @@ export interface Question {
   level?: string;    // e.g., "1", "HOTS", "LOTS"
   scoreWeight?: number; // Bobot Nilai (Default: 1)
   kisiKisi?: string; // NEW: Kisi-kisi materi per soal
+  imagePrompt?: string; // Prompt deskripsi visual AI untuk stimulus gambar
 
   matchingPairs?: {
     left: string;
