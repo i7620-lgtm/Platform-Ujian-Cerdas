@@ -12,6 +12,7 @@ import { storageService } from "../../services/storage";
 import { useExamEditorStore } from "../../stores/examEditorStore";
 import { useTeacherDashboardStore } from "../../stores/teacherDashboardStore";
 import { useArchiveExam } from "./useArchiveExam";
+import { getExamDates } from "./timeUtils";
 
 const DEFAULT_CONFIG: ExamConfig = {
   examMode: "UJIAN",
@@ -512,61 +513,6 @@ export const useTeacherDashboard = ({
     incrementResetKey();
   };
 
-  // 11. Date Parsing Logic for Filters
-  const getExamDates = useCallback((exam: Exam) => {
-    const mode = exam.config.examMode || "UJIAN";
-    const startDateRaw = exam.config.startDate || exam.config.date || "";
-    const endDateRaw = exam.config.endDate;
-
-    let start: Date;
-    if (startDateRaw.includes("T")) {
-      start = new Date(startDateRaw);
-    } else {
-      const startTimeStr = exam.config.startTime || "00:00";
-      start = new Date(`${startDateRaw}T${startTimeStr}`);
-    }
-
-    if (isNaN(start.getTime())) start = new Date();
-
-    let end: Date;
-    const endTimeStr = exam.config.endTime || "23:59";
-
-    const getLocalDateStr = (raw: string) => {
-      if (!raw) return "";
-      if (raw.includes("T")) {
-        const d = new Date(raw);
-        return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-CA");
-      }
-      return raw;
-    };
-
-    const localStartDateStr = getLocalDateStr(startDateRaw);
-    const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
-
-    if (mode === "PR") {
-      start = new Date(0);
-      end = new Date(`${localEndDateStr}T23:59:59`);
-    } else {
-      if (endDateRaw || exam.config.endTime) {
-        if (endDateRaw && endDateRaw.includes("T")) {
-          end = new Date(endDateRaw);
-        } else {
-          end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
-        }
-      } else if (exam.config.timeLimit > 0) {
-        end = new Date(start.getTime() + exam.config.timeLimit * 60000);
-      } else {
-        end = new Date(`${localStartDateStr}T23:59:59`);
-      }
-    }
-
-    if (isNaN(end.getTime())) {
-      end = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    }
-
-    return { start, end };
-  }, []);
-
   // 11. Compile filtered exam lists
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
 
@@ -594,7 +540,7 @@ export const useTeacherDashboard = ({
         !exam.config.isFinished
       );
     });
-  }, [publishedExams, getExamDates, nowTimestamp]);
+  }, [publishedExams, nowTimestamp]);
 
   const upcomingExams = useMemo(() => {
     return publishedExams
@@ -607,7 +553,7 @@ export const useTeacherDashboard = ({
           getExamDates(a).start.getTime() - getExamDates(b).start.getTime()
         );
       });
-  }, [publishedExams, getExamDates, nowTimestamp]);
+  }, [publishedExams, nowTimestamp]);
 
   const finishedExams = useMemo(() => {
     return publishedExams
@@ -618,7 +564,7 @@ export const useTeacherDashboard = ({
       .sort((a, b) => {
         return getExamDates(b).end.getTime() - getExamDates(a).end.getTime();
       });
-  }, [publishedExams, getExamDates, nowTimestamp]);
+  }, [publishedExams, nowTimestamp]);
 
   return {
     // States
