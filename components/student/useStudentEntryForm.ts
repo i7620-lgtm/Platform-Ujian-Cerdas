@@ -24,7 +24,7 @@ export const parseClassConfig = (classString: string) => {
 };
 interface UseStudentEntryFormProps {
   initialCode?: string;
-  onLoginSuccess: (student: Student, examCode: string) => void;
+  onLoginSuccess: (examCode: string, student: Student) => void;
 }
 
 export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentEntryFormProps) => {
@@ -238,7 +238,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     setError("");
 
     try {
-      const exists = await storageService.checkExamExists(cleanExamCode);
+      const exists = await storageService.getExamConfig(cleanExamCode);
       if (!exists) {
         setError("Kode ujian tidak ditemukan atau tidak aktif");
         setIsLoading(false);
@@ -266,7 +266,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       const studentData: Student = {
         studentId,
         fullName: fullName.trim(),
-        className: studentClass,
+        class: studentClass,
         absentNumber,
         schoolName: schoolName.trim(),
       };
@@ -307,7 +307,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             localStorage.getItem("deviceId") ||
             Math.random().toString(36).substring(2);
           localStorage.setItem("deviceId", deviceId);
-          if (result.deviceId && result.deviceId !== deviceId) {
+          if ((result as any).device_id && (result as any).device_id !== deviceId) {
             setError(
               `Sesi ini sedang aktif di perangkat lain. Hubungi pengawas jika Anda ingin berpindah perangkat.`,
             );
@@ -414,7 +414,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
       localStorage.removeItem(lockKey);
 
-      onLoginSuccess(studentData, cleanExamCode);
+      onLoginSuccess(cleanExamCode, studentData);
     } catch (err) {
       console.error(err);
       setError("Terjadi kesalahan. Pastikan koneksi internet stabil.");
@@ -425,9 +425,10 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   const handleUnlockAndResume = async (token: string) => {
     if (!pendingStudentData) return;
     try {
-      const isValid = await storageService.verifyResetToken(
+      const isValid = await storageService.verifyUnlockToken(
         pendingStudentData.cleanExamCode,
-        token,
+        pendingStudentData.studentData.studentId,
+        token
       );
       if (isValid) {
         setIsLocked(false);
@@ -444,10 +445,9 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           .update({ device_id: deviceId })
           .eq("exam_code", pendingStudentData.cleanExamCode)
           .eq("student_id", pendingStudentData.studentData.studentId);
-
         onLoginSuccess(
-          pendingStudentData.studentData,
           pendingStudentData.cleanExamCode,
+          pendingStudentData.studentData
         );
       } else {
         alert("Token tidak valid atau sudah kadaluarsa!");
@@ -487,7 +487,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     handleQrScan,
     handleSubmit,
     handleUnlockAndResume,
-    setIsLocked,
+    setIsLocked, pendingStudentData, setPendingStudentData,
     setIsLoading
   };
 };
