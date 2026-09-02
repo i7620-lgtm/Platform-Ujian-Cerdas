@@ -14,7 +14,7 @@ import { useDraftsView } from "../useDraftsView";
 import { PreviewModal } from "./PreviewModal";
 import { DraftExamCard } from "./DraftExamCard";
 
-export const DraftsView: React.FC<DraftsViewProps> = ({
+export const DraftsView: React.FC<{ exams: Exam[]; onDeleteDraft: (exam: Exam) => void; onContinueDraft: (exam: Exam) => void }> = ({
   exams,
   onDeleteDraft,
   onContinueDraft,
