@@ -606,7 +606,7 @@ export const QuestionAnalysisItem: React.FC<{
   );
 };
 
-const calculateTimeLeft = (exam: Exam) => {
+export const calculateTimeLeft = (exam: Exam) => {
   const startDateRaw = exam.config.startDate || exam.config.date || "";
   const endDateRaw = exam.config.endDate;
   const now = Date.now();
