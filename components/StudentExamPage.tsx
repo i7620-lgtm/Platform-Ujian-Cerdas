@@ -101,6 +101,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   student,
   initialData,
   onSubmit,
+  onUpdate,
   isDarkMode,
   toggleTheme,
 }) => {
@@ -109,8 +110,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     answers, isSubmitting, userLocation, isNavOpen, setIsNavOpen,
     hasAttemptedSubmit, showConfigIntro, setShowConfigIntro,
     activeExam, matchingOptionsMap, isMonitoring, monitoringLabel,
-    isAnswered, handleSubmit, timeLeft, isCheatingLocked, cheatWarning,
-    requestUnlock, handleAnswerChange, scrollToQuestion, answersRef
+    isAnswered, handleSubmit, timeLeft, 
+    handleAnswerChange, scrollToQuestion, answersRef
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
