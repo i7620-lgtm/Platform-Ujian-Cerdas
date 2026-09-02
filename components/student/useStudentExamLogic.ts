@@ -630,5 +630,5 @@ export const useStudentExamLogic = ({
       '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 max-w-full max-h-[50vh] object-contain h-auto" ',
     );
 
-  return { formatTime, totalQuestions, answeredCount, progress, optimizeHtml, answers, isSubmitting, userLocation, isNavOpen, setIsNavOpen, hasAttemptedSubmit, showConfigIntro, setShowConfigIntro, activeExam, matchingOptionsMap, isMonitoring, monitoringLabel, isAnswered, handleSubmit, timeLeft, isCheatingLocked, cheatWarning, requestUnlock, handleAnswerChange, scrollToQuestion, answersRef };
+  return { formatTime, totalQuestions, answeredCount, progress, optimizeHtml, answers, isSubmitting, userLocation, isNavOpen, setIsNavOpen, hasAttemptedSubmit, showConfigIntro, setShowConfigIntro, activeExam, matchingOptionsMap, isMonitoring, monitoringLabel, isAnswered, handleSubmit, timeLeft, handleAnswerChange, scrollToQuestion, answersRef };
 };
