@@ -495,7 +495,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             category: q.category?.trim() || config.subject || "Umum",
             chartData: q.chartData,
             imagePrompt: q.imagePrompt,
-            imageSearchKeyword: q.imageSearchKeyword
+            imageSearchKeyword: (q as any).imageSearchKeyword
         };
         
         if (currentQuestionType === 'TRUE_FALSE') {
@@ -574,9 +574,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const hasChart = !!q.chartData || q.questionText?.includes('[CHART]') || q.questionText?.includes('chart-placeholder');
         const hasExistingImg = q.questionText?.includes('<img') || !!q.imageUrl;
 
-        if (q.imageSearchKeyword && !hasExistingImg && !hasGeometry && !hasChart) {
+        if ((q as any).imageSearchKeyword && !hasExistingImg && !hasGeometry && !hasChart) {
           try {
-            const keyword = encodeURIComponent(q.imageSearchKeyword);
+            const keyword = encodeURIComponent((q as any).imageSearchKeyword);
             const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${keyword}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiurlwidth=800&format=json&origin=*`;
             
             const res = await fetch(url);
@@ -595,9 +595,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 if (imgUrl) {
                   const imgHtml = `
 <p style="text-align: center; margin-bottom: 16px;">
-  <img src="${imgUrl}" alt="${q.imageSearchKeyword}" loading="lazy" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0;" /><br/>
+  <img src="${imgUrl}" alt="${(q as any).imageSearchKeyword}" loading="lazy" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0;" /><br/>
   <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">
-    Sumber gambar: <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">Wikimedia Commons ("${q.imageSearchKeyword}")</a>
+    Sumber gambar: <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">Wikimedia Commons ("${(q as any).imageSearchKeyword}")</a>
   </span>
 </p>`;
                   q.questionText = imgHtml + q.questionText;
@@ -606,7 +606,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
               }
             }
           } catch (imgError) {
-            console.error("Failed to fetch image for keyword:", q.imageSearchKeyword, imgError);
+            console.error("Failed to fetch image for keyword:", (q as any).imageSearchKeyword, imgError);
           }
         }
       }
