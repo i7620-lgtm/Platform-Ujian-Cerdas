@@ -210,8 +210,15 @@ export const useOngoingExamModal = ({
           table: "results",
           filter: `exam_code=eq.${examCode}`,
         },
-        () => {
-          fetchLatest(true);
+        (payload) => {
+          const newData = payload.new as Record<string, unknown>;
+          if (newData && newData.id) {
+            setLocalResults((current) => {
+              const mapped = storageService.mapRowToResult(newData);
+              if (current.some((r) => r.id === mapped.id)) return current;
+              return [...current, mapped];
+            });
+          }
         },
       )
       .on(
@@ -222,8 +229,13 @@ export const useOngoingExamModal = ({
           table: "results",
           filter: `exam_code=eq.${examCode}`,
         },
-        () => {
-          fetchLatest(true);
+        (payload) => {
+          const oldData = payload.old as Record<string, unknown>;
+          if (oldData && oldData.id) {
+            setLocalResults((current) =>
+              current.filter((r) => r.id !== oldData.id),
+            );
+          }
         },
       )
       .on(
@@ -232,42 +244,22 @@ export const useOngoingExamModal = ({
           event: "UPDATE",
           schema: "public",
           table: "results",
+          filter: `exam_code=eq.${examCode}`,
         },
         (payload) => {
-          const newData = payload.new as { exam_code?: string; id?: number };
-          const oldData = payload.old as { exam_code?: string; id?: number };
-
-          const isRelevant =
-            (newData && newData.exam_code === examCode) ||
-            (oldData && oldData.exam_code === examCode);
-
-          if (!isRelevant) return;
-
-          console.log(
-            "Realtime result change (filtered):",
-            (payload as any).eventType,
-            newData?.id || oldData?.id,
-          );
-          if (newData?.id) {
-            supabase
-              .from("results")
-              .select(
-                "id, exam_code, student_id, student_name, class_name, status, score, correct_answers, total_questions, answers, updated_at, location",
-              )
-              .eq("id", newData.id)
-              .single()
-              .then(({ data: specificData }) => {
-                if (specificData) {
-                  setLocalResults((current) => {
-                    const updated = [...current];
-                    const mapped = storageService.mapRowToResult(specificData);
-                    const i = updated.findIndex((r) => r.id === mapped.id);
-                    if (i >= 0) updated[i] = mapped;
-                    else updated.push(mapped);
-                    return updated;
-                  });
-                }
-              });
+          const newData = payload.new as Record<string, unknown>;
+          if (newData && newData.id) {
+            setLocalResults((current) => {
+              const updated = [...current];
+              const mapped = storageService.mapRowToResult(newData);
+              const i = updated.findIndex((r) => r.id === mapped.id);
+              if (i >= 0) {
+                updated[i] = mapped;
+                return updated;
+              }
+              updated.push(mapped);
+              return updated;
+            });
           }
         },
       )
@@ -343,8 +335,6 @@ export const useOngoingExamModal = ({
                 });
               }
             });
-        } else {
-          fetchLatest(true);
         }
       })
       .subscribe((status) => {
