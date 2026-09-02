@@ -11,12 +11,13 @@ export const useOngoingExamsView = ({
   setSelectedOngoingExam,
 }: UseOngoingExamsViewParams) => {
   const [joinQrExam, setJoinQrExam] = useState<Exam | null>(null);
+  const [parentQrExam, setParentQrExam] = useState<Exam | null>(null);
   const [collabExam, setCollabExam] = useState<Exam | null>(null);
 
   const handleCopyLiveLink = useCallback((exam: Exam) => {
     const url = `${window.location.origin}/?live=${exam.code}`;
     navigator.clipboard.writeText(url);
-    alert("Link Pantauan Orang Tua disalin!");
+    alert("Link Pantauan Orang Tua berhasil disalin!");
   }, []);
 
   const handleCopyJoinLink = useCallback((exam: Exam) => {
@@ -34,8 +35,10 @@ export const useOngoingExamsView = ({
 
   return {
     joinQrExam,
+    parentQrExam,
     collabExam,
     setJoinQrExam,
+    setParentQrExam,
     setCollabExam,
     setSelectedOngoingExam,
     handleCopyLiveLink,
