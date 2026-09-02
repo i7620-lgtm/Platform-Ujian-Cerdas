@@ -1,6 +1,6 @@
 import React from "react";
 import type { ArchiveData, TeacherProfile, Result, Exam, Question } from "../../../types";
-import { getCalculatedStats, formatDuration, checkAnswerStatus } from "../archive/archiveUtils";
+import { getCalculatedStats, formatDuration, checkAnswerStatus, fixArchiveDataSorting } from "../archive/archiveUtils";
 import { calculateAggregateStats, analyzeQuestionTypePerformance } from "../examUtils";
 import { archiveService } from "../../../services/archive";
 import { storageService } from "../../../services/storage";
