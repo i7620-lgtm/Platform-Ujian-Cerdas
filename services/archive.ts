@@ -389,6 +389,25 @@ export class ArchiveService {
 
       const defaultTask = `Buatlah laporan "Analisis Karakteristik dan Ketuntasan Hasil Ujian" yang komprehensif. Jika data input berisi beberapa sekolah yang berbeda, Anda WAJIB menganalisis dan membuat penjabaran performa untuk MASING-MASING sekolah secara terpisah.`;
 
+      const isTKA = summaries.some(s => {
+          const t = (s.exam_type || '').toLowerCase().trim();
+          return t === 'tka' || t.includes('tka');
+      });
+
+      const rule6 = isTKA
+          ? `6. STANDAR EVALUASI NILAI RATA-RATA TKA (WAJIB UNTUK UJIAN TKA): Pada bagian RINGKASAN EKSEKUTIF, Anda WAJIB membuat sub-bagian khusus dengan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional". Bandingkan nilai rata-rata siswa secara spesifik dengan rerata skor TKA nasional di Indonesia yang terbaru (sekitar 500-550 poin atau setara dengan 50%-55% ketuntasan pada skala penilaian nasional terbaru) agar analisis ringkasan eksekutif terlihat lebih faktual, realistis, dan berbobot akademis tinggi.
+           - ATURAN KEPADATAN INFORMASI TKA: JANGAN PERNAH menulis penjelasan yang bertele-tele atau tidak penting seperti "Berbeda dengan ujian sekolah biasa yang menargetkan Kriteria Ketuntasan Minimal (KKM) di rentang 70-75, ujian berjenis TKA (Tes Kemampuan Akademik) memiliki karakteristik soal selektif dengan tingkat kesulitan tinggi (HOTS)." jika Anda sudah tahu bahwa yang dibahas adalah ujian TKA. Hindari penjelasan teori HOTS yang tidak bernilai guna praktis bagi guru. Tulis analisis yang langsung, faktual, padat, penting, dan mudah dipahami saja.`
+          : `6. STANDAR EVALUASI RINGKASAN (BUKAN UJIAN TKA): Karena ini BUKAN ujian berjenis TKA, DILARANG membuat sub-bagian atau mencantumkan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional" dan DILARANG membandingkannya dengan standar nilai nasional TKA. Cukup berikan analisis ringkasan pencapaian dan rata-rata performa kelas secara deskriptif langsung di dalam Ringkasan Eksekutif.`;
+
+      const ringkasanEksekutifStructure = isTKA
+          ? `1. RINGKASAN EKSEKUTIF:
+           - Berikan ringkasan performa secara keseluruhan.
+           - Sub-bagian "### Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional": Berisi evaluasi nilai rata-rata kelas sesuai standar TKA di atas. JANGAN gunakan pengantar panjang lebar, langsung ke poin evaluasinya saja.
+           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).`
+          : `1. RINGKASAN EKSEKUTIF:
+           - Berikan ringkasan performa secara keseluruhan dan capaian nilai rata-rata kelas secara deskriptif (DILARANG membuat sub-bagian "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional").
+           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).`;
+
       let existingAnalysesText = "";
       if (existingAnalyses && Object.keys(existingAnalyses).length > 0) {
           const relevantAnalyses = Object.entries(existingAnalyses).filter(([key]) => key !== "OVERALL");
@@ -430,10 +449,7 @@ export class ArchiveService {
         3. Rekomendasi Remedial: Anda WAJIB membuat minimal 5 (lima) contoh soal latihan remedial konkret, baru, dan mirip (setara indikator pencapaian kompetensi) dengan soal-soal tersulit di ujian (soal dengan 'correct_rate' rendah). Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya atau menyalinnya secara utuh.
         4. Rekomendasi Pengayaan: Anda WAJIB membuat minimal 5 (lima) contoh soal tantangan pengayaan konkret, baru, dan lebih menantang (HOTS - Higher Order Thinking Skills) berdasarkan topik utama ujian ini. Tuliskan kelima soal tersebut secara lengkap dengan teks soal baru, pilihan jawaban (jika pilihan ganda), dan kunci jawaban yang benar agar guru dapat langsung menggunakannya.
         5. PERSAMAAN MATEMATIKA TANPA LATEX: JANGAN PERNAH menggunakan sintaks matematika LaTeX seperti \\frac, \\div, \\times, $ atau $$ pada teks laporan maupun pada contoh soal remedial/pengayaan. Selalu gunakan penulisan teks biasa atau simbol Unicode standar yang bersih dan mudah dibaca (contoh: '1/5' atau '1 per 5', '240 : 6 + 15 = 55', simbol '÷' or ':' untuk pembagian, '×' atau '*' untuk perkalian, dsb.). Hal ini penting agar seluruh formula matematika tampak rapi dan dapat dibaca dengan mudah tanpa rendering MathJax/KaTeX.
-        6. STANDAR EVALUASI NILAI RATA-RATA: Pada bagian RINGKASAN EKSEKUTIF, evaluasi nilai rata-rata harus ditulis dalam sub-bagian khusus dengan judul "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional". Evaluasi ini harus mengacu pada standar berikut:
-           - Untuk Ujian Biasa/Umum: Nilai rata-rata ideal mengacu pada rentang 70-75. Bandingkan rata-rata kelas dengan rentang tersebut secara deskriptif.
-           - Khusus untuk Ujian TKA (Tes Kemampuan Akademik / UTBK TKA): Bandingkan nilai rata-rata siswa secara spesifik dengan rerata skor TKA nasional di Indonesia yang terbaru (sekitar 500-550 poin atau setara dengan 50%-55% ketuntasan pada skala penilaian nasional terbaru) agar analisis ringkasan eksekutif terlihat lebih faktual, realistis, dan berbobot akademis tinggi.
-           - ATURAN KEPADATAN INFORMASI TKA: JANGAN PERNAH menulis penjelasan yang bertele-tele atau tidak penting seperti "Berbeda dengan ujian sekolah biasa yang menargetkan Kriteria Ketuntasan Minimal (KKM) di rentang 70-75, ujian berjenis TKA (Tes Kemampuan Akademik) memiliki karakteristik soal selektif dengan tingkat kesulitan tinggi (HOTS)." jika Anda sudah tahu bahwa yang dibahas adalah ujian TKA. Hindari penjelasan teori HOTS yang tidak bernilai guna praktis bagi guru. Tulis analisis yang langsung, faktual, padat, penting, dan mudah dipahami saja.
+        ${rule6}
         7. DETEKSI KESALAHAN KUNCI JAWABAN (CRITICAL BIAS ANALYSIS):
            - Anda WAJIB secara aktif mendeteksi potensi kesalahan kunci jawaban ujian (guru salah input kunci).
            - Skenario utama deteksi: Jika persentase siswa menjawab benar ('correct_rate') sangat rendah (< 35%) DAN ada satu jawaban salah terpopuler ('top_wrong_answer') yang dipilih oleh mayoritas siswa ('top_wrong_rate' > 45%).
@@ -442,10 +458,7 @@ export class ArchiveService {
 
         STRUCTURE:
 
-        1. RINGKASAN EKSEKUTIF:
-           - Berikan ringkasan performa secara keseluruhan.
-           - Sub-bagian "### Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional": Berisi evaluasi nilai rata-rata kelas sesuai standar di atas. JANGAN gunakan pengantar panjang lebar, langsung ke poin evaluasinya saja.
-           - Highlight temuan utama (misalnya materi mana yang sudah tuntas secara agregat dan materi mana yang perlu perhatian khusus).
+        ${ringkasanEksekutifStructure}
 
         2. ANALISIS PER SEKOLAH (Wajib dipisah per sekolah jika > 1 sekolah):
            - Untuk SETIAP sekolah, sebutkan nama sekolahnya, lalu berikan:
@@ -543,7 +556,8 @@ export class ArchiveService {
 
   async uploadArchive(examCode: string, jsonString: string, metadata?: Record<string, unknown>): Promise<string> {
       const blob = new Blob([jsonString], { type: "application/json" });
-      let filename = `${String(examCode).substring(0, 10)}_${Date.now()}.json`;
+      const cleanExamCode = String(examCode || 'EXAM').substring(0, 10).replace(/[^a-zA-Z0-9_-]/g, '');
+      let filename = `${cleanExamCode}_${Date.now()}.json`;
       
       if (metadata) {
           try {
@@ -555,36 +569,49 @@ export class ArchiveService {
                   safeAuthorId = String(safeAuthorId).replace(/-/g, '');
               }
               
-              const tc = Array.isArray(metadata.targetClasses) ? metadata.targetClasses.join(',').substring(0, 10) : String(metadata.targetClasses || '').substring(0, 10);
+              const rawTc = Array.isArray(metadata.targetClasses) 
+                  ? metadata.targetClasses.filter(Boolean).join(',') 
+                  : String(metadata.targetClasses || '').trim();
               
-              const minMeta = {
-                  s: String(metadata.school || '').substring(0, 20),
-                  su: String(metadata.subject || '').substring(0, 20),
-                  c: String(metadata.classLevel || '').substring(0, 10),
-                  t: String(metadata.examType || '').substring(0, 15),
-                  tc: [tc],
-                  d: String(metadata.date || '').substring(0, 10),
-                  p: metadata.participantCount,
-                  a: safeAuthorId,
-                  ai: metadata.hasAiAnalysis ? 1 : 0
+              // Helper to generate base64 metadata filename with dynamic string lengths
+              const createFilenameWithLimits = (maxSchoolLen: number, maxSubjLen: number, maxClassLen: number) => {
+                  const minMeta = {
+                      s: String(metadata.school || '').substring(0, maxSchoolLen),
+                      su: String(metadata.subject || '').substring(0, maxSubjLen),
+                      c: String(metadata.classLevel || '').substring(0, maxClassLen),
+                      t: String(metadata.examType || '').substring(0, 12),
+                      tc: rawTc ? [rawTc.substring(0, 15)] : [],
+                      d: String(metadata.date || '').substring(0, 10),
+                      p: typeof metadata.participantCount === 'number' ? metadata.participantCount : 0,
+                      a: safeAuthorId,
+                      ai: metadata.hasAiAnalysis ? 1 : 0
+                  };
+
+                  const jsonStr = JSON.stringify(minMeta);
+                  const encodedStr = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g,
+                      (match, p1) => String.fromCharCode(Number('0x' + p1))
+                  );
+                  const b64 = btoa(encodedStr)
+                      .replace(/\+/g, '-')
+                      .replace(/\//g, '_')
+                      .replace(/=+$/, '');
+                  
+                  return `${cleanExamCode}_meta_${b64}.${Date.now()}.json`;
               };
 
-              const jsonStr = JSON.stringify(minMeta);
-              const encodedStr = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g,
-                  (match, p1) => String.fromCharCode(Number('0x' + p1))
-              );
-              const b64 = btoa(encodedStr)
-                  .replace(/\+/g, '-')
-                  .replace(/\//g, '_')
-                  .replace(/=+$/, '');
+              // Try full length first (30, 25, 10), then gracefully scale down if filename approaches limits
+              let potentialFileName = createFilenameWithLimits(30, 25, 10);
+              if (potentialFileName.length > 240) {
+                  potentialFileName = createFilenameWithLimits(18, 18, 8);
+              }
+              if (potentialFileName.length > 240) {
+                  potentialFileName = createFilenameWithLimits(10, 10, 6);
+              }
+              if (potentialFileName.length > 240) {
+                  potentialFileName = createFilenameWithLimits(5, 5, 4);
+              }
               
-              // Use dot (.) as a delimiter before the timestamp to avoid collision with base64 underscores
-              const potentialFileName = `${String(examCode).substring(0, 10)}_meta_${b64}.${Date.now()}.json`;
-              
-              // Standard Linux filename limit is 255 characters, let's keep it strictly under 250.
-              if (potentialFileName.length > 250) {
-                  filename = `${String(examCode).substring(0, 10)}_${Date.now()}.json`;
-              } else {
+              if (potentialFileName.length <= 248) {
                   filename = potentialFileName;
               }
           } catch (e) {
@@ -614,12 +641,39 @@ export class ArchiveService {
       if (!data || !Array.isArray(data)) {
           return [];
       }
+
+      // Pre-fetch all summaries to enrich legacy or plain archives (e.g. BO3PDS_1788312182598.json)
+      const summaryMap = new Map<string, any>();
+      try {
+          const { data: summaries } = await supabase
+              .from('exam_summaries')
+              .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id');
+          if (summaries && Array.isArray(summaries)) {
+              summaries.forEach((s) => {
+                  if (s && s.exam_code) {
+                      const code = String(s.exam_code).toUpperCase().trim();
+                      if (!summaryMap.has(code)) {
+                          summaryMap.set(code, s);
+                      }
+                  }
+              });
+          }
+      } catch (err) {
+          console.warn("Could not fetch exam_summaries for archive metadata lookup:", err);
+      }
       
       return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
-          let metadata = null;
-          if (f && typeof f.name === 'string' && f.name.includes('_meta_')) {
+          let metadata: Record<string, unknown> | null = null;
+          const fileName = f && typeof f.name === 'string' ? f.name : "";
+
+          // Extract exam code from filename (e.g. "BO3PDS" from "BO3PDS_1788312182598.json" or "BO3PDS_meta_....json")
+          const examCode = fileName.includes('_meta_')
+              ? fileName.split('_meta_')[0].toUpperCase().trim()
+              : fileName.split('_')[0].replace(/\.json$/i, '').toUpperCase().trim();
+
+          if (fileName.includes('_meta_')) {
               try {
-                  const parts = f.name.split('_meta_');
+                  const parts = fileName.split('_meta_');
                   if (parts.length > 1) {
                       const cleanStr = parts[1].replace(/\.json$/i, '');
                       let b64 = "";
@@ -659,9 +713,9 @@ export class ArchiveService {
                       let parsedTc: string[] = [];
                       if (parsed.tc) {
                           if (Array.isArray(parsed.tc)) {
-                              parsedTc = parsed.tc;
+                              parsedTc = parsed.tc.filter(Boolean);
                           } else {
-                              parsedTc = String(parsed.tc).split(',').map((item: string) => item.trim());
+                              parsedTc = String(parsed.tc).split(',').map((item: string) => item.trim()).filter(Boolean);
                           }
                       }
                       
@@ -686,18 +740,50 @@ export class ArchiveService {
                       };
                   }
               } catch {
-                  console.warn("Failed to parse metadata from filename:", f.name);
+                  console.warn("Failed to parse metadata from filename:", fileName);
+              }
+          }
+
+          // Fallback to exam_summaries if metadata is missing or incomplete
+          if (examCode && summaryMap.has(examCode)) {
+              const s = summaryMap.get(examCode);
+              if (!metadata) {
+                  metadata = {
+                      school: s.school_name || "-",
+                      subject: s.exam_subject || "-",
+                      classLevel: s.class_level || "-",
+                      examType: s.exam_type || "Umum",
+                      targetClasses: s.class_level ? [s.class_level] : [],
+                      date: s.exam_date || f.created_at,
+                      participantCount: typeof s.total_participants === 'number' ? s.total_participants : 0,
+                      authorId: s.author_id || "",
+                      hasAiAnalysis: false
+                  };
+              } else {
+                  // Fill in any missing properties
+                  if (!metadata.school && s.school_name) metadata.school = s.school_name;
+                  if (!metadata.subject && s.exam_subject) metadata.subject = s.exam_subject;
+                  if (!metadata.classLevel && s.class_level) metadata.classLevel = s.class_level;
+                  if (!metadata.examType && s.exam_type) metadata.examType = s.exam_type;
+                  if ((!metadata.targetClasses || (Array.isArray(metadata.targetClasses) && metadata.targetClasses.length === 0)) && s.class_level) {
+                      metadata.targetClasses = [s.class_level];
+                  }
+                  if (!metadata.date && s.exam_date) metadata.date = s.exam_date;
+                  if (metadata.participantCount === undefined && s.total_participants !== undefined) {
+                      metadata.participantCount = s.total_participants;
+                  }
+                  if (!metadata.authorId && s.author_id) metadata.authorId = s.author_id;
               }
           }
           
           return {
-              name: f ? f.name as string : "",
+              name: fileName,
               created_at: f ? f.created_at as string : "",
               size: f ? ((f.metadata as {size?: number})?.size || 0) : 0,
               metadata
           };
       });
-  }
+   }
 
   async downloadArchive(path: string): Promise<Record<string, unknown>> {
       const { data, error } = await supabase.storage.from('archives').download(path);
