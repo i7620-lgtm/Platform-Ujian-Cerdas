@@ -272,12 +272,25 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
               )}
               
               <button
+                id="ongoing-student-access-btn"
                 onClick={() => setIsJoinQrModalOpen(true)}
                 className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
               >
                 <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
                 <span>AKSES SISWA</span>
               </button>
+
+              {displayExam.config.enablePublicStream && (
+                <button
+                  id="ongoing-parent-access-btn"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                  title="Akses Pantauan Orang Tua"
+                >
+                  <ShareIcon className="w-3.5 h-3.5 text-teal-500" />
+                  <span>AKSES ORANG TUA</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setIsPrintModalOpen(true)}
@@ -542,6 +555,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         liveUrl={liveUrl}
+        examCode={displayExam.code}
       />
 
       <JoinQRModal
