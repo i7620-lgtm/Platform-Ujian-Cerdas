@@ -167,5 +167,19 @@ export const useQuestionAnalysisItemLogic = ({
     return false;
   };
 
-  return { isExpanded, setIsExpanded, isEditingKey, setIsEditingKey, tempKey, setTempKey, isSaving, handleSaveKey, difficultyColor, difficultyLabel, distribution, isCorrectAnswer };
+  return {
+    isExpanded,
+    setIsExpanded,
+    isEditingKey,
+    setIsEditingKey,
+    tempKey,
+    setTempKey,
+    isSaving,
+    handleSaveKey,
+    difficultyColor,
+    difficultyLabel,
+    distribution,
+    isCorrectAnswer,
+    getInitialKey,
+  };
 };
