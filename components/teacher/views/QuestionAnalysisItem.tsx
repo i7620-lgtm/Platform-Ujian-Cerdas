@@ -16,9 +16,19 @@ export const QuestionAnalysisItem: React.FC<{
   onUpdateKey?: (qId: string, newKey: string) => Promise<void>;
 }> = ({ q, index, stats, examResults, onUpdateKey }) => {
   const {
-    isExpanded, setIsExpanded, isEditingKey, setIsEditingKey,
-    tempKey, setTempKey, isSaving, handleSaveKey, difficultyColor,
-    difficultyLabel, distribution, isCorrectAnswer
+    isExpanded,
+    setIsExpanded,
+    isEditingKey,
+    setIsEditingKey,
+    tempKey,
+    setTempKey,
+    isSaving,
+    handleSaveKey,
+    difficultyColor,
+    difficultyLabel,
+    distribution,
+    isCorrectAnswer,
+    getInitialKey,
   } = useQuestionAnalysisItemLogic({ q, stats, examResults, onUpdateKey });
   return (
     <div
