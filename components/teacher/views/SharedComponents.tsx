@@ -43,10 +43,11 @@ export const StatWidget: React.FC<{
   );
 };
 
-export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({
-  exam,
-  minimal = false,
-}) => {
+export const RemainingTime: React.FC<{
+  exam: Exam;
+  minimal?: boolean;
+  size?: "sm" | "md";
+}> = ({ exam, minimal = false, size = "md" }) => {
   const [timeState, setTimeState] = useState(() => calculateTimeLeft(exam));
   useEffect(() => {
     const timer = setInterval(() => {
@@ -57,7 +58,7 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({
   if (timeState.status === "FINISHED")
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-300 border border-gray-200 dark:border-slate-600`}
+        className={`inline-flex items-center ${size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-0.5 text-xs"} rounded-md font-bold bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-300 border border-gray-200 dark:border-slate-600`}
       >
         Selesai
       </span>
@@ -65,7 +66,7 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({
   if (timeState.status === "UPCOMING")
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800`}
+        className={`inline-flex items-center ${size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-0.5 text-xs"} rounded-md font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800`}
       >
         Belum Dimulai
       </span>
@@ -98,17 +99,17 @@ export const RemainingTime: React.FC<{ exam: Exam; minimal?: boolean }> = ({
   }
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${colorClass} transition-colors duration-500`}
+      className={`flex items-center ${size === "sm" ? "gap-1.5 px-2 py-0.5 rounded-md text-[10px]" : "gap-2 px-3 py-1.5 rounded-lg text-sm"} border ${colorClass} transition-colors duration-500`}
     >
-      <span className="relative flex h-2 w-2">
+      <span className={`relative flex ${size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"}`}>
         <span
           className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}
         ></span>
         <span
-          className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}
+          className={`relative inline-flex rounded-full ${size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"} ${dotClass}`}
         ></span>
       </span>
-      <span className="font-mono text-sm font-bold tracking-widest tabular-nums">
+      <span className={`font-mono font-bold ${size === "sm" ? "tracking-normal" : "tracking-widest"} tabular-nums`}>
         {timeState.isUnlimited ? "Tanpa Batas" : timeString}
       </span>
     </div>

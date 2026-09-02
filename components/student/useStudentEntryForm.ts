@@ -247,28 +247,39 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
 
       const config = await storageService.getExamConfig(cleanExamCode);
 
+      const parsedClass = parseClassConfig(studentClass);
+      const cleanClassName = parsedClass.name || studentClass;
+      const cleanSchoolName = schoolName.trim() || parsedClass.schoolName || "";
+
       if (
         config.targetClasses &&
-        config.targetClasses.length > 0 &&
-        !config.targetClasses.includes(studentClass)
+        config.targetClasses.length > 0
       ) {
-        setError(
-          `Ujian ini tidak diperuntukkan bagi kelas ${studentClass}. Harap periksa kembali.`,
+        const matchesTarget = config.targetClasses.some(
+          (tc) =>
+            tc === studentClass ||
+            parseClassConfig(tc).name === cleanClassName ||
+            tc === cleanClassName,
         );
-        setIsLoading(false);
-        return;
+        if (!matchesTarget) {
+          setError(
+            `Ujian ini tidak diperuntukkan bagi kelas ${cleanClassName}. Harap periksa kembali.`,
+          );
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const studentId = `${cleanExamCode}_${schoolName}_${studentClass}_${absentNumber}`.replace(
-        /\\s+/g,
+      const studentId = `${cleanExamCode}_${cleanSchoolName}_${cleanClassName}_${absentNumber}`.replace(
+        /\s+/g,
         "_",
       );
       const studentData: Student = {
         studentId,
         fullName: fullName.trim(),
-        class: studentClass,
+        class: cleanClassName,
         absentNumber,
-        schoolName: schoolName.trim(),
+        schoolName: cleanSchoolName,
       };
 
       const result = await storageService.getStudentResult(
@@ -276,13 +287,21 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         studentId,
       );
       if (result) {
+        const isNotPR = config.examMode !== "PR";
+
         if (
           result.status === "force_closed" ||
-          result.status === "completed"
+          (result.status === "completed" && !config.allowRetakes)
         ) {
-          setError(
-            `Akun ini (Kelas ${studentClass}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
-          );
+          if (result.status === "force_closed" && config.detectBehavior && config.continueWithPermission && isNotPR) {
+            setError(
+              `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`,
+            );
+          } else {
+            setError(
+              `Akun ini (Kelas ${cleanClassName}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
+            );
+          }
           setPendingStudentData({ cleanExamCode, studentData });
           setIsLocked(true);
           setIsLoading(false);
@@ -301,7 +320,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           hasStarted &&
           !savedDuration &&
           config.detectBehavior &&
-          !config.continueWithPermission
+          !config.continueWithPermission &&
+          isNotPR
         ) {
           const deviceId =
             localStorage.getItem("deviceId") ||
@@ -316,16 +336,6 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setIsLoading(false);
             return;
           }
-        }
-
-        if (config.detectBehavior && config.continueWithPermission) {
-          setError(
-            `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`,
-          );
-          setPendingStudentData({ cleanExamCode, studentData });
-          setIsLocked(true);
-          setIsLoading(false);
-          return;
         }
       } else {
         // Validate duplicate absent number in same class if other results exist

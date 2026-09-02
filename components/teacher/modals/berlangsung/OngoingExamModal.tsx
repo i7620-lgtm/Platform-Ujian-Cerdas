@@ -97,227 +97,216 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
         <div className="bg-white dark:bg-slate-800 sm:rounded-[2rem] shadow-2xl w-full max-w-full h-full sm:h-[90vh] flex flex-col overflow-hidden relative border border-white dark:border-slate-700">
           {/* Header Modal */}
-          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-3 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-sm font-sans">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div className="flex items-center gap-3 w-full lg:w-auto">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-none shrink-0">
-                  <SignalIcon className="w-5 h-5" />
+          <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-100 dark:border-slate-700/80 bg-white dark:bg-slate-800 sticky top-0 z-20 shadow-xs font-sans flex flex-col gap-2.5">
+            {/* Top Row: Title, Code, Timer, and Close Button */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0">
+                  <SignalIcon className="w-4 h-4" />
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <h2 className="text-sm sm:text-base font-black text-slate-800 dark:text-white tracking-tight leading-tight whitespace-nowrap">
                     Live Monitoring
                   </h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[9px] sm:text-[10px] font-code slashed-zero font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-widest uppercase">
-                      {displayExam.code}
+                  <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 tracking-wider uppercase">
+                    {displayExam.code}
+                  </span>
+                  <RemainingTime exam={displayExam} size="sm" />
+                  {isRefreshing && (
+                    <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">
+                      Sync...
                     </span>
-                    <RemainingTime exam={displayExam} />
-                    {isRefreshing && (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse">
-                        Sync...
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end">
-                {displayExam.config.examMode !== "PR" && (
-                  <button
-                    onClick={handleFinishAllExams}
-                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                  >
-                    <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    SELESAIKAN UJIAN
-                  </button>
-                )}
-
-                {displayExam.config.examMode !== "PR" && (
-                  <button
-                    onClick={() => setIsAddTimeOpen(true)}
-                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                  >
-                    <ClockIcon className="w-3.5 h-3.5 text-purple-500" />
-                    TAMBAH WAKTU
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => setIsJoinQrModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                >
-                  <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
-                  AKSES SISWA
-                </button>
-
-                <button
-                  onClick={() => setIsPrintModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                >
-                  <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
-                  SOAL PDF
-                </button>
-
-                <button
-                  onClick={() => setIsGuideModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                >
-                  <BookOpenIcon className="w-3.5 h-3.5 text-blue-500" />
-                  PANDUAN
-                </button>
-
-                <button
-                  onClick={onClose}
-                  className="p-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm ml-1"
-                  title="Tutup Modal"
-                >
-                  <XMarkIcon className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-xs shrink-0"
+                title="Tutup Modal"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* FILTER & OPTION BAR */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-700/80">
-              {/* Quick Status Filter Tabs */}
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <button
-                  onClick={() => setStatusFilter("ALL")}
-                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+            {/* Bottom Row: All Filter and Action Buttons Flowing Adjacent to Each Other */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0 ${
+                  statusFilter === "ALL"
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 dark:shadow-none ring-1 ring-indigo-400/30"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                }`}
+              >
+                <span
+                  className={`min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold ${
                     statusFilter === "ALL"
-                      ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 dark:shadow-none ring-2 ring-indigo-400/30"
-                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                   }`}
                 >
-                  <div
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      statusFilter === "ALL"
-                        ? "bg-white/20 text-white"
-                        : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    {localResults.length}
-                  </div>
-                  SEMUA
-                </button>
+                  {localResults.length}
+                </span>
+                <span>SEMUA</span>
+              </button>
 
-                <button
-                  onClick={() =>
-                    setStatusFilter(
-                      statusFilter === "ONLINE" ? "ALL" : "ONLINE",
-                    )
-                  }
-                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+              <button
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "ONLINE" ? "ALL" : "ONLINE",
+                  )
+                }
+                className={`px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0 ${
+                  statusFilter === "ONLINE"
+                    ? "bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 dark:shadow-none ring-1 ring-emerald-400/30"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                }`}
+              >
+                <span
+                  className={`min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold ${
                     statusFilter === "ONLINE"
-                      ? "bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 dark:shadow-none ring-2 ring-emerald-400/30"
-                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                      ? "bg-white/20 text-white"
+                      : "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300"
                   }`}
                 >
-                  <div
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      statusFilter === "ONLINE"
-                        ? "bg-white/20 text-white"
-                        : "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300"
-                    }`}
-                  >
-                    {onlineCount}
-                  </div>
-                  MENGERJAKAN ({onlineCount})
-                </button>
+                  {onlineCount}
+                </span>
+                <span>MENGERJAKAN</span>
+              </button>
 
-                <button
-                  onClick={() =>
-                    setStatusFilter(
-                      statusFilter === "LOCKED" ? "ALL" : "LOCKED",
-                    )
-                  }
-                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+              <button
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "LOCKED" ? "ALL" : "LOCKED",
+                  )
+                }
+                className={`px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0 ${
+                  statusFilter === "LOCKED"
+                    ? "bg-rose-600 border-rose-600 text-white shadow-rose-200 dark:shadow-none ring-1 ring-rose-400/30"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                }`}
+              >
+                <span
+                  className={`min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold ${
                     statusFilter === "LOCKED"
-                      ? "bg-rose-600 border-rose-600 text-white shadow-rose-200 dark:shadow-none ring-2 ring-rose-400/30"
-                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                      ? "bg-white/20 text-white"
+                      : "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300"
                   }`}
                 >
-                  <div
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      statusFilter === "LOCKED"
-                        ? "bg-white/20 text-white"
-                        : "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300"
-                    }`}
-                  >
-                    {lockedCount}
-                  </div>
-                  TERKUNCI ({lockedCount})
-                </button>
+                  {lockedCount}
+                </span>
+                <span>TERKUNCI</span>
+              </button>
 
-                <button
-                  onClick={() =>
-                    setStatusFilter(
-                      statusFilter === "COMPLETED" ? "ALL" : "COMPLETED",
-                    )
-                  }
-                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+              <button
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "COMPLETED" ? "ALL" : "COMPLETED",
+                  )
+                }
+                className={`px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0 ${
+                  statusFilter === "COMPLETED"
+                    ? "bg-blue-600 border-blue-600 text-white shadow-blue-200 dark:shadow-none ring-1 ring-blue-400/30"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                }`}
+              >
+                <span
+                  className={`min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold ${
                     statusFilter === "COMPLETED"
-                      ? "bg-blue-600 border-blue-600 text-white shadow-blue-200 dark:shadow-none ring-2 ring-blue-400/30"
-                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                      ? "bg-white/20 text-white"
+                      : "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300"
                   }`}
                 >
-                  <div
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                      statusFilter === "COMPLETED"
-                        ? "bg-white/20 text-white"
-                        : "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300"
-                    }`}
-                  >
-                    {completedCount}
-                  </div>
-                  SELESAI ({completedCount})
+                  {completedCount}
+                </span>
+                <span>SELESAI</span>
+              </button>
+
+              <select
+                value={selectedSchool}
+                onChange={(e) => setSelectedSchool(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-xs shrink-0"
+                title="Filter Sekolah"
+              >
+                <option value="ALL">Semua Sekolah</option>
+                {uniqueSchoolsInResults.map((sch) => (
+                  <option key={sch} value={sch}>
+                    {sch}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-xs shrink-0"
+                title="Filter Kelas"
+              >
+                <option value="ALL">Semua Kelas ({localResults.length})</option>
+                {uniqueClassesInResults.map((cl) => (
+                  <option key={cl} value={cl}>
+                    {cl}
+                  </option>
+                ))}
+              </select>
+
+              {displayExam.config.examMode !== "PR" && (
+                <button
+                  onClick={handleFinishAllExams}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                >
+                  <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>SELESAIKAN UJIAN</span>
                 </button>
-              </div>
+              )}
+
+              {displayExam.config.examMode !== "PR" && (
+                <button
+                  onClick={() => setIsAddTimeOpen(true)}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                >
+                  <ClockIcon className="w-3.5 h-3.5 text-purple-500" />
+                  <span>TAMBAH WAKTU</span>
+                </button>
+              )}
               
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Mode indicator */}
-                <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Live Monitor
-                </div>
+              <button
+                id="ongoing-student-access-btn"
+                onClick={() => setIsJoinQrModalOpen(true)}
+                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+              >
+                <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
+                <span>AKSES SISWA</span>
+              </button>
 
-                {/* Filter School */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">
-                    Sekolah:
-                  </span>
-                  <select
-                    value={selectedSchool}
-                    onChange={(e) => setSelectedSchool(e.target.value)}
-                    className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm"
-                  >
-                    <option value="ALL">Semua Sekolah</option>
-                    {uniqueSchoolsInResults.map((sch) => (
-                      <option key={sch} value={sch}>
-                        {sch}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {displayExam.config.enablePublicStream && (
+                <button
+                  id="ongoing-parent-access-btn"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                  title="Akses Pantauan Orang Tua"
+                >
+                  <ShareIcon className="w-3.5 h-3.5 text-teal-500" />
+                  <span>AKSES ORANG TUA</span>
+                </button>
+              )}
 
-                {/* Filter Class */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">
-                    Kelas:
-                  </span>
-                  <select
-                    value={selectedClass}
-                    onChange={(e) => setSelectedClass(e.target.value)}
-                    className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm"
-                  >
-                    <option value="ALL">Semua ({localResults.length})</option>
-                    {uniqueClassesInResults.map((cl) => (
-                      <option key={cl} value={cl}>
-                        {cl}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <button
+                onClick={() => setIsPrintModalOpen(true)}
+                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+              >
+                <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span>SOAL PDF</span>
+              </button>
+
+              <button
+                onClick={() => setIsGuideModalOpen(true)}
+                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+              >
+                <BookOpenIcon className="w-3.5 h-3.5 text-blue-500" />
+                <span>PANDUAN</span>
+              </button>
             </div>
           </div>
 
@@ -361,9 +350,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                           ).length;
                         const answeredCount = Object.keys(
                           r.answers || {},
-                        ).filter((k) => !k.startsWith("_grade_")).length;
+                        ).filter((k) => !k.startsWith("_")).length;
                         const computedScore = calculateScore(r);
                         const isOnline = onlineStudents[r.student.studentId];
+                        const cleanClass = r.student.class
+                          ? r.student.class.includes("-")
+                            ? r.student.class
+                                .split("-")
+                                .pop()
+                                ?.replace(/\(\d+\)$/, "")
+                                .trim() || r.student.class
+                            : r.student.class.replace(/\(\d+\)$/, "").trim()
+                          : "-";
 
                         return (
                           <tr
@@ -387,7 +385,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-700">
-                                {r.student.class || "-"}
+                                {cleanClass || "-"}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -406,13 +404,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase border border-emerald-200 dark:border-emerald-800 shadow-sm">
                                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
                                     <span>Sedang Mengerjakan</span>
-                                    {isOnline ? (
+                                    {isOnline && !displayExam?.config?.disableRealtime ? (
                                       <span className="text-[8px] px-1.5 py-0.5 bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded font-black tracking-widest ml-0.5">
                                         ONLINE
                                       </span>
                                     ) : null}
                                   </span>
-                                  {totalQuestions > 0 && (
+                                  {!displayExam?.config?.disableRealtime && totalQuestions > 0 && (
                                     <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-0.5">
                                       <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                         <div
@@ -557,6 +555,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         liveUrl={liveUrl}
+        examCode={displayExam.code}
       />
 
       <JoinQRModal

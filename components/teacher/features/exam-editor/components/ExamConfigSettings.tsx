@@ -246,7 +246,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               <input
                 type="time"
                 name="startTime"
-                value={config.startTime}
+                value={config.startTime || "08:00"}
                 onChange={handleConfigChange}
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
@@ -305,7 +305,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             <input
               type="checkbox"
               name="shuffleQuestions"
-              checked={config.shuffleQuestions}
+              checked={config.shuffleQuestions || false}
               onChange={handleConfigChange}
               className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
             />
@@ -317,7 +317,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             <input
               type="checkbox"
               name="shuffleAnswers"
-              checked={config.shuffleAnswers}
+              checked={config.shuffleAnswers || false}
               onChange={handleConfigChange}
               className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
             />
@@ -329,7 +329,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             <input
               type="checkbox"
               name="allowRetakes"
-              checked={config.allowRetakes}
+              checked={config.allowRetakes || false}
               onChange={handleConfigChange}
               className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
             />
@@ -343,7 +343,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 <input
                   type="checkbox"
                   name="detectBehavior"
-                  checked={config.detectBehavior}
+                  checked={config.detectBehavior || false}
                   onChange={handleConfigChange}
                   className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
                 />
@@ -356,7 +356,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                   <input
                     type="checkbox"
                     name="continueWithPermission"
-                    checked={config.continueWithPermission}
+                    checked={config.continueWithPermission || false}
                     onChange={handleConfigChange}
                     className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
                   />
@@ -525,7 +525,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 <input
                   type="checkbox"
                   name="showResultToStudent"
-                  checked={config.showResultToStudent}
+                  checked={config.showResultToStudent || false}
                   onChange={handleConfigChange}
                   disabled={hasManualGrading}
                   className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300 disabled:text-gray-400"
@@ -548,7 +548,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               <input
                 type="checkbox"
                 name="showCorrectAnswer"
-                checked={config.showCorrectAnswer}
+                checked={config.showCorrectAnswer || false}
                 onChange={handleConfigChange}
                 className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
               />
@@ -560,7 +560,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               <input
                 type="checkbox"
                 name="enableCertificate"
-                checked={config.enableCertificate}
+                checked={config.enableCertificate || false}
                 onChange={handleConfigChange}
                 className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
               />
@@ -573,7 +573,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 <input
                   type="checkbox"
                   name="trackLocation"
-                  checked={config.trackLocation}
+                  checked={config.trackLocation || false}
                   onChange={handleConfigChange}
                   className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
                 />

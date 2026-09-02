@@ -12,6 +12,7 @@ import {
 import { RemainingTime, MetaBadge } from "./SharedComponents";
 import { CollaboratorModal } from "../CollaboratorModal";
 import { JoinQrModal } from "./JoinQrModal";
+import { ParentQrModal } from "./ParentQrModal";
 import { OngoingExamCard } from "./OngoingExamCard";
 import { useOngoingExamsView } from "../useOngoingExamsView";
 export const OngoingExamsView: React.FC<{
@@ -29,8 +30,10 @@ export const OngoingExamsView: React.FC<{
 }) => {
   const {
     joinQrExam,
+    parentQrExam,
     collabExam,
     setJoinQrExam,
+    setParentQrExam,
     setCollabExam,
     handleCopyLiveLink,
     handleCopyJoinLink,
@@ -67,7 +70,7 @@ export const OngoingExamsView: React.FC<{
                 onClick={() => setSelectedOngoingExam(exam)}
                 onQrClick={() => setJoinQrExam(exam)}
                 onCollabClick={() => setCollabExam(exam)}
-                onShareClick={() => handleCopyLiveLink(exam)}
+                onShareClick={() => setParentQrExam(exam)}
                 onDuplicateClick={() => handleDuplicate(exam)}
               />
             );
@@ -92,6 +95,14 @@ export const OngoingExamsView: React.FC<{
           exam={joinQrExam}
           onClose={() => setJoinQrExam(null)}
           onCopyLink={handleCopyJoinLink}
+        />
+      )}
+
+      {parentQrExam && (
+        <ParentQrModal
+          exam={parentQrExam}
+          onClose={() => setParentQrExam(null)}
+          onCopyLink={handleCopyLiveLink}
         />
       )}
 

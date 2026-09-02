@@ -58,13 +58,14 @@ export const OngoingExamCard: React.FC<OngoingExamCardProps> = ({
         </button>
         {exam.config.enablePublicStream && (
           <button
+            id={`parent-access-btn-${exam.code}`}
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onShareClick();
             }}
-            className="p-2 bg-white dark:bg-slate-700 text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg border border-slate-100 dark:border-slate-600 hover:border-indigo-100 dark:hover:border-indigo-800 transition-all shadow-sm"
-            title="Bagikan Link Pantauan"
+            className="p-2 bg-white dark:bg-slate-700 text-slate-400 hover:bg-teal-50 dark:hover:bg-teal-900/30 hover:text-teal-600 dark:hover:text-teal-400 rounded-lg border border-slate-100 dark:border-slate-600 hover:border-teal-100 dark:hover:border-teal-800 transition-all shadow-sm"
+            title="Akses Orang Tua"
           >
             <ShareIcon className="w-4 h-4" />
           </button>
