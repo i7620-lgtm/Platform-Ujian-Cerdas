@@ -347,3 +347,34 @@ export const optimizeExamImagesBeforeUpload = async (
   }
   return optimized;
 };
+
+export const filterEvaluationSection = (
+  content: string,
+  isTKA: boolean,
+): string => {
+  if (isTKA || !content) return content;
+
+  // Regex to find start of "Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional"
+  const startRegex =
+    /(?:^|\n)(#{1,6}\s+.*Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional.*|\*\*(?:Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional|Evaluasi Nilai Rata-Rata)\*\*:?)/i;
+  const match = content.match(startRegex);
+  if (!match || match.index === undefined) return content;
+
+  const startIndex = match.index;
+  const rest = content.substring(startIndex + match[0].length);
+
+  // Find where the next major section or heading starts
+  const nextSectionRegex = /\n(?=#{1,6}\s+|\d+\.\s+[A-Z]|\*\*[A-Z])/;
+  const nextMatch = rest.match(nextSectionRegex);
+
+  if (nextMatch && nextMatch.index !== undefined) {
+    const afterSection = rest.substring(nextMatch.index);
+    return (
+      content.substring(0, startIndex).trimEnd() +
+      "\n\n" +
+      afterSection.trimStart()
+    );
+  } else {
+    return content.substring(0, startIndex).trimEnd();
+  }
+};
