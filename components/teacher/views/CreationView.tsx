@@ -178,18 +178,16 @@ export const CreationView: React.FC<CreationViewProps> = ({
       ? aiConfig.difficulties
       : aiConfig.difficulty
         ? [aiConfig.difficulty]
-        : ["Level 3 - Penalaran (Reasoning / HOTS)"];
+        : [];
 
   const toggleDifficulty = (diffId: string) => {
     if (selectedDifficulties.includes(diffId)) {
-      if (selectedDifficulties.length > 1) {
-        const updated = selectedDifficulties.filter((d) => d !== diffId);
-        setAiConfig({
-          ...aiConfig,
-          difficulties: updated,
-          difficulty: updated[0],
-        });
-      }
+      const updated = selectedDifficulties.filter((d) => d !== diffId);
+      setAiConfig({
+        ...aiConfig,
+        difficulties: updated,
+        difficulty: updated.length > 0 ? updated[0] : "",
+      });
     } else {
       const updated = [...selectedDifficulties, diffId];
       setAiConfig({

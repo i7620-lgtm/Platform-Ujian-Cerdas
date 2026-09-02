@@ -185,9 +185,9 @@ export const useOngoingExamModal = ({
 
     const examCode = displayExam.code;
 
-    if (!isPremium || displayExam.config.disableRealtime) {
+    if (displayExam.config?.disableRealtime) {
       console.log(
-        "Realtime disabled (freemium user or Normal Mode). Relying on polling.",
+        "Realtime disabled (Normal Mode). Relying on polling.",
       );
       return;
     }
@@ -251,14 +251,25 @@ export const useOngoingExamModal = ({
           if (newData && newData.id) {
             setLocalResults((current) => {
               const updated = [...current];
-              const mapped = storageService.mapRowToResult(newData);
-              const i = updated.findIndex((r) => r.id === mapped.id);
+              const i = updated.findIndex((r) => r.id === newData.id);
               if (i >= 0) {
-                updated[i] = mapped;
+                const old = updated[i];
+                updated[i] = {
+                  ...old,
+                  status: newData.status !== undefined ? (newData.status as any) : old.status,
+                  score: newData.score !== undefined ? (newData.score as number) : old.score,
+                  correctAnswers: newData.correct_answers !== undefined ? (newData.correct_answers as number) : old.correctAnswers,
+                  totalQuestions: newData.total_questions !== undefined ? (newData.total_questions as number) : old.totalQuestions,
+                  answers: newData.answers !== undefined ? (newData.answers as Record<string, string>) : old.answers,
+                  activityLog: newData.activity_log !== undefined ? (newData.activity_log as string[]) : old.activityLog,
+                  timestamp: newData.updated_at !== undefined ? new Date(newData.updated_at as string).getTime() : old.timestamp,
+                  location: newData.location !== undefined ? (newData.location as any) : old.location,
+                };
                 return updated;
               }
-              updated.push(mapped);
-              return updated;
+              // If not found in local state, trigger a fetch to be safe
+              setTimeout(() => fetchLatest(true), 100);
+              return current;
             });
           }
         },
@@ -292,6 +303,7 @@ export const useOngoingExamModal = ({
           total: totalQuestions,
           timestamp,
         };
+        setOnlineStudents((prev) => ({ ...prev, [studentId]: true }));
         setLocalResults((prev) => {
           const idx = prev.findIndex((r) => r.student.studentId === studentId);
           if (idx >= 0 && prev[idx].status === "in_progress") {
@@ -356,6 +368,12 @@ export const useOngoingExamModal = ({
 
   const sortedResults = useMemo(() => {
     let filtered = [...localResults];
+    if (selectedSchool && selectedSchool !== "ALL") {
+      filtered = filtered.filter((r) => r.student.schoolName === selectedSchool);
+    }
+    if (selectedClass && selectedClass !== "ALL") {
+      filtered = filtered.filter((r) => r.student.class === selectedClass);
+    }
     if (statusFilter === "LOCKED") {
       filtered = filtered.filter((r) => r.status === "force_closed");
     } else if (statusFilter === "ONLINE") {
@@ -384,7 +402,7 @@ export const useOngoingExamModal = ({
       const absB = parseInt(b.student.absentNumber) || 0;
       return absA - absB;
     });
-  }, [localResults, statusFilter]);
+  }, [localResults, statusFilter, selectedSchool, selectedClass]);
 
   const uniqueClassesInResults = useMemo(() => {
     const classes = new Set(
