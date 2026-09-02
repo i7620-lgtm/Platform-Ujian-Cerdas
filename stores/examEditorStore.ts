@@ -68,22 +68,53 @@ const checkAndCascade = (state: any) => {
     }
 };
 
+export const DEFAULT_EXAM_CONFIG: ExamConfig = {
+    examMode: 'UJIAN',
+    startDate: new Date().toLocaleDateString('en-CA'),
+    endDate: new Date(Date.now() + 86400000).toLocaleDateString('en-CA'),
+    useBankSoal: false,
+    bankSoalCount: 10,
+    bankSoalProportions: { mudah: 30, sedang: 50, sulit: 20 },
+    timeLimit: 60,
+    date: new Date().toLocaleDateString('en-CA'),
+    startTime: '08:00',
+    endTime: '10:00',
+    allowRetakes: false,
+    detectBehavior: true,
+    autoSubmitInactive: true,
+    autoSaveInterval: 10,
+    shuffleQuestions: false,
+    shuffleAnswers: false,
+    continueWithPermission: false,
+    showResultToStudent: true,
+    showCorrectAnswer: false,
+    enableCertificate: false,
+    enablePublicStream: false,
+    disableRealtime: true,
+    trackLocation: false,
+    subject: 'Lainnya',
+    classLevel: 'Lainnya',
+    targetClasses: [],
+    examType: 'Lainnya',
+    description: '',
+};
+
 export const useExamEditorStore = create<ExamEditorState>()(
     immer((set) => ({
         questions: [],
-        config: {} as ExamConfig,
+        config: { ...DEFAULT_EXAM_CONFIG },
 
         setQuestions: (questions) => set((state) => {
             state.questions = questions;
         }),
 
         setConfig: (config) => set((state) => {
-            state.config = config;
+            state.config = { ...DEFAULT_EXAM_CONFIG, ...config };
         }),
 
         reset: () => set((state) => {
             state.questions = [];
-            state.config = {} as ExamConfig;
+            state.config = { ...DEFAULT_EXAM_CONFIG };
             useExamEditorUIStore.getState().resetUI();
         }),
 
