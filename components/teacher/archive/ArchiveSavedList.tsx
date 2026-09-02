@@ -67,13 +67,16 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
 
                 {file.metadata ? (
                   <div className="mt-2 space-y-1 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-2">
-                    {userRole === "super_admin" && (
+                    {file.metadata.school && file.metadata.school !== "-" && (
                       <div className="grid grid-cols-3 gap-1">
                         <span className="font-bold text-slate-400">
                           Sekolah
                         </span>
-                        <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                          : {file.metadata.school || "-"}
+                        <span 
+                          className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate"
+                          title={String(file.metadata.school)}
+                        >
+                          : {file.metadata.school}
                         </span>
                       </div>
                     )}
@@ -81,7 +84,10 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                       <span className="font-bold text-slate-400">
                         Mapel/Kelas
                       </span>
-                      <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
+                      <span 
+                        className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate"
+                        title={`${file.metadata.subject || "-"} (${file.metadata.classLevel || "-"})`}
+                      >
                         : {file.metadata.subject || "-"} ({file.metadata.classLevel || "-"})
                       </span>
                     </div>
@@ -97,7 +103,7 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                         : String(file.metadata.targetClasses).trim() !== "") && (
                         <div className="grid grid-cols-3 gap-1">
                           <span className="font-bold text-slate-400">
-                            Target
+                            Target Kelas
                           </span>
                           <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
                             : {Array.isArray(file.metadata.targetClasses)
