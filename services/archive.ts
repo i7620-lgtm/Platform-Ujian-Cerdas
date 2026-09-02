@@ -744,7 +744,7 @@ export class ArchiveService {
               }
           }
 
-          // Fallback to exam_summaries if metadata is missing or incomplete
+          // Merge & enrich with exam_summaries to always show complete, untruncated metadata
           if (examCode && summaryMap.has(examCode)) {
               const s = summaryMap.get(examCode);
               if (!metadata) {
@@ -753,27 +753,48 @@ export class ArchiveService {
                       subject: s.exam_subject || "-",
                       classLevel: s.class_level || "-",
                       examType: s.exam_type || "Umum",
-                      targetClasses: s.class_level ? [s.class_level] : [],
+                      targetClasses: [],
                       date: s.exam_date || f.created_at,
                       participantCount: typeof s.total_participants === 'number' ? s.total_participants : 0,
                       authorId: s.author_id || "",
                       hasAiAnalysis: false
                   };
               } else {
-                  // Fill in any missing properties
-                  if (!metadata.school && s.school_name) metadata.school = s.school_name;
-                  if (!metadata.subject && s.exam_subject) metadata.subject = s.exam_subject;
-                  if (!metadata.classLevel && s.class_level) metadata.classLevel = s.class_level;
-                  if (!metadata.examType && s.exam_type) metadata.examType = s.exam_type;
-                  if ((!metadata.targetClasses || (Array.isArray(metadata.targetClasses) && metadata.targetClasses.length === 0)) && s.class_level) {
-                      metadata.targetClasses = [s.class_level];
+                  // Prefer the full, untruncated strings from SQL exam_summaries
+                  if (s.school_name && (!metadata.school || s.school_name.length > String(metadata.school).length)) {
+                      metadata.school = s.school_name;
+                  }
+                  if (s.exam_subject && (!metadata.subject || s.exam_subject.length > String(metadata.subject).length)) {
+                      metadata.subject = s.exam_subject;
+                  }
+                  if (s.class_level && (!metadata.classLevel || s.class_level.length > String(metadata.classLevel).length)) {
+                      metadata.classLevel = s.class_level;
+                  }
+                  if (s.exam_type && (!metadata.examType || s.exam_type.length > String(metadata.examType).length)) {
+                      metadata.examType = s.exam_type;
                   }
                   if (!metadata.date && s.exam_date) metadata.date = s.exam_date;
-                  if (metadata.participantCount === undefined && s.total_participants !== undefined) {
+                  if ((metadata.participantCount === undefined || metadata.participantCount === 0) && s.total_participants !== undefined) {
                       metadata.participantCount = s.total_participants;
                   }
                   if (!metadata.authorId && s.author_id) metadata.authorId = s.author_id;
               }
+          }
+
+          // Clean up targetClasses to remove accidental school name or classLevel duplicates
+          if (metadata && Array.isArray(metadata.targetClasses)) {
+              metadata.targetClasses = metadata.targetClasses.filter((tc: string) => {
+                  if (!tc || typeof tc !== 'string') return false;
+                  const cleanTc = tc.trim();
+                  if (!cleanTc) return false;
+                  if (metadata?.school && (String(metadata.school).toLowerCase().includes(cleanTc.toLowerCase()) || cleanTc.toLowerCase().includes(String(metadata.school).toLowerCase()))) {
+                      return false;
+                  }
+                  if (metadata?.classLevel && cleanTc.toLowerCase() === String(metadata.classLevel).toLowerCase()) {
+                      return false;
+                  }
+                  return true;
+              });
           }
           
           return {
