@@ -263,11 +263,11 @@ export class ArchiveService {
               : [exam.config.classLevel, ...(exam.config.targetClasses || [])].filter(Boolean).join(', ');
 
           summaries.push({
-              school_name: schoolName,
-              exam_subject: exam.config.subject,
-              exam_code: exam.code,
-              exam_type: exam.config.examType, 
-              class_level: classLevelStr, 
+              school_name: String(schoolName || '').substring(0, 255),
+              exam_subject: String(exam.config.subject || '').substring(0, 255),
+              exam_code: String(exam.code || '').substring(0, 50),
+              exam_type: String(exam.config.examType || '').substring(0, 50), 
+              class_level: String(classLevelStr || '').substring(0, 255), 
               exam_date: exam.config.date || exam.config.startDate || new Date().toISOString().split('T')[0],
               total_participants: total,
               average_score: parseFloat(avg.toFixed(2)),
@@ -599,19 +599,19 @@ export class ArchiveService {
                   return `${cleanExamCode}_meta_${b64}.${Date.now()}.json`;
               };
 
-              // Try full length first (30, 25, 10), then gracefully scale down if filename approaches limits
-              let potentialFileName = createFilenameWithLimits(30, 25, 10);
-              if (potentialFileName.length > 240) {
-                  potentialFileName = createFilenameWithLimits(18, 18, 8);
+              // Try full length first (40, 30, 20), then gracefully scale down if filename approaches limits
+              let potentialFileName = createFilenameWithLimits(40, 30, 20);
+              if (potentialFileName.length > 350) {
+                  potentialFileName = createFilenameWithLimits(20, 20, 10);
               }
-              if (potentialFileName.length > 240) {
+              if (potentialFileName.length > 350) {
                   potentialFileName = createFilenameWithLimits(10, 10, 6);
               }
-              if (potentialFileName.length > 240) {
+              if (potentialFileName.length > 350) {
                   potentialFileName = createFilenameWithLimits(5, 5, 4);
               }
               
-              if (potentialFileName.length <= 248) {
+              if (potentialFileName.length <= 400) {
                   filename = potentialFileName;
               }
           } catch (e) {
@@ -642,24 +642,40 @@ export class ArchiveService {
           return [];
       }
 
+      const fileExamCodes = data.map(f => {
+          const fileName = f && typeof f.name === 'string' ? f.name : "";
+          return fileName.includes('_meta_')
+              ? fileName.split('_meta_')[0].toUpperCase().trim()
+              : fileName.split('_')[0].replace(/\.json$/i, '').toUpperCase().trim();
+      }).filter(Boolean);
+
       // Pre-fetch all summaries to enrich legacy or plain archives (e.g. BO3PDS_1788312182598.json)
       const summaryMap = new Map<string, any>();
-      try {
-          const { data: summaries } = await supabase
-              .from('exam_summaries')
-              .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id');
-          if (summaries && Array.isArray(summaries)) {
-              summaries.forEach((s) => {
-                  if (s && s.exam_code) {
-                      const code = String(s.exam_code).toUpperCase().trim();
-                      if (!summaryMap.has(code)) {
-                          summaryMap.set(code, s);
-                      }
+      if (fileExamCodes.length > 0) {
+          const uniqueCodes = Array.from(new Set(fileExamCodes));
+          const chunkSize = 100;
+          for (let i = 0; i < uniqueCodes.length; i += chunkSize) {
+              const chunk = uniqueCodes.slice(i, i + chunkSize);
+              try {
+                  const { data: summaries } = await supabase
+                      .from('exam_summaries')
+                      .select('exam_code, school_name, exam_subject, exam_type, class_level, exam_date, total_participants, author_id')
+                      .in('exam_code', chunk);
+                  
+                  if (summaries && Array.isArray(summaries)) {
+                      summaries.forEach((s) => {
+                          if (s && s.exam_code) {
+                              const code = String(s.exam_code).toUpperCase().trim();
+                              if (!summaryMap.has(code)) {
+                                  summaryMap.set(code, s);
+                              }
+                          }
+                      });
                   }
-              });
+              } catch (err) {
+                  console.warn("Could not fetch exam_summaries chunk for archive metadata lookup:", err);
+              }
           }
-      } catch (err) {
-          console.warn("Could not fetch exam_summaries for archive metadata lookup:", err);
       }
       
       return data.map((f: {name: string, created_at: string, metadata?: Record<string, unknown>}) => {
