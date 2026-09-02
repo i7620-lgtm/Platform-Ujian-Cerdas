@@ -287,13 +287,21 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         studentId,
       );
       if (result) {
+        const isNotPR = config.examMode !== "PR";
+
         if (
           result.status === "force_closed" ||
-          result.status === "completed"
+          (result.status === "completed" && !config.allowRetakes)
         ) {
-          setError(
-            `Akun ini (Kelas ${cleanClassName}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
-          );
+          if (result.status === "force_closed" && config.detectBehavior && config.continueWithPermission && isNotPR) {
+            setError(
+              `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`,
+            );
+          } else {
+            setError(
+              `Akun ini (Kelas ${cleanClassName}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
+            );
+          }
           setPendingStudentData({ cleanExamCode, studentData });
           setIsLocked(true);
           setIsLoading(false);
@@ -312,7 +320,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           hasStarted &&
           !savedDuration &&
           config.detectBehavior &&
-          !config.continueWithPermission
+          !config.continueWithPermission &&
+          isNotPR
         ) {
           const deviceId =
             localStorage.getItem("deviceId") ||
@@ -327,16 +336,6 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
             setIsLoading(false);
             return;
           }
-        }
-
-        if (config.detectBehavior && config.continueWithPermission) {
-          setError(
-            `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`,
-          );
-          setPendingStudentData({ cleanExamCode, studentData });
-          setIsLocked(true);
-          setIsLoading(false);
-          return;
         }
       } else {
         // Validate duplicate absent number in same class if other results exist
