@@ -35,8 +35,13 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                 className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-100 transition-all group"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10">
-                    {file.name}
+                  <p 
+                    className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-700 dark:group-hover:text-indigo-300 pr-10"
+                    title={file.name}
+                  >
+                    {file.name.includes("_meta_")
+                      ? `${file.name.split("_meta_")[0]}.json`
+                      : file.name}
                   </p>
                   {file.metadata &&
                     (!file.metadata.authorId ||
@@ -77,18 +82,18 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                         Mapel/Kelas
                       </span>
                       <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        : {file.metadata.subject} ({file.metadata.classLevel})
+                        : {file.metadata.subject || "-"} ({file.metadata.classLevel || "-"})
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
                       <span className="font-bold text-slate-400">Evaluasi</span>
                       <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        : {file.metadata.examType}
+                        : {file.metadata.examType || "-"}
                       </span>
                     </div>
                     {file.metadata.targetClasses &&
                       (Array.isArray(file.metadata.targetClasses)
-                        ? file.metadata.targetClasses.length > 0
+                        ? file.metadata.targetClasses.filter((t) => t && String(t).trim() !== "").length > 0
                         : String(file.metadata.targetClasses).trim() !== "") && (
                         <div className="grid grid-cols-3 gap-1">
                           <span className="font-bold text-slate-400">
@@ -96,7 +101,7 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                           </span>
                           <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
                             : {Array.isArray(file.metadata.targetClasses)
-                              ? file.metadata.targetClasses.join(", ")
+                              ? file.metadata.targetClasses.filter(Boolean).join(", ")
                               : String(file.metadata.targetClasses)}
                           </span>
                         </div>
