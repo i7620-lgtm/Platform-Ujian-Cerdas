@@ -361,9 +361,18 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                           ).length;
                         const answeredCount = Object.keys(
                           r.answers || {},
-                        ).filter((k) => !k.startsWith("_grade_")).length;
+                        ).filter((k) => !k.startsWith("_")).length;
                         const computedScore = calculateScore(r);
                         const isOnline = onlineStudents[r.student.studentId];
+                        const cleanClass = r.student.class
+                          ? r.student.class.includes("-")
+                            ? r.student.class
+                                .split("-")
+                                .pop()
+                                ?.replace(/\(\d+\)$/, "")
+                                .trim() || r.student.class
+                            : r.student.class.replace(/\(\d+\)$/, "").trim()
+                          : "-";
 
                         return (
                           <tr
@@ -387,7 +396,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-700">
-                                {r.student.class || "-"}
+                                {cleanClass || "-"}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -406,13 +415,13 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase border border-emerald-200 dark:border-emerald-800 shadow-sm">
                                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
                                     <span>Sedang Mengerjakan</span>
-                                    {isOnline ? (
+                                    {isOnline && !displayExam?.config?.disableRealtime ? (
                                       <span className="text-[8px] px-1.5 py-0.5 bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded font-black tracking-widest ml-0.5">
                                         ONLINE
                                       </span>
                                     ) : null}
                                   </span>
-                                  {totalQuestions > 0 && (
+                                  {!displayExam?.config?.disableRealtime && totalQuestions > 0 && (
                                     <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-0.5">
                                       <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                         <div
