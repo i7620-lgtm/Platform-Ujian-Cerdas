@@ -9,6 +9,7 @@ import {
 import { QuestionAnalysisItem } from "./QuestionAnalysisItem";
 export * from "./QuestionAnalysisItem";
 import { parseList, normalize, isAnswerMatch } from "../examUtils";
+import { calculateTimeLeft } from "../timeUtils";
 
 // --- SHARED COMPONENTS ---
 
