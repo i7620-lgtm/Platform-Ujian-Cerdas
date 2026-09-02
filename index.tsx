@@ -1,7 +1,12 @@
-/// <reference types="vite-plugin-pwa/client" /> 
+/// <reference types="vite-plugin-pwa/client" />
+if (typeof window !== 'undefined') {
+  (window as any).global = window;
+  (window as any).process = { env: {} };
+}
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ErrorBoundary } from './ErrorCatch';
 import './style.css'; 
 
 // Register PWA service worker
@@ -27,6 +32,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

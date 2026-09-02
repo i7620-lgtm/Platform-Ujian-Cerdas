@@ -15,9 +15,10 @@ export const downloadCertificateAsPdf = async (
     subject: string, 
     classLevel: string, 
     dateStr: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     certConfig: Record<string, any>,
-    fileName: string
+    fileName: string,
+    schoolName?: string
 ): Promise<void> => {
         const { jsPDF } = await import('jspdf');
         const { CertificateDOM } = await import('../components/CertificateDOM');
@@ -44,7 +45,7 @@ export const downloadCertificateAsPdf = async (
                         // This prevents the SVG cloned image from inheriting fixed top: -9999px and rendering out of bounds (blank).
                         const captureTarget = (div.firstElementChild || div) as HTMLElement;
                         
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                         
                         const renderOptions: any = {
                             pixelRatio: 2.5,
                             cacheBust: true,
@@ -81,6 +82,7 @@ export const downloadCertificateAsPdf = async (
                         qrLink={data.qrLink}
                         verifyCode={data.verifyCode}
                         config={certConfig}
+                        schoolName={schoolName}
                         onRendered={handleRendered}
                     />
                 );

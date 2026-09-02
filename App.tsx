@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
+import { ExamWaitingRoomView } from './components/student/ExamWaitingRoomView';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { ResultNotFoundPage } from './components/ResultNotFoundPage';
@@ -15,8 +16,35 @@ import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { supabase } from './lib/supabase';
 
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error("Gagal memuat komponen dinamis, memuat ulang halaman...", error);
+      const isChunkLoadFailed = 
+        error instanceof TypeError ||
+        (error as any)?.name === "ChunkLoadError" ||
+        /Failed to fetch dynamically imported module|chunk/i.test(String(error));
+        
+      if (isChunkLoadFailed) {
+        const lastReload = sessionStorage.getItem("last-chunk-reload-app");
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+          sessionStorage.setItem("last-chunk-reload-app", String(now));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+
 // Lazy Load Teacher Dashboard agar siswa tidak perlu mendownload kodenya
-const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
+const TeacherDashboard = lazyWithRetry(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 
 type View = 'SELECTOR' | 'TEACHER_LOGIN' | 'STUDENT_LOGIN' | 'TEACHER_DASHBOARD' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'LIVE_MONITOR' | 'TERMS' | 'PRIVACY' | 'TUTORIAL' | 'WAITING_ROOM' | 'COLLABORATOR_MODE' | 'RESULT_NOT_FOUND';
 
@@ -243,6 +271,7 @@ const App: React.FC = () => {
 
               if (!isNaN(startTime.getTime()) && now < startTime) {
                   setWaitingExam(exam);
+                  setCurrentStudent(student);
                   setView('WAITING_ROOM');
                   return;
               }
@@ -791,12 +820,12 @@ const App: React.FC = () => {
         )}
 
         {view === 'WAITING_ROOM' && waitingExam && (
-            <InvitationModal 
-                isOpen={true} 
-                onClose={resetToHome} 
+            <ExamWaitingRoomView 
                 exam={waitingExam}
-                schoolName={waitingExam.authorSchool}
-                // Teacher name defaults to 'Pengajar' inside component if undefined, which is fine for waiting room
+                student={currentStudent || { fullName: 'Siswa', schoolName: '', class: '', absentNumber: '', studentId: '' }}
+                onBack={resetToHome}
+                onStartExam={(code, stud) => handleStudentLoginSuccess(code, stud)}
+                isDarkMode={darkMode}
             />
         )}
 

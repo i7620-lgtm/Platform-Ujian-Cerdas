@@ -3,38 +3,49 @@ export type QuestionType = 'MULTIPLE_CHOICE' | 'COMPLEX_MULTIPLE_CHOICE' | 'TRUE
 
 export interface QuizConfig {
   count: number;
-  type: string;
+  type?: string;
+  types?: string[];
   subject: string;
-  difficulty: string;
+  difficulty?: string;
+  difficulties?: string[];
   blueprint: string;
   includeImages: boolean;
+}
+
+export interface CartesianConfig {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  xStep: number;
+  yStep: number;
+}
+
+export interface ChartPoint {
+  x: number;
+  y: number;
+}
+
+export interface ChartDataset {
+  label: string;
+  data: (number | string | ChartPoint)[];
+  backgroundColor?: string[];
+  borderColor?: string[];
+  showLine?: boolean;
+  fill?: boolean;
+  isFunction?: boolean;
+  functionStr?: string;
+  icon?: string;
 }
 
 export interface ChartData {
   type: 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian';
   title?: string;
   labels: string[];
-  datasets: {
-    label: string;
-    data: (number | string | any)[];
-    backgroundColor?: string[];
-    borderColor?: string[];
-    showLine?: boolean;
-    fill?: boolean;
-    isFunction?: boolean;
-    functionStr?: string;
-    icon?: string;
-  }[];
+  datasets: ChartDataset[];
   showTooltip?: boolean;
   showLegend?: boolean;
-  cartesianConfig?: {
-    xMin: number;
-    xMax: number;
-    yMin: number;
-    yMax: number;
-    xStep: number;
-    yStep: number;
-  };
+  cartesianConfig?: CartesianConfig;
 }
 
 export interface Question {
@@ -55,6 +66,8 @@ export interface Question {
   level?: string;    // e.g., "1", "HOTS", "LOTS"
   scoreWeight?: number; // Bobot Nilai (Default: 1)
   kisiKisi?: string; // NEW: Kisi-kisi materi per soal
+  imagePrompt?: string; // Prompt deskripsi visual AI untuk stimulus gambar
+  imageSearchKeyword?: string;
 
   matchingPairs?: {
     left: string;
@@ -197,4 +210,30 @@ export interface ExamSummary {
     question_stats: Record<string, unknown>[]; // JSONB Statistical Snapshot
     region?: string;
     author_id?: string;
+}
+
+export type ArchiveTab = 'DETAIL' | 'STUDENTS' | 'ANALYSIS' | 'CLASS_ANALYSIS' | 'AI_ANALYSIS';
+
+export interface ArchiveMetadata {
+    school?: string;
+    subject?: string;
+    classLevel?: string;
+    examType?: string;
+    targetClasses?: string[];
+    date?: string | number;
+    participantCount?: number;
+    authorId?: string;
+}
+
+export interface ArchiveData {
+    exam: Exam;
+    results: Result[];
+    version?: string;
+    repairedAt?: string;
+    ai_analyses?: Record<string, string>;
+}
+
+export interface ArchiveViewerProps {
+    onReuseExam: (exam: Exam) => void;
+    teacherProfile: any;
 }

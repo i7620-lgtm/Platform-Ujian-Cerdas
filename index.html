@@ -6,7 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     
-    <!-- Polyfill for older browsers -->
+    <!-- Polyfill for process and global so Node modules don't crash -->
+    <script>
+      window.global = window;
+      window.process = { env: {} };
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js-bundle/3.37.0/minified.js"></script>
     
     <!-- PWA / Mobile Capability -->
