@@ -6,10 +6,10 @@ export interface ExamTimeState {
   isUnlimited?: boolean;
 }
 
-export const calculateTimeLeft = (exam: Exam): ExamTimeState => {
+export const getExamDates = (exam: Exam): { start: Date; end: Date } => {
+  const mode = exam.config?.examMode || "UJIAN";
   const startDateRaw = exam.config?.startDate || exam.config?.date || "";
   const endDateRaw = exam.config?.endDate;
-  const now = Date.now();
 
   let start: Date;
   if (startDateRaw.includes("T")) {
@@ -21,19 +21,10 @@ export const calculateTimeLeft = (exam: Exam): ExamTimeState => {
 
   if (isNaN(start.getTime())) start = new Date();
 
-  if (now < start.getTime()) {
-    return {
-      status: "UPCOMING",
-      diff: Math.max(0, start.getTime() - now),
-      isUnlimited: false,
-    };
-  }
-
   let end: Date;
   const endTimeStr = exam.config?.endTime || "23:59";
-  const mode = exam.config?.examMode || "UJIAN";
 
-  const getLocalDateStr = (raw: string) => {
+  const getLocalDateStr = (raw: string | undefined) => {
     if (!raw) return "";
     if (raw.includes("T")) {
       const d = new Date(raw);
@@ -43,10 +34,12 @@ export const calculateTimeLeft = (exam: Exam): ExamTimeState => {
   };
 
   const localStartDateStr = getLocalDateStr(startDateRaw);
-  const localEndDateStr = getLocalDateStr(endDateRaw || "") || localStartDateStr;
+  const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
 
   if (mode === "PR") {
-    end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
+    // Mode PR ignores time selection and goes until midnight of the deadline
+    start = new Date(0); // Available anytime before deadline
+    end = new Date(`${localEndDateStr}T23:59:59`);
   } else {
     if (endDateRaw || exam.config?.endTime) {
       if (endDateRaw && endDateRaw.includes("T")) {
@@ -65,10 +58,26 @@ export const calculateTimeLeft = (exam: Exam): ExamTimeState => {
     end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   }
 
+  return { start, end };
+};
+
+export const calculateTimeLeft = (exam: Exam): ExamTimeState => {
+  const now = Date.now();
+  const { start, end } = getExamDates(exam);
+  const mode = exam.config?.examMode || "UJIAN";
+
+  if (now < start.getTime()) {
+    return {
+      status: "UPCOMING",
+      diff: Math.max(0, start.getTime() - now),
+      isUnlimited: false,
+    };
+  }
+
   const timeLeft = Math.max(0, end.getTime() - now);
   return {
     status: timeLeft === 0 ? "FINISHED" : "ONGOING",
     diff: timeLeft,
-    isUnlimited: mode === "PR" || exam.config?.timeLimit === 0,
+    isUnlimited: mode === "PR" || (exam.config && exam.config.timeLimit === 0),
   };
 };
