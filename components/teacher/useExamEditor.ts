@@ -183,7 +183,7 @@ export const useExamEditor = ({
           difficulty: cognitiveLevel,
           difficulties: [cognitiveLevel],
           blueprint: q.kisiKisi || "",
-          includeImages: config.includeImages ?? true,
+          includeImages: (config as any).includeImages ?? true,
         };
 
         const generatedQuestions = await generateQuestions(aiConfig);
@@ -212,7 +212,7 @@ export const useExamEditor = ({
         setIsGeneratingId(null);
       }
     },
-    [config.subject, config.includeImages, setQuestions, setIsGeneratingId],
+    [config.subject, (config as any).includeImages, setQuestions, setIsGeneratingId],
   );
 
   // Cascading configurations on manual configuration changes
