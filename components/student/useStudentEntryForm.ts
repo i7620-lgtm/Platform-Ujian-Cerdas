@@ -327,77 +327,31 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           setIsLoading(false);
           return;
         }
-
-        const deviceId =
-          localStorage.getItem("deviceId") ||
-          Math.random().toString(36).substring(2);
-        localStorage.setItem("deviceId", deviceId);
-        await supabase
-          .from("results")
-          .update({ device_id: deviceId })
-          .eq("exam_code", cleanExamCode)
-          .eq("student_id", studentId);
       } else {
-        const { data: allResults } = await supabase
-          .from("results")
-          .select("student_name, absent_number")
-          .eq("exam_code", cleanExamCode)
-          .eq("class_name", studentClass);
-
-        if (allResults) {
-          const existing = allResults.find(
-            (r) => r.absent_number === absentNumber,
+        // Validate duplicate absent number in same class if other results exist
+        try {
+          const classResults = await storageService.getResults(
+            cleanExamCode,
+            studentClass,
+            schoolName.trim(),
           );
-          if (existing && existing.student_name !== fullName.trim()) {
-            setError(
-              `Nomor urut ${absentNumber} di kelas ${studentClass} sudah terdaftar atas nama ${existing.student_name}. Hubungi pengawas.`,
+          if (classResults && classResults.length > 0) {
+            const existingSameAbsent = classResults.find(
+              (r) =>
+                r.student.absentNumber === absentNumber &&
+                r.student.fullName.trim().toLowerCase() !==
+                  fullName.trim().toLowerCase(),
             );
-            setIsLoading(false);
-            return;
+            if (existingSameAbsent) {
+              setError(
+                `Nomor urut ${absentNumber} di kelas ${studentClass} sudah terdaftar atas nama ${existingSameAbsent.student.fullName}. Hubungi pengawas.`,
+              );
+              setIsLoading(false);
+              return;
+            }
           }
-        }
-
-        const deviceId =
-          localStorage.getItem("deviceId") ||
-          Math.random().toString(36).substring(2);
-        localStorage.setItem("deviceId", deviceId);
-
-        const newResult = {
-          exam_code: cleanExamCode,
-          student_id: studentId,
-          student_name: fullName.trim(),
-          class_name: studentClass,
-          absent_number: absentNumber,
-          school_name: schoolName.trim(),
-          answers: {},
-          score: 0,
-          status: "in_progress",
-          device_id: deviceId,
-          start_time: new Date().toISOString(),
-        };
-
-        const { error: insertError } = await supabase
-          .from("results")
-          .insert(newResult);
-
-        if (insertError) {
-          console.error("Error creating result:", insertError);
-          if (insertError.code === "23505") {
-             const { error: updateError } = await supabase
-              .from("results")
-              .update(newResult)
-              .eq("exam_code", cleanExamCode)
-              .eq("student_id", studentId);
-             if (updateError) {
-                setError("Gagal membuat sesi ujian baru. Hubungi pengawas.");
-                setIsLoading(false);
-                return;
-             }
-          } else {
-             setError("Gagal membuat sesi ujian baru. Hubungi pengawas.");
-             setIsLoading(false);
-             return;
-          }
+        } catch (checkErr) {
+          console.warn("Could not check duplicate absent number:", checkErr);
         }
       }
 
@@ -408,7 +362,10 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         studentClass,
         absentNumber,
       };
-      localStorage.setItem(`student_pref_${cleanExamCode}`, JSON.stringify(scopedPref));
+      localStorage.setItem(
+        `student_pref_${cleanExamCode}`,
+        JSON.stringify(scopedPref),
+      );
 
       // Clear pending locks
       const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
@@ -428,26 +385,25 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       const isValid = await storageService.verifyUnlockToken(
         pendingStudentData.cleanExamCode,
         pendingStudentData.studentData.studentId,
-        token
+        token,
       );
       if (isValid) {
         setIsLocked(false);
         const lockKey = `exam_lock_${pendingStudentData.cleanExamCode}_${pendingStudentData.studentData.studentId}`;
         localStorage.removeItem(lockKey);
 
-        const deviceId =
-          localStorage.getItem("deviceId") ||
-          Math.random().toString(36).substring(2);
-        localStorage.setItem("deviceId", deviceId);
+        try {
+          await storageService.unlockStudentExam(
+            pendingStudentData.cleanExamCode,
+            pendingStudentData.studentData.studentId,
+          );
+        } catch (unlockErr) {
+          console.warn("Error unlocking student session:", unlockErr);
+        }
 
-        await supabase
-          .from("results")
-          .update({ device_id: deviceId })
-          .eq("exam_code", pendingStudentData.cleanExamCode)
-          .eq("student_id", pendingStudentData.studentData.studentId);
         onLoginSuccess(
           pendingStudentData.cleanExamCode,
-          pendingStudentData.studentData
+          pendingStudentData.studentData,
         );
       } else {
         alert("Token tidak valid atau sudah kadaluarsa!");
