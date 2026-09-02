@@ -67,6 +67,7 @@ export interface Question {
   scoreWeight?: number; // Bobot Nilai (Default: 1)
   kisiKisi?: string; // NEW: Kisi-kisi materi per soal
   imagePrompt?: string; // Prompt deskripsi visual AI untuk stimulus gambar
+  imageSearchKeyword?: string;
 
   matchingPairs?: {
     left: string;
