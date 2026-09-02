@@ -62,7 +62,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     handleQrScan,
     handleSubmit,
     handleUnlockAndResume,
-    setIsLocked,
+    setIsLocked, pendingStudentData, setPendingStudentData,
     setIsLoading
   } = useStudentEntryForm({ initialCode, onLoginSuccess });
 
