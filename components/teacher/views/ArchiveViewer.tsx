@@ -75,9 +75,9 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
   } = useArchiveViewerLogic({ archiveViewer: archiveViewerInstance, teacherProfile });
   const {
     activeTab, setActiveTab, selectedSchool, setSelectedSchool, selectedClass,
-    setSelectedClass, isPrinting, setIsPrinting, printRef, handlePrint,
-    handleDownloadExcel, isEditingMetadata, setIsEditingMetadata, handleUpdateMetadata,
-    selectedResult, setSelectedResult,
+    setSelectedClass, handlePrint,
+    handleDownloadExcel,
+    
     sourceType,
     currentCloudFilename,
     resetView,
@@ -416,8 +416,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
             setShowEditMetadata(false);
 
             if (sourceType === "CLOUD" && currentCloudFilename) {
-              setIsLoadingCloud(true);
-              setLoadingMessage("Menyimpan info baru ke Cloud...");
               try {
                 const jsonString = JSON.stringify(updatedData);
                 await storageService.uploadArchive(
@@ -444,7 +442,6 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
                   err,
                 );
               } finally {
-                setIsLoadingCloud(false);
               }
             }
           }}
