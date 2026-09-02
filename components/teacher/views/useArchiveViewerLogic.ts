@@ -169,7 +169,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
     const classes = new Set(
       results.map((r) => String(r.student.class || "Tanpa Kelas")),
     );
-    return Array.from(classes).sort((a, b) =>
+    return (Array.from(classes) as string[]).sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
     );
   }, [archiveData, selectedSchool]);
