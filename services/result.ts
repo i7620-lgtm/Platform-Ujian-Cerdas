@@ -35,12 +35,25 @@ export class ResultService {
                     }
                 }
             }
-            dbSchoolName = student?.schoolName || '';
+            dbSchoolName = student?.schoolName || (row.school_name as string) || '';
             if (dbClassName && dbClassName.includes('::')) {
                 const parts = dbClassName.split('::');
                 dbSchoolName = parts[0];
                 dbClassName = parts[1];
             }
+        }
+
+        // Clean dbClassName if it contains embedded School or limit, e.g. "SD NEGERI 2 PADANGSAMBIAN-6A(33)"
+        if (dbClassName) {
+            let clean = dbClassName.trim().replace(/\(\d+\)$/, '').trim();
+            if (clean.includes('-')) {
+                const parts = clean.split('-');
+                if (!dbSchoolName && parts.length > 1) {
+                    dbSchoolName = parts.slice(0, parts.length - 1).join('-').trim();
+                }
+                clean = parts[parts.length - 1].trim();
+            }
+            dbClassName = clean;
         }
 
         const answers = (row.answers as Record<string, string>) || {};
