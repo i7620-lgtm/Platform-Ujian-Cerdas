@@ -348,12 +348,34 @@ export const useArchiveViewer = ({
     if (!archiveData) return;
 
     const confirmMsg =
-      "Apakah Anda yakin ingin mengganti kunci jawaban soal ini?\n\nSemua jawaban siswa akan diperiksa ulang dan nilai rapor rapor siswa akan di-recalculasi secara real-time.";
+      "Apakah Anda yakin ingin mengganti kunci jawaban soal ini?\n\nSemua jawaban siswa akan diperiksa ulang dan nilai rapor siswa akan di-recalculasi secara real-time.";
     if (!confirm(confirmMsg)) return;
 
     const updatedQuestions = archiveData.exam.questions.map((q) => {
       if (q.id === qId) {
-        return { ...q, correctAnswer: newKey };
+        if (q.questionType === "TRUE_FALSE") {
+          try {
+            return {
+              ...q,
+              trueFalseRows: JSON.parse(newKey),
+              correctAnswer: newKey,
+            };
+          } catch {
+            return { ...q, correctAnswer: newKey };
+          }
+        } else if (q.questionType === "MATCHING") {
+          try {
+            return {
+              ...q,
+              matchingPairs: JSON.parse(newKey),
+              correctAnswer: newKey,
+            };
+          } catch {
+            return { ...q, correctAnswer: newKey };
+          }
+        } else {
+          return { ...q, correctAnswer: newKey };
+        }
       }
       return q;
     });
@@ -390,16 +412,51 @@ export const useArchiveViewer = ({
       setLoadingMessage("Menyinkronkan perbaikan kunci ke Cloud...");
       try {
         const jsonString = JSON.stringify(finalArchiveData);
-        await storageService.uploadArchive(updatedExam.code, jsonString, {
-          school: updatedExam.authorSchool,
-          subject: updatedExam.config.subject,
-          classLevel: updatedExam.config.classLevel,
-          examType: updatedExam.config.examType,
-          targetClasses: updatedExam.config.targetClasses,
-          date: updatedExam.config.date,
-          participantCount: updatedResults.length,
-          authorId: updatedExam.authorId,
-        });
+        const newFilename = await storageService.uploadArchive(
+          updatedExam.code,
+          jsonString,
+          {
+            school: updatedExam.authorSchool,
+            subject: updatedExam.config.subject,
+            classLevel: updatedExam.config.classLevel,
+            examType: updatedExam.config.examType,
+            targetClasses: updatedExam.config.targetClasses,
+            date: updatedExam.config.date,
+            participantCount: updatedResults.length,
+            authorId: updatedExam.authorId,
+          },
+        );
+
+        if (currentCloudFilename && currentCloudFilename !== newFilename) {
+          try {
+            await storageService.deleteArchive(currentCloudFilename);
+          } catch (delErr) {
+            console.warn(
+              "Failed to delete old archive during update key",
+              delErr,
+            );
+          }
+        }
+        setCurrentCloudFilename(newFilename);
+
+        try {
+          await storageService.registerLegacyArchive(
+            updatedExam,
+            updatedResults,
+          );
+        } catch (err) {
+          console.warn("Gagal mencatat statistik ulang:", err);
+        }
+
+        const list = await storageService.getArchivedList();
+        setCloudArchives(
+          list as {
+            name: string;
+            created_at: string;
+            size: number;
+            metadata?: ArchiveMetadata;
+          }[],
+        );
       } catch (err) {
         console.warn("Cloud sync error during key modification", err);
       } finally {
