@@ -1,7 +1,7 @@
 import React from "react";
 import { ChartData } from "../../types";
 
-export const CartesianChart: React.FC<{ data: ChartData }> = ({ data }) => {
+const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"]; export const CartesianChart: React.FC<{ data: ChartData }> = ({ data }) => {
   const { labels, datasets } = data;
       
         const config = data.cartesianConfig || {
