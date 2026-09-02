@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import type { Result, Exam } from "../../../../types";
+import { filterEvaluationSection } from "../archiveUtils";
 import Markdown from "react-markdown";
 import {
   LineChart,
@@ -127,18 +128,32 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
     );
   };
 
+  const isTKA = useMemo(() => {
+    const typeStr = (exam.config.examType || "").toLowerCase().trim();
+    return typeStr === "tka" || typeStr.includes("tka");
+  }, [exam.config.examType]);
+
+  const sanitizedContent = useMemo(() => {
+    if (!content) return "";
+    return filterEvaluationSection(content, isTKA);
+  }, [content, isTKA]);
+
   let splitAnalysis = { before: "", after: "", splitFound: false };
-  const regex = /(?:^|\n)(#{1,6}\s+.*Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional.*|\*\*(?:Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional|Evaluasi Nilai Rata-Rata)\*\*:?)/i;
-  const match = content.match(regex);
-  
-  if (match && match.index !== undefined) {
-    splitAnalysis = {
-      before: content.substring(0, match.index),
-      after: content.substring(match.index),
-      splitFound: true,
-    };
+  if (sanitizedContent && isTKA) {
+    const regex = /(?:^|\n)(#{1,6}\s+.*Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional.*|\*\*(?:Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional|Evaluasi Nilai Rata-Rata)\*\*:?)/i;
+    const match = sanitizedContent.match(regex);
+    
+    if (match && match.index !== undefined) {
+      splitAnalysis = {
+        before: sanitizedContent.substring(0, match.index),
+        after: sanitizedContent.substring(match.index),
+        splitFound: true,
+      };
+    } else {
+      splitAnalysis = { before: sanitizedContent, after: "", splitFound: false };
+    }
   } else {
-    splitAnalysis = { before: content, after: "", splitFound: false };
+    splitAnalysis = { before: sanitizedContent, after: "", splitFound: false };
   }
 
   const markdownComponents = {
@@ -178,7 +193,7 @@ export const PrintAIAnalysis: React.FC<PrintAIAnalysisProps> = ({ title, content
           <>
             {renderChart()}
             <div className="markdown-body mt-4">
-              <Markdown components={markdownComponents}>{content}</Markdown>
+              <Markdown components={markdownComponents}>{sanitizedContent}</Markdown>
             </div>
           </>
         )}
