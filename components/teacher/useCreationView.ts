@@ -17,8 +17,8 @@ const DEFAULT_AI_CONFIG: QuizConfig = {
   type: "Pilihan Ganda",
   types: ["Pilihan Ganda"],
   subject: "",
-  difficulty: "Level 3 - Penalaran (Reasoning / HOTS)",
-  difficulties: ["Level 3 - Penalaran (Reasoning / HOTS)"],
+  difficulty: "",
+  difficulties: [],
   blueprint: "",
   includeImages: true,
 };
