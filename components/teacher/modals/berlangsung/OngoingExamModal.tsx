@@ -123,108 +123,53 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end">
                 {displayExam.config.examMode !== "PR" && (
-                  <>
-                    <button
-                      onClick={() =>
-                        setStatusFilter(
-                          statusFilter === "LOCKED" ? "ALL" : "LOCKED",
-                        )
-                      }
-                      className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all ${
-                        statusFilter === "LOCKED"
-                          ? "bg-rose-50 border-rose-200 text-rose-600"
-                          : "bg-white border-slate-200 text-slate-500"
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-[9px] font-bold">
-                        {lockedCount}
-                      </div>
-                      TERKUNCI
-                    </button>
+                  <button
+                    onClick={handleFinishAllExams}
+                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                  >
+                    <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    SELESAIKAN UJIAN
+                  </button>
+                )}
 
-                    <button
-                      onClick={() =>
-                        setStatusFilter(
-                          statusFilter === "ONLINE" ? "ALL" : "ONLINE",
-                        )
-                      }
-                      className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all ${
-                        statusFilter === "ONLINE"
-                          ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                          : "bg-white border-slate-200 text-slate-500"
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[9px] font-bold">
-                        {onlineCount}
-                      </div>
-                      ONLINE
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        setStatusFilter(
-                          statusFilter === "COMPLETED" ? "ALL" : "COMPLETED",
-                        )
-                      }
-                      className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all ${
-                        statusFilter === "COMPLETED"
-                          ? "bg-indigo-50 border-indigo-200 text-indigo-600"
-                          : "bg-white border-slate-200 text-slate-500"
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[9px] font-bold">
-                        {completedCount}
-                      </div>
-                      SELESAI
-                    </button>
-
-                    <button
-                      onClick={handleFinishAllExams}
-                      className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-emerald-200 text-emerald-600 bg-white hover:bg-emerald-50 text-[10px] font-black uppercase tracking-wider transition-all"
-                    >
-                      <CheckCircleIcon className="w-3.5 h-3.5" />
-                      SELESAIKAN UJIAN
-                    </button>
-                  </>
+                {displayExam.config.examMode !== "PR" && (
+                  <button
+                    onClick={() => setIsAddTimeOpen(true)}
+                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                  >
+                    <ClockIcon className="w-3.5 h-3.5 text-purple-500" />
+                    TAMBAH WAKTU
+                  </button>
                 )}
                 
                 <button
-                  onClick={() => setIsPrintModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 text-[10px] font-black uppercase tracking-wider transition-all"
+                  onClick={() => setIsJoinQrModalOpen(true)}
+                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
                 >
-                  <DocumentDuplicateIcon className="w-3.5 h-3.5" />
+                  <QrCodeIcon className="w-3.5 h-3.5 text-indigo-500" />
+                  AKSES SISWA
+                </button>
+
+                <button
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                >
+                  <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
                   SOAL PDF
                 </button>
 
                 <button
                   onClick={() => setIsGuideModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 text-[10px] font-black uppercase tracking-wider transition-all"
+                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
                 >
-                  <BookOpenIcon className="w-3.5 h-3.5" />
-                  CARA PAKAI
+                  <BookOpenIcon className="w-3.5 h-3.5 text-blue-500" />
+                  PANDUAN
                 </button>
-
-                <button
-                  onClick={() => setIsJoinQrModalOpen(true)}
-                  className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-emerald-200 text-emerald-600 bg-white hover:bg-emerald-50 text-[10px] font-black uppercase tracking-wider transition-all"
-                >
-                  <QrCodeIcon className="w-3.5 h-3.5" />
-                  AKSES SISWA
-                </button>
-
-                {displayExam.config.examMode !== "PR" && (
-                  <button
-                    onClick={() => setIsAddTimeOpen(true)}
-                    className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-purple-200 text-purple-600 bg-white hover:bg-purple-50 text-[10px] font-black uppercase tracking-wider transition-all"
-                  >
-                    <ClockIcon className="w-3.5 h-3.5" />
-                    WAKTU
-                  </button>
-                )}
 
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-full border border-slate-200 text-slate-400 bg-white hover:bg-slate-50 transition-all"
+                  className="p-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm ml-1"
+                  title="Tutup Modal"
                 >
                   <XMarkIcon className="w-4 h-4" />
                 </button>
@@ -232,15 +177,109 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
             </div>
 
             {/* FILTER & OPTION BAR */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-50 dark:border-slate-700/50">
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
-                  <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                  Normal Mode
-                </div>
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-700/80">
+              {/* Quick Status Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <button
+                  onClick={() => setStatusFilter("ALL")}
+                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+                    statusFilter === "ALL"
+                      ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 dark:shadow-none ring-2 ring-indigo-400/30"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      statusFilter === "ALL"
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {localResults.length}
+                  </div>
+                  SEMUA
+                </button>
+
+                <button
+                  onClick={() =>
+                    setStatusFilter(
+                      statusFilter === "ONLINE" ? "ALL" : "ONLINE",
+                    )
+                  }
+                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+                    statusFilter === "ONLINE"
+                      ? "bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 dark:shadow-none ring-2 ring-emerald-400/30"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      statusFilter === "ONLINE"
+                        ? "bg-white/20 text-white"
+                        : "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300"
+                    }`}
+                  >
+                    {onlineCount}
+                  </div>
+                  MENGERJAKAN ({onlineCount})
+                </button>
+
+                <button
+                  onClick={() =>
+                    setStatusFilter(
+                      statusFilter === "LOCKED" ? "ALL" : "LOCKED",
+                    )
+                  }
+                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+                    statusFilter === "LOCKED"
+                      ? "bg-rose-600 border-rose-600 text-white shadow-rose-200 dark:shadow-none ring-2 ring-rose-400/30"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      statusFilter === "LOCKED"
+                        ? "bg-white/20 text-white"
+                        : "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300"
+                    }`}
+                  >
+                    {lockedCount}
+                  </div>
+                  TERKUNCI ({lockedCount})
+                </button>
+
+                <button
+                  onClick={() =>
+                    setStatusFilter(
+                      statusFilter === "COMPLETED" ? "ALL" : "COMPLETED",
+                    )
+                  }
+                  className={`px-3 py-1.5 flex items-center gap-2 rounded-full border text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${
+                    statusFilter === "COMPLETED"
+                      ? "bg-blue-600 border-blue-600 text-white shadow-blue-200 dark:shadow-none ring-2 ring-blue-400/30"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                      statusFilter === "COMPLETED"
+                        ? "bg-white/20 text-white"
+                        : "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300"
+                    }`}
+                  >
+                    {completedCount}
+                  </div>
+                  SELESAI ({completedCount})
+                </button>
               </div>
               
               <div className="flex flex-wrap items-center gap-3">
+                {/* Mode indicator */}
+                <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Live Monitor
+                </div>
+
                 {/* Filter School */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">
@@ -353,39 +392,49 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               {r.status === "completed" ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase border border-slate-200 dark:border-slate-600">
-                                  <CheckCircleIcon className="w-3.5 h-3.5" />{" "}
-                                  Selesai
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                                  <CheckCircleIcon className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>Sudah Selesai</span>
                                 </span>
                               ) : r.status === "force_closed" ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase border border-rose-100 dark:border-rose-900 animate-pulse">
-                                  <LockClosedIcon className="w-3.5 h-3.5" />{" "}
-                                  Terkunci
-                                </span>
-                              ) : isOnline ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase border border-emerald-100 dark:border-emerald-900 shadow-sm">
-                                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{" "}
-                                  Online
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase border border-rose-200 dark:border-rose-800 shadow-sm animate-pulse">
+                                  <LockClosedIcon className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>Terkunci</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-lg text-[10px] font-black uppercase border border-slate-200 dark:border-slate-700">
-                                  Offline
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase border border-emerald-200 dark:border-emerald-800 shadow-sm">
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                                    <span>Sedang Mengerjakan</span>
+                                    {isOnline ? (
+                                      <span className="text-[8px] px-1.5 py-0.5 bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded font-black tracking-widest ml-0.5">
+                                        ONLINE
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {totalQuestions > 0 && (
+                                    <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold pl-0.5">
+                                      <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${Math.min(100, Math.round((answeredCount / totalQuestions) * 100))}%`,
+                                          }}
+                                        />
+                                      </div>
+                                      <span>
+                                        {answeredCount}/{totalQuestions} Soal
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </td>
 
                             <td className="px-6 py-4 whitespace-nowrap text-center">
-                              {displayExam.config.showResultToStudent ? (
-                                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50/50 dark:bg-indigo-900/10 px-2 py-1 rounded">
-                                  {r.score !== undefined
-                                    ? r.score
-                                    : computedScore}
-                                </span>
-                              ) : (
-                                <span className="text-xs font-bold text-slate-400 italic">
-                                  Disembunyikan
-                                </span>
-                              )}
+                              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50/50 dark:bg-indigo-900/10 px-2 py-1 rounded">
+                                {r.score > 0 ? r.score : computedScore > 0 ? computedScore : r.score !== undefined ? r.score : 0}
+                              </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               {r.status === "completed" ? (
