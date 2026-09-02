@@ -247,28 +247,39 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
 
       const config = await storageService.getExamConfig(cleanExamCode);
 
+      const parsedClass = parseClassConfig(studentClass);
+      const cleanClassName = parsedClass.name || studentClass;
+      const cleanSchoolName = schoolName.trim() || parsedClass.schoolName || "";
+
       if (
         config.targetClasses &&
-        config.targetClasses.length > 0 &&
-        !config.targetClasses.includes(studentClass)
+        config.targetClasses.length > 0
       ) {
-        setError(
-          `Ujian ini tidak diperuntukkan bagi kelas ${studentClass}. Harap periksa kembali.`,
+        const matchesTarget = config.targetClasses.some(
+          (tc) =>
+            tc === studentClass ||
+            parseClassConfig(tc).name === cleanClassName ||
+            tc === cleanClassName,
         );
-        setIsLoading(false);
-        return;
+        if (!matchesTarget) {
+          setError(
+            `Ujian ini tidak diperuntukkan bagi kelas ${cleanClassName}. Harap periksa kembali.`,
+          );
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const studentId = `${cleanExamCode}_${schoolName}_${studentClass}_${absentNumber}`.replace(
-        /\\s+/g,
+      const studentId = `${cleanExamCode}_${cleanSchoolName}_${cleanClassName}_${absentNumber}`.replace(
+        /\s+/g,
         "_",
       );
       const studentData: Student = {
         studentId,
         fullName: fullName.trim(),
-        class: studentClass,
+        class: cleanClassName,
         absentNumber,
-        schoolName: schoolName.trim(),
+        schoolName: cleanSchoolName,
       };
 
       const result = await storageService.getStudentResult(
@@ -281,7 +292,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
           result.status === "completed"
         ) {
           setError(
-            `Akun ini (Kelas ${studentClass}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
+            `Akun ini (Kelas ${cleanClassName}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
           );
           setPendingStudentData({ cleanExamCode, studentData });
           setIsLocked(true);
