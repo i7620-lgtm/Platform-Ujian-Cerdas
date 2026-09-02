@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import type { Exam, Result, TeacherProfile, ExamSummary } from "../../../types";
 import { ChartBarIcon, SparklesIcon } from "../../Icons";
-import { formatDuration } from "./archiveUtils";
+import { formatDuration, filterEvaluationSection } from "./archiveUtils";
 import { archiveService } from "../../../services/archive";
 import Markdown from "react-markdown";
 import {
@@ -133,20 +133,32 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
 
   const analysisSchools = Array.from(new Set(classAnalysisData.map(c => c.schoolName)));
 
+  const isTKA = useMemo(() => {
+    const typeStr = (exam.config.examType || "").toLowerCase().trim();
+    return typeStr === "tka" || typeStr.includes("tka");
+  }, [exam.config.examType]);
+
+  const sanitizedAnalysis = useMemo(() => {
+    if (!aiAnalysisResult) return "";
+    return filterEvaluationSection(aiAnalysisResult, isTKA);
+  }, [aiAnalysisResult, isTKA]);
+
   let splitAnalysis = { before: "", after: "", splitFound: false };
-  if (aiAnalysisResult) {
+  if (sanitizedAnalysis && isTKA) {
     const regex = /(?:^|\n)(#{1,6}\s+.*Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional.*|\*\*(?:Evaluasi Nilai Rata-Rata Berdasarkan Standar Nasional|Evaluasi Nilai Rata-Rata)\*\*:?)/i;
-    const match = aiAnalysisResult.match(regex);
+    const match = sanitizedAnalysis.match(regex);
     if (match && match.index !== undefined) {
       const matchIndex = match.index;
       splitAnalysis = {
-        before: aiAnalysisResult.substring(0, matchIndex),
-        after: aiAnalysisResult.substring(matchIndex),
+        before: sanitizedAnalysis.substring(0, matchIndex),
+        after: sanitizedAnalysis.substring(matchIndex),
         splitFound: true
       };
     } else {
-      splitAnalysis = { before: aiAnalysisResult, after: "", splitFound: false };
+      splitAnalysis = { before: sanitizedAnalysis, after: "", splitFound: false };
     }
+  } else {
+    splitAnalysis = { before: sanitizedAnalysis, after: "", splitFound: false };
   }
 
   const renderClassPerformanceChart = () => {
@@ -435,7 +447,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
                 </div>
                 <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
                   <div className="markdown-body">
-                    <Markdown>{aiAnalysisResult}</Markdown>
+                    <Markdown>{sanitizedAnalysis}</Markdown>
                   </div>
                 </div>
               </div>
