@@ -81,10 +81,13 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               Sesi Terkunci
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-              Akun "{fullName}" (Kelas {studentClass}, No {absentNumber}) sedang
-              aktif atau dihentikan paksa.
-              <br />
-              Masukkan <strong>Token Reset</strong> dari pengawas.
+              {error ? error : `Akun "${fullName}" (Kelas ${studentClass}, No ${absentNumber}) sedang aktif atau dihentikan paksa.`}
+              {!error?.includes('selesai') && !error?.includes('Dihentikan Paksa') && (
+                <>
+                  <br />
+                  Masukkan <strong>Token Reset</strong> dari pengawas.
+                </>
+              )}
             </p>
             <UnlockForm
               onUnlock={handleUnlockAndResume}
