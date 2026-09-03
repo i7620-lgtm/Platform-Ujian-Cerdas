@@ -4,6 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 
 export class ResultService {
+  private static rpcDisabled = false;
   mapRowToResult(row: Record<string, unknown>): Result {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';
@@ -111,112 +112,90 @@ export class ResultService {
         return { ...resultPayload, isSynced: false, status: resultPayload.status || 'in_progress' };
     }
 
-    try {
-        // SECURITY FIX: SECURE SERVER-SIDE SCORING VIA RPC
-        // Tries to use Supabase stored function to securely calculate and store results
-        const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
-            p_exam_code: resultPayload.examCode,
-            p_student_id: resultPayload.student.studentId,
-            p_student_name: resultPayload.student.fullName,
-            p_class_name: resultPayload.student.class,
-            p_school_name: resultPayload.student.schoolName || '',
-            p_answers: resultPayload.answers || {},
-            p_status: resultPayload.status || 'in_progress',
-            p_device_info: null,
-            p_location: resultPayload.location || null,
-            p_activity_log: resultPayload.activityLog || [],
-            p_result_id: resultPayload.student.resultId || null
-        });
-
-        if (rpcError) {
-             console.error("RPC calculate_and_submit_exam failed. You must deploy the RPC function in Supabase.", rpcError);
-             throw rpcError;
-        }
-
-        const durationStr = resultPayload.answers['_duration'];
-        const completionTime = durationStr ? parseInt(durationStr) : undefined;
-        const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
-
-        // VERIFY SCORE: If the server's score differs significantly from the client's payload, 
-        // the RPC might be outdated (e.g. failing on MATCHING, TRUE_FALSE, or markdown math).
-        // Since we know the client-side calculates newer question formats accurately, we override if there is a discrepancy.
-        let finalScore = rpcData.score;
-        let finalCorrect = rpcData.correct_answers;
-        
-        if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
-             console.warn(`RPC Score (${finalScore}) differs from Client Score (${resultPayload.score}). Overriding with client score to support new question formats.`);
-             finalScore = resultPayload.score;
-             finalCorrect = resultPayload.correctAnswers || finalCorrect;
-             
-             // Update the database to reflect the overridden score
-             await supabase.from('results').update({
-                  score: finalScore,
-                  correct_answers: finalCorrect,
-                  total_questions: resultPayload.totalQuestions
-             }).eq('id', rpcData.id);
-        }
-
-        // Return successfully scored and saved result directly from server response
-        return {
-            ...resultPayload,
-            id: rpcData.id,
-            student: {
-                 ...resultPayload.student,
-                 resultId: rpcData.id
-            },
-            score: finalScore,
-            correctAnswers: finalCorrect,
-            totalQuestions: resultPayload.totalQuestions || rpcData.total_questions,
-            status: rpcData.status,
-            completionTime: validCompletionTime,
-            isSynced: true
-        };
-    } catch (error) {
-        console.error("CRITICAL DB ERROR / RPC FAILED:", error);
-        
-        const errObj = error as Record<string, unknown>;
-        const isNetworkError = !errObj.code && errObj.message === 'Failed to fetch'; 
-        
-        if (isNetworkError) {
-            console.warn("Network glitch, adding to queue...");
-            offlineService.addToQueue(resultPayload);
-            return { ...resultPayload, isSynced: false };
-        }
-        
-        // --- FALLBACK TO CLIENT-SIDE UPSERT IF RPC FAILS ---
-        console.warn("Falling back to client-side insert/update...");
+    // 1. Try secure RPC calculation if enabled and supported
+    if (!ResultService.rpcDisabled) {
         try {
-             // Let's do the standard client-side calculation if we have to.
-             // We'll trust the payload's score, or just pass what we have.
-             const student = resultPayload.student;
-             const classNameWithSchool = student.schoolName 
-                 ? `${student.schoolName}::${student.class}`
-                 : student.class;
-             
-             let finalError;
-             let newId = student.resultId;
-             
-             if (student.resultId) {
-                 const { error: updateError } = await supabase
-                     .from('results')
-                     .update({ 
-                         answers: resultPayload.answers || {}, 
-                         status: resultPayload.status || 'in_progress',
-                         activity_log: resultPayload.activityLog || [], 
-                         score: resultPayload.score || 0, 
-                         correct_answers: resultPayload.correctAnswers || 0,
-                         total_questions: resultPayload.totalQuestions || 0, 
-                         location: resultPayload.location || null, 
-                         updated_at: new Date().toISOString()
-                     })
-                     .eq('id', student.resultId);
-                 finalError = updateError;
-             } else {
-                 const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
-                    exam_code: resultPayload.examCode, 
-                    student_id: student.studentId, 
-                    student_name: student.fullName,
-                    class_name: classNameWithSchool, 
+            // Only send valid 36-char string UUID to avoid 22P02 uuid syntax error
+            const validUuid = typeof resultPayload.student.resultId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resultPayload.student.resultId)
+                ? resultPayload.student.resultId
+                : null;
+
+            const { data: rpcData, error: rpcError } = await supabase.rpc('calculate_and_submit_exam', {
+                p_exam_code: resultPayload.examCode,
+                p_student_id: resultPayload.student.studentId,
+                p_student_name: resultPayload.student.fullName,
+                p_class_name: resultPayload.student.class,
+                p_school_name: resultPayload.student.schoolName || '',
+                p_answers: resultPayload.answers || {},
+                p_status: resultPayload.status || 'in_progress',
+                p_device_info: null,
+                p_location: resultPayload.location || null,
+                p_activity_log: resultPayload.activityLog || [],
+                p_result_id: validUuid
+            });
+
+            if (rpcError) {
+                // If RPC fails (missing column, type mismatch, function not deployed), disable RPC for the session
+                ResultService.rpcDisabled = true;
+                console.info("RPC calculate_and_submit_exam is unavailable or schema mismatched in Supabase. Falling back to direct database persistence.");
+            } else if (rpcData) {
+                const durationStr = resultPayload.answers?.['_duration'];
+                const completionTime = durationStr ? parseInt(durationStr) : undefined;
+                const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
+
+                let finalScore = rpcData.score;
+                let finalCorrect = rpcData.correct_answers;
+
+                if (resultPayload.score !== undefined && resultPayload.score > finalScore) {
+                    finalScore = resultPayload.score;
+                    finalCorrect = resultPayload.correctAnswers || finalCorrect;
+
+                    await supabase.from('results').update({
+                        score: finalScore,
+                        correct_answers: finalCorrect,
+                        total_questions: resultPayload.totalQuestions
+                    }).eq('id', rpcData.id);
+                }
+
+                return {
+                    ...resultPayload,
+                    id: rpcData.id,
+                    student: {
+                        ...resultPayload.student,
+                        resultId: rpcData.id
+                    },
+                    score: finalScore,
+                    correctAnswers: finalCorrect,
+                    totalQuestions: resultPayload.totalQuestions || rpcData.total_questions,
+                    status: rpcData.status,
+                    completionTime: validCompletionTime,
+                    isSynced: true
+                };
+            }
+        } catch (rpcEx) {
+            ResultService.rpcDisabled = true;
+            const errObj = rpcEx as Record<string, unknown>;
+            if (!errObj.code && errObj.message === 'Failed to fetch') {
+                offlineService.addToQueue(resultPayload);
+                return { ...resultPayload, isSynced: false };
+            }
+        }
+    }
+
+    // 2. Direct database persistence (client-side calculation and upsert)
+    try {
+        const student = resultPayload.student;
+        const classNameWithSchool = student.schoolName 
+            ? `${student.schoolName}::${student.class}`
+            : student.class;
+
+        let finalError;
+        let newId = student.resultId;
+
+        if (student.resultId) {
+            const { error: updateError } = await supabase
+                .from('results')
+                .update({ 
                     answers: resultPayload.answers || {}, 
                     status: resultPayload.status || 'in_progress',
                     activity_log: resultPayload.activityLog || [], 
@@ -225,34 +204,58 @@ export class ResultService {
                     total_questions: resultPayload.totalQuestions || 0, 
                     location: resultPayload.location || null, 
                     updated_at: new Date().toISOString()
-                 }, { onConflict: 'exam_code,student_id' }).select('id').single();
-                 
-                 finalError = upsertError;
-                 if (upsertData) newId = upsertData.id;
-             }
-             
-             if (finalError) throw finalError;
-             
-             // Successfully submitted using fallback
-             return {
-                 ...resultPayload,
-                 id: newId ? Number(newId) : undefined,
-                 student: {
-                     ...resultPayload.student,
-                     resultId: newId ? Number(newId) : undefined
-                 },
-                 isSynced: true
-             };
-        } catch (fallbackError) {
-             console.error("Fallback UPSERT also failed:", fallbackError);
-             const fallbackErrObj = fallbackError as Record<string, unknown>;
-             throw new Error("Gagal menyimpan ke server: " + (fallbackErrObj.message || errObj.message || "Izin database ditolak (RLS)."));
+                })
+                .eq('id', student.resultId);
+            finalError = updateError;
+        } else {
+            const { data: upsertData, error: upsertError } = await supabase.from('results').upsert({
+                exam_code: resultPayload.examCode, 
+                student_id: student.studentId, 
+                student_name: student.fullName,
+                class_name: classNameWithSchool, 
+                answers: resultPayload.answers || {}, 
+                status: resultPayload.status || 'in_progress',
+                activity_log: resultPayload.activityLog || [], 
+                score: resultPayload.score || 0, 
+                correct_answers: resultPayload.correctAnswers || 0,
+                total_questions: resultPayload.totalQuestions || 0, 
+                location: resultPayload.location || null, 
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'exam_code,student_id' }).select('id').maybeSingle();
+
+            finalError = upsertError;
+            if (upsertData) newId = upsertData.id;
         }
+
+        if (finalError) throw finalError;
+
+        const durationStr = resultPayload.answers?.['_duration'];
+        const completionTime = durationStr ? parseInt(durationStr) : undefined;
+        const validCompletionTime = !isNaN(completionTime as number) ? completionTime : 0;
+
+        return {
+            ...resultPayload,
+            id: newId ? Number(newId) : undefined,
+            student: {
+                ...resultPayload.student,
+                resultId: newId ? Number(newId) : undefined
+            },
+            completionTime: validCompletionTime,
+            isSynced: true
+        };
+    } catch (saveError) {
+        console.error("Direct save failed:", saveError);
+        const errObj = saveError as Record<string, unknown>;
+        if (!errObj.code && errObj.message === 'Failed to fetch') {
+            offlineService.addToQueue(resultPayload);
+            return { ...resultPayload, isSynced: false };
+        }
+        throw new Error("Gagal menyimpan hasil ujian: " + (errObj.message || "Izin database ditolak (RLS)."));
     }
   }
 
   async getStudentResult(examCode: string, studentId: string): Promise<Result | null> {
-      const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).single();
+      const { data, error } = await supabase.from('results').select('*').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
       if (error || !data) return null;
       
       let absentNumber = '00';
@@ -304,13 +307,13 @@ export class ResultService {
   }
 
   async unlockStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
+      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
       const currentLog = (data?.activity_log as string[]) || [];
       await supabase.from('results').update({ status: 'in_progress', activity_log: [...currentLog, "Guru membuka kunci"] }).eq('exam_code', examCode).eq('student_id', studentId);
   }
 
   async finishStudentExam(examCode: string, studentId: string): Promise<void> {
-      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).single();
+      const { data } = await supabase.from('results').select('activity_log').eq('exam_code', examCode).eq('student_id', studentId).maybeSingle();
       const currentLog = (data?.activity_log as string[]) || [];
       const { error } = await supabase
           .from('results')
@@ -322,7 +325,7 @@ export class ResultService {
           .eq('student_id', studentId);
       if (error) throw error;
 
-      const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (examData?.config?.disableRealtime) return;
 
       // Broadcast to specific student to force submit immediately
@@ -355,7 +358,7 @@ export class ResultService {
       await this.finishAllExams(examCode);
 
       // 2. Update exam config to isFinished: true
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (data && data.config) {
           const newConfig = { ...data.config, isFinished: true };
           const { error } = await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
@@ -382,7 +385,7 @@ export class ResultService {
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (data && data.config) {
           const oldConfig = data.config as ExamConfig;
           const newTimeLimit = (oldConfig.timeLimit || 0) + additionalMinutes;
@@ -451,7 +454,7 @@ export class ResultService {
               .select('unlock_token, activity_log')
               .eq('exam_code', examCode)
               .eq('student_id', studentId)
-              .single();
+              .maybeSingle();
 
           if (error || !data) return false;
           
@@ -495,7 +498,7 @@ export class ResultService {
           .from('results')
           .select('student_name, class_name, student_id, exam_code')
           .eq('id', resultId)
-          .single();
+          .maybeSingle();
       
       if (fetchError || !currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${resultId})`);
 
