@@ -286,8 +286,41 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         cleanExamCode,
         studentId,
       );
+
+      // --- DEADLINE CHECK ---
+      const mode = (config.examMode || 'UJIAN').trim().toUpperCase();
+      const isPR = mode === 'PR';
+      const getLocalDateStr = (raw) => {
+          if (!raw) return '';
+          if (raw.includes('T')) {
+              const d = new Date(raw);
+              return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA');
+          }
+          return raw;
+      };
+      
+      const endDateStr = getLocalDateStr(config.endDate || config.date);
+      const endTimeStr = isPR ? '23:59' : (config.endTime || '23:59');
+
+      let absoluteExamEndTime;
+      if (config.endDate && config.endDate.includes('T')) {
+          absoluteExamEndTime = new Date(config.endDate).getTime();
+      } else {
+          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+      }
+
+      if (isNaN(absoluteExamEndTime)) {
+          absoluteExamEndTime = Infinity;
+      }
+
+      if (Date.now() > absoluteExamEndTime) {
+          setError(`Ujian ini telah ditutup karena melewati batas waktu pengerjaan (${endDateStr} ${endTimeStr}).`);
+          setIsLoading(false);
+          return;
+      }
+      // ----------------------
+
       if (result) {
-        const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
         const isNotPR = !isPR;
 
         // Pada mode PR: Tidak ada penguncian akun karena force_closed atau kecurangan.
