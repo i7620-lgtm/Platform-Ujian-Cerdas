@@ -327,15 +327,16 @@
   
   /* Exceptions for Superscript/Subscript */
   
-  /* Viewer (Prose) - Pretty styling that doesn't affect line height */
-  .prose sup, .prose sub { 
+  /* Viewer (Prose) & Option Content - Pretty styling that doesn't affect line height */
+  .prose sup, .prose sub,
+  .option-content sup, .option-content sub { 
       font-size: 75%; 
       line-height: 0; 
       vertical-align: baseline;
       position: relative;
   }
-  .prose sup { top: -0.5em; }
-  .prose sub { bottom: -0.25em; }
+  .prose sup, .option-content sup { top: -0.4em; }
+  .prose sub, .option-content sub { bottom: -0.2em; }
 
   /* Editor (Wysiwyg) - Native styling for robust editing behavior */
   /* We use standard vertical-align to ensure the browser's cursor logic works as expected */
@@ -443,5 +444,104 @@
   overflow: auto hidden;
   padding-top: 0.2rem;
   padding-bottom: 0.2rem;
+}
+
+/* --- Student Exam Margins & Line Normalization --- */
+/* Reset default browser margins inside option items to keep buttons vertically balanced */
+.option-content,
+.option-content p,
+.option-content div {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.option-content p:not(:last-child) {
+  margin-bottom: 0.35rem !important;
+}
+
+/* Question text vertical alignment and paragraph spacing */
+.student-question-text > :first-child,
+.student-question-text > div:first-child > :first-child,
+.student-question-text p:first-child,
+.student-question-text > div > p:first-child {
+  margin-top: 0 !important;
+}
+
+.student-question-text > :last-child,
+.student-question-text > div:last-child > :last-child,
+.student-question-text p:last-child,
+.student-question-text > div > p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.student-question-text p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* --- Student Exam Font Sizing (Cascading) --- */
+.exam-content-small .prose,
+.exam-content-small .prose p,
+.exam-content-small .prose li,
+.exam-content-small .prose td,
+.exam-content-small .prose th {
+  font-size: 0.875rem !important;
+  line-height: 1.55 !important;
+}
+.exam-content-small .option-content,
+.exam-content-small .option-content p,
+.exam-content-small .option-content span,
+.exam-content-small .option-content td,
+.exam-content-small .option-content th {
+  font-size: 0.8125rem !important;
+  line-height: 1.45 !important;
+}
+.exam-content-small textarea,
+.exam-content-small input {
+  font-size: 0.8125rem !important;
+}
+
+.exam-content-normal .prose,
+.exam-content-normal .prose p,
+.exam-content-normal .prose li,
+.exam-content-normal .prose td,
+.exam-content-normal .prose th {
+  font-size: 1rem !important;
+  line-height: 1.625 !important;
+}
+.exam-content-normal .option-content,
+.exam-content-normal .option-content p,
+.exam-content-normal .option-content span,
+.exam-content-normal .option-content td,
+.exam-content-normal .option-content th {
+  font-size: 0.9375rem !important;
+  line-height: 1.5 !important;
+}
+.exam-content-normal textarea,
+.exam-content-normal input {
+  font-size: 0.9375rem !important;
+}
+
+.exam-content-large .prose,
+.exam-content-large .prose p,
+.exam-content-large .prose li,
+.exam-content-large .prose td,
+.exam-content-large .prose th {
+  font-size: 1.125rem !important;
+  line-height: 1.6 !important;
+}
+.exam-content-large .option-content,
+.exam-content-large .option-content p,
+.exam-content-large .option-content span,
+.exam-content-large .option-content td,
+.exam-content-large .option-content th {
+  font-size: 1.0625rem !important;
+  line-height: 1.5 !important;
+}
+.exam-content-large textarea,
+.exam-content-large input {
+  font-size: 1.0625rem !important;
 }
 /* -------------------------------------- */
