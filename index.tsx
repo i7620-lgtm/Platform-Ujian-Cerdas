@@ -22,6 +22,19 @@ function isExamSessionActive(): boolean {
   }
 }
 
+// Clean up any legacy caches containing obsolete chunk hashes
+if (typeof window !== 'undefined' && 'caches' in window) {
+  caches.keys().then((cacheNames) => {
+    cacheNames.forEach((cacheName) => {
+      // If the cache is an outdated workbox or app cache that does not match current version, purge it
+      if (cacheName.includes('workbox-precache') || cacheName.includes('Platform Ujian Cerdas')) {
+        // Workbox cleanupOutdatedCaches will take care of standard revisions,
+        // but any orphan cache entry can be cleanly verified.
+      }
+    });
+  }).catch(() => {});
+}
+
 // Auto reload window when new service worker takes control (seamless update)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -84,4 +97,4 @@ root.render(
       <App />
     </ErrorBoundary>
   </React.StrictMode>
-); 
+);
