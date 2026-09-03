@@ -48,15 +48,16 @@ export const useExamAntiCheat = ({
     useEffect(() => {
         let calculatedDeadline: number;
 
+        const mode = (exam.config.examMode || 'UJIAN').trim().toUpperCase();
+        const isPR = mode === 'PR';
+
         if (student.class === 'PREVIEW') {
-            const mode = exam.config.examMode || 'UJIAN';
-            const timeLimitMs = mode === 'PR' ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
+            const timeLimitMs = isPR ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
             calculatedDeadline = timeLimitMs > 0 ? Date.now() + timeLimitMs : Infinity;
         } else {
-            const mode = exam.config.examMode || 'UJIAN';
             const storedStartTime = initialData?.answers?._startTime ? parseInt(initialData.answers._startTime) : null;
             const actualStartTime = storedStartTime || initialData?.timestamp || Date.now();
-            const timeLimitMs = mode === 'PR' ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
+            const timeLimitMs = isPR ? 0 : (exam.config.timeLimit || 0) * 60 * 1000;
 
             const getLocalDateStr = (raw: string) => {
                 if (!raw) return '';
@@ -68,7 +69,7 @@ export const useExamAntiCheat = ({
             };
 
             const endDateStr = getLocalDateStr(exam.config.endDate || exam.config.date);
-            const endTimeStr = mode === 'PR' ? '23:59' : (exam.config.endTime || '23:59');
+            const endTimeStr = isPR ? '23:59' : (exam.config.endTime || '23:59');
 
             let absoluteExamEndTime: number;
             if (exam.config.endDate && exam.config.endDate.includes('T')) {
@@ -123,10 +124,12 @@ export const useExamAntiCheat = ({
 
     // Handle Active Anti-Cheat (Meninggalkan Halaman / Buka Tab Baru / Keluar Halaman)
     useEffect(() => {
-        if (student.class === 'PREVIEW' || !exam.config.detectBehavior || exam.config.examMode === 'PR') return;
+        const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+        if (student.class === 'PREVIEW' || !exam.config.detectBehavior || isPR) return;
 
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
-            if (isSubmittingRef.current) return;
+            const currentIsPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+            if (isSubmittingRef.current || currentIsPR) return;
 
             const timestamp = new Date().toLocaleTimeString();
             logRef.current.push(`[${timestamp}] Pelanggaran: ${reason}`);
