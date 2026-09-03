@@ -323,25 +323,24 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       if (result) {
         const isNotPR = !isPR;
 
+        // Jika ujian sudah selesai dan tidak boleh retake, izinkan login agar App.tsx dapat mengarahkan ke halaman hasil.
+        if (result.status === "completed" && !config.allowRetakes) {
+          // Do not lock, let it pass to onLoginSuccess
+        }
         // Pada mode PR: Tidak ada penguncian akun karena force_closed atau kecurangan.
-        // Siswa hanya diblokir jika ujian sudah berstatus 'completed' dan ujian tidak mengizinkan retake.
-        if (
-          (isNotPR && result.status === "force_closed") ||
-          (result.status === "completed" && !config.allowRetakes)
-        ) {
-          if (result.status === "force_closed" && config.detectBehavior && config.continueWithPermission && isNotPR) {
+        else if (isNotPR && result.status === "force_closed") {
+          if (config.detectBehavior && config.continueWithPermission) {
             setError(
-              `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`,
+              `Sesi ini terkunci. Hubungi pengawas untuk meminta izin melanjutkan ujian.`
             );
+            setPendingStudentData({ cleanExamCode, studentData });
+            setIsLocked(true);
+            setIsLoading(false);
+            return;
           } else {
-            setError(
-              `Akun ini (Kelas ${cleanClassName}, No ${absentNumber}) sudah berstatus: ${result.status === "completed" ? "Selesai" : "Dihentikan Paksa"}. Hubungi pengawas untuk mereset sesi Anda.`,
-            );
+            // Jika tidak diizinkan melanjutkan (continueWithPermission=false), biarkan masuk agar App.tsx 
+            // menendang mereka ke halaman hasil (Student Result).
           }
-          setPendingStudentData({ cleanExamCode, studentData });
-          setIsLocked(true);
-          setIsLoading(false);
-          return;
         }
 
         const currentAnswers =
