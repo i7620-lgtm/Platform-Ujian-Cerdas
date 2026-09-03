@@ -325,7 +325,7 @@ export class ResultService {
           .eq('student_id', studentId);
       if (error) throw error;
 
-      const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data: examData } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (examData?.config?.disableRealtime) return;
 
       // Broadcast to specific student to force submit immediately
@@ -358,7 +358,7 @@ export class ResultService {
       await this.finishAllExams(examCode);
 
       // 2. Update exam config to isFinished: true
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (data && data.config) {
           const newConfig = { ...data.config, isFinished: true };
           const { error } = await supabase.from('exams').update({ config: newConfig }).eq('code', examCode);
@@ -385,7 +385,7 @@ export class ResultService {
   }
 
   async extendExamTime(examCode: string, additionalMinutes: number): Promise<void> {
-      const { data } = await supabase.from('exams').select('config').eq('code', examCode).single();
+      const { data } = await supabase.from('exams').select('config').eq('code', examCode).maybeSingle();
       if (data && data.config) {
           const oldConfig = data.config as ExamConfig;
           const newTimeLimit = (oldConfig.timeLimit || 0) + additionalMinutes;
@@ -498,7 +498,7 @@ export class ResultService {
           .from('results')
           .select('student_name, class_name, student_id, exam_code')
           .eq('id', resultId)
-          .single();
+          .maybeSingle();
       
       if (fetchError || !currentResult) throw new Error(`Data siswa tidak ditemukan. (ID: ${resultId})`);
 
