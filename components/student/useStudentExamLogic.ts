@@ -64,8 +64,8 @@ export const useStudentExamLogic = ({
   });
 
   // Monitoring Status
-  const isMonitoring =
-    activeExam.config.detectBehavior && activeExam.config.examMode !== "PR";
+  const isPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
+  const isMonitoring = activeExam.config.detectBehavior && !isPR;
   const monitoringLabel = activeExam.config.continueWithPermission
     ? "Diawasi & Terkunci"
     : "Diawasi Sistem";
@@ -124,8 +124,12 @@ export const useStudentExamLogic = ({
       setIsSubmitting(true);
       isSubmittingRef.current = true;
 
+      // PADA MODE PR: Status tidak boleh force_closed (selalu completed jika selesai/ditutup)
+      const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
+      const resolvedStatus = (currentIsPR && status === "force_closed") ? "completed" : status;
+
       try {
-        if (status === "completed" || status === "force_closed") {
+        if (resolvedStatus === "completed" || resolvedStatus === "force_closed") {
           const startTimeStr = answersRef.current["_startTime"];
           if (startTimeStr) {
             const startTime = parseInt(startTimeStr);
@@ -140,7 +144,7 @@ export const useStudentExamLogic = ({
         await onSubmit(
           answersRef.current,
           timeLeftRef.current,
-          status,
+          resolvedStatus,
           logRef.current,
           userLocation,
           grading,
@@ -151,7 +155,7 @@ export const useStudentExamLogic = ({
             .send({
               type: "broadcast",
               event: "student_submitted",
-              payload: { studentId: student.studentId, status },
+              payload: { studentId: student.studentId, status: resolvedStatus },
             })
             .catch(() => {});
         }
@@ -305,7 +309,8 @@ export const useStudentExamLogic = ({
           if (data) {
             if (data.status === "closed" && !isSubmittingRef.current) {
               alert("Ujian telah ditutup oleh Guru.");
-              handleSubmit(true, "force_closed");
+              const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
+              handleSubmit(true, currentIsPR ? "completed" : "force_closed");
               return;
             }
             if (data.config) {
@@ -325,12 +330,12 @@ export const useStudentExamLogic = ({
               .select("status, student_id")
               .eq("id", student.resultId)
               .single();
-            if (
-              resultData &&
-              (resultData.status === "completed" ||
-                resultData.status === "force_closed") &&
-              !isSubmittingRef.current
-            ) {
+            const currentIsPR = (activeExam.config.examMode || "").trim().toUpperCase() === "PR";
+            const shouldStop = resultData && (
+              resultData.status === "completed" ||
+              (!currentIsPR && resultData.status === "force_closed")
+            );
+            if (shouldStop && !isSubmittingRef.current) {
               alert(
                 "Ujian telah dihentikan oleh Guru. Jawaban Anda akan dikumpulkan otomatis.",
               );
@@ -369,6 +374,7 @@ export const useStudentExamLogic = ({
     student.resultId,
     student.class,
     handleSubmit,
+    activeExam.config.examMode,
   ]);
 
   const isLoadedRef = useRef(false);
@@ -533,7 +539,7 @@ export const useStudentExamLogic = ({
   useEffect(() => {
     if (
       activeExam.config.trackLocation &&
-      activeExam.config.examMode !== "PR" &&
+      !isPR &&
       student.class !== "PREVIEW" &&
       "geolocation" in navigator
     ) {
@@ -543,7 +549,7 @@ export const useStudentExamLogic = ({
     }
   }, [
     activeExam.config.trackLocation,
-    activeExam.config.examMode,
+    isPR,
     student.class,
   ]);
 
