@@ -337,7 +337,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               Izinkan Kerjakan Ulang
             </span>
           </label>
-          {config.examMode !== "PR" && (
+          {(config.examMode || "").trim().toUpperCase() !== "PR" && (
             <>
               <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
                 <input
