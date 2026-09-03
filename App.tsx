@@ -291,11 +291,18 @@ const App: React.FC = () => {
       }
 
       if (res && res.status === 'force_closed' && !isPreview) {
-          setCurrentExam(exam);
-          setCurrentStudent({ ...student, resultId: res.id });
-          setStudentResult(res);
-          setView('STUDENT_RESULT');
-          return;
+          const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
+          if (isPR) {
+              // Pada mode PR, siswa tidak boleh terkunci akibat force_closed. Izinkan melanjutkan pengerjaan.
+              setResumedResult(res);
+              studentWithId = { ...student, resultId: res.id };
+          } else {
+              setCurrentExam(exam);
+              setCurrentStudent({ ...student, resultId: res.id });
+              setStudentResult(res);
+              setView('STUDENT_RESULT');
+              return;
+          }
       }
 
       // Initialize with potential resultId if resuming
