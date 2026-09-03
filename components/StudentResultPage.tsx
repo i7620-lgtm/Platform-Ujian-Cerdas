@@ -297,7 +297,9 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
     exam.questions,
   ]);
 
-  if (result.status === "force_closed") {
+  const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
+
+  if (result.status === "force_closed" && !isPR) {
     return (
       <UnlockScreen
         unlockToken={unlockToken}
