@@ -62,13 +62,10 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       sourcemap: false,
       minify: 'esbuild',
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-          },
-        },
+      modulePreload: {
+        polyfill: false
       },
+      rollupOptions: {},
     },
   };
-}); 
+});
