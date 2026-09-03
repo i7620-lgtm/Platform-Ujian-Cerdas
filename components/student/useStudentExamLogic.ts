@@ -624,11 +624,23 @@ export const useStudentExamLogic = ({
   ).length;
   const progress =
     totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-  const optimizeHtml = (html: string) =>
-    sanitizeHtml(html).replace(
+  const optimizeHtml = (html: string) => {
+    if (!html) return "";
+    let cleaned = sanitizeHtml(html);
+    // Remove leading and trailing empty paragraphs, whitespace, or linebreaks
+    cleaned = cleaned.replace(
+      /^(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*|<br\s*\/?>\s*)+/gi,
+      "",
+    );
+    cleaned = cleaned.replace(
+      /(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*|<br\s*\/?>\s*)+$/gi,
+      "",
+    );
+    return cleaned.replace(
       /<img /g,
       '<img loading="lazy" class="rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 max-w-full max-h-[50vh] object-contain h-auto" ',
     );
+  };
 
   return { formatTime, totalQuestions, answeredCount, progress, optimizeHtml, answers, isSubmitting, userLocation, isNavOpen, setIsNavOpen, hasAttemptedSubmit, showConfigIntro, setShowConfigIntro, activeExam, matchingOptionsMap, isMonitoring, monitoringLabel, isAnswered, handleSubmit, timeLeft, handleAnswerChange, scrollToQuestion, answersRef };
 };
