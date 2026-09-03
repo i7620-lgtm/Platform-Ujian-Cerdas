@@ -93,6 +93,19 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Track active exam session for safe PWA updates
+  useEffect(() => {
+    if (view === 'STUDENT_EXAM') {
+      sessionStorage.setItem('is_exam_in_progress', 'true');
+    } else {
+      sessionStorage.removeItem('is_exam_in_progress');
+      if (sessionStorage.getItem('pending_pwa_refresh') === 'true') {
+        sessionStorage.removeItem('pending_pwa_refresh');
+        window.location.reload();
+      }
+    }
+  }, [view]);
+
   // Global Math Hydration Effect
   useEffect(() => {
     const renderMath = (el: Element) => {
