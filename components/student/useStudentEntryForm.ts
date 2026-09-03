@@ -287,10 +287,13 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
         studentId,
       );
       if (result) {
-        const isNotPR = config.examMode !== "PR";
+        const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
+        const isNotPR = !isPR;
 
+        // Pada mode PR: Tidak ada penguncian akun karena force_closed atau kecurangan.
+        // Siswa hanya diblokir jika ujian sudah berstatus 'completed' dan ujian tidak mengizinkan retake.
         if (
-          result.status === "force_closed" ||
+          (isNotPR && result.status === "force_closed") ||
           (result.status === "completed" && !config.allowRetakes)
         ) {
           if (result.status === "force_closed" && config.detectBehavior && config.continueWithPermission && isNotPR) {

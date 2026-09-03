@@ -110,6 +110,11 @@ export const useExamEditorStore = create<ExamEditorState>()(
 
         setConfig: (config) => set((state) => {
             state.config = { ...DEFAULT_EXAM_CONFIG, ...config };
+            if (state.config.examMode === 'PR') {
+                state.config.detectBehavior = false;
+                state.config.continueWithPermission = false;
+                state.config.trackLocation = false;
+            }
         }),
 
         reset: () => set((state) => {
@@ -131,6 +136,11 @@ export const useExamEditorStore = create<ExamEditorState>()(
 
         handleConfigChangeManual: (updater) => set((state) => {
             state.config = updater(state.config);
+            if (state.config.examMode === 'PR') {
+                state.config.detectBehavior = false;
+                state.config.continueWithPermission = false;
+                state.config.trackLocation = false;
+            }
         }),
 
         handleSubjectSelect: (subject) => set((state) => {
