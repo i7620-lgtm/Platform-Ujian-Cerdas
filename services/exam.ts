@@ -379,6 +379,12 @@ export class ExamService {
     }
 
     async saveExam(exam: Exam): Promise<void> {
+        if (exam.config && (exam.config.examMode || '').trim().toUpperCase() === 'PR') {
+            exam.config.detectBehavior = false;
+            exam.config.continueWithPermission = false;
+            exam.config.trackLocation = false;
+        }
+
         const processedQuestions = exam.questions.map(q => {
             let qCopy = JSON.parse(JSON.stringify(q));
             if (typeof cleanupQuestionContent === 'function') {
