@@ -290,6 +290,9 @@ const App: React.FC = () => {
           }
       }
 
+      // Initialize with potential resultId if resuming
+      let studentWithId = { ...student, resultId: res?.id };
+
       if (res && res.status === 'force_closed' && !isPreview) {
           const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
           if (isPR) {
@@ -304,9 +307,6 @@ const App: React.FC = () => {
               return;
           }
       }
-
-      // Initialize with potential resultId if resuming
-      let studentWithId = { ...student, resultId: res?.id };
       
       if (res && res.status === 'in_progress' && !isPreview) {
         setResumedResult(res);
