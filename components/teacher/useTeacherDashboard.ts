@@ -322,10 +322,18 @@ export const useTeacherDashboard = ({
       status,
     };
 
+    const isPR = (examData.config.examMode || "").trim().toUpperCase() === "PR";
     const finalExamData: Exam = {
       ...examData,
       config: {
         ...examData.config,
+        ...(isPR
+          ? {
+              detectBehavior: false,
+              continueWithPermission: false,
+              trackLocation: false,
+            }
+          : {}),
         isFinished: false, // Reset on save/publish to ensure it's not stuck in finished state
       },
     };
