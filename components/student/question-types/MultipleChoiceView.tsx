@@ -29,7 +29,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
               key={i}
               type="button"
               onClick={() => onAnswerChange(qId, opt)}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${
+              className={`w-full text-left p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -45,7 +45,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
                 {String.fromCharCode(65 + i)}
               </span>
               <div
-                className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content flex-1 min-w-0"
+                className="text-slate-700 dark:text-slate-200 font-medium option-content flex-1 min-w-0"
                 dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}
               />
             </button>
@@ -75,7 +75,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
                 );
                 onAnswerChange(qId, JSON.stringify(newAns));
               }}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${
+              className={`w-full text-left p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 sm:gap-4 ${
                 isSelected
                   ? "border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/20"
                   : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -91,7 +91,7 @@ export const MultipleChoiceView: React.FC<MultipleChoiceViewProps> = ({
                 {String.fromCharCode(65 + i)}
               </div>
               <div
-                className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium option-content flex-1 min-w-0"
+                className="text-slate-700 dark:text-slate-200 font-medium option-content flex-1 min-w-0"
                 dangerouslySetInnerHTML={{ __html: optimizeHtml(opt) }}
               />
             </button>
