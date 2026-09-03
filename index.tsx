@@ -14,12 +14,19 @@ import { registerSW } from 'virtual:pwa-register';
 
 let isRefreshing = false;
 
+function isExamSessionActive(): boolean {
+  try {
+    return typeof sessionStorage !== 'undefined' && sessionStorage.getItem('is_exam_in_progress') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 // Auto reload window when new service worker takes control (seamless update)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (isRefreshing) return;
-    const isExamActive = sessionStorage.getItem('is_exam_in_progress') === 'true';
-    if (!isExamActive) {
+    if (!isExamSessionActive()) {
       isRefreshing = true;
       window.location.reload();
     }
@@ -29,13 +36,14 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    const isExamActive = sessionStorage.getItem('is_exam_in_progress') === 'true';
-    if (!isExamActive) {
+    if (!isExamSessionActive()) {
       // Segera aktifkan versi baru tanpa perlu konfirmasi manual jika tidak sedang ujian
       updateSW(true);
     } else {
       console.info('Versi baru siap, menunda refresh hingga sesi ujian selesai.');
-      sessionStorage.setItem('pending_pwa_refresh', 'true');
+      try {
+        sessionStorage.setItem('pending_pwa_refresh', 'true');
+      } catch { /* ignore */ }
     }
   },
   onOfflineReady() {
