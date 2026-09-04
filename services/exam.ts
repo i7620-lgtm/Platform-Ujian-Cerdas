@@ -192,7 +192,14 @@ export class ExamService {
     }
 
     sanitizeExamForStudent(exam: Exam, studentId?: string, includeAnswers = false): Exam {
-        if (!studentId || studentId === 'monitor' || studentId === 'check_schedule') {
+        if (studentId === 'monitor') {
+            return {
+                ...exam,
+                questions: includeAnswers ? exam.questions : exam.questions.map(q => this.stripAnswersFromQuestion(q))
+            };
+        }
+
+        if (!studentId || studentId === 'check_schedule') {
             let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
             if (exam.config.shuffleQuestions) {
                 questionsToProcess = shuffleArray(questionsToProcess);
@@ -346,7 +353,9 @@ export class ExamService {
         };
 
         let includeAnswers = false;
-        if (studentId && studentId !== 'monitor' && studentId !== 'check_schedule') {
+        if (studentId === 'monitor') {
+            includeAnswers = !!exam.config.enablePublicStream;
+        } else if (studentId && studentId !== 'check_schedule') {
             const { data: result } = await supabase.from('results').select('status').eq('exam_code', code).eq('student_id', studentId).maybeSingle();
             if (result && (result.status === 'completed' || result.status === 'force_closed')) {
                 includeAnswers = exam.config.showResultToStudent;
