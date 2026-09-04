@@ -27,6 +27,7 @@ import { UnlockScreen } from "./student/result/UnlockScreen";
 import { CompletedClosedScreen } from "./student/result/CompletedClosedScreen";
 import { AnalysisCards } from "./student/result/AnalysisCards";
 import { ReviewSection } from "./student/result/ReviewSection";
+import { StudentFeedbackModal } from "./student/result/StudentFeedbackModal";
 
 interface StudentResultPageProps {
   result: Result;
@@ -47,11 +48,28 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
 }) => {
   const config = exam.config;
   const [expandedReview, setExpandedReview] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
-  // Scroll to top on mount
+  // Scroll to top on mount and trigger feedback modal for completed exam
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+
+    if (result.status === "completed" || result.status === "force_closed") {
+      try {
+        const alreadySubmitted = localStorage.getItem(
+          `feedback_submitted_${exam.code}_${result.student.studentId}`,
+        );
+        if (!alreadySubmitted) {
+          const timer = setTimeout(() => {
+            setShowFeedbackModal(true);
+          }, 700);
+          return () => clearTimeout(timer);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [exam.code, result.student.studentId, result.status]);
 
   // Unlock State for Force Closed View
   const [unlockToken, setUnlockToken] = useState("");
@@ -516,14 +534,36 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
             </div>
           )}
 
-          <button
-            onClick={onFinish}
-            className="w-full bg-slate-900 dark:bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 active:scale-[0.98] mt-10 text-xs uppercase tracking-widest"
-          >
-            Tutup Halaman
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-3 mt-8">
+            <button
+              onClick={() => setShowFeedbackModal(true)}
+              type="button"
+              className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-xs font-bold transition-all inline-flex items-center justify-center gap-2"
+            >
+              <span>⭐</span>
+              <span>Beri Penilaian & Saran</span>
+            </button>
+
+            <button
+              onClick={onFinish}
+              className="w-full flex-1 bg-slate-900 dark:bg-indigo-600 text-white font-bold py-3.5 px-6 rounded-2xl hover:bg-black dark:hover:bg-indigo-700 transition-all shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 active:scale-[0.98] text-xs uppercase tracking-widest"
+            >
+              Tutup Halaman
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* FEEDBACK MODAL POPUP */}
+      {showFeedbackModal && (
+        <StudentFeedbackModal
+          examCode={exam.code}
+          studentName={result.student.fullName}
+          studentId={result.student.studentId}
+          schoolName={result.student.schoolName || exam.authorSchool}
+          onClose={() => setShowFeedbackModal(false)}
+        />
+      )}
     </div>
   );
 };

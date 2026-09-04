@@ -505,18 +505,28 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
       )}
 
       {pendingStudentData && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md relative animate-slide-in-up border border-white dark:border-slate-700">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 mb-4">
-              <UserIcon className="w-6 h-6" />
+        <div
+          id="modal-konfirmasi-data-diri-overlay"
+          className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            id="modal-konfirmasi-data-diri-card"
+            className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md relative animate-slide-in-up border border-white dark:border-slate-700"
+          >
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 shadow-sm">
+                <UserIcon className="w-7 h-7" />
+              </div>
             </div>
-            <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">
-              Konfirmasi Data Diri
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-              Pastikan data di bawah ini adalah benar milik Anda sebelum memulai
-              ujian.
-            </p>
+            <div className="text-center mb-6">
+              <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">
+                Konfirmasi Data Diri
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Pastikan data di bawah ini adalah benar milik Anda sebelum memulai
+                ujian.
+              </p>
+            </div>
 
             <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 space-y-4 mb-6">
               <div>
@@ -557,15 +567,17 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
 
             <div className="flex gap-3">
               <button
+                id="btn-bukan-kembali-modal"
                 onClick={() => {
                   setPendingStudentData(null);
                   setIsLoading(false);
                 }}
-                className="flex-1 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors uppercase tracking-wide"
+                className="flex-1 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors uppercase tracking-wide min-h-[44px]"
               >
                 Bukan, Kembali
               </button>
               <button
+                id="btn-ya-data-benar-modal"
                 onClick={() => {
                   onLoginSuccess(
                     pendingStudentData.cleanExamCode,
@@ -573,7 +585,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                   );
                   setPendingStudentData(null);
                 }}
-                className="flex-[1.5] py-3 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all uppercase tracking-wide flex items-center justify-center gap-2"
+                className="flex-[1.5] py-3 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all uppercase tracking-wide flex items-center justify-center gap-2 min-h-[44px]"
               >
                 <CheckCircleIcon className="w-4 h-4" />
                 Ya, Data Sudah Benar

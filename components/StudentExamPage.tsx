@@ -7,12 +7,12 @@ import {
   ChevronDownIcon,
   CheckIcon,
   ChevronUpIcon,
-  LockClosedIcon,
   SunIcon,
   MoonIcon,
   ShieldCheckIcon,
   MapPinIcon,
   ArrowsRightLeftIcon,
+  LockClosedIcon,
 } from "./Icons";
 import { storageService } from "../services/storage";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -92,6 +92,7 @@ interface StudentExamPageProps {
     grading?: Record<string, unknown>,
   ) => void;
   onUpdate?: (answers: Record<string, string>, timeLeft: number) => void;
+  onBack?: () => void;
   isDarkMode?: boolean;
   toggleTheme?: () => void;
 }
@@ -102,6 +103,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   initialData,
   onSubmit,
   onUpdate,
+  onBack,
   isDarkMode,
   toggleTheme,
 }) => {

@@ -317,32 +317,16 @@ export class ExamService {
     async getExamForStudent(code: string, studentId?: string, isPreview = false): Promise<Exam | null> {
         let data = null;
 
-        try {
-            const { data: fullData, error: fullError } = await supabase
-                .from('exams')
-                .select('*, profiles:author_id(full_name)')
-                .eq('code', code)
-                .maybeSingle();
-            
-            if (!fullError && fullData) {
-                data = fullData;
-            }
-        } catch {
-            console.warn("Attempt 1 (Full Fetch) failed, retrying with fallback...");
-        }
+        const { data: simpleData, error: simpleError } = await supabase
+            .from('exams')
+            .select('*')
+            .eq('code', code)
+            .maybeSingle();
 
-        if (!data) {
-            const { data: simpleData, error: simpleError } = await supabase
-                .from('exams')
-                .select('*')
-                .eq('code', code)
-                .maybeSingle();
-            
-            if (simpleError) {
-                console.error("Attempt 2 (Fallback) failed:", simpleError);
-            } else {
-                data = simpleData;
-            }
+        if (simpleError) {
+            console.error("Fetch exam failed:", simpleError);
+        } else {
+            data = simpleData;
         }
 
         if (!data) {
@@ -354,7 +338,7 @@ export class ExamService {
         const exam: Exam = {
             code: data.code, 
             authorId: data.author_id, 
-            authorName: data.profiles?.full_name || 'Pengajar', 
+            authorName: (data.author_name as string) || 'Pengajar', 
             authorSchool: data.school,
             config: data.config, 
             questions: data.questions, 
@@ -724,7 +708,7 @@ export class ExamService {
     }
 
     async getExamForArchive(code: string): Promise<Exam | null> {
-        const { data, error } = await supabase.from('exams').select('*').eq('code', code).single();
+        const { data, error } = await supabase.from('exams').select('*').eq('code', code).maybeSingle();
         if (error || !data) return null;
 
         const examData: Exam = {

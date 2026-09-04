@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 
 export class ResultService {
-  private static rpcDisabled = false;
+  private static rpcDisabled = true; // Use direct Supabase persistence to avoid 400 RPC signature errors
   mapRowToResult(row: Record<string, unknown>): Result {
         const studentIdStr = row.student_id as string;
         let absentNumber = '00';

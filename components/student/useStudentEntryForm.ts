@@ -418,7 +418,8 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
       localStorage.removeItem(lockKey);
 
-      onLoginSuccess(cleanExamCode, studentData);
+      setPendingStudentData({ cleanExamCode, studentData });
+      setIsLoading(false);
     } catch (err) {
       console.error(err);
       setError("Terjadi kesalahan. Pastikan koneksi internet stabil.");

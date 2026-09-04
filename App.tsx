@@ -93,6 +93,25 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Track active exam session for safe PWA updates
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+        if (view === 'STUDENT_EXAM') {
+          sessionStorage.setItem('is_exam_in_progress', 'true');
+        } else {
+          sessionStorage.removeItem('is_exam_in_progress');
+          if (sessionStorage.getItem('pending_pwa_refresh') === 'true') {
+            sessionStorage.removeItem('pending_pwa_refresh');
+            window.location.reload();
+          }
+        }
+      }
+    } catch {
+      // Ignore sessionStorage exceptions in private/restricted modes
+    }
+  }, [view]);
+
   // Global Math Hydration Effect
   useEffect(() => {
     const renderMath = (el: Element) => {
@@ -796,6 +815,7 @@ const App: React.FC = () => {
                 student={currentStudent} 
                 initialData={resumedResult}
                 onSubmit={handleExamSubmit}
+                onBack={resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
             />
