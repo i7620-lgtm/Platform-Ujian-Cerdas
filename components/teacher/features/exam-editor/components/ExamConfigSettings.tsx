@@ -137,9 +137,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             />
           </div>
           <p className="text-[10px] text-slate-400 mt-2 italic font-medium">
-            Biarkan kosong agar siswa bebas mengisi kelas. Ketik "6A" untuk
-            membatasi kelas, atau "6A 40" untuk membatasi kelas dan jumlah
-            siswa (otomatis menjadi "6A(40)").
+            Biarkan kosong agar siswa bebas mengisi kelas. Ketik "6A" untuk membatasi kelas, "6A 40" untuk membatasi kelas dan jumlah siswa (otomatis menjadi "6A(40)"), atau "SD Negeri 2 Padangsambian-6A(40)" untuk membatasi sekolah, kelas, dan jumlah siswa. Tekan "Enter" untuk menyimpan target kelas.
           </p>
         </div>
 
