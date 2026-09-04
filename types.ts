@@ -174,6 +174,7 @@ export interface Result {
     isSynced?: boolean; 
     timestamp?: number;
     location?: { lat: number; lng: number } | string;
+    isPlaceholder?: boolean;
 }
 
 export type AccountType = 'super_admin' | 'admin_sekolah' | 'guru' | 'collaborator';
