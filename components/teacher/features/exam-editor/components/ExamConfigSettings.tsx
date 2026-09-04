@@ -624,7 +624,6 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                   store.handleConfigChangeManual((prev: any) => ({
                     ...prev,
                     disableRealtime: true,
-                    enablePublicStream: false,
                   }))
                 }
                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.disableRealtime ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-emerald-200"}`}
@@ -656,16 +655,15 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                   store.handleConfigChangeManual((prev: any) => ({
                     ...prev,
                     disableRealtime: false,
-                    enablePublicStream: false,
                   }))
                 }
-                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime && !config.enablePublicStream ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200"}`}
+                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${!config.disableRealtime ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-200"}`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime && !config.enablePublicStream ? "border-indigo-500" : "border-slate-400"}`}
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${!config.disableRealtime ? "border-indigo-500" : "border-slate-400"}`}
                   >
-                    {!config.disableRealtime && !config.enablePublicStream && (
+                    {!config.disableRealtime && (
                       <div className="w-2 h-2 bg-indigo-500 rounded-full" />
                     )}
                   </div>
@@ -688,8 +686,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                     onChange={(e) => {
                        store.handleConfigChangeManual((prev: any) => ({
                          ...prev,
-                         enablePublicStream: e.target.checked,
-                         disableRealtime: false
+                         enablePublicStream: e.target.checked
                        }))
                     }}
                     className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
@@ -706,7 +703,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                   </div>
                 </label>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">
-                  Menyediakan link streaming public sehingga penonton atau orang tua dapat melihat kemajuan siswa secara live selama ujian berlangsung. Ini memaksa mode Realtime aktif.
+                  Menyediakan link streaming public sehingga penonton atau orang tua dapat melihat kemajuan/nilai siswa secara live selama ujian berlangsung.
                 </p>
             </div>
           </div>
