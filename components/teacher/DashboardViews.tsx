@@ -9,4 +9,5 @@ export * from "./views/OngoingExamsView";
 export * from "./views/UpcomingExamsView";
 export * from "./views/FinishedExamsView";
 export * from "./views/UserManagementView";
+export * from "./views/StudentFeedbackView";
 export * from "./views/ArchiveViewer";
