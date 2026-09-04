@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { offlineService } from './offline';
+import { calculateExamScore } from '../components/teacher/examUtils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Result, ResultStatus, Exam, ExamConfig } from '../types';
 
@@ -192,6 +193,26 @@ export class ResultService {
         let finalError;
         let newId = student.resultId;
 
+        // Auto-recalculate score securely if completed/force_closed and score is 0
+        let finalScore = resultPayload.score || 0;
+        let finalCorrect = resultPayload.correctAnswers || 0;
+        let finalTotal = resultPayload.totalQuestions || 0;
+
+        if (finalScore === 0 && (resultPayload.status === 'completed' || resultPayload.status === 'force_closed')) {
+            try {
+                const { data: examData } = await supabase.from('exams').select('*').eq('code', resultPayload.examCode).maybeSingle();
+                if (examData) {
+                    const exam = examData as Exam;
+                    const { score, correctAnswers, totalQuestions } = calculateExamScore(exam, resultPayload.answers || {});
+                    finalScore = score;
+                    finalCorrect = correctAnswers;
+                    finalTotal = totalQuestions;
+                }
+            } catch (err) {
+                console.error("Failed to recalculate score on submit", err);
+            }
+        }
+
         if (student.resultId) {
             const { error: updateError } = await supabase
                 .from('results')
@@ -199,9 +220,9 @@ export class ResultService {
                     answers: resultPayload.answers || {}, 
                     status: resultPayload.status || 'in_progress',
                     activity_log: resultPayload.activityLog || [], 
-                    score: resultPayload.score || 0, 
-                    correct_answers: resultPayload.correctAnswers || 0,
-                    total_questions: resultPayload.totalQuestions || 0, 
+                    score: finalScore, 
+                    correct_answers: finalCorrect, 
+                    total_questions: finalTotal, 
                     location: resultPayload.location || null, 
                     updated_at: new Date().toISOString()
                 })
@@ -216,9 +237,9 @@ export class ResultService {
                 answers: resultPayload.answers || {}, 
                 status: resultPayload.status || 'in_progress',
                 activity_log: resultPayload.activityLog || [], 
-                score: resultPayload.score || 0, 
-                correct_answers: resultPayload.correctAnswers || 0,
-                total_questions: resultPayload.totalQuestions || 0, 
+                score: finalScore, 
+                correct_answers: finalCorrect, 
+                total_questions: finalTotal, 
                 location: resultPayload.location || null, 
                 updated_at: new Date().toISOString()
             }, { onConflict: 'exam_code,student_id' }).select('id').maybeSingle();
@@ -235,6 +256,9 @@ export class ResultService {
 
         return {
             ...resultPayload,
+            score: finalScore,
+            correctAnswers: finalCorrect,
+            totalQuestions: finalTotal,
             id: newId ? Number(newId) : undefined,
             student: {
                 ...resultPayload.student,

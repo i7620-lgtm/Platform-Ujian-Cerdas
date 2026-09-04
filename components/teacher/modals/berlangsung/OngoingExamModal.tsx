@@ -491,7 +491,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
 
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50/50 dark:bg-indigo-900/10 px-2 py-1 rounded">
-                                {r.score > 0 ? r.score : computedScore > 0 ? computedScore : r.score !== undefined ? r.score : 0}
+                                {Math.max(r.score || 0, computedScore || 0)}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
