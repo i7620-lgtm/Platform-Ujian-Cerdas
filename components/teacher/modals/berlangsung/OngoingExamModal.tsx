@@ -420,7 +420,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         const answeredCount = Object.keys(
                           r.answers || {},
                         ).filter((k) => !k.startsWith("_")).length;
-                        const computedScore = calculateScore(r);
+                        const computedScore = isReadOnly ? (r.score || 0) : calculateScore(r);
                         const isOnline = onlineStudents[r.student.studentId];
 
                         return (
