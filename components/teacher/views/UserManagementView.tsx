@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import type { AccountType } from "../../../types";
-import { UserIcon } from "../../Icons";
+import { UserIcon, StarIcon } from "../../Icons";
 import { useUserManagementView } from "../useUserManagementView";
+import { StudentFeedbackView } from "./StudentFeedbackView";
 
 export const UserManagementView: React.FC = () => {
+  const [activeSubTab, setActiveSubTab] = useState<"USERS" | "FEEDBACKS">("USERS");
+
   const {
     users,
     isLoading,
@@ -21,135 +24,178 @@ export const UserManagementView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <div className="p-2 bg-slate-800 rounded-lg text-white">
-          <UserIcon className="w-6 h-6" />
+      {/* Top Header & Sub-Tab Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-slate-900 dark:bg-slate-800 rounded-xl text-white shadow-sm">
+            {activeSubTab === "USERS" ? (
+              <UserIcon className="w-6 h-6" />
+            ) : (
+              <StarIcon className="w-6 h-6 fill-amber-400 text-amber-400" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+              {activeSubTab === "USERS"
+                ? "Kelola Pengguna & Sekolah"
+                : "Rekap Penilaian & Saran Siswa"}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              {activeSubTab === "USERS"
+                ? "Manajemen hak akses, role guru, dan penempatan sekolah."
+                : "Rekapan ulasan rating bintang (1-5) dan kritik saran langsung dari siswa."}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-neutral dark:text-white">
-            Kelola Pengguna
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">
-            Manajemen akses dan penempatan sekolah.
-          </p>
+
+        {/* Sub-Tab Buttons */}
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 self-start sm:self-auto">
+          <button
+            onClick={() => setActiveSubTab("USERS")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeSubTab === "USERS"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            <UserIcon className="w-4 h-4" />
+            <span>Pengguna ({users.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab("FEEDBACKS")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeSubTab === "FEEDBACKS"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            <StarIcon className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <span>Penilaian & Saran</span>
+          </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
-        <table className="w-full text-left min-w-[1000px]">
-          <thead className="bg-slate-50/50 dark:bg-slate-700/50">
-            <tr>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Nama / Email
-              </th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Aktivitas Guru
-              </th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Aktivitas Siswa
-              </th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Role & Sekolah
-              </th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-            {isLoading ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-6 py-10 text-center text-slate-400 dark:text-slate-500"
-                >
-                  Memuat data pengguna...
-                </td>
-              </tr>
-            ) : users.length > 0 ? (
-              users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30"
-                >
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                      {user.fullName}
-                    </div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      {user.email || "-"}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-slate-700 dark:text-slate-300">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        {user.stats?.questionsCount || 0}
-                      </span>{" "}
-                      Soal dibuat
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1">
-                      Waktu akses:{" "}
-                      {user.stats?.teacherAccessMins === "Tidak Tercatat"
-                        ? user.stats.teacherAccessMins
-                        : `~${user.stats?.teacherAccessMins} menit`}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-slate-700 dark:text-slate-300">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {user.stats?.uniqueStudents || 0}
-                      </span>{" "}
-                      Siswa mengejakan
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1">
-                      Total waktu:{" "}
-                      <span className="font-medium text-slate-700 dark:text-slate-300">
-                        {user.stats?.totalStudentTimeMins || 0}
-                      </span>{" "}
-                      menit
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1 items-start">
-                      <span
-                        className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                          user.accountType === "super_admin"
-                            ? "bg-slate-800 text-white"
-                            : user.accountType === "admin_sekolah"
-                              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
-                        }`}
-                      >
-                        {user.accountType.replace("_", " ")}
-                      </span>
-                      <span className="text-[10px] font-medium text-slate-500">
-                        {user.school}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => handleEditClick(user)}
-                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline"
-                    >
-                      Edit
-                    </button>
-                  </td>
+      {activeSubTab === "FEEDBACKS" ? (
+        <StudentFeedbackView />
+      ) : (
+        <>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left min-w-[1000px]">
+              <thead className="bg-slate-50/50 dark:bg-slate-700/50">
+                <tr>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Nama / Email
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Aktivitas Guru
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Aktivitas Siswa
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Role & Sekolah
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">
+                    Aksi
+                  </th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-6 py-10 text-center text-slate-400 dark:text-slate-500"
-                >
-                  Tidak ada pengguna ditemukan.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                {isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-10 text-center text-slate-400 dark:text-slate-500"
+                    >
+                      Memuat data pengguna...
+                    </td>
+                  </tr>
+                ) : users.length > 0 ? (
+                  users.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-slate-50/30 dark:hover:bg-slate-700/30"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                          {user.fullName}
+                        </div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                          {user.email || "-"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-slate-700 dark:text-slate-300">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
+                            {user.stats?.questionsCount || 0}
+                          </span>{" "}
+                          Soal dibuat
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">
+                          Waktu akses:{" "}
+                          {user.stats?.teacherAccessMins === "Tidak Tercatat"
+                            ? user.stats.teacherAccessMins
+                            : `~${user.stats?.teacherAccessMins} menit`}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-slate-700 dark:text-slate-300">
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            {user.stats?.uniqueStudents || 0}
+                          </span>{" "}
+                          Siswa mengerjakan
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">
+                          Total waktu:{" "}
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {user.stats?.totalStudentTimeMins || 0}
+                          </span>{" "}
+                          menit
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span
+                            className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                              user.accountType === "super_admin"
+                                ? "bg-slate-800 text-white"
+                                : user.accountType === "admin_sekolah"
+                                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+                            }`}
+                          >
+                            {user.accountType.replace("_", " ")}
+                          </span>
+                          <span className="text-[10px] font-medium text-slate-500">
+                            {user.school}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleEditClick(user)}
+                          className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-10 text-center text-slate-400 dark:text-slate-500"
+                    >
+                      Tidak ada pengguna ditemukan.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {editingUser && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
