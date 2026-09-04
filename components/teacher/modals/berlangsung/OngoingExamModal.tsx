@@ -46,6 +46,9 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     selectedSchool,
     statusFilter,
     localResults,
+    schoolScopedResults,
+    totalScopedCount,
+    classCounts,
     isRefreshing,
     isAddTimeOpen,
     addTimeValue,
@@ -146,7 +149,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                       : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                   }`}
                 >
-                  {localResults.length}
+                  {totalScopedCount}
                 </span>
                 <span>SEMUA</span>
               </button>
@@ -243,10 +246,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-xs shrink-0"
                 title="Filter Kelas"
               >
-                <option value="ALL">Semua Kelas ({localResults.length})</option>
+                <option value="ALL">
+                  Semua Kelas ({schoolScopedResults ? schoolScopedResults.length : localResults.length})
+                </option>
                 {uniqueClassesInResults.map((cl) => (
                   <option key={cl} value={cl}>
-                    {cl}
+                    {cl} ({classCounts[cl] || 0})
                   </option>
                 ))}
               </select>
@@ -343,6 +348,70 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                     {sortedResults.length > 0 ? (
                       sortedResults.map((r) => {
+                        const isPlaceholder = !!r.isPlaceholder || !r.student.fullName;
+                        const cleanClass = r.student.class
+                          ? r.student.class.includes("-")
+                            ? r.student.class
+                                .split("-")
+                                .pop()
+                                ?.replace(/\(\d+\)$/, "")
+                                .trim() || r.student.class
+                            : r.student.class.replace(/\(\d+\)$/, "").trim()
+                          : "-";
+
+                        if (isPlaceholder) {
+                          return (
+                            <tr
+                              key={r.student.studentId}
+                              className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors opacity-70 hover:opacity-100"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-400 dark:text-slate-500 text-xs">
+                                    {r.student.absentNumber}
+                                  </div>
+                                  <div>
+                                    <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic">
+                                      - Belum Ada Data Siswa -
+                                    </div>
+                                    <div className="text-[10px] text-slate-300 dark:text-slate-600 uppercase font-bold tracking-wider mt-0.5">
+                                      {r.student.schoolName || "-"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider bg-slate-50/60 dark:bg-slate-800/60 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-700/60">
+                                  {cleanClass || "-"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 rounded-lg text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700/60 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                                  <span>Belum Mengerjakan</span>
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="text-xs font-bold text-slate-300 dark:text-slate-600 font-mono">
+                                  -
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600">
+                                  -
+                                </span>
+                              </td>
+                              {!isReadOnly && (
+                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end pr-3 text-slate-300 dark:text-slate-600 text-xs font-bold">
+                                    -
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        }
+
                         const totalQuestions =
                           r.totalQuestions ||
                           displayExam.questions.filter(
@@ -353,15 +422,6 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                         ).filter((k) => !k.startsWith("_")).length;
                         const computedScore = calculateScore(r);
                         const isOnline = onlineStudents[r.student.studentId];
-                        const cleanClass = r.student.class
-                          ? r.student.class.includes("-")
-                            ? r.student.class
-                                .split("-")
-                                .pop()
-                                ?.replace(/\(\d+\)$/, "")
-                                .trim() || r.student.class
-                            : r.student.class.replace(/\(\d+\)$/, "").trim()
-                          : "-";
 
                         return (
                           <tr
@@ -542,7 +602,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </table>
               </div>
               <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex justify-between items-center sticky bottom-0">
-                <span>Total: {localResults.length} Siswa</span>
+                <span>Total: {totalScopedCount} Siswa</span>
                 <span>Updated: {new Date().toLocaleTimeString()}</span>
               </div>
             </div>
