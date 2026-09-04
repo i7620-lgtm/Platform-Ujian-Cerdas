@@ -685,19 +685,72 @@ export const analyzeStudentPerformance = (
     stats.length > 0 ? stats[stats.length - 1].percentage : 0;
 
   // 4. Generate Recommendation
-  const score = Number(result.score);
+  const totalQuestionsScored = Object.values(statsMap).reduce(
+    (acc, curr) => acc + curr.total,
+    0,
+  );
+  const totalCorrectScored = Object.values(statsMap).reduce(
+    (acc, curr) => acc + curr.correct,
+    0,
+  );
+  const calculatedScore =
+    totalQuestionsScored > 0
+      ? Math.round((totalCorrectScored / totalQuestionsScored) * 100)
+      : 0;
+
+  // Use result.score if valid (> 0), otherwise fallback to calculatedScore
+  const score =
+    typeof result.score === "number" && result.score > 0
+      ? result.score
+      : calculatedScore;
+
+  const rawKkm = exam.config?.kkm;
+  const kkm =
+    rawKkm !== undefined &&
+    rawKkm !== null &&
+    rawKkm !== "" &&
+    !isNaN(Number(rawKkm)) &&
+    Number(rawKkm) > 0
+      ? Number(rawKkm)
+      : null;
+
   let recommendation = "";
 
-  if (score < 60) {
-    recommendation =
-      "Perlu Remedial. Fokus ulangi materi dasar secara keseluruhan.";
-  } else if (score < 80) {
-    recommendation = `Cukup Baik. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`;
-  } else if (score < 95) {
-    recommendation = `Sangat Baik. Pertahankan prestasi dan bantu teman sebagai Tutor Sebaya.`;
+  if (kkm !== null) {
+    // Guru secara eksplisit mengatur KKM
+    if (score < kkm) {
+      recommendation = `Perlu Remedial. Nilai belum mencapai KKM (${kkm}). Fokus ulangi materi yang belum tuntas.`;
+    } else if (score >= 95) {
+      recommendation =
+        "Istimewa (Sempurna). Siap untuk materi pengayaan atau tingkat lanjut.";
+    } else if (score >= 80) {
+      recommendation =
+        "Sangat Baik. Pertahankan prestasi dan bantu teman sebagai Tutor Sebaya.";
+    } else {
+      recommendation =
+        weakestCategory && weakestScore < 100
+          ? `Tuntas KKM. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
+          : "Tuntas KKM. Terus pertahankan dan tingkatkan pemahaman materi.";
+    }
   } else {
-    recommendation =
-      "Istimewa (Perfect). Siap untuk materi pengayaan atau tingkat lanjut.";
+    // Guru TIDAK mengatur KKM -> Jangan tampilkan kata 'Perlu Remedial'
+    if (score >= 95) {
+      recommendation =
+        "Istimewa (Sempurna). Pemahaman materi sangat baik dan memuaskan.";
+    } else if (score >= 80) {
+      recommendation =
+        "Sangat Baik. Pertahankan prestasimu dan terus giat belajar.";
+    } else if (score >= 60) {
+      recommendation =
+        weakestCategory && weakestScore < 100
+          ? `Cukup Baik. Tingkatkan pemahaman pada materi "${weakestCategory}" (${weakestScore}%).`
+          : "Cukup Baik. Terus tingkatkan pemahaman materi.";
+    } else {
+      recommendation =
+        weakestCategory && weakestScore < 100
+          ? `Perlu Peningkatan. Fokus pelajari materi "${weakestCategory}" (${weakestScore}%) secara lebih mendalam.`
+          : "Perlu Peningkatan. Fokus ulangi dan pelajari materi dasar secara berkala.";
+    }
   }
 
   return { stats, weakestCategory, strongestCategory, recommendation };
@@ -2656,3 +2709,5 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
     alert("Terjadi kesalahan saat membuat dokumen soal.");
   }
 };
+
+export { calculateTimeLeft, type ExamTimeState } from "./timeUtils";
