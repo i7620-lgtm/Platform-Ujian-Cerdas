@@ -180,7 +180,7 @@ export const StudentFeedbackView: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2.5">
             <span>Rekapan Penilaian & Kritik Saran Siswa</span>
             <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-              {feedbacks.length} Masukan
+              {`${feedbacks.length} Masukan`}
             </span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -410,13 +410,6 @@ export const StudentFeedbackView: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                           {item.student_name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span>ID: {item.student_id}</span>
-                          <span>•</span>
-                          <span className="font-medium text-slate-600 dark:text-slate-400">
-                            {item.school_name || "-"}
-                          </span>
                         </div>
                         {item.exam_code && (
                           <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
