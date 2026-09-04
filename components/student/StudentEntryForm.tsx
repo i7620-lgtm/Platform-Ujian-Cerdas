@@ -513,16 +513,20 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
             id="modal-konfirmasi-data-diri-card"
             className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md relative animate-slide-in-up border border-white dark:border-slate-700"
           >
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 mb-4">
-              <UserIcon className="w-6 h-6" />
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 shadow-sm">
+                <UserIcon className="w-7 h-7" />
+              </div>
             </div>
-            <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">
-              Konfirmasi Data Diri
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-              Pastikan data di bawah ini adalah benar milik Anda sebelum memulai
-              ujian.
-            </p>
+            <div className="text-center mb-6">
+              <h3 className="font-black text-slate-800 dark:text-white text-xl mb-1 tracking-tight">
+                Konfirmasi Data Diri
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Pastikan data di bawah ini adalah benar milik Anda sebelum memulai
+                ujian.
+              </p>
+            </div>
 
             <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 space-y-4 mb-6">
               <div>
