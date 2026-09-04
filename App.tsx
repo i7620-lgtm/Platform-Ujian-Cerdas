@@ -815,6 +815,7 @@ const App: React.FC = () => {
                 student={currentStudent} 
                 initialData={resumedResult}
                 onSubmit={handleExamSubmit}
+                onBack={resetToHome}
                 isDarkMode={darkMode}
                 toggleTheme={toggleTheme}
             />
@@ -900,4 +901,4 @@ const App: React.FC = () => {
   );
 };
  
-export default App; 
+export default App;
