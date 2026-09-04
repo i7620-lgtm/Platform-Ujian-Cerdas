@@ -71,8 +71,8 @@ export const useOngoingExamModal = ({
       try {
         const data = await storageService.getResults(
           displayExam.code,
-          selectedClass === "ALL" ? "" : selectedClass,
-          selectedSchool === "ALL" ? "" : selectedSchool,
+          undefined,
+          undefined,
         );
         setLocalResults(data);
 
@@ -92,7 +92,7 @@ export const useOngoingExamModal = ({
         if (!silent) setIsRefreshing(false);
       }
     },
-    [displayExam?.code, selectedClass, selectedSchool],
+    [displayExam?.code],
   );
 
   useEffect(() => {
@@ -366,23 +366,246 @@ export const useOngoingExamModal = ({
     isPremium,
   ]);
 
+  const schoolScopedResults = useMemo(() => {
+    if (!selectedSchool || selectedSchool === "ALL") return localResults;
+    return localResults.filter((r) => r.student.schoolName === selectedSchool);
+  }, [localResults, selectedSchool]);
+
+  const uniqueClassesInResults = useMemo(() => {
+    const classes = new Set(
+      schoolScopedResults.map((r) => r.student.class || "Lainnya"),
+    );
+    if (displayExam?.config?.targetClasses) {
+      displayExam.config.targetClasses.forEach((tc) => {
+        const match = String(tc).match(/^(.+?)(?:\s*\(\s*(\d+)\s*\))?$/);
+        const raw = match ? match[1].trim() : String(tc).trim();
+        let cls = raw;
+        let sch = "";
+        const dashIdx = raw.indexOf("-");
+        if (dashIdx !== -1) {
+          sch = raw.substring(0, dashIdx).trim();
+          cls = raw.substring(dashIdx + 1).trim();
+        }
+        if (
+          !selectedSchool ||
+          selectedSchool === "ALL" ||
+          !sch ||
+          sch.toLowerCase() === selectedSchool.toLowerCase()
+        ) {
+          if (cls) classes.add(cls);
+        }
+      });
+    }
+    return Array.from(classes).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true }),
+    );
+  }, [schoolScopedResults, displayExam?.config?.targetClasses, selectedSchool]);
+
+  const uniqueSchoolsInResults = useMemo(() => {
+    const schools = new Set(
+      localResults.map((r) => r.student.schoolName || "Lainnya"),
+    );
+    return Array.from(schools).sort((a, b) => a.localeCompare(b, undefined));
+  }, [localResults]);
+
+  const classCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    schoolScopedResults.forEach((r) => {
+      const cl = r.student.class || "Lainnya";
+      counts[cl] = (counts[cl] || 0) + 1;
+    });
+    return counts;
+  }, [schoolScopedResults]);
+
+  const scopedResults = useMemo(() => {
+    if (!selectedClass || selectedClass === "ALL") return schoolScopedResults;
+    return schoolScopedResults.filter((r) => r.student.class === selectedClass);
+  }, [schoolScopedResults, selectedClass]);
+
+  const totalScopedCount = scopedResults.length;
+
   const sortedResults = useMemo(() => {
-    let filtered = [...localResults];
-    if (selectedSchool && selectedSchool !== "ALL") {
-      filtered = filtered.filter((r) => r.student.schoolName === selectedSchool);
-    }
-    if (selectedClass && selectedClass !== "ALL") {
-      filtered = filtered.filter((r) => r.student.class === selectedClass);
-    }
-    if (statusFilter === "LOCKED") {
-      filtered = filtered.filter((r) => r.status === "force_closed");
-    } else if (statusFilter === "ONLINE") {
-      filtered = filtered.filter((r) => r.status === "in_progress");
-    } else if (statusFilter === "COMPLETED") {
-      filtered = filtered.filter((r) => r.status === "completed");
+    if (statusFilter !== "ALL") {
+      let filtered = [...scopedResults];
+      if (statusFilter === "LOCKED") {
+        filtered = filtered.filter((r) => r.status === "force_closed");
+      } else if (statusFilter === "ONLINE") {
+        filtered = filtered.filter((r) => r.status === "in_progress");
+      } else if (statusFilter === "COMPLETED") {
+        filtered = filtered.filter((r) => r.status === "completed");
+      }
+
+      return filtered.sort((a, b) => {
+        const schoolA = a.student.schoolName || "";
+        const schoolB = b.student.schoolName || "";
+        const schoolCompare = schoolA.localeCompare(schoolB, undefined, {
+          sensitivity: "base",
+        });
+        if (schoolCompare !== 0) return schoolCompare;
+
+        const classA = a.student.class || "";
+        const classB = b.student.class || "";
+        const classCompare = classA.localeCompare(classB, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (classCompare !== 0) return classCompare;
+
+        const absA = parseInt(a.student.absentNumber) || 0;
+        const absB = parseInt(b.student.absentNumber) || 0;
+        return absA - absB;
+      });
     }
 
-    return filtered.sort((a, b) => {
+    const classGroups = new Map<
+      string,
+      { school: string; className: string; results: Result[] }
+    >();
+
+    if (selectedClass && selectedClass !== "ALL") {
+      const defaultSchool =
+        selectedSchool && selectedSchool !== "ALL"
+          ? selectedSchool
+          : scopedResults[0]?.student.schoolName || "";
+      const key = `${defaultSchool}:::${selectedClass}`;
+      classGroups.set(key, {
+        school: defaultSchool,
+        className: selectedClass,
+        results: [],
+      });
+    }
+
+    scopedResults.forEach((r) => {
+      const sch = r.student.schoolName || "";
+      const cls = r.student.class || "Lainnya";
+      const key = `${sch}:::${cls}`;
+      if (!classGroups.has(key)) {
+        classGroups.set(key, { school: sch, className: cls, results: [] });
+      }
+      classGroups.get(key)!.results.push(r);
+    });
+
+    const getConfiguredClassLimit = (
+      className: string,
+      schoolName: string,
+      targetClasses?: string[],
+    ): number | null => {
+      if (!targetClasses || targetClasses.length === 0) return null;
+
+      const cleanTargetClassName = className
+        .replace(/\(\d+\)$/, "")
+        .trim()
+        .toLowerCase();
+      const cleanSchool = (schoolName || "").trim().toLowerCase();
+
+      for (const tc of targetClasses) {
+        const match = String(tc).match(/^(.+?)(?:\s*\(\s*(\d+)\s*\))?$/);
+        if (match && match[2]) {
+          const limit = parseInt(match[2], 10);
+          if (!isNaN(limit) && limit > 0) {
+            const fullPrefix = match[1].trim();
+            let tcSchool = "";
+            let tcClass = fullPrefix;
+            const dashIdx = fullPrefix.indexOf("-");
+            if (dashIdx !== -1) {
+              tcSchool = fullPrefix.substring(0, dashIdx).trim().toLowerCase();
+              tcClass = fullPrefix.substring(dashIdx + 1).trim();
+            }
+            const cleanTcClass = tcClass.toLowerCase();
+
+            const isClassMatch =
+              cleanTcClass === cleanTargetClassName ||
+              cleanTargetClassName.endsWith(cleanTcClass) ||
+              cleanTcClass.endsWith(cleanTargetClassName);
+
+            const isSchoolMatch =
+              !tcSchool ||
+              !cleanSchool ||
+              tcSchool === cleanSchool ||
+              cleanSchool.includes(tcSchool) ||
+              tcSchool.includes(cleanSchool);
+
+            if (isClassMatch && isSchoolMatch) {
+              return limit;
+            }
+          }
+        }
+      }
+
+      return null;
+    };
+
+    const finalResults: Result[] = [];
+
+    classGroups.forEach((group) => {
+      const { school, className, results } = group;
+
+      const numericAbsents = results
+        .map((r) => parseInt(r.student.absentNumber, 10))
+        .filter((n) => !isNaN(n) && n > 0);
+
+      const nonNumericResults = results.filter(
+        (r) =>
+          isNaN(parseInt(r.student.absentNumber, 10)) ||
+          parseInt(r.student.absentNumber, 10) <= 0,
+      );
+
+      const configuredLimit = getConfiguredClassLimit(
+        className,
+        school,
+        displayExam?.config?.targetClasses,
+      );
+
+      const maxSubmittedAbsent =
+        numericAbsents.length > 0 ? Math.max(...numericAbsents) : 0;
+
+      const maxAbsent =
+        configuredLimit !== null && configuredLimit > 0
+          ? Math.max(configuredLimit, maxSubmittedAbsent)
+          : maxSubmittedAbsent;
+
+      if (maxAbsent > 0) {
+        const absentMap = new Map<number, Result[]>();
+        results.forEach((r) => {
+          const num = parseInt(r.student.absentNumber, 10);
+          if (!isNaN(num) && num > 0) {
+            if (!absentMap.has(num)) absentMap.set(num, []);
+            absentMap.get(num)!.push(r);
+          }
+        });
+
+        for (let i = 1; i <= maxAbsent; i++) {
+          const existing = absentMap.get(i);
+          if (existing && existing.length > 0) {
+            finalResults.push(...existing);
+          } else {
+            finalResults.push({
+              id: undefined,
+              isPlaceholder: true,
+              student: {
+                studentId: `placeholder-${className}-${i}`,
+                fullName: "",
+                schoolName: school,
+                class: className,
+                absentNumber: String(i),
+              },
+              examCode: displayExam?.code || "",
+              answers: {},
+              score: 0,
+              totalQuestions: 0,
+              correctAnswers: 0,
+              status: undefined,
+            });
+          }
+        }
+      } else {
+        finalResults.push(...results);
+      }
+
+      finalResults.push(...nonNumericResults);
+    });
+
+    return finalResults.sort((a, b) => {
       const schoolA = a.student.schoolName || "";
       const schoolB = b.student.schoolName || "";
       const schoolCompare = schoolA.localeCompare(schoolB, undefined, {
@@ -402,23 +625,7 @@ export const useOngoingExamModal = ({
       const absB = parseInt(b.student.absentNumber) || 0;
       return absA - absB;
     });
-  }, [localResults, statusFilter, selectedSchool, selectedClass]);
-
-  const uniqueClassesInResults = useMemo(() => {
-    const classes = new Set(
-      localResults.map((r) => r.student.class || "Lainnya"),
-    );
-    return Array.from(classes).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true }),
-    );
-  }, [localResults]);
-
-  const uniqueSchoolsInResults = useMemo(() => {
-    const schools = new Set(
-      localResults.map((r) => r.student.schoolName || "Lainnya"),
-    );
-    return Array.from(schools).sort((a, b) => a.localeCompare(b, undefined));
-  }, [localResults]);
+  }, [scopedResults, statusFilter, selectedClass, selectedSchool, displayExam?.code, displayExam?.config?.targetClasses]);
 
   const handleGenerateToken = async (
     studentId: string,
@@ -654,16 +861,16 @@ export const useOngoingExamModal = ({
   const isLargeScale = !!displayExam?.config?.disableRealtime;
 
   const lockedCount = useMemo(
-    () => localResults.filter((r) => r.status === "force_closed").length,
-    [localResults],
+    () => scopedResults.filter((r) => r.status === "force_closed").length,
+    [scopedResults],
   );
   const onlineCount = useMemo(
-    () => localResults.filter((r) => r.status === "in_progress").length,
-    [localResults],
+    () => scopedResults.filter((r) => r.status === "in_progress").length,
+    [scopedResults],
   );
   const completedCount = useMemo(
-    () => localResults.filter((r) => r.status === "completed").length,
-    [localResults],
+    () => scopedResults.filter((r) => r.status === "completed").length,
+    [scopedResults],
   );
 
   return {
@@ -673,6 +880,10 @@ export const useOngoingExamModal = ({
     selectedSchool,
     statusFilter,
     localResults,
+    schoolScopedResults,
+    scopedResults,
+    totalScopedCount,
+    classCounts,
     isRefreshing,
     isAddTimeOpen,
     addTimeValue,
