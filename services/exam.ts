@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { authService } from './auth';
 import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '../types';
-import { compressImage, calculateExamScore, cleanupQuestionContent } from '../components/teacher/examUtils';
+import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
 
 // Helper: Get file extension safely from data URI
 const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
@@ -538,7 +538,14 @@ export class ExamService {
                 q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
             }
             if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
+                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                    const parsed = parseList(q.correctAnswer, q.options);
+                    q.correctAnswer = JSON.stringify(
+                        (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
+                    );
+                } else {
+                    q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
+                }
             }
 
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
@@ -555,7 +562,7 @@ export class ExamService {
             }
 
             if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
-                 try {
+                try {
                     const blob = base64ToBlob(q.audioUrl);
                     const ext = getExtFromDataUrl(q.audioUrl, 'mp3');
                     const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
@@ -720,7 +727,14 @@ export class ExamService {
                 q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
             }
             if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-                q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
+                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') {
+                    const parsed = parseList(q.correctAnswer, q.options);
+                    q.correctAnswer = JSON.stringify(
+                        (parsed || []).map((opt: string) => this.sanitizeHtmlString(opt))
+                    );
+                } else {
+                    q.correctAnswer = this.sanitizeHtmlString(q.correctAnswer);
+                }
             }
 
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
