@@ -3,18 +3,86 @@ import { authService } from './auth';
 import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore, cleanupQuestionContent } from '../components/teacher/examUtils';
 
-// Helper: Convert Base64 to Blob for Upload
-const base64ToBlob = (base64: string): Blob => {
-    const arr = base64.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
+// Helper: Get file extension safely from data URI
+const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
+    if (!dataUrl) return defaultExt;
+    const mimeMatch = dataUrl.match(/^data:([^;,]+)/);
+    if (!mimeMatch) return defaultExt;
+    const mime = mimeMatch[1].toLowerCase();
+    if (mime.includes('svg')) return 'svg';
+    if (mime.includes('png')) return 'png';
+    if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+    if (mime.includes('webp')) return 'webp';
+    if (mime.includes('gif')) return 'gif';
+    if (mime.includes('mp3') || mime.includes('mpeg')) return 'mp3';
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('ogg')) return 'ogg';
+    const sub = mime.split('/')[1];
+    return sub ? sub.replace(/[^a-zA-Z0-9]/g, '') : defaultExt;
+};
+
+// Helper: Convert Data URI (Base64, UTF-8 SVG, etc.) to Blob for Upload
+const base64ToBlob = (dataUrl: string): Blob => {
+    if (!dataUrl || typeof dataUrl !== 'string') {
+        return new Blob([], { type: 'application/octet-stream' });
     }
-    return new Blob([u8arr], { type: mime });
+
+    const commaIndex = dataUrl.indexOf(',');
+    const header = commaIndex !== -1 ? dataUrl.slice(0, commaIndex) : '';
+    let content = commaIndex !== -1 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+
+    const mimeMatch = header.match(/^data:([^;,]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : (header.includes('image') ? 'image/png' : 'application/octet-stream');
+    const isBase64 = header.toLowerCase().includes(';base64') || commaIndex === -1;
+
+    // If content contains URL encoding (like %20, %2B, %3D), decode it first
+    if (content.includes('%')) {
+        try {
+            content = decodeURIComponent(content);
+        } catch {
+            // Keep original content if decode fails
+        }
+    }
+
+    if (isBase64) {
+        try {
+            // Strip whitespace, newlines, and convert URL-safe base64
+            let cleanB64 = content.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+            // Filter to only valid base64 characters
+            cleanB64 = cleanB64.replace(/[^A-Za-z0-9+/=]/g, '');
+            // Remove any trailing padding characters to correctly re-pad
+            cleanB64 = cleanB64.replace(/=+$/, '');
+            
+            // Correct length modulo 4
+            const remainder = cleanB64.length % 4;
+            if (remainder === 2) {
+                cleanB64 += '==';
+            } else if (remainder === 3) {
+                cleanB64 += '=';
+            } else if (remainder === 1) {
+                cleanB64 = cleanB64.slice(0, -1);
+            }
+
+            if (cleanB64.length > 0) {
+                const bstr = atob(cleanB64);
+                const u8arr = new Uint8Array(bstr.length);
+                for (let i = 0; i < bstr.length; i++) {
+                    u8arr[i] = bstr.charCodeAt(i);
+                }
+                return new Blob([u8arr], { type: mime });
+            }
+        } catch (e) {
+            console.warn("Gagal atob base64, mencoba alternatif decodeURIComponent:", e);
+        }
+    }
+
+    // Handle non-base64 or failed base64 data URIs (e.g. data:image/svg+xml;utf8,... or percent-encoded data URLs)
+    try {
+        const decoded = decodeURIComponent(content);
+        return new Blob([decoded], { type: mime });
+    } catch {
+        return new Blob([content], { type: mime });
+    }
 };
 
 // Helper: Convert URL to Base64 for Archiving
@@ -419,7 +487,7 @@ export class ExamService {
                 if (src && src.startsWith('data:image')) {
                     try {
                         const blob = base64ToBlob(src);
-                        const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                        const ext = getExtFromDataUrl(src, 'png');
                         const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
                         const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                         if (data) {
@@ -438,7 +506,7 @@ export class ExamService {
                 if (src && src.startsWith('data:audio')) {
                     try {
                         const blob = base64ToBlob(src);
-                        const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                        const ext = getExtFromDataUrl(src, 'mp3');
                         const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
                         const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                         if (data) {
@@ -476,8 +544,7 @@ export class ExamService {
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
                 try {
                     const blob = base64ToBlob(q.imageUrl);
-                    const mime = q.imageUrl.substring(5, q.imageUrl.indexOf(';'));
-                    const ext = mime.split('/')[1] || 'png';
+                    const ext = getExtFromDataUrl(q.imageUrl, 'png');
                     const filename = `${examCode}/${q.id}_img_${Date.now()}.${ext}`;
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                     if (data) {
@@ -490,8 +557,7 @@ export class ExamService {
             if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
                  try {
                     const blob = base64ToBlob(q.audioUrl);
-                    const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
-                    const ext = mime.split('/')[1] || 'mp3';
+                    const ext = getExtFromDataUrl(q.audioUrl, 'mp3');
                     const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
                     
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
@@ -603,7 +669,7 @@ export class ExamService {
                 if (src && src.startsWith('data:image')) {
                     try {
                         const blob = base64ToBlob(src);
-                        const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                        const ext = getExtFromDataUrl(src, 'png');
                         const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
                         const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                         if (data) {
@@ -622,7 +688,7 @@ export class ExamService {
                 if (src && src.startsWith('data:audio')) {
                     try {
                         const blob = base64ToBlob(src);
-                        const ext = src.substring(src.indexOf('/') + 1, src.indexOf(';'));
+                        const ext = getExtFromDataUrl(src, 'mp3');
                         const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
                         const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                         if (data) {
@@ -660,8 +726,7 @@ export class ExamService {
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
                 try {
                     const blob = base64ToBlob(q.imageUrl);
-                    const mime = q.imageUrl.substring(5, q.imageUrl.indexOf(';'));
-                    const ext = mime.split('/')[1] || 'png';
+                    const ext = getExtFromDataUrl(q.imageUrl, 'png');
                     const filename = `${examCode}/${q.id}_img_${Date.now()}.${ext}`;
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
                     if (data) {
@@ -674,8 +739,7 @@ export class ExamService {
             if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
                  try {
                     const blob = base64ToBlob(q.audioUrl);
-                    const mime = q.audioUrl.substring(5, q.audioUrl.indexOf(';'));
-                    const ext = mime.split('/')[1] || 'mp3';
+                    const ext = getExtFromDataUrl(q.audioUrl, 'mp3');
                     const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
                     
                     const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });

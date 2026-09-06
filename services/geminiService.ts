@@ -2,6 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
 import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum } from "../components/teacher/geometryUtils";
+import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
+import { generateContextualEducationalSvg } from "./smartSvgTemplates";
+import { generateSmartFallbackQuestions } from "./smartFallbackGenerator";
+import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
 
 export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
     const selectedTypes: string[] = (config.types && config.types.length > 0)
@@ -61,7 +65,13 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
       * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie/venn/relation).
-      ${config.includeImages ? `* STIMULUS GAMBAR / ILUSTRASI (FITUR AKTIF): Karena fitur gambar aktif, Anda WAJIB mengisi property 'imageSearchKeyword' untuk butir soal yang membutuhkan stimulus visual, ilustrasi materi, foto benda nyata, peta/lingkungan, atau tokoh sejarah. Tuliskan 1-2 kata kunci pencarian dalam BAHASA INGGRIS (contoh: "borobudur temple" atau "rafflesia arnoldii"). JANGAN menuliskan tag <img> ke dalam questionText karena sistem akan otomatis mencari gambar dari Wikimedia berdasarkan 'imageSearchKeyword' di atas soal.` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
+      ${config.includeImages ? `* STRATEGI MEMILIH CARA TERBAIK STIMULUS SOAL (FITUR GAMBAR & REPRESENTATIF AKTIF):
+        Anda WAJIB memilih satu cara representasi TERBAIK untuk stimulus setiap butir soal sesuai materi yang diuji:
+        1. Cara 'geometry' (Bangun Geometri Matematis): Gunakan tag [GEOMETRY:shape_name:{...}] jika butir soal menguji bangun datar/ruang/gabungan dengan dimensi angka spesifik (cm, m). Set 'visualStimulusType': "geometry".
+        2. Cara 'chart' (Diagram Statistik & Hubungan): Gunakan tag [CHART] dan isi 'chartData' jika butir soal menguji data statistik (batang/garis/lingkaran), relasi/fungsi, diagram venn, atau kurva/titik koordinat kartesius. Set 'visualStimulusType': "chart".
+        3. Cara 'table' (Tabel Markdown): Gunakan tabel data terstruktur Markdown untuk daftar frekuensi nilai, jadwal, atau perbandingan tekstual. Set 'visualStimulusType': "table".
+        4. Cara 'wikimedia_photo' (Foto Otentik Nyata): Gunakan jika soal membutuhkan foto riil sejarah/tokoh pahlawan (Soekarno, Cut Nyak Dien), candi/monumen nyata (Borobudur, Prambanan, Monas), atau flora/fauna endemik nyata (Komodo, Rafflesia). Tuliskan 1-2 kata kunci bahasa Inggris pada 'imageSearchKeyword'. Set 'visualStimulusType': "wikimedia_photo".
+        5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk seluruh konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), peta/denah konseptual, bagan alur proses (flowchart), infografis materi, atau ilustrasi kontekstual. Tuliskan deskripsi gambar ilmiah yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("infographic", "diagram", "flowchart", "geometry", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
     - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3.
@@ -96,9 +106,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     
     STIMULUS VISUAL & GAMBAR REPRESENTATIF (TKA KEMENDIKDASMEN):
     - Soal asesmen TKA mengedepankan stimulus kontekstual yang kaya visual (grafik, denah, diagram, foto/ilustrasi benda nyata).
-    - Geometri & Bangun: Gunakan tag [GEOMETRY:shape_name:{...}] dengan label dimensi presisi untuk menampilkan bangun datar/ruang.
-    - Data & Statistik: Gunakan 'chartData' dan tag [CHART] untuk menampilkan diagram batang/garis/lingkaran/venn.
-    - Sains / IPA / IPS / Tematik / Kehidupan Sehari-hari / Literasi: ${config.includeImages ? `Fitur gambar aktif! Anda WAJIB mengisi property 'imageSearchKeyword' dengan 1-2 kata kunci bahasa Inggris yang spesifik (contoh: "food web").` : `Fitur gambar dinonaktifkan.`}
+    - Pilih cara terbaik: 'geometry' (bangun geometri [GEOMETRY:...]), 'chart' (grafik data statistik [CHART]), 'table' (tabel data), 'wikimedia_photo' (foto nyata sejarah/tokoh), atau 'ai_svg' (gambar vektor SVG otomatis untuk sains/siklus/organ/proses/infografis).
+    - ${config.includeImages ? `Fitur gambar aktif! Untuk konsep sains, proses, siklus, biologi, atau infografis, WAJIB isi 'svgPrompt' dan pilih 'svgStyle' (ai_svg). Untuk foto nyata tokoh/candi, isi 'imageSearchKeyword'.` : `Fitur gambar dinonaktifkan.`}
     
     RESPON:
     - Berikan respon dalam format JSON array.
@@ -193,10 +202,24 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       description: "Pasangan untuk soal Menjodohkan"
     },
     chartData: chartDataSchema,
+    visualStimulusType: {
+      type: Type.STRING,
+      enum: ["none", "geometry", "chart", "table", "wikimedia_photo", "ai_svg"],
+      description: "Cara stimulus visual terbaik untuk butir soal ini: 'geometry' (bangun ruang/datar), 'chart' (grafik data), 'table' (tabel data), 'wikimedia_photo' (foto pahlawan/tempat bersejarah nyata), atau 'ai_svg' (diagram sains, siklus, organ, infografis konsep, ilustrasi materi)."
+    },
+    svgPrompt: {
+      type: Type.STRING,
+      description: "Deskripsi detail visual jika visualStimulusType = 'ai_svg' untuk digambar oleh Generator Gambar AI secara otomatis (contoh: 'Bagan daur siklus air lengkap dengan proses evaporasi, kondensasi, presipitasi, dan infiltrasi')."
+    },
+    svgStyle: {
+      type: Type.STRING,
+      enum: ["infographic", "diagram", "flowchart", "geometry", "flat_art"],
+      description: "Gaya diagram SVG yang diinginkan: 'infographic', 'diagram', 'flowchart', 'geometry', atau 'flat_art'."
+    },
     imageSearchKeyword: { 
       type: Type.STRING, 
       description: config.includeImages 
-        ? "1-2 kata kunci bahasa Inggris spesifik untuk pencarian foto referensi di Wikimedia (contoh: 'solar eclipse', 'borobudur temple', 'mitochondria')." 
+        ? "1-2 kata kunci bahasa Inggris spesifik untuk pencarian foto referensi di Wikimedia jika visualStimulusType = 'wikimedia_photo' (contoh: 'borobudur temple', 'komodo dragon', 'soekarno')." 
         : "FITUR GAMBAR NONAKTIF. Abaikan field ini." 
     }
   };
@@ -207,9 +230,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
   
   const isLevel6 = combinedText.includes('C6') || combinedText.includes('LEVEL 6');
   
-  let modelsToTry: string[] = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
+  let modelsToTry: string[] = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
   if (isLevel6) {
-      modelsToTry = ['gemini-3.7-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+      modelsToTry = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
   }
 
   const replaceGeometryPlaceholders = (text: string) => {
@@ -226,12 +249,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       });
   };
 
-  const replaceChartPlaceholders = (text: string, hasChart: boolean) => {
-      if (!text || !hasChart) return text;
+  const replaceChartPlaceholders = (text: string, _hasChart?: boolean) => {
+      if (!text) return text;
       const CHART_PLACEHOLDER_HTML = `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
       
-      if (/\\?\[(CHART|DIAGRAM|GAMBAR).*?\\?\]/i.test(text)) {
-          return text.replace(/\\?\[(CHART|DIAGRAM|GAMBAR).*?\\?\]/gi, CHART_PLACEHOLDER_HTML);
+      if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(text)) {
+          return text.replace(/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/gi, CHART_PLACEHOLDER_HTML);
       }
       return text;
   };
@@ -286,30 +309,18 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       4. WAJIB mengisi 'category' dengan sub-topik / domain materi spesifik butir soal tersebut.
       5. Pastikan kunci jawaban ('correctAnswer') 100% akurat dan dibuktikan melalui 'explanation'.
       ${config.includeImages ? `
-      6. WAJIB STIMULUS GAMBAR:
-         - Fitur 'Sertakan Gambar' AKTIF (includeImages=true).
-         - Untuk butir soal yang TIDAK menggunakan geometri [GEOMETRY:...] atau grafik data 'chartData', Anda WAJIB MENGISI field 'imageSearchKeyword' dengan kata kunci bahasa Inggris (contoh: "volcano eruption").
-         - Gambar referensi asli akan otomatis dicarikan dari Wikimedia dan disisipkan di atas soal oleh sistem.
+      6. STIMULUS REPRESENTATIF TERBAIK (includeImages=true):
+         - Fitur 'Sertakan Gambar, Geometri Bangun & Diagram Representatif' AKTIF.
+         - Analisis materi soal dan tentukan CARA TERBAIK:
+           * Geometri bangun datar/ruang/gabungan berdimensi angka? Pilih 'geometry' dan sertakan tag [GEOMETRY:...].
+           * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'.
+           * Tabel data terstruktur / daftar frekuensi? Pilih 'table' (tabel Markdown murni).
+           * Foto pahlawan/tempat/monumen/spesies otentik nyata? Pilih 'wikimedia_photo' dan isi 'imageSearchKeyword'.
+           * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'. Generator Gambar AI akan langsung menggambar vektor SVG tajam stimulus tersebut secara otomatis!
       ` : ''}
     `;
 
-    const res = await fetch("/api/generate-questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry, properties })
-    });
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-        const rawHtml = await res.text();
-        console.error("Non-JSON response from server:", rawHtml.slice(0, 300));
-        throw new Error("Server mengembalikan respons non-JSON. Silakan coba sesaat lagi.");
-    }
-    const data = await res.json();
-    if (!data.success) {
-        throw new Error(data.error || "Failed to generate questions");
-    }
-
-    const questions: {
+    let questions: {
       id: string;
       questionType?: string;
       questionText: string;
@@ -327,7 +338,38 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       category?: string;
       imagePrompt?: string;
       imageSearchKeyword?: string;
-    }[] = JSON.parse(data.text || "[]");
+    }[] = [];
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+      const res = await fetch("/api/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry, properties }),
+          signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+          const rawHtml = await res.text();
+          console.error("Non-JSON response from server:", rawHtml.slice(0, 300));
+          throw new Error("Server mengembalikan respons non-JSON. Safe Fallback diaktifkan.");
+      }
+      const data = await res.json();
+      if (!data.success) {
+          throw new Error(data.error || "Failed to generate questions");
+      }
+      questions = JSON.parse(data.text || "[]");
+    } catch (batchErr: any) {
+      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, batchErr?.message);
+      return generateSmartFallbackQuestions({
+        ...config,
+        count: batchCount,
+      }, batchErr?.message || "Safe Fallback Aktif");
+    }
 
     const batchQuestions: Question[] = questions.map((q, index) => {
         const globalIndex = startIndex + index;
@@ -560,16 +602,94 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         const batchResults = await generateSingleBatch(offset, batchCount);
         results.push(batchResults);
       } catch (err: any) {
-        console.error("Batch error at offset", offset, ":", err);
-        throw err;
+        console.warn("[Safe Fallback] Batch error at offset", offset, ":", err?.message);
+        results.push(generateSmartFallbackQuestions({ ...config, count: batchCount }, err?.message));
       }
     }
 
-    const finalQuestions: Question[] = results.flat();
+    let finalQuestions: Question[] = results.flat();
+    if (finalQuestions.length === 0) {
+      finalQuestions = generateSmartFallbackQuestions(config, "Inisialisasi Safe Fallback");
+    }
 
-    // Process AI Educational Images and fallback
-    for (const q of finalQuestions) {
-      if (config.includeImages) {
+    // Process AI Educational Images, Geometry, Charts & Automatic SVG Generator
+    if (config.includeImages) {
+      // Phase 1: Collect questions needing automatic AI SVG generation
+      const svgTasks: Array<{ q: Question; prompt: string; style: string; hasInlineTag: boolean }> = [];
+
+      for (const q of finalQuestions) {
+        const text = q.questionText || '';
+        const hasGeometry = text.includes('[GEOMETRY:') || text.includes('class="geometry-shape"');
+        const hasChart = !!q.chartData || text.includes('[CHART]') || text.includes('chart-placeholder');
+        const hasExistingImg = text.includes('<img') || !!q.imageUrl;
+
+        const aiSvgMatch = /\\?\[\s*ai_svg(?::\s*([^\]]*))?\s*\\?\]/i.exec(text);
+        const hasInlineTag = !!aiSvgMatch;
+
+        if (hasGeometry || hasChart) {
+          continue;
+        }
+
+        const tagPrompt = aiSvgMatch ? aiSvgMatch[1]?.trim() : '';
+        const explicitSvgPrompt = (q as any).svgPrompt?.trim();
+        const svgStyle = (q as any).svgStyle || "diagram";
+
+        let finalPrompt = tagPrompt || explicitSvgPrompt;
+
+        if (!finalPrompt) {
+          const textRefersToVisual = /(perhatikan|berdasarkan|pada|amati)\s+(gambar|diagram|bagan|ilustrasi|grafik|skema|infografis)/i.test(text);
+          if (hasInlineTag || (q as any).visualStimulusType === "ai_svg" || (textRefersToVisual && !(q as any).imageSearchKeyword && !hasExistingImg)) {
+            finalPrompt = `Diagram ilmiah materi ${q.category || config.subject}: ${q.kisiKisi || text.replace(/<[^>]+>/g, '').replace(/\[ai_svg[^\]]*\]/gi, '').slice(0, 100)}`;
+          }
+        }
+
+        if (finalPrompt) {
+          svgTasks.push({ q, prompt: finalPrompt, style: svgStyle, hasInlineTag });
+        }
+      }
+
+      // Execute SVG generation for all detected tasks with guaranteed fallback
+      if (svgTasks.length > 0) {
+        for (const { q, prompt, style, hasInlineTag } of svgTasks) {
+          try {
+            let svgCode = "";
+            try {
+              svgCode = await generateEducationalSvg(prompt, style);
+            } catch (apiErr) {
+              console.warn("Gagal membuat SVG via API, beralih ke template edukatif terverifikasi:", apiErr);
+            }
+
+            if (!svgCode || !svgCode.includes('<svg')) {
+              svgCode = generateContextualEducationalSvg(prompt, style);
+            }
+
+            if (svgCode && svgCode.includes('<svg')) {
+              const dataUrl = svgToDataUrl(svgCode);
+              const cleanCaption = prompt.length > 60 ? prompt.slice(0, 57) + "..." : prompt;
+              const imgHtml = `
+<p style="text-align: center; margin-bottom: 16px;">
+  <img src="${dataUrl}" alt="${cleanCaption}" loading="lazy" style="max-width: 100%; max-height: 420px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: inline-block; margin: 0 auto; border: 1px solid #e2e8f0;" /><br/>
+  <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: inline-block;">
+    📐 Stimulus Vektor AI: ${cleanCaption}
+  </span>
+</p>`;
+              if (hasInlineTag && q.questionText) {
+                q.questionText = q.questionText.replace(/\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]/gi, imgHtml);
+              } else {
+                q.questionText = imgHtml + (q.questionText || '');
+              }
+              q.imageUrl = dataUrl;
+              q.imagePrompt = prompt;
+            }
+          } catch (svgErr) {
+            console.error("Catatan stimulus gambar SVG:", svgErr);
+          }
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+
+      // Phase 2: Wikimedia image search for remaining questions with imageSearchKeyword
+      for (const q of finalQuestions) {
         const hasGeometry = q.questionText?.includes('[GEOMETRY:') || q.questionText?.includes('class="geometry-shape"');
         const hasChart = !!q.chartData || q.questionText?.includes('[CHART]') || q.questionText?.includes('chart-placeholder');
         const hasExistingImg = q.questionText?.includes('<img') || !!q.imageUrl;
@@ -610,16 +730,32 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           }
         }
       }
+
+      // Bersihkan seluruh sisa tag [ai_svg] jika masih tertinggal
+      for (const q of finalQuestions) {
+        if (q.questionText) {
+          q.questionText = q.questionText.replace(/\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]/gi, '').trim();
+        }
+        if (q.options) {
+          q.options = q.options.map(opt => (opt || '').replace(/\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]/gi, '').trim());
+        }
+      }
+    } else {
+      // Jika fitur gambar dimatikan, hapus seluruh tag [ai_svg] yang dihasilkan AI
+      for (const q of finalQuestions) {
+        if (q.questionText) {
+          q.questionText = q.questionText.replace(/\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]/gi, '').trim();
+        }
+        if (q.options) {
+          q.options = q.options.map(opt => (opt || '').replace(/\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]/gi, '').trim());
+        }
+      }
     }
 
-    return finalQuestions;
+    return repairQuestionCharts(finalQuestions);
   } catch (error) {
-    console.error("Failed to generate questions:", error);
-    const err = error as Error;
-    const msg = err?.message || "";
-    if (msg.includes("QUOTA_EXCEEDED") || msg.includes("Deadline Exceeded") || msg.includes("504") || msg.includes("timeout")) {
-      throw err;
-    }
-    throw new Error(msg || "Gagal memproses pembuatan soal dari AI. Silakan coba lagi.");
+    console.warn("[Safe Fallback] Mengaktifkan kurikulum fallback darurat:", error);
+    const fallbackQuestions = generateSmartFallbackQuestions(config, (error as Error)?.message || "Safe Fallback Aktif");
+    return repairQuestionCharts(fallbackQuestions);
   }
 }
