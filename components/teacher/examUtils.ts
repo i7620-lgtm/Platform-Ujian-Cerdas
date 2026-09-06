@@ -1769,7 +1769,8 @@ export const sanitizeHtml = (html: string): string => {
     wrapper.appendChild(table);
   });
 
-  return doc.body.innerHTML;
+  const result = doc.body.innerHTML;
+  return result.replace(/(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi, "");
 };
 
 // --- MARKDOWN CONVERTER ---
@@ -2071,7 +2072,13 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
     let chartScripts = "";
 
     const injectChart = (chartData: ChartData | undefined | null, html: string): string => {
-      let processedHtml = html;
+      let processedHtml = html || "";
+      if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(processedHtml)) {
+        processedHtml = processedHtml.replace(
+          /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+          '<span class="chart-placeholder" data-chart="true"></span>'
+        );
+      }
       if (chartData) {
         chartCounter++;
         const canvasId = `pdf-chart-${chartCounter}`;
