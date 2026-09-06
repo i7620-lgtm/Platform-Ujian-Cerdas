@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ChartData } from "../../types";
 import {
@@ -295,17 +295,24 @@ export const WysiwygEditor: React.FC<{
   } = state;
 
   const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
+  const lastValueRef = useRef(value);
 
   useEffect(() => {
     if (editorRef.current) {
       const isFocused = document.activeElement === editorRef.current;
       const currentHtml = editorRef.current.innerHTML;
+      const propChangedExternally = value !== lastValueRef.current;
+      lastValueRef.current = value;
 
       if (value !== currentHtml) {
-        if (!isFocused || !currentHtml || currentHtml === "<p><br></p>") {
-          let newHtml = value;
-          if (chartData && !newHtml.includes('data-chart="true"')) {
-            newHtml += `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
+        if (propChangedExternally || !isFocused || !currentHtml || currentHtml === "<p><br></p>") {
+          let newHtml = value || "";
+          const CHART_PLACEHOLDER = `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
+          
+          if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(newHtml)) {
+            newHtml = newHtml.replace(/(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi, CHART_PLACEHOLDER);
+          } else if (chartData && !newHtml.includes('data-chart="true"')) {
+            newHtml += CHART_PLACEHOLDER;
           }
           editorRef.current.innerHTML = newHtml;
         }
@@ -316,11 +323,13 @@ export const WysiwygEditor: React.FC<{
   useEffect(() => {
     if (editorRef.current) {
       const node = editorRef.current.querySelector('[data-chart="true"]');
-      if (node && chartData) {
+      if (node) {
         const textSpan = node.querySelector(
           ".chart-placeholder-text",
         ) as HTMLElement;
-        if (textSpan) textSpan.style.display = "none";
+        if (textSpan) {
+          textSpan.style.display = chartData ? "none" : "block";
+        }
       }
       setChartNode(node as HTMLElement);
     }

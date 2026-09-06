@@ -231,7 +231,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
             className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded text-xs font-bold hover:from-purple-600 hover:to-indigo-700 shadow-sm transition-all whitespace-nowrap"
             title="Generate Gambar Stimulus dengan AI Gratis"
           >
-            <Sparkles className="w-3.5 h-3.5" /> AI Gambar
+            <Sparkles className="w-3.5 h-3.5" /> Gambar AI
           </button>
         )}
         <button

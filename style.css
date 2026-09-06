@@ -481,67 +481,128 @@
   margin-bottom: 0.5rem;
 }
 
-/* --- Student Exam Font Sizing (Cascading) --- */
-.exam-content-small .prose,
-.exam-content-small .prose p,
-.exam-content-small .prose li,
-.exam-content-small .prose td,
-.exam-content-small .prose th {
-  font-size: 0.875rem !important;
-  line-height: 1.55 !important;
-}
-.exam-content-small .option-content,
-.exam-content-small .option-content p,
-.exam-content-small .option-content span,
-.exam-content-small .option-content td,
-.exam-content-small .option-content th {
-  font-size: 0.8125rem !important;
-  line-height: 1.45 !important;
-}
-.exam-content-small textarea,
-.exam-content-small input {
-  font-size: 0.8125rem !important;
+/* --- Student Exam Font Sizing (Cascading & Multi-Step Scalable) --- */
+.exam-content-scalable {
+  --exam-prose-size: 1rem;
+  --exam-option-size: 0.9375rem;
+  --exam-input-size: 0.9375rem;
+  --exam-line-height: 1.625;
 }
 
-.exam-content-normal .prose,
-.exam-content-normal .prose p,
-.exam-content-normal .prose li,
-.exam-content-normal .prose td,
-.exam-content-normal .prose th {
-  font-size: 1rem !important;
-  line-height: 1.625 !important;
-}
-.exam-content-normal .option-content,
-.exam-content-normal .option-content p,
-.exam-content-normal .option-content span,
-.exam-content-normal .option-content td,
-.exam-content-normal .option-content th {
-  font-size: 0.9375rem !important;
-  line-height: 1.5 !important;
-}
-.exam-content-normal textarea,
-.exam-content-normal input {
-  font-size: 0.9375rem !important;
+.exam-content-scalable .student-question-text,
+.exam-content-scalable .student-question-text p,
+.exam-content-scalable .student-question-text li,
+.exam-content-scalable .student-question-text td,
+.exam-content-scalable .student-question-text th,
+.exam-content-scalable .student-question-text blockquote {
+  font-size: var(--exam-prose-size) !important;
+  line-height: var(--exam-line-height) !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
-.exam-content-large .prose,
-.exam-content-large .prose p,
-.exam-content-large .prose li,
-.exam-content-large .prose td,
-.exam-content-large .prose th {
-  font-size: 1.125rem !important;
-  line-height: 1.6 !important;
+.exam-content-scalable .option-content,
+.exam-content-scalable .option-content p,
+.exam-content-scalable .option-content span:not(.katex *):not(.katex),
+.exam-content-scalable .option-content td,
+.exam-content-scalable .option-content th,
+.exam-content-scalable .option-content label {
+  font-size: var(--exam-option-size) !important;
+  line-height: 1.52 !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
-.exam-content-large .option-content,
-.exam-content-large .option-content p,
-.exam-content-large .option-content span,
-.exam-content-large .option-content td,
-.exam-content-large .option-content th {
-  font-size: 1.0625rem !important;
-  line-height: 1.5 !important;
+
+.exam-content-scalable textarea,
+.exam-content-scalable input:not([type="checkbox"]):not([type="radio"]) {
+  font-size: var(--exam-input-size) !important;
 }
-.exam-content-large textarea,
-.exam-content-large input {
-  font-size: 1.0625rem !important;
+
+/* Ensure math formulas (KaTeX) scale proportionally with base font without breaking sub/superscripts */
+.exam-content-scalable .katex {
+  font-size: 1.05em !important;
+}
+.exam-content-scalable .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.25rem 0;
+}
+
+/* Ensure wide tables scroll cleanly without breaking card layout */
+.exam-content-scalable .student-question-text table {
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Individual Stepped Fallback Classes */
+.exam-font-step--2 {
+  --exam-prose-size: 0.825rem;
+  --exam-option-size: 0.775rem;
+  --exam-input-size: 0.775rem;
+  --exam-line-height: 1.55;
+}
+.exam-font-step--1 {
+  --exam-prose-size: 0.9125rem;
+  --exam-option-size: 0.85rem;
+  --exam-input-size: 0.85rem;
+  --exam-line-height: 1.58;
+}
+.exam-font-step-0 {
+  --exam-prose-size: 1rem;
+  --exam-option-size: 0.9375rem;
+  --exam-input-size: 0.9375rem;
+  --exam-line-height: 1.625;
+}
+.exam-font-step-1 {
+  --exam-prose-size: 1.125rem;
+  --exam-option-size: 1.05rem;
+  --exam-input-size: 1.05rem;
+  --exam-line-height: 1.625;
+}
+.exam-font-step-2 {
+  --exam-prose-size: 1.25rem;
+  --exam-option-size: 1.15rem;
+  --exam-input-size: 1.15rem;
+  --exam-line-height: 1.65;
+}
+.exam-font-step-3 {
+  --exam-prose-size: 1.375rem;
+  --exam-option-size: 1.25rem;
+  --exam-input-size: 1.25rem;
+  --exam-line-height: 1.68;
+}
+.exam-font-step-4 {
+  --exam-prose-size: 1.525rem;
+  --exam-option-size: 1.375rem;
+  --exam-input-size: 1.375rem;
+  --exam-line-height: 1.7;
+}
+.exam-font-step-5 {
+  --exam-prose-size: 1.68rem;
+  --exam-option-size: 1.5rem;
+  --exam-input-size: 1.5rem;
+  --exam-line-height: 1.72;
+}
+
+/* Backward compatibility classes for legacy references */
+.exam-content-small {
+  --exam-prose-size: 0.875rem;
+  --exam-option-size: 0.8125rem;
+  --exam-input-size: 0.8125rem;
+  --exam-line-height: 1.55;
+}
+.exam-content-normal {
+  --exam-prose-size: 1rem;
+  --exam-option-size: 0.9375rem;
+  --exam-input-size: 0.9375rem;
+  --exam-line-height: 1.625;
+}
+.exam-content-large {
+  --exam-prose-size: 1.25rem;
+  --exam-option-size: 1.15rem;
+  --exam-input-size: 1.15rem;
+  --exam-line-height: 1.65;
 }
 /* -------------------------------------- */

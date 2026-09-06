@@ -233,14 +233,10 @@ export const useTeacherDashboard = ({
       let sanitizedCorrectAnswer = q.correctAnswer;
       if (q.correctAnswer) {
         if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-          const parsed = parseList(q.correctAnswer);
-          if (parsed && parsed.length > 0) {
-            sanitizedCorrectAnswer = JSON.stringify(
-              parsed.map((opt) => sanitizeHtml(opt)),
-            );
-          } else {
-            sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
-          }
+          const parsed = parseList(q.correctAnswer, q.options);
+          sanitizedCorrectAnswer = JSON.stringify(
+            (parsed || []).map((opt) => sanitizeHtml(opt)),
+          );
         } else if (q.questionType === "MULTIPLE_CHOICE") {
           try {
             const parsed = JSON.parse(q.correctAnswer);

@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { generateQuestionsOnServer, generateAIAnalysisOnServer } from "./server/ai.js";
+import { generateQuestionsOnServer, generateAIAnalysisOnServer, generateSvgOnServer } from "./server/ai.js";
 
 async function startServer() {
   const app = express();
@@ -15,6 +15,17 @@ async function startServer() {
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  app.post("/api/generate-svg", async (req, res) => {
+    try {
+      const { prompt, style } = req.body;
+      const svgCode = await generateSvgOnServer(prompt, style);
+      res.json({ success: true, svg: svgCode });
+    } catch (error: any) {
+      console.warn("API warning generating SVG:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
   });
 
   app.post("/api/generate-questions", async (req, res) => {

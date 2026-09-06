@@ -253,6 +253,12 @@ export const generateBookHtml = ({
     html: string,
   ): string => {
     let processedHtml = html || "";
+    if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(processedHtml)) {
+      processedHtml = processedHtml.replace(
+        /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+        '<span class="chart-placeholder" data-chart="true"></span>'
+      );
+    }
     if (chartData) {
       chartCounter++;
       const canvasId = "pdf-chart-" + chartCounter;

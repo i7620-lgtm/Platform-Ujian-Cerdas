@@ -705,8 +705,12 @@ export class ArchiveService {
                           b64 = lastUnderscoreIndex !== -1 ? cleanStr.substring(0, lastUnderscoreIndex) : cleanStr;
                       }
                       
-                      b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-                      while (b64.length % 4) b64 += '=';
+                      b64 = b64.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+                      b64 = b64.replace(/[^A-Za-z0-9+/=]/g, '').replace(/=+$/, '');
+                      const rem = b64.length % 4;
+                      if (rem === 2) b64 += '==';
+                      else if (rem === 3) b64 += '=';
+                      else if (rem === 1) b64 = b64.slice(0, -1);
                       
                       const byteString = atob(b64);
                       const decodedStr = decodeURIComponent(

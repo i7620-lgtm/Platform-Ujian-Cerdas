@@ -68,6 +68,9 @@ export interface Question {
   kisiKisi?: string; // NEW: Kisi-kisi materi per soal
   imagePrompt?: string; // Prompt deskripsi visual AI untuk stimulus gambar
   imageSearchKeyword?: string;
+  visualStimulusType?: 'none' | 'geometry' | 'chart' | 'table' | 'wikimedia_photo' | 'ai_svg';
+  svgPrompt?: string;
+  svgStyle?: string;
 
   matchingPairs?: {
     left: string;

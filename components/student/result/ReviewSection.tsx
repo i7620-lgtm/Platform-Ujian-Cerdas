@@ -7,7 +7,13 @@ const renderQuestionTextWithChart = (
   html: string,
   chartData: ChartData | undefined,
 ) => {
-  const sanitized = sanitizeHtml(html);
+  let sanitized = sanitizeHtml(html);
+  if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(sanitized)) {
+    sanitized = sanitized.replace(
+      /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+      '<span data-chart="true"></span>',
+    );
+  }
   if (!chartData) {
     return (
       <div

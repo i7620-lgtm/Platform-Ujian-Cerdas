@@ -4,7 +4,6 @@ import {
   StarIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
-  TrashIcon,
   CheckCircleIcon,
 } from "../../Icons";
 
@@ -26,7 +25,6 @@ export const StudentFeedbackView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [starFilter, setStarFilter] = useState<number | "ALL">("ALL");
   const [selectedSchool, setSelectedSchool] = useState<string>("ALL");
-  const [isDeletingId, setIsDeletingId] = useState<string | number | null>(null);
 
   useEffect(() => {
     fetchFeedbacks();
@@ -73,24 +71,6 @@ export const StudentFeedbackView: React.FC = () => {
       console.error("Gagal memuat feedback:", err);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDeleteFeedback = async (id: number | string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus data ulasan ini?")) {
-      return;
-    }
-
-    setIsDeletingId(id);
-    try {
-      if (typeof id === "number" || !String(id).startsWith("local-")) {
-        await supabase.from("app_feedbacks").delete().eq("id", id);
-      }
-      setFeedbacks((prev) => prev.filter((item) => item.id !== id));
-    } catch (err) {
-      console.error("Gagal menghapus feedback:", err);
-    } finally {
-      setIsDeletingId(null);
     }
   };
 
@@ -376,15 +356,12 @@ export const StudentFeedbackView: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   Waktu
                 </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">
-                  Aksi
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                     <ArrowPathIcon className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-500" />
                     Memuat data masukan siswa...
                   </td>
@@ -472,24 +449,12 @@ export const StudentFeedbackView: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 font-medium">
                         {dateStr}
                       </td>
-
-                      {/* Aksi */}
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleDeleteFeedback(item.id)}
-                          disabled={isDeletingId === item.id}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                          title="Hapus masukan ini"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                     <p className="font-bold text-sm">Tidak ada penilaian / kritik saran ditemukan.</p>
                     <p className="text-xs mt-1">
                       {searchQuery || starFilter !== "ALL" || selectedSchool !== "ALL"

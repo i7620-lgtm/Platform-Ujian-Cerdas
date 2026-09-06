@@ -36,7 +36,20 @@ const renderQuestionTextWithChart = (
   chartData: ChartData | undefined,
   optimizeHtml: (h: string) => string,
 ) => {
-  const optimized = optimizeHtml(html);
+  let optimized = optimizeHtml(html);
+  if (/\\?\[\s*ai_svg/i.test(optimized)) {
+    optimized = optimized.replace(
+      /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
+      "",
+    );
+  }
+  if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(optimized)) {
+    optimized = optimized.replace(
+      /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+      '<span data-chart="true"></span>',
+    );
+  }
+
   if (!chartData) {
     return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
   }
@@ -116,26 +129,94 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     handleAnswerChange, scrollToQuestion, answersRef
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
-  type FontSize = "small" | "normal" | "large";
-  const [fontSize, setFontSize] = useState<FontSize>(() => {
+  interface FontStepConfig {
+    step: number;
+    percentage: number;
+    qSizeRem: number;
+    optSizeRem: number;
+    inputSizeRem: number;
+    lineHeight: number;
+    label: string;
+  }
+
+  const FONT_STEP_CONFIGS: FontStepConfig[] = [
+    { step: -2, percentage: 80, qSizeRem: 0.825, optSizeRem: 0.775, inputSizeRem: 0.775, lineHeight: 1.55, label: "Sangat Kecil" },
+    { step: -1, percentage: 90, qSizeRem: 0.9125, optSizeRem: 0.85, inputSizeRem: 0.85, lineHeight: 1.58, label: "Kecil" },
+    { step: 0, percentage: 100, qSizeRem: 1.0, optSizeRem: 0.9375, inputSizeRem: 0.9375, lineHeight: 1.625, label: "Normal" },
+    { step: 1, percentage: 112, qSizeRem: 1.125, optSizeRem: 1.05, inputSizeRem: 1.05, lineHeight: 1.625, label: "Besar (+1)" },
+    { step: 2, percentage: 125, qSizeRem: 1.25, optSizeRem: 1.15, inputSizeRem: 1.15, lineHeight: 1.65, label: "Besar (+2)" },
+    { step: 3, percentage: 140, qSizeRem: 1.375, optSizeRem: 1.25, inputSizeRem: 1.25, lineHeight: 1.68, label: "Besar (+3)" },
+    { step: 4, percentage: 155, qSizeRem: 1.525, optSizeRem: 1.375, inputSizeRem: 1.375, lineHeight: 1.7, label: "Besar (+4)" },
+    { step: 5, percentage: 170, qSizeRem: 1.68, optSizeRem: 1.5, inputSizeRem: 1.5, lineHeight: 1.72, label: "Maksimal (+5)" },
+  ];
+
+  const MIN_FONT_STEP = -2;
+  const MAX_FONT_STEP = 5;
+  const NORMAL_FONT_STEP = 0;
+
+  const [fontStep, setFontStep] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem("student_font_size");
-      if (saved === "small" || saved === "normal" || saved === "large") {
-        return saved;
+      const savedStep = localStorage.getItem("student_font_step");
+      if (savedStep !== null) {
+        const parsed = parseInt(savedStep, 10);
+        if (!isNaN(parsed) && parsed >= MIN_FONT_STEP && parsed <= MAX_FONT_STEP) {
+          return parsed;
+        }
       }
+      const oldSaved = localStorage.getItem("student_font_size");
+      if (oldSaved === "small") return -1;
+      if (oldSaved === "large") return 2;
     } catch {
       // fallback
     }
-    return "normal";
+    return NORMAL_FONT_STEP;
   });
 
-  const handleFontSizeChange = (size: FontSize) => {
-    setFontSize(size);
-    try {
-      localStorage.setItem("student_font_size", size);
-    } catch {
-      // ignore
-    }
+  const currentFontConfig =
+    FONT_STEP_CONFIGS.find((c) => c.step === fontStep) || FONT_STEP_CONFIGS[2];
+
+  const handleDecreaseFontSize = () => {
+    setFontStep((prev) => {
+      const next = Math.max(MIN_FONT_STEP, prev - 1);
+      try {
+        localStorage.setItem("student_font_step", String(next));
+        localStorage.setItem(
+          "student_font_size",
+          next < 0 ? "small" : next > 0 ? "large" : "normal",
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const handleResetFontSize = () => {
+    setFontStep(() => {
+      try {
+        localStorage.setItem("student_font_step", "0");
+        localStorage.setItem("student_font_size", "normal");
+      } catch {
+        // ignore
+      }
+      return NORMAL_FONT_STEP;
+    });
+  };
+
+  const handleIncreaseFontSize = () => {
+    setFontStep((prev) => {
+      const next = Math.min(MAX_FONT_STEP, prev + 1);
+      try {
+        localStorage.setItem("student_font_step", String(next));
+        localStorage.setItem(
+          "student_font_size",
+          next < 0 ? "small" : next > 0 ? "large" : "normal",
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   const headerRef = useRef<HTMLElement>(null);
@@ -325,53 +406,71 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               </div>
             )}
 
-            {/* Fitur Pilihan Ukuran Font Soal (A A A dari kecil ke besar) */}
+            {/* Fitur Pilihan Ukuran Font Soal (A- untuk terus memperkecil, A untuk normal, A+ untuk terus memperbesar) */}
             <div
               id="exam-font-size-selector"
               className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs"
-              title="Pilihan Ukuran Font Soal"
+              title={`Ukuran Tulisan: ${currentFontConfig.percentage}% (${currentFontConfig.label})`}
+              aria-label="Pengatur ukuran tulisan soal"
             >
+              {/* Tombol Perkecil (A-) */}
               <button
-                id="font-size-small-btn"
+                id="font-size-decrease-btn"
                 type="button"
-                onClick={() => handleFontSizeChange("small")}
-                className={`h-7 w-6 sm:w-7 flex items-center justify-center rounded-md transition-all ${
-                  fontSize === "small"
-                    ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-bold"
+                onClick={handleDecreaseFontSize}
+                disabled={fontStep <= MIN_FONT_STEP}
+                className={`h-7 px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
+                  fontStep <= MIN_FONT_STEP
+                    ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40"
+                    : fontStep < 0
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/50 font-bold"
                 }`}
-                title="Ukuran Font: Lebih Kecil"
-                aria-label="Ukuran font lebih kecil"
+                title={`Perkecil Ukuran Tulisan (A-) • Saat ini: ${currentFontConfig.percentage}%`}
+                aria-label="Perkecil ukuran font"
               >
-                <span className="text-[10px] sm:text-[11px] leading-none">A</span>
+                <span className="text-[11px] sm:text-xs font-bold leading-none">A</span>
+                <span className="text-[10px] sm:text-[11px] font-black leading-none -ml-0.5">−</span>
               </button>
+
+              {/* Tombol Normal (A di tengah) */}
               <button
                 id="font-size-normal-btn"
                 type="button"
-                onClick={() => handleFontSizeChange("normal")}
-                className={`h-7 w-6 sm:w-7 flex items-center justify-center rounded-md transition-all ${
-                  fontSize === "normal"
+                onClick={handleResetFontSize}
+                className={`h-7 px-2 sm:px-2.5 flex items-center justify-center rounded-md transition-all select-none ${
+                  fontStep === 0
                     ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-bold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/60 dark:hover:bg-slate-700/50 font-bold"
                 }`}
-                title="Ukuran Font: Normal"
-                aria-label="Ukuran font normal"
+                title={
+                  fontStep === 0
+                    ? "Ukuran Tulisan Normal (100%)"
+                    : `Kembalikan ke Ukuran Normal (100%) • Saat ini: ${currentFontConfig.percentage}%`
+                }
+                aria-label="Kembalikan ukuran font normal"
               >
-                <span className="text-xs sm:text-[13px] leading-none">A</span>
+                <span className="text-xs sm:text-[13px] leading-none font-bold">A</span>
               </button>
+
+              {/* Tombol Perbesar (A+) */}
               <button
-                id="font-size-large-btn"
+                id="font-size-increase-btn"
                 type="button"
-                onClick={() => handleFontSizeChange("large")}
-                className={`h-7 w-6 sm:w-7 flex items-center justify-center rounded-md transition-all ${
-                  fontSize === "large"
-                    ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-bold"
+                onClick={handleIncreaseFontSize}
+                disabled={fontStep >= MAX_FONT_STEP}
+                className={`h-7 px-1.5 sm:px-2 flex items-center justify-center rounded-md transition-all select-none ${
+                  fontStep >= MAX_FONT_STEP
+                    ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40"
+                    : fontStep > 0
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-black border border-slate-200/80 dark:border-slate-600"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/50 font-bold"
                 }`}
-                title="Ukuran Font: Lebih Besar"
-                aria-label="Ukuran font lebih besar"
+                title={`Perbesar Ukuran Tulisan (A+) • Saat ini: ${currentFontConfig.percentage}%`}
+                aria-label="Perbesar ukuran font"
               >
-                <span className="text-sm sm:text-base leading-none">A</span>
+                <span className="text-xs sm:text-[13px] font-bold leading-none">A</span>
+                <span className="text-[10px] sm:text-[11px] font-black leading-none -ml-0.5">+</span>
               </button>
             </div>
 
@@ -455,7 +554,17 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         </div>
       </div>
 
-      <main className={`w-full max-w-full mx-auto px-4 sm:px-6 pt-24 space-y-8 exam-content-${fontSize}`}>
+      <main
+        className={`w-full max-w-full mx-auto px-4 sm:px-6 pt-24 space-y-8 exam-content-scalable exam-font-step-${fontStep}`}
+        style={
+          {
+            "--exam-prose-size": `${currentFontConfig.qSizeRem}rem`,
+            "--exam-option-size": `${currentFontConfig.optSizeRem}rem`,
+            "--exam-input-size": `${currentFontConfig.inputSizeRem}rem`,
+            "--exam-line-height": currentFontConfig.lineHeight,
+          } as React.CSSProperties
+        }
+      >
         {activeExam.questions.map((q, idx) => {
           const num =
             activeExam.questions
@@ -486,7 +595,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                         <AudioPlayer src={q.audioUrl} />
                       </div>
                     )}
-                    <div className={`student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-6 ${fontSize === "small" ? "prose-sm" : fontSize === "large" ? "prose-lg" : "prose-base"}`}>
+                    <div className="student-question-text prose prose-slate dark:prose-invert max-w-none font-medium mb-6">
                       {renderQuestionTextWithChart(
                         q.questionText,
                         q.chartData,
@@ -530,7 +639,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                           onChange={(e) =>
                             handleAnswerChange(q.id, e.target.value)
                           }
-                          className="w-full p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-sm text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                          className="w-full p-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none min-h-[160px] text-slate-700 dark:text-slate-200 transition-all resize-y placeholder:text-slate-400 dark:placeholder:text-slate-600 leading-relaxed"
                           placeholder="Tulis jawaban lengkap Anda..."
                         />
                       )}
@@ -546,7 +655,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                             onChange={(e) =>
                               handleAnswerChange(q.id, e.target.value)
                             }
-                            className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none text-sm font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none font-bold text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all"
                             placeholder="Ketik jawaban singkat..."
                           />
                         </div>

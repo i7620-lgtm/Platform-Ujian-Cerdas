@@ -155,6 +155,9 @@ export const useExamEditor = ({
     );
   }, [questions]);
 
+  const subject = config.subject;
+  const includeImagesConfig = (config as any)?.includeImages;
+
   // Generate single question leveraging AI/Gemini inside the editor
   const handleGenerateSingleQuestion = useCallback(
     async (q: Question) => {
@@ -174,16 +177,21 @@ export const useExamEditor = ({
                     : "Esai";
 
         const cognitiveLevel = q.level || "Level 3 - Penalaran (Reasoning / HOTS)";
+        const cleanContext = (q.questionText || "").replace(/<[^>]+>/g, " ").trim();
+        const blueprintPrompt = q.kisiKisi
+          ? q.kisiKisi
+          : (cleanContext ? `Buat variasi soal baru yang berbeda atau perbarui dari topik ini: "${cleanContext.slice(0, 200)}"` : "");
 
+        const includeImages = includeImagesConfig ?? true;
         const aiConfig = {
-          subject: q.category || config.subject || "Umum",
+          subject: q.category || subject || "Umum",
           count: 1,
           type: questionTypeLabel,
           types: [questionTypeLabel],
           difficulty: cognitiveLevel,
           difficulties: [cognitiveLevel],
-          blueprint: q.kisiKisi || "",
-          includeImages: (config as any).includeImages ?? true,
+          blueprint: blueprintPrompt,
+          includeImages,
         };
 
         const generatedQuestions = await generateQuestions(aiConfig);
@@ -197,10 +205,17 @@ export const useExamEditor = ({
                     ...question,
                     ...newQ,
                     id: question.id,
+                    questionText: newQ.questionText,
+                    options: newQ.options || (newQ.questionType === "MULTIPLE_CHOICE" || newQ.questionType === "COMPLEX_MULTIPLE_CHOICE" ? [] : undefined),
+                    correctAnswer: newQ.correctAnswer,
+                    explanation: newQ.explanation || "",
+                    chartData: newQ.chartData ?? undefined,
+                    trueFalseRows: newQ.trueFalseRows || undefined,
+                    matchingPairs: newQ.matchingPairs || undefined,
                     category: newQ.category || q.category,
                     level: newQ.level || q.level,
                     kisiKisi: newQ.kisiKisi || q.kisiKisi,
-                    scoreWeight: newQ.scoreWeight || q.scoreWeight,
+                    scoreWeight: newQ.scoreWeight || q.scoreWeight || 1,
                   }
                 : question,
             ),
@@ -212,7 +227,7 @@ export const useExamEditor = ({
         setIsGeneratingId(null);
       }
     },
-    [config.subject, (config as any).includeImages, setQuestions, setIsGeneratingId],
+    [subject, includeImagesConfig, setQuestions, setIsGeneratingId],
   );
 
   // Cascading configurations on manual configuration changes

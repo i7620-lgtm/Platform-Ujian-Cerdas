@@ -105,7 +105,13 @@ export const useExamEditorStore = create<ExamEditorState>()(
         config: { ...DEFAULT_EXAM_CONFIG },
 
         setQuestions: (questions) => set((state) => {
-            state.questions = questions;
+            state.questions = (questions || []).map((q) => {
+                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer) {
+                    const parsed = parseList(q.correctAnswer, q.options);
+                    return { ...q, correctAnswer: JSON.stringify(parsed) };
+                }
+                return q;
+            });
         }),
 
         setConfig: (config) => set((state) => {
@@ -252,9 +258,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
                         if (isAnswerMatch(q.correctAnswer, oldOption, q.questionType)) newCorrectAnswer = text; 
                     } 
                     else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
-                        let answers = parseList(q.correctAnswer);
-                        if (answers.some(a => isAnswerMatch(a, oldOption, q.questionType))) { 
-                            answers = answers.map(a => isAnswerMatch(a, oldOption, q.questionType) ? text : a); 
+                        let answers = parseList(q.correctAnswer, q.options);
+                        if (answers.some(a => a === oldOption || isAnswerMatch(a, oldOption, q.questionType))) { 
+                            answers = answers.map(a => (a === oldOption || isAnswerMatch(a, oldOption, q.questionType)) ? text : a); 
                             newCorrectAnswer = JSON.stringify(answers); 
                         } 
                     }
@@ -274,16 +280,23 @@ export const useExamEditorStore = create<ExamEditorState>()(
         handleComplexCorrectAnswerChange: (questionId, option, isChecked) => set((state) => {
             state.questions = state.questions.map((q) => {
                 if (q.id === questionId) {
-                    const currentAnswers = parseList(q.correctAnswer);
-                    const currentlyCheckedOptions = (q.options || []).filter(o => 
-                        currentAnswers.some(a => isAnswerMatch(a, o, q.questionType))
-                    );
+                    const currentAnswers = parseList(q.correctAnswer, q.options);
+                    const currentlyCheckedOptions = (q.options || []).filter((o, idx) => {
+                        const letter = String.fromCharCode(65 + idx);
+                        return currentAnswers.some(a => 
+                            a === letter ||
+                            a === o ||
+                            isAnswerMatch(a, o, q.questionType) ||
+                            (typeof a === 'string' && a.trim().toUpperCase() === letter)
+                        );
+                    });
                     
-                    let newKeys;
+                    let newKeys: string[];
+                    const optionExists = currentlyCheckedOptions.some(o => o === option || isAnswerMatch(o, option, q.questionType));
                     if (isChecked) { 
-                        newKeys = currentlyCheckedOptions.includes(option) ? currentlyCheckedOptions : [...currentlyCheckedOptions, option];
+                        newKeys = optionExists ? currentlyCheckedOptions : [...currentlyCheckedOptions, option];
                     } else { 
-                        newKeys = currentlyCheckedOptions.filter(o => o !== option);
+                        newKeys = currentlyCheckedOptions.filter(o => o !== option && !isAnswerMatch(o, option, q.questionType));
                     } 
                     newKeys.sort((a, b) => (q.options || []).indexOf(a) - (q.options || []).indexOf(b));
                     return { ...q, correctAnswer: JSON.stringify(newKeys) };
@@ -338,8 +351,8 @@ export const useExamEditorStore = create<ExamEditorState>()(
                     if (q.questionType === 'MULTIPLE_CHOICE') { 
                         if (isAnswerMatch(q.correctAnswer, optionToRemove, q.questionType)) newCorrectAnswer = newOptions[0] || ''; 
                     } else if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE') { 
-                        let answers = parseList(q.correctAnswer);
-                        answers = answers.filter(a => !isAnswerMatch(a, optionToRemove, q.questionType)); 
+                        let answers = parseList(q.correctAnswer, q.options);
+                        answers = answers.filter(a => a !== optionToRemove && !isAnswerMatch(a, optionToRemove, q.questionType)); 
                         newCorrectAnswer = JSON.stringify(answers); 
                     } 
                     return { ...q, options: newOptions, optionImages: newOptionImages, optionCharts: newOptionCharts, correctAnswer: newCorrectAnswer };

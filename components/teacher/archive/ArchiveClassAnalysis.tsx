@@ -326,7 +326,7 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
                         {formatDuration(c.averageTime)}
                       </td>
                       <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
-                        {c.lowestScore} - {c.highestScore}
+                        {c.lowestScore ?? 0} - {c.highestScore ?? 0}
                       </td>
                       {exam.config.kkm && (
                         <td className="px-6 py-4 text-center">
