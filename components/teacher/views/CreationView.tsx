@@ -839,7 +839,7 @@ export const CreationView: React.FC<CreationViewProps> = ({
                   </label>
                 </div>
                 <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold">
-                  Wikimedia & Visual SVG
+                  Auto Vektor AI, Geometri & Diagram
                 </span>
               </div>
             </div>
