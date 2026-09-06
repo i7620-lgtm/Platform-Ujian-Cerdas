@@ -317,6 +317,7 @@ export const useArchiveViewerLogic = ({ archiveViewer, teacherProfile }: UseArch
           averageScore,
           averageTime,
           lowestScore,
+          highestScore,
           passRate,
           passCount,
           questionTypeStats: qtStats,
