@@ -30,7 +30,7 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
       <div className="space-y-3">
         {q.options.map((opt, optIndex) => {
           const letter = String.fromCharCode(65 + optIndex);
-          const currentAnswers = parseList(q.correctAnswer);
+          const currentAnswers = parseList(q.correctAnswer, q.options);
           const isSelected = currentAnswers.some((ans) =>
             ans === letter ||
             ans === opt ||
