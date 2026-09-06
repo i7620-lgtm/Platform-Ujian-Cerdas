@@ -5,7 +5,7 @@ import { ExamEditor } from "./teacher/ExamEditor";
 import { OngoingExamModal } from "./teacher/DashboardModals";
 import { storageService } from "../services/storage";
 import { LogoIcon, MoonIcon, SunIcon, LogoutIcon } from "./Icons";
-import { sanitizeHtml } from "./teacher/examUtils";
+import { sanitizeHtml, parseList } from "./teacher/examUtils";
 import { useExamEditorStore } from "../stores/examEditorStore";
 
 interface CollaboratorViewProps {
@@ -46,18 +46,10 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({
           let sanitizedCorrectAnswer = q.correctAnswer;
           if (q.correctAnswer) {
             if (q.questionType === "COMPLEX_MULTIPLE_CHOICE") {
-              try {
-                const parsed = JSON.parse(q.correctAnswer);
-                if (Array.isArray(parsed)) {
-                  sanitizedCorrectAnswer = JSON.stringify(
-                    parsed.map((opt) => sanitizeHtml(opt)),
-                  );
-                } else {
-                  sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
-                }
-              } catch {
-                sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
-              }
+              const parsed = parseList(q.correctAnswer, q.options);
+              sanitizedCorrectAnswer = JSON.stringify(
+                (parsed || []).map((opt) => sanitizeHtml(opt)),
+              );
             } else {
               sanitizedCorrectAnswer = sanitizeHtml(q.correctAnswer);
             }
