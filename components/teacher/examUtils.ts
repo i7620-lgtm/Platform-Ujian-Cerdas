@@ -296,27 +296,77 @@ export const isAnswerMatch = (
   return false;
 };
 
-export const parseList = (str: string | undefined | null): string[] => {
+export const parseList = (
+  str: string | undefined | null,
+  optionsContext?: string[]
+): string[] => {
   if (!str) return [];
+
+  // Helper to extract options from optionsContext if available
+  const matchFromOptionsContext = (rawText: string, opts: string[]): string[] => {
+    if (!opts || opts.length === 0) return [];
+    const matched: string[] = [];
+    opts.forEach((opt, idx) => {
+      const letter = String.fromCharCode(65 + idx);
+      if (new RegExp(`(?:^|[^a-zA-Z0-9])${letter}(?:[^a-zA-Z0-9]|$)`, "i").test(rawText)) {
+        if (rawText.trim().length < 50 && (rawText.includes(letter) || rawText.toUpperCase().includes(letter))) {
+          matched.push(opt);
+          return;
+        }
+      }
+      if (rawText.includes(opt)) {
+        matched.push(opt);
+        return;
+      }
+      const optPlain = opt.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+      if (optPlain.length >= 3) {
+        const rawPlain = rawText.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+        const chunk = optPlain.slice(0, Math.min(optPlain.length, 30));
+        if (rawPlain.includes(chunk)) {
+          matched.push(opt);
+        }
+      }
+    });
+    return matched;
+  };
 
   // Helper to recursively unescape stringified JSON
   const deepParse = (input: string): unknown => {
     try {
-      let fixedInput = input;
+      const fixedInput = input.trim();
       try {
-        JSON.parse(fixedInput);
+        const p = JSON.parse(fixedInput);
+        if (typeof p === "string") return deepParse(p);
+        return p;
       } catch {
-        // If it fails, try replacing literal newlines with escaped newlines
-        fixedInput = input
+        const cleaned = fixedInput
           .replace(/\n/g, "\\n")
           .replace(/\r/g, "\\r")
           .replace(/\t/g, "\\t");
+        try {
+          const p = JSON.parse(cleaned);
+          if (typeof p === "string") return deepParse(p);
+          return p;
+        } catch {
+          if (cleaned.includes("&quot;")) {
+            const unquoted = cleaned.replace(/&quot;/g, '"');
+            try {
+              const p = JSON.parse(unquoted);
+              if (typeof p === "string") return deepParse(p);
+              return p;
+            } catch {}
+          }
+          if (cleaned.includes('\\"')) {
+            const unescaped = cleaned.replace(/\\+"/g, '"');
+            try {
+              const p = JSON.parse(unescaped);
+              if (typeof p === "string") return deepParse(p);
+              return p;
+            } catch {}
+          }
+        }
       }
-      const parsed = JSON.parse(fixedInput);
-      if (typeof parsed === "string") {
-        return deepParse(parsed);
-      }
-      return parsed;
+      throw new Error("Cannot JSON parse");
     } catch {
       let cleaned = input.trim();
       if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
@@ -341,7 +391,6 @@ export const parseList = (str: string | undefined | null): string[] => {
       const flattened: string[] = [];
       const processItem = (item: unknown) => {
         if (typeof item === "string") {
-          // Only deepParse if it looks like a stringified array or object
           if (
             (item.startsWith("[") && item.endsWith("]")) ||
             (item.startsWith("{") && item.endsWith("}"))
@@ -368,7 +417,13 @@ export const parseList = (str: string | undefined | null): string[] => {
       parsed.forEach(processItem);
       return flattened;
     }
+
     if (typeof parsed === "string") {
+      if (optionsContext && optionsContext.length > 0) {
+        const contextual = matchFromOptionsContext(parsed, optionsContext);
+        if (contextual.length > 0) return contextual;
+      }
+
       // Try splitting by ||| first as it's the most robust delimiter
       if (parsed.includes("|||")) {
         return parsed
@@ -376,10 +431,25 @@ export const parseList = (str: string | undefined | null): string[] => {
           .map((s) => s.trim())
           .filter(Boolean);
       }
+
+      // If it looks like a single HTML snippet without separated items
+      if (parsed.startsWith("<") && parsed.endsWith(">") && !parsed.includes('","')) {
+        return [parsed.trim()];
+      }
+
+      // Try splitting by `","` if it looks like array items
+      if (parsed.includes('","') || parsed.includes('", "')) {
+        return parsed
+          .split(/",\s*"/)
+          .map((s) => s.replace(/^"|"$/g, "").trim())
+          .filter(Boolean);
+      }
+
       // If it looks like HTML, don't split by comma as it might break equations or tags
       if (parsed.includes("<") && parsed.includes(">")) {
         return [parsed.trim()];
       }
+
       return parsed
         .split(",")
         .map((s) => {
@@ -395,11 +465,31 @@ export const parseList = (str: string | undefined | null): string[] => {
     /* ignore */
   }
 
+  // Fallback with optionsContext
+  if (optionsContext && optionsContext.length > 0) {
+    const contextual = matchFromOptionsContext(str, optionsContext);
+    if (contextual.length > 0) return contextual;
+  }
+
   // Fallback: handle legacy comma-separated or ||| separated
   if (str.includes("|||")) {
     return str
       .split("|||")
       .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  // If it looks like a single HTML tag
+  if (str.startsWith("<") && str.endsWith(">") && !str.includes('","')) {
+    return [str.trim()];
+  }
+
+  // Try splitting by `","`
+  if (str.includes('","') || str.includes('", "')) {
+    return str
+      .replace(/^\[|\]$/g, "")
+      .split(/",\s*"/)
+      .map((s) => s.replace(/^"|"$/g, "").trim())
       .filter(Boolean);
   }
 
@@ -415,7 +505,6 @@ export const parseList = (str: string | undefined | null): string[] => {
   }
 
   // Split by comma, but try to respect quotes if possible
-  // Simple split for now, but clean up quotes
   return cleanStr
     .split(",")
     .map((s) => {
@@ -423,7 +512,6 @@ export const parseList = (str: string | undefined | null): string[] => {
       if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
         trimmed = trimmed.slice(1, -1);
       }
-      // Unescape internal quotes
       trimmed = trimmed.replace(/\\"/g, '"');
       return trimmed;
     })
@@ -2037,8 +2125,16 @@ export const cleanupQuestionContent = (q: any): any => {
   const qClean = { ...q };
   if (qClean.questionText)
     qClean.questionText = minifyExamHtml(qClean.questionText);
-  if (qClean.correctAnswer)
-    qClean.correctAnswer = minifyExamHtml(qClean.correctAnswer);
+  if (qClean.correctAnswer) {
+    if (qClean.questionType === "COMPLEX_MULTIPLE_CHOICE") {
+      const parsed = parseList(qClean.correctAnswer, qClean.options);
+      qClean.correctAnswer = JSON.stringify(
+        (parsed || []).map((opt: string) => minifyExamHtml(opt))
+      );
+    } else {
+      qClean.correctAnswer = minifyExamHtml(qClean.correctAnswer);
+    }
+  }
   if (qClean.options && Array.isArray(qClean.options)) {
     qClean.options = qClean.options.map((opt: string) => minifyExamHtml(opt));
   }
