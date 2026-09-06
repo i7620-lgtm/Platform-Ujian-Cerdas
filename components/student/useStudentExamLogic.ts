@@ -633,6 +633,10 @@ export const useStudentExamLogic = ({
   const optimizeHtml = (html: string) => {
     if (!html) return "";
     let cleaned = sanitizeHtml(html);
+    cleaned = cleaned.replace(
+      /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
+      "",
+    );
     // Remove leading and trailing empty paragraphs, whitespace, or linebreaks
     cleaned = cleaned.replace(
       /^(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*|<br\s*\/?>\s*)+/gi,
