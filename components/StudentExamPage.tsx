@@ -36,7 +36,20 @@ const renderQuestionTextWithChart = (
   chartData: ChartData | undefined,
   optimizeHtml: (h: string) => string,
 ) => {
-  const optimized = optimizeHtml(html);
+  let optimized = optimizeHtml(html);
+  if (/\\?\[\s*ai_svg/i.test(optimized)) {
+    optimized = optimized.replace(
+      /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
+      "",
+    );
+  }
+  if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(optimized)) {
+    optimized = optimized.replace(
+      /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+      '<span data-chart="true"></span>',
+    );
+  }
+
   if (!chartData) {
     return <div dangerouslySetInnerHTML={{ __html: optimized }}></div>;
   }
