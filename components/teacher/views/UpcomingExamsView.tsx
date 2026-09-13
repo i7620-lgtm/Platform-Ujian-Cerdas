@@ -118,6 +118,21 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
                     <span className="flex items-center gap-1.5">
                       <ClockIcon className="w-3.5 h-3.5" />{" "}
                       {(() => {
+                        if (exam.config.examMode === "PR") {
+                          const endDate = exam.config.endDate || exam.config.date || "";
+                          const endTime = exam.config.endTime || "23:59";
+                          let dateStr = endDate;
+                          if (endDate.includes("T")) {
+                            const dEnd = new Date(endDate);
+                            if (!isNaN(dEnd.getTime())) {
+                              dateStr = dEnd.toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "short",
+                              });
+                            }
+                          }
+                          return `Tenggat: ${dateStr} pukul ${endTime}`;
+                        }
                         const startDate =
                           exam.config.startDate || exam.config.date || "";
                         const d = startDate.includes("T")
@@ -144,7 +159,7 @@ export const UpcomingExamsView: React.FC<UpcomingExamsViewProps> = ({
                     <span className="text-gray-300 dark:text-slate-600">•</span>
                     <span>
                       {exam.config.examMode === "PR"
-                        ? "Tanpa Batas"
+                        ? "Mode PR"
                         : exam.config.timeLimit > 0
                           ? `${exam.config.timeLimit} Menit`
                           : "Tanpa Batas"}

@@ -110,6 +110,12 @@ export const OngoingExamCard: React.FC<OngoingExamCardProps> = ({
           text={exam.config.examType}
           colorClass="bg-gray-100 text-gray-600"
         />
+        {exam.config.examMode === "PR" && (
+          <MetaBadge
+            text={`Mode PR (s.d. ${exam.config.endTime || "23:59"})`}
+            colorClass="bg-amber-50 text-amber-700 border-amber-200"
+          />
+        )}
         {exam.config.targetClasses && exam.config.targetClasses.length > 0 && (
           <MetaBadge
             text={exam.config.targetClasses.join(", ")}
