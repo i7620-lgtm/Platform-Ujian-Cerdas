@@ -168,6 +168,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               store.handleConfigChangeManual((prev: any) => ({
                 ...prev,
                 examMode: "UJIAN",
+                endTime: prev.endTime === "23:59" ? "10:00" : (prev.endTime || "10:00"),
               }))
             }
             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === "UJIAN" || !config.examMode ? "border-primary bg-primary/5" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/30"}`}
@@ -197,6 +198,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 detectBehavior: false,
                 continueWithPermission: false,
                 trackLocation: false,
+                endTime: prev.endTime && prev.endTime !== "10:00" ? prev.endTime : "23:59",
               }))
             }
             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${config.examMode === "PR" ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-200"}`}
@@ -214,18 +216,55 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed ml-6">
-              Dapat dikerjakan kapan saja sebelum tenggat waktu.
+              Dapat dikerjakan kapan saja sebelum batas waktu akhir.
             </p>
           </div>
         </div>
 
-        {(config.examMode === "UJIAN" || !config.examMode) && (
+        {config.examMode === "PR" ? (
+          <>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Tenggat Tanggal Pengumpulan
+              </label>
+              <input
+                id="input-pr-end-date"
+                type="date"
+                name="endDate"
+                value={
+                  config.endDate ||
+                  config.date ||
+                  new Date().toLocaleDateString("en-CA")
+                }
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Batas Jam Pengumpulan
+              </label>
+              <input
+                id="input-pr-end-time"
+                type="time"
+                name="endTime"
+                value={config.endTime || "23:59"}
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Default 23:59 waktu setempat. Siswa dapat mengumpulkan tugas hingga jam ini.
+              </p>
+            </div>
+          </>
+        ) : (
           <>
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
                 Tanggal Mulai
               </label>
               <input
+                id="input-exam-start-date"
                 type="date"
                 name="startDate"
                 value={
@@ -242,6 +281,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 Jam Mulai
               </label>
               <input
+                id="input-exam-start-time"
                 type="time"
                 name="startTime"
                 value={config.startTime || "08:00"}
@@ -251,9 +291,27 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Tanggal Selesai
+              </label>
+              <input
+                id="input-exam-end-date"
+                type="date"
+                name="endDate"
+                value={
+                  config.endDate ||
+                  config.date ||
+                  new Date().toLocaleDateString("en-CA")
+                }
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
                 Jam Selesai
               </label>
               <input
+                id="input-exam-end-time"
                 type="time"
                 name="endTime"
                 value={config.endTime || "10:00"}
@@ -261,41 +319,24 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
             </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Durasi Pengerjaan (Menit)
+              </label>
+              <input
+                id="input-exam-time-limit"
+                type="number"
+                name="timeLimit"
+                value={config.timeLimit || ""}
+                placeholder="0"
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Isi 0 untuk tanpa batas waktu.
+              </p>
+            </div>
           </>
-        )}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-            Tenggat Waktu / Tanggal Selesai
-          </label>
-          <input
-            type="date"
-            name="endDate"
-            value={
-              config.endDate ||
-              config.date ||
-              new Date().toLocaleDateString("en-CA")
-            }
-            onChange={handleConfigChange}
-            className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
-          />
-        </div>
-        {(config.examMode === "UJIAN" || !config.examMode) && (
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-              Durasi Pengerjaan (Menit)
-            </label>
-            <input
-              type="number"
-              name="timeLimit"
-              value={config.timeLimit || ""}
-              placeholder="0"
-              onChange={handleConfigChange}
-              className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              Isi 0 untuk tanpa batas waktu.
-            </p>
-          </div>
         )}
 
         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
