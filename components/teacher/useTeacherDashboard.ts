@@ -293,9 +293,11 @@ export const useTeacherDashboard = ({
       ? localDateTime.toISOString()
       : new Date().toISOString();
 
+    const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
+    const prEndTime = isPR ? (config.endTime || "23:59") : (config.endTime || "10:00");
     const endDateToUse = (config.endDate || dateToUse).split("T")[0];
     const localEndDateTime = new Date(
-      `${endDateToUse}T${config.endTime || "23:59"}:59`,
+      `${endDateToUse}T${prEndTime}:59`,
     );
     const isoEnd = !isNaN(localEndDateTime.getTime())
       ? localEndDateTime.toISOString()
@@ -311,14 +313,13 @@ export const useTeacherDashboard = ({
         date: isoStart,
         startDate: isoStart,
         endDate: isoEnd,
-        startTime: config.startTime,
-        endTime: config.endTime,
+        startTime: isPR ? (config.startTime || "00:00") : config.startTime,
+        endTime: prEndTime,
       },
       createdAt: editingExam?.createdAt || String(readableDate),
       status,
     };
 
-    const isPR = (examData.config.examMode || "").trim().toUpperCase() === "PR";
     const finalExamData: Exam = {
       ...examData,
       config: {
@@ -446,6 +447,11 @@ export const useTeacherDashboard = ({
       }
     }
 
+    const isEditPR = (exam.config.examMode || "").trim().toUpperCase() === "PR";
+    if (isEditPR) {
+      localEndTime = exam.config.endTime || localEndTime || "23:59";
+    }
+
     setConfig({
       ...exam.config,
       date: localStartDate,
@@ -488,6 +494,10 @@ export const useTeacherDashboard = ({
           minute: "2-digit",
         });
       }
+    }
+
+    if (isEditPR) {
+      localEndTime = exam.config.endTime || localEndTime || "23:59";
     }
 
     setConfig({

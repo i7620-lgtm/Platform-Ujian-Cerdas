@@ -256,6 +256,9 @@ export const useExamEditor = ({
             newConfig.detectBehavior = false;
             newConfig.continueWithPermission = false;
             newConfig.trackLocation = false;
+            if (!newConfig.endTime || newConfig.endTime === "10:00") {
+              newConfig.endTime = "23:59";
+            }
           }
           return newConfig;
         });
