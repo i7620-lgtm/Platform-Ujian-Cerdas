@@ -1,6 +1,17 @@
-import React from "react";
-import { ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, SparklesIcon } from "../../../../Icons";
+import React, { useRef, useState } from "react";
+import {
+  ArrowPathIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  SparklesIcon,
+  DocumentArrowUpIcon,
+  CheckCircleIcon,
+} from "../../../../Icons";
 import type { ExamConfig } from "../../../../../types";
+import {
+  downloadStudentDataTemplate,
+  parseStudentDataExcel,
+} from "../../../studentDataUtils";
 
 interface ExamConfigSettingsProps {
   config: ExamConfig;
@@ -19,6 +30,55 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
   hasManualGrading,
   isPremium,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+
+  const handleDownloadExcelFormat = () => {
+    downloadStudentDataTemplate("Format_Data_Siswa.xlsx");
+  };
+
+  const handleExcelFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadSuccessMessage(null);
+
+    try {
+      const parsed = await parseStudentDataExcel(file);
+      if (parsed.targetClassTags.length > 0) {
+        if (typeof store.handleAddClassTags === "function") {
+          store.handleAddClassTags(parsed.targetClassTags);
+        } else {
+          parsed.targetClassTags.forEach((tag: string) => {
+            if (typeof store.handleAddClassTagAction === "function") {
+              store.handleAddClassTagAction(tag);
+            } else if (typeof store.handleAddClassTag === "function") {
+              store.handleAddClassTag(tag);
+            }
+          });
+        }
+        const schoolMsg = parsed.schoolName ? `Sekolah: ${parsed.schoolName}. ` : "";
+        setUploadSuccessMessage(
+          `Berhasil! ${schoolMsg}${parsed.classes.length} kelas & ${parsed.students.length} siswa berhasil dimuat.`
+        );
+      } else {
+        alert("File Excel dibaca, namun tidak ditemukan data kelas atau siswa.");
+      }
+    } catch (err) {
+      console.error("Gagal membaca file Excel:", err);
+      alert("Format file Excel tidak sesuai. Silakan gunakan template yang telah disediakan.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      setTimeout(() => {
+        setUploadSuccessMessage(null);
+      }, 7000);
+    }
+  };
   return (
     <div className="bg-white dark:bg-slate-800 p-8 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
@@ -109,9 +169,56 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-            Target Kelas (Opsional)
-          </label>
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <label className="text-sm font-bold text-gray-700 dark:text-slate-300">
+              Target Kelas (Opsional)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx, .xls"
+                onChange={handleExcelFileUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleDownloadExcelFormat}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors shadow-xs"
+                title="Download template Excel untuk format data sekolah, kelas, dan nama siswa"
+              >
+                <DocumentArrowUpIcon className="w-3.5 h-3.5 rotate-180" />
+                <span>Download Format</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all shadow-xs"
+                title="Upload file Excel data sekolah, kelas, dan siswa"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Mengunggah...</span>
+                  </>
+                ) : (
+                  <>
+                    <DocumentArrowUpIcon className="w-3.5 h-3.5" />
+                    <span>Upload Data Siswa</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {uploadSuccessMessage && (
+            <div className="mb-3 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 text-xs font-medium text-emerald-800 dark:text-emerald-300 animate-fadeIn">
+              <CheckCircleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>{uploadSuccessMessage}</span>
+            </div>
+          )}
+
           <div className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl min-h-[56px] flex flex-wrap gap-2 items-center">
             {config.targetClasses?.map((tag) => (
               <span
