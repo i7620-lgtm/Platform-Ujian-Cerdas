@@ -37,9 +37,9 @@ export const getExamDates = (exam: Exam): { start: Date; end: Date } => {
   const localEndDateStr = getLocalDateStr(endDateRaw) || localStartDateStr;
 
   if (mode === "PR") {
-    // Mode PR ignores time selection and goes until midnight of the deadline
+    // Mode PR is available anytime before the deadline end time (default 23:59)
     start = new Date(0); // Available anytime before deadline
-    end = new Date(`${localEndDateStr}T23:59:59`);
+    end = new Date(`${localEndDateStr}T${endTimeStr}:59`);
   } else {
     if (endDateRaw || exam.config?.endTime) {
       if (endDateRaw && endDateRaw.includes("T")) {

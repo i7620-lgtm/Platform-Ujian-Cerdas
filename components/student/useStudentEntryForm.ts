@@ -300,11 +300,11 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       };
       
       const endDateStr = getLocalDateStr(config.endDate || config.date);
-      const endTimeStr = isPR ? '23:59' : (config.endTime || '23:59');
+      const endTimeStr = isPR ? (config.endTime || '23:59') : (config.endTime || '23:59');
 
       let absoluteExamEndTime;
       if (isPR) {
-          absoluteExamEndTime = new Date(`${endDateStr}T23:59:59`).getTime();
+          absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
       } else if (config.endDate && config.endDate.includes('T')) {
           absoluteExamEndTime = new Date(config.endDate).getTime();
       } else {

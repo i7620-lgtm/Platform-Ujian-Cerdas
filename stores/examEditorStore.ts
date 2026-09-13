@@ -30,6 +30,7 @@ interface ExamEditorState {
 
     // Mutator actions
     handleAddClassTag: (newTag: string) => void;
+    handleAddClassTags: (newTags: string[]) => void;
     removeClassTag: (tag: string) => void;
     handleConfigChangeManual: (updater: (prev: ExamConfig) => ExamConfig) => void;
     handleSubjectSelect: (subject: string) => void;
@@ -120,6 +121,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 state.config.detectBehavior = false;
                 state.config.continueWithPermission = false;
                 state.config.trackLocation = false;
+                if (!state.config.endTime || state.config.endTime === '10:00') {
+                    state.config.endTime = '23:59';
+                }
             }
         }),
 
@@ -136,6 +140,12 @@ export const useExamEditorStore = create<ExamEditorState>()(
             useExamEditorUIStore.getState().setClassTagInput('');
         }),
 
+        handleAddClassTags: (newTags) => set((state) => {
+            const current = state.config.targetClasses || [];
+            const merged = Array.from(new Set([...current, ...newTags]));
+            state.config.targetClasses = merged;
+        }),
+
         removeClassTag: (tag) => set((state) => {
             state.config.targetClasses = state.config.targetClasses?.filter(t => t !== tag) || [];
         }),
@@ -146,6 +156,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 state.config.detectBehavior = false;
                 state.config.continueWithPermission = false;
                 state.config.trackLocation = false;
+                if (!state.config.endTime || state.config.endTime === '10:00') {
+                    state.config.endTime = '23:59';
+                }
             }
         }),
 

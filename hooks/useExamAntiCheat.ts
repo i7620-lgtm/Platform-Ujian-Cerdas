@@ -69,10 +69,12 @@ export const useExamAntiCheat = ({
             };
 
             const endDateStr = getLocalDateStr(exam.config.endDate || exam.config.date);
-            const endTimeStr = isPR ? '23:59' : (exam.config.endTime || '23:59');
+            const endTimeStr = isPR ? (exam.config.endTime || '23:59') : (exam.config.endTime || '23:59');
 
             let absoluteExamEndTime: number;
-            if (exam.config.endDate && exam.config.endDate.includes('T')) {
+            if (isPR) {
+                absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
+            } else if (exam.config.endDate && exam.config.endDate.includes('T')) {
                 absoluteExamEndTime = new Date(exam.config.endDate).getTime();
             } else {
                 absoluteExamEndTime = new Date(`${endDateStr}T${endTimeStr}:59`).getTime();
@@ -113,14 +115,19 @@ export const useExamAntiCheat = ({
             timeLeftRef.current = diff;
 
             if (diff <= 0 && student.class !== 'PREVIEW' && !isSubmittingRef.current) {
-                onForceSubmit(true, 'completed');
+                // Pada mode PR, jangan auto-submit paksa saat deadline berakhir,
+                // biarkan siswa mengumpulkan, namun sistem login telah diblokir untuk pengerjaan baru.
+                const mode = (exam.config.examMode || 'UJIAN').trim().toUpperCase();
+                if (mode !== 'PR') {
+                    onForceSubmit(true, 'completed');
+                }
             }
         };
 
         tick();
         const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [deadline, onForceSubmit, student.class, timeLeftRef]);
+    }, [deadline, onForceSubmit, student.class, timeLeftRef, exam.config.examMode]);
 
     // Handle Active Anti-Cheat (Meninggalkan Halaman / Buka Tab Baru / Keluar Halaman)
     useEffect(() => {

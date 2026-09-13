@@ -23,6 +23,7 @@ export const useExamEditor = ({
     setConfig,
     reset,
     handleAddClassTagAction,
+    handleAddClassTagsAction,
     removeClassTag,
     handleConfigChangeManual,
     handleSubjectSelect,
@@ -56,6 +57,7 @@ export const useExamEditor = ({
       setConfig: s.setConfig,
       reset: s.reset,
       handleAddClassTagAction: s.handleAddClassTag,
+      handleAddClassTagsAction: s.handleAddClassTags,
       removeClassTag: s.removeClassTag,
       handleConfigChangeManual: s.handleConfigChangeManual,
       handleSubjectSelect: s.handleSubjectSelect,
@@ -256,6 +258,9 @@ export const useExamEditor = ({
             newConfig.detectBehavior = false;
             newConfig.continueWithPermission = false;
             newConfig.trackLocation = false;
+            if (!newConfig.endTime || newConfig.endTime === "10:00") {
+              newConfig.endTime = "23:59";
+            }
           }
           return newConfig;
         });
@@ -325,6 +330,7 @@ export const useExamEditor = ({
 
     // Mutators / Handlers
     handleAddClassTag,
+    handleAddClassTags: handleAddClassTagsAction,
     removeClassTag,
     handleConfigChangeManual,
     handleSubjectSelect,

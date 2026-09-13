@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { StudentLogin } from './components/StudentLogin';
-import { ExamWaitingRoomView } from './components/student/ExamWaitingRoomView';
 import { StudentExamPage } from './components/StudentExamPage';
 import { StudentResultPage } from './components/StudentResultPage';
 import { ResultNotFoundPage } from './components/ResultNotFoundPage';
@@ -52,7 +51,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<View>('SELECTOR');
   const [previousView, setPreviousView] = useState<View>('SELECTOR');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
-  const [waitingExam, setWaitingExam] = useState<Exam | null>(null);
+  const [invitationExam, setInvitationExam] = useState<Exam | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [studentResult, setStudentResult] = useState<Result | null>(null);
   const [resumedResult, setResumedResult] = useState<Result | null>(null);
@@ -289,9 +288,7 @@ const App: React.FC = () => {
               const now = new Date();
 
               if (!isNaN(startTime.getTime()) && now < startTime) {
-                  setWaitingExam(exam);
-                  setCurrentStudent(student);
-                  setView('WAITING_ROOM');
+                  setInvitationExam(exam);
                   return;
               }
           }
@@ -443,7 +440,7 @@ const App: React.FC = () => {
         return;
     }
 
-    const joinCode = params.get('join');
+    const joinCode = params.get('join') || params.get('invite');
     if (joinCode) {
         const code = joinCode.trim().toUpperCase();
         // Check schedule before showing login
@@ -464,11 +461,11 @@ const App: React.FC = () => {
                         
                         const now = new Date();
 
-                        // Strict check: Only go to waiting room if startTime is valid AND now < startTime
+                        // Strict check: if exam has not started yet, show invitation card directly (replaces waiting room)
                         if (!isNaN(startTime.getTime()) && now < startTime) {
-                            // Too early (Waiting Room)
-                            setWaitingExam(exam);
-                            setView('WAITING_ROOM');
+                            setInvitationExam(exam);
+                            setPrefillCode(code);
+                            setView('STUDENT_LOGIN');
                         } else {
                             // On time (Direct Login)
                             setPrefillCode(code);
@@ -846,16 +843,6 @@ const App: React.FC = () => {
             />
         )}
 
-        {view === 'WAITING_ROOM' && waitingExam && (
-            <ExamWaitingRoomView 
-                exam={waitingExam}
-                student={currentStudent || { fullName: 'Siswa', schoolName: '', class: '', absentNumber: '', studentId: '' }}
-                onBack={resetToHome}
-                onStartExam={(code, stud) => handleStudentLoginSuccess(code, stud)}
-                isDarkMode={darkMode}
-            />
-        )}
-
         {view === 'COLLABORATOR_MODE' && collaboratorData && (
             <CollaboratorView 
                 exam={collaboratorData.exam}
@@ -867,10 +854,22 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* Global Invitation Modal */}
+        {/* Global & Specific Invitation Modal */}
         <InvitationModal 
-            isOpen={isInviteOpen} 
-            onClose={() => setIsInviteOpen(false)} 
+            isOpen={isInviteOpen || !!invitationExam} 
+            onClose={() => {
+                setIsInviteOpen(false);
+                setInvitationExam(null);
+            }} 
+            exam={invitationExam}
+            teacherName={invitationExam?.authorName || teacherProfile?.name}
+            schoolName={invitationExam?.authorSchool || teacherProfile?.school}
+            onJoin={(code) => {
+                setInvitationExam(null);
+                setIsInviteOpen(false);
+                setPrefillCode(code);
+                setView('STUDENT_LOGIN');
+            }}
         />
 
         {/* Profile Completion Modal */}

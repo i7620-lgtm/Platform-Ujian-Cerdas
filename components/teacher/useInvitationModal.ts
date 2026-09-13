@@ -1,7 +1,11 @@
 import { useEffect, useCallback, useState } from "react";
-import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import type { Exam } from "../../types";
+import {
+  downloadStudentDataTemplate,
+  parseStudentDataExcel,
+  type StudentExcelRecord as Student,
+} from "./studentDataUtils";
 
 export interface TimeLeft {
   d: number;
@@ -10,12 +14,7 @@ export interface TimeLeft {
   s: number;
 }
 
-export interface Student {
-  absentNumber: string;
-  fullName: string;
-  className: string;
-  schoolName: string;
-}
+export type { Student };
 
 interface UseInvitationModalProps {
   isOpen: boolean;
@@ -166,109 +165,33 @@ export const useInvitationModal = ({
 
   // Download format excel
   const handleDownloadFormat = useCallback(() => {
-    const wsData = [
-      ["cara penggunaan :", "1. Isi semua data pada halaman ini dengan benar."],
-      ["", "2. Tambahkan Sheet Baru jika sekolah memiliki lebih dari 1 kelas."],
-      [],
-      ["Nama sekolah", ""],
-      ["Nama kelas", "6A"],
-      [],
-      ["nomor absen", "nama siswa"],
-      [1, "Siswa Contoh 1"],
-      [2, "Siswa Contoh 2"],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Kelas 6A");
-    XLSX.writeFile(wb, "Format_Data_Siswa.xlsx");
+    downloadStudentDataTemplate("Format_Data_Siswa.xlsx");
   }, []);
 
   // Upload spreadsheet data
   const handleUploadData = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+      try {
+        const parsed = await parseStudentDataExcel(file);
+        setStudents(parsed.students);
+        setParsedSchoolName(parsed.schoolName);
+        setParsedClasses(parsed.classes);
 
-        const allStudents: Student[] = [];
-        let globalSchoolName = "";
-        const allClasses: string[] = [];
-
-        wb.SheetNames.forEach((wsname) => {
-          const ws = wb.Sheets[wsname];
-          const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-          let className = wsname;
-          let schoolNameFromSheet = "";
-          let startRow = -1;
-
-          for (let i = 0; i < data.length; i++) {
-            const row = data[i];
-            if (!row) continue;
-
-            const colA = String(row[0] || "")
-              .trim()
-              .toLowerCase();
-
-            if (colA === "nama kelas") {
-              className = String(row[1] || "").trim() || className;
-            }
-            if (colA === "nama sekolah") {
-              schoolNameFromSheet =
-                String(row[1] || "").trim() || schoolNameFromSheet;
-            }
-            if (colA === "nomor absen") {
-              startRow = i + 1;
-            }
-          }
-
-          if (schoolNameFromSheet) globalSchoolName = schoolNameFromSheet;
-          if (
-            className &&
-            className !== "Sheet1" &&
-            !allClasses.includes(className)
-          ) {
-            allClasses.push(className);
-          }
-
-          if (startRow !== -1) {
-            for (let i = startRow; i < data.length; i++) {
-              const row = data[i];
-              if (!row) continue;
-              const absentNumber = String(row[0] || "").trim();
-              const fullName = String(row[1] || "").trim();
-
-              if (fullName) {
-                allStudents.push({
-                  absentNumber,
-                  fullName,
-                  className,
-                  schoolName: schoolNameFromSheet || globalSchoolName,
-                });
-              }
-            }
-          }
-        });
-
-        setStudents(allStudents);
-        setParsedSchoolName(globalSchoolName);
-        setParsedClasses(allClasses);
-
-        if (allClasses.length > 0) {
-          setSelectedClass(allClasses[0]);
-        } else if (allStudents.length > 0) {
+        if (parsed.classes.length > 0) {
+          setSelectedClass(parsed.classes[0]);
+        } else if (parsed.students.length > 0) {
           const uniqueClasses = Array.from(
-            new Set(allStudents.map((s) => s.className)),
+            new Set(parsed.students.map((s) => s.className)),
           );
           if (uniqueClasses.length > 0)
             setSelectedClass(uniqueClasses[0] as string);
         }
-      };
-      reader.readAsBinaryString(file);
+      } catch (err) {
+        console.error("Gagal memproses file Excel:", err);
+      }
     },
     [setSelectedClass, setParsedClasses, setParsedSchoolName, setStudents],
   );
