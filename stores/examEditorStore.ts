@@ -120,6 +120,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 state.config.detectBehavior = false;
                 state.config.continueWithPermission = false;
                 state.config.trackLocation = false;
+                if (!state.config.endTime || state.config.endTime === '10:00') {
+                    state.config.endTime = '23:59';
+                }
             }
         }),
 
@@ -146,6 +149,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 state.config.detectBehavior = false;
                 state.config.continueWithPermission = false;
                 state.config.trackLocation = false;
+                if (!state.config.endTime || state.config.endTime === '10:00') {
+                    state.config.endTime = '23:59';
+                }
             }
         }),
 
