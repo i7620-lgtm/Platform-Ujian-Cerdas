@@ -378,3 +378,174 @@ export const filterEvaluationSection = (
     return content.substring(0, startIndex).trimEnd();
   }
 };
+
+const INDONESIAN_MONTHS = [
+  { full: "januari", short: "jan", num: "1", num2: "01", en: "january" },
+  { full: "februari", short: "feb", num: "2", num2: "02", en: "february" },
+  { full: "maret", short: "mar", num: "3", num2: "03", en: "march" },
+  { full: "april", short: "apr", num: "4", num2: "04", en: "april" },
+  { full: "mei", short: "mei", num: "5", num2: "05", en: "may" },
+  { full: "juni", short: "jun", num: "6", num2: "06", en: "june" },
+  { full: "juli", short: "jul", num: "7", num2: "07", en: "july" },
+  { full: "agustus", short: "ags", num: "8", num2: "08", alt: "agu", en: "august" },
+  { full: "september", short: "sep", num: "9", num2: "09", en: "september" },
+  { full: "oktober", short: "okt", num: "10", num2: "10", en: "october" },
+  { full: "november", short: "nov", num: "11", num2: "11", en: "november" },
+  { full: "desember", short: "des", num: "12", num2: "12", en: "december" },
+];
+
+/**
+ * Extracts the effective timestamp (in ms) of an archive for sorting and date matching.
+ * Prioritizes metadata exam date, followed by created_at, and filename timestamp.
+ */
+export const getArchiveEffectiveTimestamp = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): number => {
+  if (file.metadata?.date) {
+    const parsed = Date.parse(String(file.metadata.date));
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  if (file.created_at) {
+    const parsed = Date.parse(String(file.created_at));
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  if (file.name) {
+    const match = file.name.match(/[._](\d{10,13})/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      const ts = num < 10000000000 ? num * 1000 : num;
+      if (!isNaN(ts) && ts > 0) return ts;
+    }
+  }
+  return 0;
+};
+
+/**
+ * Sorts cloud archives strictly from newest date to oldest date.
+ */
+export const sortArchivesNewestFirst = <
+  T extends { name: string; created_at?: string; metadata?: ArchiveMetadata }
+>(
+  archives: T[]
+): T[] => {
+  return [...archives].sort((a, b) => {
+    const timeA = getArchiveEffectiveTimestamp(a);
+    const timeB = getArchiveEffectiveTimestamp(b);
+    return timeB - timeA;
+  });
+};
+
+/**
+ * Builds a search corpus for an archive entry including:
+ * - Nama Sekolah
+ * - Mapel & Kelas & Target Kelas
+ * - Jenis Evaluasi
+ * - Tanggal, Bulan (nama & angka), Tahun
+ * - Kode Soal & Nama Berkas
+ */
+export const buildArchiveSearchCorpus = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): string => {
+  const tokens: string[] = [];
+
+  // 1. Kode soal & nama file
+  const examCode = file.name.includes("_meta_")
+    ? file.name.split("_meta_")[0].trim()
+    : file.name.split("_")[0].replace(/\.json$/i, "").trim();
+  tokens.push(examCode);
+  tokens.push(file.name);
+
+  // 2. Nama Sekolah
+  if (file.metadata?.school && file.metadata.school !== "-") {
+    tokens.push(file.metadata.school);
+  }
+
+  // 3. Mapel & Kelas & Target Kelas
+  if (file.metadata?.subject && file.metadata.subject !== "-") {
+    tokens.push(file.metadata.subject);
+  }
+  if (file.metadata?.classLevel && file.metadata.classLevel !== "-") {
+    tokens.push(file.metadata.classLevel);
+    tokens.push(`kelas ${file.metadata.classLevel}`);
+    tokens.push(`kls ${file.metadata.classLevel}`);
+  }
+  if (file.metadata?.targetClasses) {
+    if (Array.isArray(file.metadata.targetClasses)) {
+      tokens.push(...file.metadata.targetClasses.filter(Boolean));
+    } else {
+      tokens.push(String(file.metadata.targetClasses));
+    }
+  }
+
+  // 4. Jenis Evaluasi
+  if (file.metadata?.examType && file.metadata.examType !== "-") {
+    tokens.push(file.metadata.examType);
+    tokens.push(`evaluasi ${file.metadata.examType}`);
+    tokens.push(`ujian ${file.metadata.examType}`);
+  }
+
+  // 5. Tanggal / Bulan / Tahun
+  const dateSources = [file.metadata?.date, file.created_at].filter(Boolean);
+  for (const rawDate of dateSources) {
+    const d = new Date(String(rawDate));
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear().toString();
+      const monthIdx = d.getMonth();
+      const dateNum = d.getDate().toString();
+      const datePad = dateNum.padStart(2, "0");
+      const monthInfo = INDONESIAN_MONTHS[monthIdx];
+
+      tokens.push(year);
+      tokens.push(dateNum);
+      tokens.push(datePad);
+
+      if (monthInfo) {
+        tokens.push(monthInfo.full);
+        tokens.push(monthInfo.short);
+        if (monthInfo.alt) tokens.push(monthInfo.alt);
+        if (monthInfo.en) tokens.push(monthInfo.en);
+        tokens.push(monthInfo.num);
+        tokens.push(monthInfo.num2);
+
+        // Formatted date representations
+        tokens.push(`${dateNum} ${monthInfo.full} ${year}`);
+        tokens.push(`${datePad} ${monthInfo.full} ${year}`);
+        tokens.push(`${dateNum} ${monthInfo.short} ${year}`);
+        tokens.push(`${datePad}/${monthInfo.num2}/${year}`);
+        tokens.push(`${datePad}-${monthInfo.num2}-${year}`);
+        tokens.push(`${year}-${monthInfo.num2}-${datePad}`);
+        tokens.push(`${monthInfo.full} ${year}`);
+        tokens.push(`${monthInfo.short} ${year}`);
+      }
+    } else if (typeof rawDate === "string") {
+      tokens.push(rawDate);
+    }
+  }
+
+  return tokens.join(" ").toLowerCase();
+};
+
+/**
+ * Checks if an archive matches a search query across school, subject, class, evaluation type, date, or exam code.
+ */
+export const matchesArchiveSearch = (
+  file: {
+    name: string;
+    created_at?: string;
+    metadata?: ArchiveMetadata;
+  },
+  query: string
+): boolean => {
+  const cleanQuery = query.trim().toLowerCase();
+  if (!cleanQuery) return true;
+
+  const corpus = buildArchiveSearchCorpus(file);
+  const searchTerms = cleanQuery.split(/\s+/).filter(Boolean);
+
+  // All typed terms must match somewhere in the corpus
+  return searchTerms.every((term) => corpus.includes(term));
+};
