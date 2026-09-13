@@ -22,6 +22,7 @@ interface InvitationModalProps {
   teacherName?: string;
   schoolName?: string;
   exam?: Exam | null;
+  onJoin?: (examCode: string) => void;
 }
 
 export const InvitationModal: React.FC<InvitationModalProps> = ({
@@ -30,6 +31,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
   teacherName,
   schoolName,
   exam,
+  onJoin,
 }) => {
   const hook = useInvitationModal({ isOpen, exam, onClose });
   const {
@@ -46,6 +48,14 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
     typeof window !== "undefined" ? window.location.origin : "";
   const joinUrl = exam ? `${currentUrl}/?join=${exam.code}` : currentUrl;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(joinUrl)}&margin=10`;
+
+  const displaySchoolName =
+    schoolName ||
+    exam?.authorSchool ||
+    exam?.config?.schoolName ||
+    teacherName ||
+    exam?.authorName ||
+    "Penyelenggara Ujian";
 
   if (!isOpen) return null;
 
@@ -238,14 +248,29 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
                   </div>
                 </div>
 
-                <a
-                  href={joinUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block w-full py-2 sm:py-2.5 bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg sm:rounded-xl text-center shadow-md transition-all active:scale-95"
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isStarted) {
+                      if (onJoin && exam) {
+                        onJoin(exam.code);
+                      } else {
+                        window.location.href = joinUrl;
+                      }
+                    } else {
+                      alert(
+                        `Ujian belum dimulai.\nJadwal Pelaksanaan: ${getFormattedStartDate()}.\n\nSilakan bersiap dan masuk saat jadwal pelaksanaan tiba.`
+                      );
+                    }
+                  }}
+                  className={`block w-full py-2 sm:py-2.5 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg sm:rounded-xl text-center shadow-md transition-all active:scale-95 ${
+                    isStarted
+                      ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse shadow-emerald-500/20"
+                      : "bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
+                  }`}
                 >
-                  Click to Join
-                </a>
+                  {isStarted ? "Masuk Ujian Sekarang" : "Click to Join"}
+                </button>
                 <button
                   onClick={() => setShowRegisterModal(true)}
                   className="block w-full py-2 sm:py-2.5 bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg sm:rounded-xl text-center shadow-md transition-all active:scale-95 mt-2"
@@ -267,7 +292,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({
                     <UserIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
                   <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
-                    {schoolName || teacherName || "Sekolah"}
+                    {displaySchoolName}
                   </span>
                 </div>
               </div>
