@@ -30,6 +30,7 @@ interface ExamEditorState {
 
     // Mutator actions
     handleAddClassTag: (newTag: string) => void;
+    handleAddClassTags: (newTags: string[]) => void;
     removeClassTag: (tag: string) => void;
     handleConfigChangeManual: (updater: (prev: ExamConfig) => ExamConfig) => void;
     handleSubjectSelect: (subject: string) => void;
@@ -137,6 +138,12 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 state.config.targetClasses = [...(state.config.targetClasses || []), newTag];
             }
             useExamEditorUIStore.getState().setClassTagInput('');
+        }),
+
+        handleAddClassTags: (newTags) => set((state) => {
+            const current = state.config.targetClasses || [];
+            const merged = Array.from(new Set([...current, ...newTags]));
+            state.config.targetClasses = merged;
         }),
 
         removeClassTag: (tag) => set((state) => {
