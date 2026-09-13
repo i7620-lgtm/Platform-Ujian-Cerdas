@@ -629,7 +629,7 @@ export class ArchiveService {
 
    async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: Record<string, unknown>}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
-          limit: 100,
+          limit: 1000,
           sortBy: { column: 'created_at', order: 'desc' },
       });
       
@@ -823,6 +823,30 @@ export class ArchiveService {
               size: f ? ((f.metadata as {size?: number})?.size || 0) : 0,
               metadata
           };
+      });
+
+      // Always sort archives from newest date to oldest
+      return mapped.sort((a, b) => {
+          const getTimestamp = (item: typeof a) => {
+              if (item.metadata?.date) {
+                  const t = Date.parse(String(item.metadata.date));
+                  if (!isNaN(t) && t > 0) return t;
+              }
+              if (item.created_at) {
+                  const t = Date.parse(String(item.created_at));
+                  if (!isNaN(t) && t > 0) return t;
+              }
+              if (item.name) {
+                  const match = item.name.match(/[._](\d{10,13})/);
+                  if (match) {
+                      const num = parseInt(match[1], 10);
+                      const ts = num < 10000000000 ? num * 1000 : num;
+                      if (!isNaN(ts) && ts > 0) return ts;
+                  }
+              }
+              return 0;
+          };
+          return getTimestamp(b) - getTimestamp(a);
       });
    }
 
