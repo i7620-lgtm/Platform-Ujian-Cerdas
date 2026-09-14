@@ -601,7 +601,8 @@ const App: React.FC = () => {
   const resetToHome = () => { 
     setView('SELECTOR'); 
     setCurrentExam(null); 
-    setWaitingExam(null);
+    setInvitationExam(null);
+    setIsInviteOpen(false);
     setCurrentStudent(null); 
     setStudentResult(null); 
     setResumedResult(null);
