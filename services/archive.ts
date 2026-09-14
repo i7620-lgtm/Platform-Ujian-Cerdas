@@ -629,7 +629,7 @@ export class ArchiveService {
 
    async getArchivedList(): Promise<{name: string, created_at: string, size: number, metadata?: Record<string, unknown>}[]> {
       const { data, error } = await supabase.storage.from('archives').list('', {
-          limit: 100,
+          limit: 1000,
           sortBy: { column: 'created_at', order: 'desc' },
       });
       
@@ -823,6 +823,48 @@ export class ArchiveService {
               size: f ? ((f.metadata as {size?: number})?.size || 0) : 0,
               metadata
           };
+      });
+
+      // Always sort archives from newest date to oldest
+      return mapped.sort((a, b) => {
+          const parseTime = (val: unknown): number => {
+              if (!val) return 0;
+              const str = String(val).trim();
+              if (!str || str === "-") return 0;
+              const ymd = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+              if (ymd) {
+                  const d = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+                  return isNaN(d.getTime()) ? 0 : d.getTime();
+              }
+              const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+              if (dmy) {
+                  const d = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+                  return isNaN(d.getTime()) ? 0 : d.getTime();
+              }
+              const t = Date.parse(str);
+              return isNaN(t) ? 0 : t;
+          };
+
+          const getTimestamp = (item: typeof a) => {
+              if (item.metadata?.date) {
+                  const t = parseTime(item.metadata.date);
+                  if (t > 0) return t;
+              }
+              if (item.created_at) {
+                  const t = parseTime(item.created_at);
+                  if (t > 0) return t;
+              }
+              if (item.name) {
+                  const match = item.name.match(/[._](\d{10,13})/);
+                  if (match) {
+                      const num = parseInt(match[1], 10);
+                      const ts = num < 10000000000 ? num * 1000 : num;
+                      if (!isNaN(ts) && ts > 0) return ts;
+                  }
+              }
+              return 0;
+          };
+          return getTimestamp(b) - getTimestamp(a);
       });
    }
 

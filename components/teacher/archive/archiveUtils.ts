@@ -378,3 +378,243 @@ export const filterEvaluationSection = (
     return content.substring(0, startIndex).trimEnd();
   }
 };
+
+const INDONESIAN_MONTHS = [
+  { full: "januari", short: "jan", alt: "jan", num: "1", num2: "01", en: "january" },
+  { full: "februari", short: "feb", alt: "pebruari", num: "2", num2: "02", en: "february" },
+  { full: "maret", short: "mar", alt: "mar", num: "3", num2: "03", en: "march" },
+  { full: "april", short: "apr", alt: "apr", num: "4", num2: "04", en: "april" },
+  { full: "mei", short: "mei", alt: "may", num: "5", num2: "05", en: "may" },
+  { full: "juni", short: "jun", alt: "june", num: "6", num2: "06", en: "june" },
+  { full: "juli", short: "jul", alt: "july", num: "7", num2: "07", en: "july" },
+  { full: "agustus", short: "agu", alt: "ags", en: "august", num: "8", num2: "08" },
+  { full: "september", short: "sep", alt: "sept", en: "september", num: "9", num2: "09" },
+  { full: "oktober", short: "okt", alt: "oct", en: "october", num: "10", num2: "10" },
+  { full: "november", short: "nov", alt: "nop", en: "november", num: "11", num2: "11" },
+  { full: "desember", short: "des", alt: "dec", en: "december", num: "12", num2: "12" },
+];
+
+/**
+ * Parses any date value into a local calendar Date object reliably,
+ * avoiding UTC-midnight timezone shifts that could turn September 1 into August 31.
+ */
+export const parseArchiveDate = (raw: unknown): Date | null => {
+  if (!raw) return null;
+  if (typeof raw === "number") {
+    const d = new Date(raw < 10000000000 ? raw * 1000 : raw);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const str = String(raw).trim();
+  if (!str || str === "-") return null;
+
+  // 1. Format: YYYY-MM-DD or YYYY/MM/DD (e.g. 2026-09-01)
+  const ymd = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymd) {
+    const y = parseInt(ymd[1], 10);
+    const m = parseInt(ymd[2], 10) - 1;
+    const d = parseInt(ymd[3], 10);
+    const dateObj = new Date(y, m, d);
+    return isNaN(dateObj.getTime()) ? null : dateObj;
+  }
+
+  // 2. Format: DD-MM-YYYY or DD/MM/YYYY (e.g. 01-09-2026)
+  const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmy) {
+    const d = parseInt(dmy[1], 10);
+    const m = parseInt(dmy[2], 10) - 1;
+    const y = parseInt(dmy[3], 10);
+    const dateObj = new Date(y, m, d);
+    return isNaN(dateObj.getTime()) ? null : dateObj;
+  }
+
+  // 3. Fallback standard parse
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+/**
+ * Resolves the single authoritative Date object for an archive.
+ * Priority:
+ * 1. metadata.date (Tanggal pelaksanaan ujian yang diinput/diatur pengguna)
+ * 2. created_at (Fallback hanya jika metadata.date belum tercatat)
+ * 3. timestamp pada nama file (Fallback terakhir)
+ */
+export const getArchiveEffectiveDate = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): Date | null => {
+  if (file.metadata?.date && file.metadata.date !== "-") {
+    const d = parseArchiveDate(file.metadata.date);
+    if (d) return d;
+  }
+  if (file.created_at) {
+    const d = parseArchiveDate(file.created_at);
+    if (d) return d;
+  }
+  if (file.name) {
+    const match = file.name.match(/[._](\d{10,13})/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      const ts = num < 10000000000 ? num * 1000 : num;
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+};
+
+/**
+ * Formats the authoritative date for display on archive cards.
+ */
+export const formatArchiveDisplayDate = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): string => {
+  const d = getArchiveEffectiveDate(file);
+  if (!d) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+/**
+ * Extracts the effective timestamp (in ms) of an archive for sorting and date matching.
+ * Uses getArchiveEffectiveDate to guarantee consistent sorting and date handling.
+ */
+export const getArchiveEffectiveTimestamp = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): number => {
+  const d = getArchiveEffectiveDate(file);
+  return d ? d.getTime() : 0;
+};
+
+/**
+ * Sorts cloud archives strictly from newest date to oldest date.
+ */
+export const sortArchivesNewestFirst = <
+  T extends { name: string; created_at?: string; metadata?: ArchiveMetadata }
+>(
+  archives: T[]
+): T[] => {
+  return [...archives].sort((a, b) => {
+    const timeA = getArchiveEffectiveTimestamp(a);
+    const timeB = getArchiveEffectiveTimestamp(b);
+    return timeB - timeA;
+  });
+};
+
+/**
+ * Builds a search corpus for an archive entry including:
+ * - Kode Soal (bersih tanpa hash base64 nama berkas)
+ * - Nama Sekolah
+ * - Mapel & Kelas & Target Kelas
+ * - Jenis Evaluasi
+ * - Tanggal, Bulan (nama & angka), Tahun (hanya dari tanggal resmi arsip terkait)
+ */
+export const buildArchiveSearchCorpus = (file: {
+  name: string;
+  created_at?: string;
+  metadata?: ArchiveMetadata;
+}): string => {
+  const tokens: string[] = [];
+
+  // 1. Kode soal (hanya exam code bersih, BUKAN string base64 metadata)
+  const examCode = file.name.includes("_meta_")
+    ? file.name.split("_meta_")[0].trim()
+    : file.name.split("_")[0].replace(/\.json$/i, "").trim();
+  if (examCode) {
+    tokens.push(examCode);
+  }
+
+  // 2. Nama Sekolah
+  if (file.metadata?.school && file.metadata.school !== "-") {
+    tokens.push(file.metadata.school);
+  }
+
+  // 3. Mapel & Kelas & Target Kelas
+  if (file.metadata?.subject && file.metadata.subject !== "-") {
+    tokens.push(file.metadata.subject);
+  }
+  if (file.metadata?.classLevel && file.metadata.classLevel !== "-") {
+    tokens.push(file.metadata.classLevel);
+    tokens.push(`kelas ${file.metadata.classLevel}`);
+    tokens.push(`kls ${file.metadata.classLevel}`);
+  }
+  if (file.metadata?.targetClasses) {
+    if (Array.isArray(file.metadata.targetClasses)) {
+      tokens.push(...file.metadata.targetClasses.filter(Boolean));
+    } else {
+      tokens.push(String(file.metadata.targetClasses));
+    }
+  }
+
+  // 4. Jenis Evaluasi
+  if (file.metadata?.examType && file.metadata.examType !== "-") {
+    tokens.push(file.metadata.examType);
+    tokens.push(`evaluasi ${file.metadata.examType}`);
+    tokens.push(`ujian ${file.metadata.examType}`);
+  }
+
+  // 5. Tanggal / Bulan / Tahun yang SESUAI (hanya 1 tanggal resmi arsip)
+  const effectiveDate = getArchiveEffectiveDate(file);
+  if (effectiveDate) {
+    const year = effectiveDate.getFullYear().toString();
+    const monthIdx = effectiveDate.getMonth(); // 0 - 11
+    const dateNum = effectiveDate.getDate().toString();
+    const datePad = dateNum.padStart(2, "0");
+    const monthInfo = INDONESIAN_MONTHS[monthIdx];
+
+    tokens.push(year);
+    tokens.push(dateNum);
+    tokens.push(datePad);
+
+    if (monthInfo) {
+      tokens.push(monthInfo.full);
+      tokens.push(monthInfo.short);
+      if (monthInfo.alt) tokens.push(monthInfo.alt);
+      if (monthInfo.en) tokens.push(monthInfo.en);
+      tokens.push(monthInfo.num);
+      tokens.push(monthInfo.num2);
+
+      // Gabungan format tanggal yang umum dicari
+      tokens.push(`${dateNum} ${monthInfo.full} ${year}`);
+      tokens.push(`${datePad} ${monthInfo.full} ${year}`);
+      tokens.push(`${dateNum} ${monthInfo.short} ${year}`);
+      tokens.push(`${datePad} ${monthInfo.short} ${year}`);
+      tokens.push(`${datePad}/${monthInfo.num2}/${year}`);
+      tokens.push(`${datePad}-${monthInfo.num2}-${year}`);
+      tokens.push(`${year}-${monthInfo.num2}-${datePad}`);
+      tokens.push(`${monthInfo.full} ${year}`);
+      tokens.push(`${monthInfo.short} ${year}`);
+    }
+  }
+
+  return tokens.join(" ").toLowerCase();
+};
+
+/**
+ * Checks if an archive matches a search query across school, subject, class, evaluation type, date, or exam code.
+ */
+export const matchesArchiveSearch = (
+  file: {
+    name: string;
+    created_at?: string;
+    metadata?: ArchiveMetadata;
+  },
+  query: string
+): boolean => {
+  const cleanQuery = query.trim().toLowerCase();
+  if (!cleanQuery) return true;
+
+  const corpus = buildArchiveSearchCorpus(file);
+  const searchTerms = cleanQuery.split(/\s+/).filter(Boolean);
+
+  // All typed terms must match somewhere in the corpus
+  return searchTerms.every((term) => corpus.includes(term));
+};
