@@ -10,6 +10,7 @@ import {
   type ArchiveMetadata,
   sortArchivesNewestFirst,
   matchesArchiveSearch,
+  formatArchiveDisplayDate,
 } from "./archiveUtils";
 
 interface ArchiveSavedListProps {
@@ -242,26 +243,7 @@ export const ArchiveSavedList: React.FC<ArchiveSavedListProps> = ({
                     <div className="grid grid-cols-3 gap-1">
                       <span className="font-bold text-slate-400">Tanggal</span>
                       <span className="col-span-2 font-medium text-slate-700 dark:text-slate-300 truncate">
-                        :{" "}
-                        {file.metadata.date && !isNaN(Date.parse(String(file.metadata.date)))
-                          ? new Date(file.metadata.date).toLocaleDateString(
-                              "id-ID",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )
-                          : file.created_at && !isNaN(Date.parse(String(file.created_at)))
-                          ? new Date(file.created_at).toLocaleDateString(
-                              "id-ID",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )
-                          : "-"}
+                        : {formatArchiveDisplayDate(file)}
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
