@@ -827,14 +827,32 @@ export class ArchiveService {
 
       // Always sort archives from newest date to oldest
       return mapped.sort((a, b) => {
+          const parseTime = (val: unknown): number => {
+              if (!val) return 0;
+              const str = String(val).trim();
+              if (!str || str === "-") return 0;
+              const ymd = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+              if (ymd) {
+                  const d = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+                  return isNaN(d.getTime()) ? 0 : d.getTime();
+              }
+              const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+              if (dmy) {
+                  const d = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+                  return isNaN(d.getTime()) ? 0 : d.getTime();
+              }
+              const t = Date.parse(str);
+              return isNaN(t) ? 0 : t;
+          };
+
           const getTimestamp = (item: typeof a) => {
               if (item.metadata?.date) {
-                  const t = Date.parse(String(item.metadata.date));
-                  if (!isNaN(t) && t > 0) return t;
+                  const t = parseTime(item.metadata.date);
+                  if (t > 0) return t;
               }
               if (item.created_at) {
-                  const t = Date.parse(String(item.created_at));
-                  if (!isNaN(t) && t > 0) return t;
+                  const t = parseTime(item.created_at);
+                  if (t > 0) return t;
               }
               if (item.name) {
                   const match = item.name.match(/[._](\d{10,13})/);
