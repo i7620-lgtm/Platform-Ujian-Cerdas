@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { authService } from './auth';
 import type { Exam, Question, TeacherProfile, ExamConfig, ResultStatus } from '../types';
 import { compressImage, calculateExamScore, cleanupQuestionContent, parseList } from '../components/teacher/examUtils';
+import { uploadToCloudinary } from './cloudinary';
 
 // Helper: Get file extension safely from data URI
 const getExtFromDataUrl = (dataUrl: string, defaultExt: string = 'png'): string => {
@@ -121,6 +122,42 @@ const urlToBase64 = async (url: string): Promise<string | null> => {
             img.src = url;
         });
     }
+};
+
+// Helper: Upload media to Cloudinary (zero Supabase egress) with fallback to Supabase Storage
+const uploadMediaWithFallback = async (
+    src: string,
+    examCode: string,
+    contextId: string,
+    type: 'img' | 'audio',
+    index?: number
+): Promise<{ url: string; bucketPath?: string } | null> => {
+    // 1. Prioritize Cloudinary (Free egress, global CDN, auto-optimized)
+    try {
+        const cloudUrl = await uploadToCloudinary(src);
+        if (cloudUrl) {
+            return { url: cloudUrl };
+        }
+    } catch (err) {
+        console.warn('Cloudinary upload attempt failed, falling back to Supabase Storage:', err);
+    }
+
+    // 2. Safe Fallback: Supabase Storage
+    try {
+        const defaultExt = type === 'img' ? 'png' : 'mp3';
+        const blob = base64ToBlob(src);
+        const ext = getExtFromDataUrl(src, defaultExt);
+        const suffix = index !== undefined ? `_${index}` : '';
+        const filename = `${examCode}/${contextId}_${type}_${Date.now()}${suffix}.${ext}`;
+        const { data } = await supabase.storage.from('soal').upload(filename, blob, { upsert: true, cacheControl: '31536000' });
+        if (data) {
+            const { data: publicUrlData } = supabase.storage.from('soal').getPublicUrl(filename);
+            return { url: publicUrlData.publicUrl, bucketPath: filename };
+        }
+    } catch (e) {
+        console.error(`Fallback upload ${type} to Supabase failed:`, e);
+    }
+    return null;
 };
 
 // Helper: shuffle array (Fisher-Yates)
@@ -486,14 +523,10 @@ export class ExamService {
                 const src = img.getAttribute('src');
                 if (src && src.startsWith('data:image')) {
                     try {
-                        const blob = base64ToBlob(src);
-                        const ext = getExtFromDataUrl(src, 'png');
-                        const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
-                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                        if (data) {
-                            const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                            img.setAttribute('src', publicUrlData.publicUrl);
-                            img.setAttribute('data-bucket-path', filename); 
+                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'img', i);
+                        if (res) {
+                            img.setAttribute('src', res.url);
+                            if (res.bucketPath) img.setAttribute('data-bucket-path', res.bucketPath);
                         }
                     } catch (e) { console.error("Gagal upload gambar", e); }
                 }
@@ -505,14 +538,10 @@ export class ExamService {
                 const src = audio.getAttribute('src');
                 if (src && src.startsWith('data:audio')) {
                     try {
-                        const blob = base64ToBlob(src);
-                        const ext = getExtFromDataUrl(src, 'mp3');
-                        const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
-                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                        if (data) {
-                            const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                            audio.setAttribute('src', publicUrlData.publicUrl);
-                            audio.setAttribute('data-bucket-path', filename);
+                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'audio', i);
+                        if (res) {
+                            audio.setAttribute('src', res.url);
+                            if (res.bucketPath) audio.setAttribute('data-bucket-path', res.bucketPath);
                         }
                     } catch (e) { console.error("Gagal upload audio", e); }
                 }
@@ -550,27 +579,18 @@ export class ExamService {
 
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
                 try {
-                    const blob = base64ToBlob(q.imageUrl);
-                    const ext = getExtFromDataUrl(q.imageUrl, 'png');
-                    const filename = `${examCode}/${q.id}_img_${Date.now()}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        q.imageUrl = publicUrlData.publicUrl;
+                    const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
+                    if (res) {
+                        q.imageUrl = res.url;
                     }
                 } catch (e) { console.error("Upload image failed", e); }
             }
 
             if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
                 try {
-                    const blob = base64ToBlob(q.audioUrl);
-                    const ext = getExtFromDataUrl(q.audioUrl, 'mp3');
-                    const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
-                    
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        q.audioUrl = publicUrlData.publicUrl;
+                    const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
+                    if (res) {
+                        q.audioUrl = res.url;
                     }
                 } catch (e) { console.error("Gagal upload audio", e); }
             }
@@ -675,14 +695,10 @@ export class ExamService {
                 const src = img.getAttribute('src');
                 if (src && src.startsWith('data:image')) {
                     try {
-                        const blob = base64ToBlob(src);
-                        const ext = getExtFromDataUrl(src, 'png');
-                        const filename = `${examCode}/${contextId}_img_${Date.now()}_${i}.${ext}`;
-                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                        if (data) {
-                            const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                            img.setAttribute('src', publicUrlData.publicUrl);
-                            img.setAttribute('data-bucket-path', filename); 
+                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'img', i);
+                        if (res) {
+                            img.setAttribute('src', res.url);
+                            if (res.bucketPath) img.setAttribute('data-bucket-path', res.bucketPath);
                         }
                     } catch (e) { console.error("Gagal upload gambar", e); }
                 }
@@ -694,14 +710,10 @@ export class ExamService {
                 const src = audio.getAttribute('src');
                 if (src && src.startsWith('data:audio')) {
                     try {
-                        const blob = base64ToBlob(src);
-                        const ext = getExtFromDataUrl(src, 'mp3');
-                        const filename = `${examCode}/${contextId}_audio_${Date.now()}_${i}.${ext}`;
-                        const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                        if (data) {
-                            const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                            audio.setAttribute('src', publicUrlData.publicUrl);
-                            audio.setAttribute('data-bucket-path', filename);
+                        const res = await uploadMediaWithFallback(src, examCode, contextId, 'audio', i);
+                        if (res) {
+                            audio.setAttribute('src', res.url);
+                            if (res.bucketPath) audio.setAttribute('data-bucket-path', res.bucketPath);
                         }
                     } catch (e) { console.error("Gagal upload audio", e); }
                 }
@@ -739,27 +751,18 @@ export class ExamService {
 
             if (q.imageUrl && q.imageUrl.startsWith('data:image')) {
                 try {
-                    const blob = base64ToBlob(q.imageUrl);
-                    const ext = getExtFromDataUrl(q.imageUrl, 'png');
-                    const filename = `${examCode}/${q.id}_img_${Date.now()}.${ext}`;
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        q.imageUrl = publicUrlData.publicUrl;
+                    const res = await uploadMediaWithFallback(q.imageUrl, examCode, q.id, 'img');
+                    if (res) {
+                        q.imageUrl = res.url;
                     }
                 } catch (e) { console.error("Upload image failed", e); }
             }
 
             if (q.audioUrl && q.audioUrl.startsWith('data:audio')) {
-                 try {
-                    const blob = base64ToBlob(q.audioUrl);
-                    const ext = getExtFromDataUrl(q.audioUrl, 'mp3');
-                    const filename = `${examCode}/${q.id}_audio_${Date.now()}.${ext}`;
-                    
-                    const { data } = await supabase.storage.from(BUCKET_NAME).upload(filename, blob, { upsert: true, cacheControl: '31536000' });
-                    if (data) {
-                        const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
-                        q.audioUrl = publicUrlData.publicUrl;
+                try {
+                    const res = await uploadMediaWithFallback(q.audioUrl, examCode, q.id, 'audio');
+                    if (res) {
+                        q.audioUrl = res.url;
                     }
                 } catch (e) { console.error("Gagal upload audio", e); }
             }
