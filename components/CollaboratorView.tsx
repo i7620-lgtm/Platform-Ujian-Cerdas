@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { Exam, Question, ExamConfig } from "../types";
 import { ExamEditor } from "./teacher/ExamEditor";
 import { OngoingExamModal } from "./teacher/DashboardModals";
@@ -25,14 +24,10 @@ export const CollaboratorView: React.FC<CollaboratorViewProps> = ({
   isDarkMode,
   toggleTheme,
 }) => {
-  const { questions, config, setQuestions, setConfig } = useExamEditorStore(
-    useShallow((s) => ({
-      questions: s.questions,
-      config: s.config,
-      setQuestions: s.setQuestions,
-      setConfig: s.setConfig,
-    }))
-  );
+  const questions = useExamEditorStore((s) => s.questions);
+  const config = useExamEditorStore((s) => s.config);
+  const setQuestions = useExamEditorStore((s) => s.setQuestions);
+  const setConfig = useExamEditorStore((s) => s.setConfig);
 
   useEffect(() => {
     setQuestions(exam.questions);
