@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { compressImage, sanitizeHtml } from "./examUtils";
+import { renderLatexToString } from "../../utils/mathRenderer";
 
 export type WysiwygTab = "FORMAT" | "PARAGRAPH" | "INSERT" | "MATH";
 
@@ -237,57 +238,51 @@ export const useWysiwygEditor = ({
   };
 
   const insertMath = (latex: string) => {
-    const mathGlobal = window as any;
-    if (mathGlobal.katex) {
-      const html = mathGlobal.katex.renderToString(latex, {
-        throwOnError: false,
-        displayMode: false,
-      });
+    const html = renderLatexToString(latex, false);
 
-      if (document.activeElement !== editorRef.current) {
-        restoreSelection();
-      }
-      if (editorRef.current) editorRef.current.focus();
-
-      const sel = window.getSelection();
-      if (
-        sel &&
-        sel.rangeCount > 0 &&
-        editorRef.current &&
-        editorRef.current.contains(sel.anchorNode)
-      ) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-
-        const span = document.createElement("span");
-        span.className = "math-visual";
-        span.style.display = "inline-block";
-        span.style.verticalAlign = "middle";
-        span.contentEditable = "false";
-        span.setAttribute("data-latex", latex);
-        span.innerHTML = html;
-
-        const zws1 = document.createTextNode("\u200B");
-        const zws2 = document.createTextNode("\u200B");
-
-        const frag = document.createDocumentFragment();
-        frag.appendChild(zws1);
-        frag.appendChild(span);
-        frag.appendChild(zws2);
-
-        range.insertNode(frag);
-        range.setStartAfter(zws2);
-        range.setEndAfter(zws2);
-        sel.removeAllRanges();
-        sel.addRange(range);
-
-        checkActiveFormats();
-      } else {
-        const wrapper = `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, "&quot;")}">${html}</span>&#8203;`;
-        runCmd("insertHTML", wrapper);
-      }
-      handleInput();
+    if (document.activeElement !== editorRef.current) {
+      restoreSelection();
     }
+    if (editorRef.current) editorRef.current.focus();
+
+    const sel = window.getSelection();
+    if (
+      sel &&
+      sel.rangeCount > 0 &&
+      editorRef.current &&
+      editorRef.current.contains(sel.anchorNode)
+    ) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+
+      const span = document.createElement("span");
+      span.className = "math-visual";
+      span.style.display = "inline-block";
+      span.style.verticalAlign = "middle";
+      span.contentEditable = "false";
+      span.setAttribute("data-latex", latex);
+      span.innerHTML = html;
+
+      const zws1 = document.createTextNode("\u200B");
+      const zws2 = document.createTextNode("\u200B");
+
+      const frag = document.createDocumentFragment();
+      frag.appendChild(zws1);
+      frag.appendChild(span);
+      frag.appendChild(zws2);
+
+      range.insertNode(frag);
+      range.setStartAfter(zws2);
+      range.setEndAfter(zws2);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      checkActiveFormats();
+    } else {
+      const wrapper = `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, "&quot;")}">${html}</span>&#8203;`;
+      runCmd("insertHTML", wrapper);
+    }
+    handleInput();
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {

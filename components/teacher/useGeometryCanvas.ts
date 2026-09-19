@@ -116,13 +116,18 @@ export function useGeometryCanvas() {
   const addPresetShape = useCallback(
     (svgPathHtml: string, title?: string) => {
       const id = `preset-${Date.now()}`;
+      // Smart offset so multiple shapes don't obscure each other initially
+      const presetCount = elements.filter((e) => e.type === "preset").length;
+      const initialTx = 100 + (presetCount % 3) * 50;
+      const initialTy = 80 + Math.floor(presetCount / 3) * 50;
+
       const newElem: CanvasElement = {
         id,
         type: "preset",
         presetSvgHtml: svgPathHtml,
         rotate: 0,
-        tx: 100, // centered initially
-        ty: 80,
+        tx: initialTx,
+        ty: initialTy,
         color: strokeColor,
         strokeWidth,
         label: title || "Preset Shape",
@@ -132,6 +137,47 @@ export function useGeometryCanvas() {
       setSelectedElementId(id);
     },
     [elements, strokeColor, strokeWidth, pushState],
+  );
+
+  // Snap and attach shapes flush together so they never separate or leave gaps
+  const snapAttachShapes = useCallback(
+    (direction: "top" | "bottom" | "left" | "right" = "top") => {
+      const presets = elements.filter((e) => e.type === "preset");
+      if (presets.length < 2) return;
+
+      const target = presets[0]; // base shape
+      const toAttach =
+        presets.find((p) => p.id === selectedElementId && p.id !== target.id) ||
+        presets[presets.length - 1];
+      if (!toAttach || toAttach.id === target.id) return;
+
+      let newTx = target.tx ?? 100;
+      let newTy = target.ty ?? 80;
+
+      if (direction === "top") {
+        newTy = (target.ty ?? 80) - 115;
+        newTx = target.tx ?? 100;
+      } else if (direction === "bottom") {
+        newTy = (target.ty ?? 80) + 115;
+        newTx = target.tx ?? 100;
+      } else if (direction === "left") {
+        newTx = (target.tx ?? 100) - 115;
+        newTy = target.ty ?? 80;
+      } else if (direction === "right") {
+        newTx = (target.tx ?? 100) + 115;
+        newTy = target.ty ?? 80;
+      }
+
+      const updated = elements.map((el) => {
+        if (el.id === toAttach.id) {
+          return { ...el, tx: newTx, ty: newTy, rotate: 0 };
+        }
+        return el;
+      });
+
+      pushState(updated);
+    },
+    [elements, selectedElementId, pushState],
   );
 
   // Track mouse-down action depending on key Tool
@@ -294,6 +340,7 @@ export function useGeometryCanvas() {
     selectedElementId,
     setSelectedElementId,
     addPresetShape,
+    snapAttachShapes,
     handleCanvasMouseDown,
     handleCanvasMouseMove,
     handleCanvasMouseUp,

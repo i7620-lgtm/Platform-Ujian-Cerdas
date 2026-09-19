@@ -27,17 +27,22 @@ export const SHAPES_3D = [
 ];
 
 export const SHAPES_COMBINED = [
-  { id: "house", name: "Segiempat + Segitiga" },
-  { id: "capsule", name: "Tabung + Setengah Bola Atas" },
-  { id: "capsule2", name: "Kapsul (Tabung + 2 Setengah Bola)" },
-  { id: "icecream", name: "Kerucut + Setengah Bola" },
-  { id: "tube_cone", name: "Tabung + Kerucut" },
+  { id: "house", name: "Rumah 2D (Persegi Panjang + Segitiga)" },
+  { id: "combined_rect_semicircle", name: "Persegi Panjang + 1/2 Lingkaran" },
+  { id: "tube_cone", name: "Tabung + Kerucut (Tenda / Silo)" },
+  { id: "capsule", name: "Tabung + 1/2 Bola Atas" },
+  { id: "capsule2", name: "Kapsul (Tabung + 2x 1/2 Bola)" },
+  { id: "icecream", name: "Kerucut + 1/2 Bola (Es Krim)" },
   { id: "cone_cone", name: "Kerucut Ganda (Gasing)" },
-  { id: "cube_pyramid", name: "Kubus + Limas Segiempat" },
   { id: "block_pyramid", name: "Balok + Limas Segiempat" },
-  { id: "block_roof", name: "Balok + Prisma Segitiga" },
-  { id: "tube_tubes", name: "Bertingkat (Tabung)" },
-  { id: "tube_sphere", name: "Tabung + Bola (di dalam)" },
+  { id: "cube_pyramid", name: "Kubus + Limas Segiempat" },
+  { id: "block_roof", name: "Balok + Prisma Segitiga (Atap 3D)" },
+  { id: "combined_cuboid_cube", name: "Balok + Kubus Bertumpuk" },
+  { id: "tube_tubes", name: "Dua Tabung Bertingkat" },
+  { id: "combined_l_shape", name: "Bangun Bentuk L (Poligon)" },
+  { id: "combined_rect_rect", name: "Bangun Bentuk T (Dua Persegi Panjang)" },
+  { id: "shaded_circle_in_square", name: "Daerah Diarsir: Persegi - Lingkaran" },
+  { id: "shaded_square_in_circle", name: "Daerah Diarsir: Lingkaran - Persegi" },
 ];
 
 interface UseGeometryModalParams {
@@ -197,7 +202,8 @@ export const useGeometryModal = ({
       finalSvg = generateCanvasCombinedSVG(canvasHook.elements, 500, 350);
     }
 
-    const html = `<span class="geometry-shape" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0 0.5rem; text-align: center; line-height: 1;">${finalSvg}</span>`;
+    const dataShapeAttr = workspaceMode === "preset" ? ` data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}"` : "";
+    const html = `<span class="geometry-shape" contenteditable="false"${dataShapeAttr} style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${finalSvg}</span>`;
     onInsert(html);
     onClose();
   };

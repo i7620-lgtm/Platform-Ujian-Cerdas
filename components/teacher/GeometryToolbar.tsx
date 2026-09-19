@@ -21,6 +21,8 @@ interface GeometryToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onClear: () => void;
+  onSnapAttach?: (direction: "top" | "bottom" | "left" | "right") => void;
+  hasPresets?: boolean;
 }
 
 const PALETTE_COLORS = [
@@ -44,9 +46,55 @@ export const GeometryToolbar: React.FC<GeometryToolbarProps> = ({
   canUndo,
   canRedo,
   onClear,
+  onSnapAttach,
+  hasPresets,
 }) => {
   return (
     <div className="flex flex-col gap-4 p-3 bg-gray-50 dark:bg-slate-800/80 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+      {/* Snap & Attach Helper (when multiple shapes are in canvas) */}
+      {hasPresets && onSnapAttach && (
+        <div className="p-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 rounded-lg border border-indigo-200/80 dark:border-indigo-800/60">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+              🧲 Rapatkan &amp; Satukan Bangun
+            </span>
+          </div>
+          <p className="text-[10px] text-indigo-600/90 dark:text-indigo-300/80 mb-2 leading-tight">
+            Tempelkan bangun agar menempel presisi tanpa celah/terpisah:
+          </p>
+          <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => onSnapAttach("top")}
+              className="py-1 px-1.5 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded transition-colors"
+            >
+              ⬆️ Tempel di Atas
+            </button>
+            <button
+              type="button"
+              onClick={() => onSnapAttach("bottom")}
+              className="py-1 px-1.5 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded transition-colors"
+            >
+              ⬇️ Tempel di Bawah
+            </button>
+            <button
+              type="button"
+              onClick={() => onSnapAttach("left")}
+              className="py-1 px-1.5 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded transition-colors"
+            >
+              ⬅️ Tempel Kiri
+            </button>
+            <button
+              type="button"
+              onClick={() => onSnapAttach("right")}
+              className="py-1 px-1.5 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded transition-colors"
+            >
+              ➡️ Tempel Kanan
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tool Selections */}
       <div>
         <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-2">

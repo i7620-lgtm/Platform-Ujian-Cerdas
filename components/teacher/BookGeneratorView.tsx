@@ -8,6 +8,7 @@ import {
   getFormattedAnswerText,
 } from "./bookHelpers";
 import { useBookGenerator } from "./useBookGenerator";
+import { hydrateMathInContainer } from "../../utils/mathRenderer";
 
 const renderQuestionTextWithChart = (
   html: string,
@@ -123,33 +124,10 @@ export const BookGeneratorView: React.FC<BookGeneratorViewProps> = ({
   profile,
 }) => {
   useEffect(() => {
-    const renderMath = () => {
-      // @ts-expect-error - external lib
-      if (typeof window !== "undefined" && window.katex) {
-        const mathElements = document.querySelectorAll(
-          ".math-visual, [data-latex]",
-        );
-        mathElements.forEach((el) => {
-          const latex = el.getAttribute("data-latex") || el.textContent;
-          if (latex) {
-            try {
-              // @ts-expect-error - external lib
-              window.katex.render(latex, el, {
-                throwOnError: false,
-                displayMode: false,
-              });
-            } catch (e) {
-              console.error("KaTeX error:", e);
-            }
-          }
-        });
-      }
-    };
-
-    // Slight delay to allow DOM to update
-    const timeout = setTimeout(renderMath, 300);
+    hydrateMathInContainer(document);
+    const timeout = setTimeout(() => hydrateMathInContainer(document), 200);
     return () => clearTimeout(timeout);
-  });
+  }, []);
 
   const {
     selectedExams,

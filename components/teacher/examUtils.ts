@@ -1,4 +1,6 @@
 import type { Question, QuestionType, Exam, Result, ChartData } from "../../types";
+import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
+import { renderLatexToString, renderMathInHtml, normalizeLatex } from "../../utils/mathRenderer";
 
 // --- INTERFACES ---
 interface VisualLine {
@@ -1725,10 +1727,134 @@ export const calculateExamScore = (
   };
 };
 
+// Clean orphaned or escaped SVG tags that leaked into text, while safely preserving all valid SVG markup
+export const cleanOrphanedSvgMarkup = (html: string): string => {
+  if (!html) return html || "";
+
+  // 1. Temporarily extract all valid, complete <svg ...>...</svg> blocks to protect them completely
+  const validSvgs: string[] = [];
+  let cleaned = html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, (match) => {
+    const placeholder = `%%%PROTECTED_SVG_BLOCK_${validSvgs.length}%%%`;
+    validSvgs.push(match);
+    return placeholder;
+  });
+
+  // 2. Remove escaped or unescaped orphan code blocks or paragraphs containing leaked SVG fragments outside of valid SVGs
+  cleaned = cleaned.replace(
+    /(?:<pre[^>]*>)?(?:<code[^>]*>)?(?:<p[^>]*>)?\s*(?:&lt;|<)\s*(?:g|path|rect|polygon)\b[\s\S]*?(?:&lt;|<)\s*\/\s*svg\s*(?:&gt;|>)\s*(?:<\/p>)?(?:<\/code>)?(?:<\/pre>)?/gi,
+    "",
+  );
+
+  // 3. Remove standalone leaked closing svg tags like </svg> or &lt;/svg&gt; outside of valid SVGs
+  cleaned = cleaned.replace(
+    /(?:<p[^>]*>)?\s*(?:&lt;|<)\s*\/\s*svg\s*(?:&gt;|>)\s*(?:<\/p>)?/gi,
+    "",
+  );
+
+  // 4. Restore protected valid SVGs intact
+  validSvgs.forEach((svg, i) => {
+    cleaned = cleaned.replace(`%%%PROTECTED_SVG_BLOCK_${i}%%%`, svg);
+  });
+
+  return cleaned;
+};
+
+// Repair any geometry SVGs that were previously stripped of their labels or truncated
+export const repairGeometrySvgInHtml = (html: string): string => {
+  if (!html) return html || "";
+
+  const extractQuestionLabels = (): Record<string, string> => {
+    const labs: Record<string, string> = {
+      bottom_width: "12 cm",
+      bottom_depth: "8 cm",
+      bottom_height: "10 cm",
+      top_height: "6 cm"
+    };
+    const pM = html.match(/panjang\s*(\d+(?:[.,]\d+)?\s*(?:cm|m|mm)?)/i);
+    const lM = html.match(/lebar\s*(\d+(?:[.,]\d+)?\s*(?:cm|m|mm)?)/i);
+    const tLimasM = html.match(/tinggi\s*limas\s*(\d+(?:[.,]\d+)?\s*(?:cm|m|mm)?)/i);
+    const tBalokM = html.match(/(?:dan\s*)?tinggi(?:\s*balok)?\s*(\d+(?:[.,]\d+)?\s*(?:cm|m|mm)?)/i);
+
+    if (pM) labs.bottom_width = pM[1].trim();
+    if (lM) labs.bottom_depth = lM[1].trim();
+    if (tBalokM) labs.bottom_height = tBalokM[1].trim();
+    if (tLimasM) labs.top_height = tLimasM[1].trim();
+    return labs;
+  };
+
+  let repaired = html;
+
+  // 1. If HTML has an SVG without </svg> closing tag, ensure it is closed properly
+  repaired = repaired.replace(/(<svg\b[^>]*>(?:(?!<\/svg>)[\s\S])*?)(<\/span>|<\/p>|<\/div>|$)/gi, (m, p1, p2) => {
+    if (!p1.includes("</svg>")) {
+      return `${p1}</svg>${p2}`;
+    }
+    return m;
+  });
+
+  // 2. If HTML contains a geometry shape where labels (<g> or <text>) were stripped by past bugs or needs re-hydration to the new external label layout
+  repaired = repaired.replace(/(<span[^>]*class="[^"]*geometry-shape[^"]*"[^>]*>)([\s\S]*?)(<\/span>)/gi, (match, openSpan, innerContent, closeSpan) => {
+    // Check if openSpan has data-shape
+    const shapeMatch = openSpan.match(/data-shape="([^"]+)"/);
+    const labelsMatch = openSpan.match(/data-labels="([^"]+)"/);
+    if (shapeMatch) {
+      const shape = shapeMatch[1];
+      let labels = {};
+      try {
+        labels = JSON.parse(decodeURIComponent(labelsMatch ? labelsMatch[1] : "{}"));
+      } catch {
+        labels = {};
+      }
+      const svg = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
+      return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+    }
+
+    // Only re-hydrate to combined_cuboid_pyramid if the element is specifically a legacy truncated combined cuboid pyramid
+    if (
+      innerContent.includes('t_limas') ||
+      innerContent.includes('combined_cuboid_pyramid') ||
+      (html.includes("miniatur rumah") && html.includes("limas") && html.includes("balok"))
+    ) {
+      const defaultLabels = extractQuestionLabels();
+      const svg = generateGeometrySVG("combined_cuboid_pyramid", defaultLabels, "#e2e8f0", "#0f172a", false, true, true);
+      return `<span class="geometry-shape" contenteditable="false" data-shape="combined_cuboid_pyramid" data-labels="${encodeURIComponent(JSON.stringify(defaultLabels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+    }
+
+    if (innerContent.includes("<text") && innerContent.includes("</svg>")) {
+      return match;
+    }
+
+    return match;
+  });
+
+  // 3. Also check bare SVGs without .geometry-shape span
+  repaired = repaired.replace(/(<svg\b[^>]*viewBox="(?:0 0 220 220|0 0 240 \d+)"[^>]*>)([\s\S]*?)(<\/svg>|$)/gi, (match, openSvg, innerSvg, closeSvg) => {
+    // If it already has complete text labels and closing svg tag, keep it as is
+    if (innerSvg.includes("<text") && closeSvg.includes("</svg>")) {
+      return match;
+    }
+    if (
+      innerSvg.includes('t_limas') ||
+      (html.includes("miniatur rumah") && html.includes("limas") && html.includes("balok"))
+    ) {
+      const defaultLabels = extractQuestionLabels();
+      const svg = generateGeometrySVG("combined_cuboid_pyramid", defaultLabels, "#e2e8f0", "#0f172a", false, true, true);
+      return `<span class="geometry-shape" contenteditable="false" data-shape="combined_cuboid_pyramid" data-labels="${encodeURIComponent(JSON.stringify(defaultLabels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+    }
+    return match;
+  });
+
+  return repaired;
+};
+
 export const sanitizeHtml = (html: string): string => {
   if (!html) return "";
+
+  // Pre-process any raw LaTeX / math markers ($...$, $$...$$, \(...\), \[...\])
+  const mathProcessed = renderMathInHtml(html);
+
   const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
+  const doc = parser.parseFromString(mathProcessed, "text/html");
 
   // SECURITY FIX: Remove potentially dangerous tags (XSS Protection)
   const dangerousTags = [
@@ -1750,23 +1876,35 @@ export const sanitizeHtml = (html: string): string => {
 
   const isMath = (el: Element) =>
     el.classList.contains("math-visual") ||
-    el.closest(".math-visual") ||
+    el.closest(".math-visual") !== null ||
     el.classList.contains("katex") ||
-    el.closest(".katex") ||
+    el.closest(".katex") !== null ||
+    el.classList.contains("katex-html") ||
+    el.closest(".katex-html") !== null ||
+    el.classList.contains("katex-mathml") ||
+    el.closest(".katex-mathml") !== null ||
+    el.classList.contains("math-fallback") ||
+    el.closest(".math-fallback") !== null ||
     el.tagName.toLowerCase() === "math" ||
-    el.closest("math") ||
+    el.closest("math") !== null ||
     el.classList.contains("MathJax") ||
-    el.closest(".MathJax") ||
+    el.closest(".MathJax") !== null ||
     el.classList.contains("mjx-container") ||
-    el.closest(".mjx-container") ||
+    el.closest(".mjx-container") !== null ||
     el.classList.contains("math-tex") ||
-    el.closest(".math-tex");
+    el.closest(".math-tex") !== null;
 
-  // Handle style tags separately to preserve them if they are inside math
+  const isGeometry = (el: Element) =>
+    el.classList.contains("geometry-shape") ||
+    el.closest(".geometry-shape") !== null ||
+    el.tagName.toLowerCase() === "svg" ||
+    el.closest("svg") !== null;
+
+  // Handle style tags separately to preserve them if they are inside math or geometry
   const styleElements = doc.getElementsByTagName("style");
   for (let i = styleElements.length - 1; i >= 0; i--) {
     const el = styleElements[i];
-    if (!isMath(el)) {
+    if (!isMath(el) && !isGeometry(el)) {
       el.parentNode?.removeChild(el);
     }
   }
@@ -1793,7 +1931,7 @@ export const sanitizeHtml = (html: string): string => {
       }
     }
 
-    if (!isMath(el)) {
+    if (!isMath(el) && !isGeometry(el)) {
       if (el instanceof HTMLElement) {
         // Remove color and background-color styles
         el.style.color = "";
@@ -1858,7 +1996,11 @@ export const sanitizeHtml = (html: string): string => {
   });
 
   const result = doc.body.innerHTML;
-  return result.replace(/(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi, "");
+  const withoutAiSvg = result.replace(
+    /(?:<p[^>]*>)?\s*\\?\[\s*ai_svg(?::\s*[^\]]*)?\s*\\?\]\s*(?:<\/p>)?/gi,
+    "",
+  );
+  return repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(withoutAiSvg));
 };
 
 // --- MARKDOWN CONVERTER ---
@@ -1867,7 +2009,42 @@ export const htmlToMarkdown = (html: string): string => {
   if (!html) return "";
   let markdown = html;
 
-  // 1. Math (Inline)
+  if (typeof window !== "undefined" && typeof DOMParser !== "undefined") {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<body>${markdown}</body>`, "text/html");
+
+      // 1. Math: cleanly replace .math-visual elements using DOM nodes to prevent trailing unclosed span artifacts
+      doc.querySelectorAll(".math-visual").forEach((el) => {
+        const latex = el.getAttribute("data-latex") || "";
+        const isBlock = (el as HTMLElement).style.display === "block";
+        const textNode = doc.createTextNode(isBlock ? `$$${latex}$$` : `$${latex}$`);
+        el.parentNode?.replaceChild(textNode, el);
+      });
+
+      // 1b. Geometry: preserve [GEOMETRY:shape:labels]
+      doc.querySelectorAll(".geometry-shape").forEach((el) => {
+        const shape = el.getAttribute("data-shape");
+        const labelsAttr = el.getAttribute("data-labels");
+        if (shape) {
+          let labelsStr = "{}";
+          try {
+            labelsStr = labelsAttr ? decodeURIComponent(labelsAttr) : "{}";
+          } catch {
+            labelsStr = labelsAttr || "{}";
+          }
+          const textNode = doc.createTextNode(`[GEOMETRY:${shape}:${labelsStr}]`);
+          el.parentNode?.replaceChild(textNode, el);
+        }
+      });
+
+      markdown = doc.body.innerHTML;
+    } catch {
+      // fallback to regex below
+    }
+  }
+
+  // 1. Math (Inline Regex Fallback)
   // From: <span class="math-visual" ... data-latex="\frac{1}{2}">...</span>
   // To: $\frac{1}{2}$
   const mathRegex =
@@ -1941,10 +2118,24 @@ export const markdownToHtml = (markdown: string): string => {
 
   let processedMarkdown = markdown;
 
+  // If markdown contains existing .math-visual spans from previous passes, convert them to $...$ first
+  // so marked can parse markdown cleanly without mangling nested KaTeX spans
+  if (processedMarkdown.includes("math-visual")) {
+    processedMarkdown = htmlToMarkdown(processedMarkdown);
+  }
+
   // 1. Extract Math to prevent ANY replacements from messing it up
   const mathBlocks: string[] = [];
   processedMarkdown = processedMarkdown.replace(
     /\$\$([\s\S]+?)\$\$/g,
+    (match, latex) => {
+      const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
+      mathBlocks.push(latex);
+      return placeholder;
+    },
+  );
+  processedMarkdown = processedMarkdown.replace(
+    /\\\[([\s\S]+?)\\\]/g,
     (match, latex) => {
       const placeholder = `%%%MATH_BLOCK_${mathBlocks.length}%%%`;
       mathBlocks.push(latex);
@@ -1961,8 +2152,57 @@ export const markdownToHtml = (markdown: string): string => {
       return placeholder;
     },
   );
+  processedMarkdown = processedMarkdown.replace(
+    /\\\(([\s\S]+?)\\\)/g,
+    (match, latex) => {
+      const placeholder = `%%%MATH_INLINE_${mathInlines.length}%%%`;
+      mathInlines.push(latex);
+      return placeholder;
+    },
+  );
 
-  // 2. Extract Audio
+  // Also catch un-delimited LaTeX fractions, roots, or units that might appear in AI-generated options
+  processedMarkdown = processedMarkdown.replace(
+    /(?:^|\s)((\d+[\d.,]*\s*)?\\(?:text|mathrm)\{[^}]+\}\^[0-9]+|\\frac\{[^}]+\}\{[^}]+\}|\\sqrt(?:\[[^\]]+\])?\{[^}]+\})(?:$|\s)/g,
+    (match, latex) => {
+      const placeholder = `%%%MATH_INLINE_${mathInlines.length}%%%`;
+      mathInlines.push(latex.trim());
+      const prefix = match.startsWith(" ") ? " " : "";
+      const suffix = match.endsWith(" ") ? " " : "";
+      return `${prefix}${placeholder}${suffix}`;
+    },
+  );
+
+  // 2. Extract Geometry (tags, spans, and SVGs) so marked never treats them as code blocks
+  const geometryBlocks: string[] = [];
+  processedMarkdown = processedMarkdown.replace(
+    /<span[^>]*class="[^"]*geometry-shape[^"]*"[^>]*>[\s\S]*?<\/span>/gi,
+    (match) => {
+      const placeholder = `%%%GEOMETRY_BLOCK_${geometryBlocks.length}%%%`;
+      geometryBlocks.push(match);
+      return placeholder;
+    },
+  );
+  processedMarkdown = processedMarkdown.replace(
+    /<svg[^>]*>[\s\S]*?<\/svg>/gi,
+    (match) => {
+      const placeholder = `%%%GEOMETRY_BLOCK_${geometryBlocks.length}%%%`;
+      geometryBlocks.push(match);
+      return placeholder;
+    },
+  );
+
+  const geometryPlaceholders: Array<{ shape: string; labelsStr: string; match: string }> = [];
+  processedMarkdown = processedMarkdown.replace(
+    /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi,
+    (match, shape, labelsStr) => {
+      const placeholder = `%%%GEOMETRY_TAG_${geometryPlaceholders.length}%%%`;
+      geometryPlaceholders.push({ shape, labelsStr: labelsStr || "{}", match });
+      return placeholder;
+    },
+  );
+
+  // 3. Extract Audio
   const audios: string[] = [];
   processedMarkdown = processedMarkdown.replace(
     /\[\[audio:([^\]]+)\]\]/g,
@@ -2043,29 +2283,9 @@ export const markdownToHtml = (markdown: string): string => {
 
   // 5. Restore Math
   const renderMath = (latex: string, displayMode: boolean) => {
-    // If the latex has \n inside it (from AI output formatting), we can remove them or replace them with spaces,
-    // BUT wait, in math blocks \\ is used for newlines. We shouldn't mess with it unless it breaks KaTeX.
-    // Actually, KaTeX handles literal newlines gracefully.
-    let rendered = latex;
-    const w = window as unknown as {
-      katex?: {
-        renderToString: (
-          latex: string,
-          options: { throwOnError: boolean; displayMode: boolean },
-        ) => string;
-      };
-    };
-    if (w.katex) {
-      try {
-        rendered = w.katex.renderToString(latex, {
-          throwOnError: false,
-          displayMode,
-        });
-      } catch {
-        /* ignore */
-      }
-    }
-    return `&#8203;<span class="math-visual" style="display: ${displayMode ? "block" : "inline-block"}; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
+    const clean = normalizeLatex(latex);
+    const rendered = renderLatexToString(clean, displayMode);
+    return `&#8203;<span class="math-visual" style="display: ${displayMode ? "block" : "inline-block"}; vertical-align: middle;" contenteditable="false" data-latex="${clean.replace(/"/g, "&quot;")}">${rendered}</span>&#8203;`;
   };
 
   mathBlocks.forEach((latex, i) => {
@@ -2076,7 +2296,23 @@ export const markdownToHtml = (markdown: string): string => {
     html = html.replace(`%%%MATH_INLINE_${i}%%%`, renderMath(latex, false));
   });
 
-  return html.trim();
+  // 6. Restore Geometry
+  geometryBlocks.forEach((geo, i) => {
+    html = html.replace(`%%%GEOMETRY_BLOCK_${i}%%%`, geo);
+  });
+
+  geometryPlaceholders.forEach(({ shape, labelsStr, match }, i) => {
+    try {
+      const labels = parseGeometryLabels(labelsStr);
+      const svg = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
+      const span = `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: inline-block; vertical-align: middle; margin: 0 0.5rem; text-align: center; line-height: 1;">${svg}</span>`;
+      html = html.replace(`%%%GEOMETRY_TAG_${i}%%%`, span);
+    } catch {
+      html = html.replace(`%%%GEOMETRY_TAG_${i}%%%`, match);
+    }
+  });
+
+  return repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(html.trim()));
 };
 
 export const minifyExamHtml = (html: string | undefined | null): string => {
@@ -2085,9 +2321,10 @@ export const minifyExamHtml = (html: string | undefined | null): string => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
 
-    // 1. Minify KaTeX/Math content
+    // 1. Ensure KaTeX/Math content retains visual rendering
+    // Do not empty innerHTML as it causes math formulas/units to disappear in editors and preview cards
     doc.querySelectorAll(".math-visual[data-latex]").forEach((el) => {
-      el.innerHTML = "";
+      // Keep rendered content intact
     });
 
     // 2. Clean Chart Placeholders

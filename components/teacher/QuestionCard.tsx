@@ -1,5 +1,4 @@
 import React from "react";
-import { useShallow } from "zustand/react/shallow";
 import type { Question, QuestionType } from "../../types";
 import {
   TrashIcon,
@@ -32,37 +31,17 @@ export const QuestionCard = React.memo(
     isGenerating,
     onGenerate,
   }: QuestionCardProps) => {
-    const {
-      handleTypeChange,
-      handleDeleteQuestion,
-      handleCategoryChange,
-      handleLevelChange,
-      handleScoreWeightChange,
-      handleKisiKisiChange,
-      handleQuestionTextChange,
-    } = useExamEditorStore(
-      useShallow((s) => ({
-        handleTypeChange: s.handleTypeChange,
-        handleDeleteQuestion: s.handleDeleteQuestion,
-        handleCategoryChange: s.handleCategoryChange,
-        handleLevelChange: s.handleLevelChange,
-        handleScoreWeightChange: s.handleScoreWeightChange,
-        handleKisiKisiChange: s.handleKisiKisiChange,
-        handleQuestionTextChange: s.handleQuestionTextChange,
-      }))
-    );
+    const handleTypeChange = useExamEditorStore((s) => s.handleTypeChange);
+    const handleDeleteQuestion = useExamEditorStore((s) => s.handleDeleteQuestion);
+    const handleCategoryChange = useExamEditorStore((s) => s.handleCategoryChange);
+    const handleLevelChange = useExamEditorStore((s) => s.handleLevelChange);
+    const handleScoreWeightChange = useExamEditorStore((s) => s.handleScoreWeightChange);
+    const handleKisiKisiChange = useExamEditorStore((s) => s.handleKisiKisiChange);
+    const handleQuestionTextChange = useExamEditorStore((s) => s.handleQuestionTextChange);
 
-    const {
-      setEditingChartTarget,
-      setInsertIndex,
-      setTypeSelectionModalOpen,
-    } = useExamEditorUIStore(
-      useShallow((s) => ({
-        setEditingChartTarget: s.setEditingChartTarget,
-        setInsertIndex: s.setInsertIndex,
-        setTypeSelectionModalOpen: s.setTypeSelectionModalOpen,
-      }))
-    );
+    const setEditingChartTarget = useExamEditorUIStore((s) => s.setEditingChartTarget);
+    const setInsertIndex = useExamEditorUIStore((s) => s.setInsertIndex);
+    const setTypeSelectionModalOpen = useExamEditorUIStore((s) => s.setTypeSelectionModalOpen);
 
     return (
       <React.Fragment key={q.id}>

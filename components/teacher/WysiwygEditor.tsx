@@ -16,6 +16,9 @@ import { ToolbarActions } from "./ToolbarActions";
 import { EquationEditorTab as VisualMathModal } from "./EquationEditorTab";
 import { useWysiwygEditor } from "./useWysiwygEditor";
 import { transliterate } from "../../utils/aksaraBali";
+import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
+import { cleanOrphanedSvgMarkup, repairGeometrySvgInHtml } from "./examUtils";
+import { hydrateMathInContainer } from "../../utils/mathRenderer";
 
 export const SelectionModal: React.FC<{
   isOpen: boolean;
@@ -314,7 +317,26 @@ export const WysiwygEditor: React.FC<{
           } else if (chartData && !newHtml.includes('data-chart="true"')) {
             newHtml += CHART_PLACEHOLDER;
           }
+
+          // Resolve any unrendered geometry tag
+          if (/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)) {
+            newHtml = newHtml.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi, (_match, shape, labelsStr) => {
+              try {
+                const labels = parseGeometryLabels(labelsStr || "{}");
+                const svg = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
+                return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+              } catch {
+                return _match;
+              }
+            });
+          }
+
+          // Clean any orphaned SVG code fragments from past errors and repair geometry SVGs
+          newHtml = repairGeometrySvgInHtml(cleanOrphanedSvgMarkup(newHtml));
           editorRef.current.innerHTML = newHtml;
+
+          // Rehydrate any KaTeX math elements or raw LaTeX
+          hydrateMathInContainer(editorRef.current);
         }
       }
     }
