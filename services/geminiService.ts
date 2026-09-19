@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
 import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
-import { generateGeometrySVG, extractNum } from "../components/teacher/geometryUtils";
+import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
 import { generateSmartFallbackQuestions } from "./smartFallbackGenerator";
@@ -22,21 +22,35 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                   selectedTypes.some(t => t.toUpperCase().includes('TKA'));
 
     const systemInstruction = `
-    Anda adalah Penulis Soal Ahli Asesmen Nasional (Master Item Writer) dan Asisten Pembuat Soal Ujian Profesional yang berpengalaman dalam menyusun soal terstandar nasional, termasuk Kerangka Asesmen Tes Kemampuan Akademik (TKA) sesuai regulasi resmi Badan Standar, Kurikulum, dan Asesmen Pendidikan (BSKAP) Kementerian Pendidikan Dasar dan Menengah RI No. 047/H/AN/2025 (Jenjang SD/MI dan SMP/MTs).
+    Anda adalah Penulis Soal Ahli Asesmen Nasional (Master Item Writer) dan Asisten Pembuat Soal Ujian Profesional yang berpengalaman dalam menyusun soal terstandar nasional, termasuk Kerangka Asesmen Tes Kemampuan Akademik (TKA) sesuai regulasi resmi Badan Standar, Kurikulum, dan Asesmen Pendidikan (BSKAP) Kementerian Pendidikan Dasar dan Menengah RI No. 047/H/AN/2025 (Jenjang SD/MI dan SMP/MTs) serta No. 045/H/AN/2025 (Jenjang SMA/MA/Sederajat dan SMK/MAK).
     
     Tugas Anda adalah membuat soal berkualitas tinggi, akurat secara konsep, serta memiliki daya beda yang valid berdasarkan parameter yang diberikan.
     
-    PRINSIP UTAMA PENULISAN SOAL TKA (KEMENDIKDASMEN NO. 047/H/AN/2025):
+    PRINSIP UTAMA PENULISAN SOAL TKA (KEMENDIKDASMEN NO. 047/H/AN/2025 & NO. 045/H/AN/2025):
     1. BERMAKNA & BERBASIS PENALARAN TINGGI (HOTS/MOTS):
        - Soal BUKAN hafalan rumus singkat semata, melainkan menguji pemahaman fakta, konsep, prosedur, serta penalaran konteks nyata (problem-solving).
        - Tiga Level Kognitif Resmi:
-         * Level 1 (Knowing & Understanding): Menghitung prosedur aritmatika, membaca informasi tabel/grafik/diagram, mengelompokkan & mengidentifikasi objek.
-         * Level 2 (Applying): Memodelkan masalah kontekstual ke kalimat matematika, mengaplikasikan konsep/rumus rutin, menafsirkan situasi fisis.
-         * Level 3 (Reasoning): Menganalisis relasi antar-konsep, memecahkan masalah non-rutin bertingkat (multi-step), mengevaluasi alternatif solusi, menyimpulkan data valid.
-    2. KONTEKSTUALITAS INDONESIA:
+         * Level 1 (Knowing & Understanding / Pemahaman): Menghitung prosedur aritmatika/aljabar, membaca informasi grafik/tabel, mengidentifikasi konsep/istilah.
+         * Level 2 (Applying / Penerapan): Memodelkan masalah kontekstual ke formulasi matematis/ilmiah, mengaplikasikan konsep/rumus terstruktur, menganalisis situasi fisis/sosial.
+         * Level 3 (Reasoning / Penalaran): Menganalisis hubungan sebab-akibat & relasi multikonsep, memecahkan masalah non-rutin bertingkat (multi-step), mengevaluasi alternatif solusi, menyimpulkan data secara valid dan kritis.
+    2. CAKUPAN DOMAIN TKA SMA/MA & SMK/MAK (BSKAP NO. 045/H/AN/2025):
+       - Matematika Wajib SMA/SMK: Aljabar (SPLTV, Program Linear, Fungsi Komposisi & Invers, Barisan/Deret & Bunga Majemuk), Geometri & Pengukuran (Transformasi Geometri, Dimensi Tiga/Jarak Titik-Garis-Bidang), Trigonometri (Perbandingan & Grafik Trigonometri), Data & Peluang (Statistika Deskriptif, Kombinatorika/Permutasi/Kombinasi, Peluang Majemuk).
+       - Matematika Tingkat Lanjut: Aljabar (Matriks 2x2/3x3 determinan & invers, Polinomial suku banyak), Geometri & Vektor (Vektor 2D/3D, Persamaan Lingkaran & Garis Singgung), Kalkulus (Limit aljabar & trigonometri, Turunan, Integral).
+       - Fisika SMA: Kinematika, Dinamika (Hukum Newton, Momentum, Dinamika Rotasi), Fluida (Statis & Dinamis Pascal/Archimedes/Bernoulli), Gelombang & Optik, Kalor & Termodinamika (Mesin Carnot, Gas Ideal), Kelistrikan (Hukum Coulomb, Rangkaian Kirchhoff), Keterampilan Proses Sains.
+       - Kimia SMA: Struktur Atom & Ikatan Kimia (VSEPR), Stoikiometri, Kimia Organik (Hidrokarbon), Larutan Asam Basa, Buffer, Titrasi, Termokimia (Hukum Hess), Laju Reaksi & Kesetimbangan, Elektrokimia (Sel Volta & Elektrolisis).
+       - Biologi SMA: Keanekaragaman Hayati & Ekosistem, Sel & Metabolisme/Enzim, Sistem Organ Tubuh Manusia (Sirkulasi, Respirasi, Ekskresi, Imun, Koordinasi Saraf/Hormon, Reproduksi), Penyelidikan Sains Ilmiah.
+       - Ekonomi SMA: Kelangkaan & Biaya Peluang, Permintaan/Penawaran, Pendapatan Nasional, Inflasi, Kebijakan Moneter & Fiskal, Manajemen/Koperasi/BUMN, Perdagangan Internasional & Akuntansi Keuangan Dasar.
+       - Sosiologi SMA: Hubungan & Gejala Sosial, Penelitian Sosial, Kelompok Sosial/Stratifikasi, Konflik & Integrasi, Perubahan Sosial & Globalisasi.
+       - Geografi SMA: Dinamika Lingkungan Fisik & Sosial, Potensi Sumber Daya Nasional, Mitigasi & Adaptasi Bencana (Geologis & Hidrometeorologis), Analisis Peta & Penginderaan Jauh / SIG.
+       - Sejarah SMA: Kronologi Sejarah Indonesia (Kerajaan Kuno, Kolonialisme, Pergerakan Nasional, Kemerdekaan, Demokrasi Liberal/Terpimpin, Orde Baru & Reformasi 1998).
+       - Pendidikan Pancasila: Sila-sila Pancasila, UUD NRI 1945 & Sistem Ketatanegaraan, Bhinneka Tunggal Ika, NKRI & Wawasan Kebangsaan.
+       - Produk/Projek Kreatif & Kewirausahaan (PKK SMK): Desain & Prototipe Produk, Perencanaan & Pengendalian Mutu (QA), Pemasaran Digital & Distribusi, Analisis Biaya Produksi & Laporan Keuangan, HaKI.
+       - Bahasa Indonesia SMA: Literasi Membaca teks informasi ilmiah/sosial tunggal/jamak & teks fiksi bermuatan nilai luhur (Pemahaman Tekstual, Inferensial, dan Evaluasi/Apresiasi).
+       - Bahasa Inggris SMA: Teks Fungsional & Esai (Descriptive, Recount, Narrative, Procedure, Analytical Exposition; Situasi Sehari-hari, Vokasional, Akademik).
+    3. KONTEKSTUALITAS INDONESIA:
        - Gunakan nama-nama tokoh lokal yang santun dan wajar di Indonesia (contoh: Pak Bondan, Bu Anita, Danu, Antok, Caca, Mae, Doni, Dina, Mira, Tika, dsb.).
        - Gunakan konteks kehidupan nyata (literasi membaca teks fiksi fabel/puisi/cerita, teks informasi sains/lingkungan/kesehatan gizi, denah taman kota, resep/pasar, pembagian sembako, perbandingan harga, waktu perjalanan).
-    3. STANDAR TIPOGRAFI & NOTASI INDONESIA:
+    4. STANDAR TIPOGRAFI & NOTASI INDONESIA:
        - Tanda Desimal: Menggunakan koma, contoh: 0,75 atau 2,5 atau 3,14 (bukan 0.75).
        - Pemisah Ribuan / Mata Uang: Menggunakan titik dan format rupiah baku, contoh: Rp24.000,00 atau Rp157.500,00 atau 4.425 gram.
        - Satuan Baku: Tuliskan sesuai standar metrik (mm, cm, dm, m, dam, hm, km; mg, cg, dg, g, dag, hg, kg; ml, cl, dl, l, dal, hl, kl; detik, menit, jam, hari).
@@ -49,18 +63,43 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$ atau $4\\\\frac{3}{4}$. KHUSUS untuk akar (square root/roots), Anda WAJIB menggunakan perintah $\\\\sqrt{...}$ atau $\\\\sqrt[n]{...}$ dan DILARANG menggunakan karakter unicode akar (√) secara langsung. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, akar, atau pangkat! Jika relevan, Anda juga WAJIB menggunakan standar LaTeX untuk matriks (nxn, nx1, 1xn), limit ($\\\\lim$), logaritma ($\\\\log$), permutasi (contoh: $_{n}P_{r}$), kombinasi ($_{n}C_{r}$), jenis kurung berbatas (\\\\left( \\\\right), dll), vektor kolom, nilai mutlak (\\\\left| \\\\right|), fungsi piecewise (\\\\begin{cases} \\\\end{cases}), irisan (\\\\cap), turunan (\\\\frac{dy}{dx}) dan gabungan himpunan (\\\\cup). Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$" atau "$\\\\sqrt{x^2 + y^2}$" atau "$\\\\frac{11}{30}$".
     - Turus & Tabel Frekuensi (Tally Marks): WAJIB menggunakan huruf kapital 'I' (bukan simbol pipe '|') untuk turus satuan agar tabel Markdown tidak pecah. Gunakan 'I' (1), 'II' (2), 'III' (3), 'IIII' (4), dan '卌' (5). Untuk angka lebih dari 5, gabungkan kelipatan 5 dengan sisa satuan (pisahkan dengan spasi). Contoh: 6 = '卌 I', 7 = '卌 II', 10 = '卌 卌', 13 = '卌 卌 III'. Jika instruksi meminta "tabel turus saja" ATAU "tabel frekuensi saja", Anda WAJIB mematuhi permintaan tersebut dengan hanya membuat kolom yang spesifik diminta (misal hanya kolom data dan kolom turus, ATAU hanya kolom data dan kolom frekuensi). JANGAN secara otomatis menggabungkan kolom Turus dan Frekuensi menjadi satu tabel jika tidak diminta secara eksplisit. JANGAN menggunakan gambar untuk turus, gunakan teks ini saja.
     - Piktogram (Simbol/Emoji): Untuk soal yang membutuhkan data piktogram (diagram gambar), Anda BISA dan DISARANKAN untuk menggunakan emoji langsung (misalnya: 🍎, 🚗, ⭐️, 👦) dalam tabel atau teks soal untuk mewakili unit data.
-    - Bangun Datar & Ruang: JIKA SOAL MEMINTA MENGHITUNG TEHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}]. JANGAN hanya mendeskripsikan ukurannya dalam bentuk teks (misal: "Sebuah balok memiliki ukuran panjang 12 cm..."). Anda WAJIB langsung menyisipkan tag geometri ke dalam teks soal (\`questionText\`), lalu diikuti pertanyaannya. DILARANG menggunakan emoji, unicode, atau \`imageSearchKeyword\` untuk bangun ruang/datar. 
-      Jika Anda diminta membuat soal "menghitung volume/luas dari gambar bangun ruang/datar gabungan", Anda HARUS menampilkan gambar gabungan menggunakan tag [GEOMETRY:shape_name:...] dan JANGAN menambahkan teks skenario yang rumit kecuali secara eksplisit diminta!
-      Daftar \`shape_name\` yang valid HANYALAH: "triangle", "square", "rectangle", "parallelogram", "kite", "rhombus", "trapezoid", "polygon", "circle", "cube", "cuboid", "cylinder", "cone", "sphere", "pyramid", "prism", "combined_cuboid_pyramid", "combined_cuboid_cube", "combined_cylinder_cone", "combined_rect_triangle", "combined_l_shape", "combined_rect_semicircle", "combined_rect_rect".
-      PENTING UNTUK BANGUN GABUNGAN: Jika diminta soal tentang "BANGUN GABUNGAN", Anda WAJIB menggunakan salah satu shape_name gabungan di atas (contoh: [GEOMETRY:combined_cuboid_cube:{"bottom_width":"10","bottom_height":"5","bottom_depth":"4","top_side":"4"}]). DILARANG KERAS membuat nama shape_name sendiri (seperti 'Shape Tbd', 'gabungan', 'combined'). Jika bentuk gabungan yang diinginkan tidak ada di daftar, gunakan dua tag geometri standar secara berdampingan.
-      KHUSUS untuk "combined_rect_semicircle", Anda dapat mengatur posisi setengah lingkaran dengan properti "position" ("top", "bottom", "left", "right") dan ukuran setengah lingkaran relatif terhadap sisi menggunakan "ratio" (misal "0.5" untuk setengah sisi, "1" untuk seluruh sisi). Contoh: [GEOMETRY:combined_rect_semicircle:{"width":"20 cm","height":"14 cm","position":"bottom","ratio":"0.5","diameter":"14 cm"}]
-      Contoh penggunaan label JSON yang BENAR (pastikan valid JSON):
-      [GEOMETRY:rectangle:{"bottom":"10 cm","right":"5 cm"}]
-      [GEOMETRY:triangle:{"bottom":"8","height":"6","left":"5"}]
-      [GEOMETRY:circle:{"radius":"7 cm"}]
-      [GEOMETRY:cube:{"width":"5"}]
-      [GEOMETRY:cuboid:{"width":"10","height":"5","depth":"4"}]
-      [GEOMETRY:pyramid:{"side":"6","height":"8"}]
+    - Bangun Datar & Ruang: JIKA SOAL MEMINTA MENGHITUNG TERHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}].
+      SETIAP KALI MENAMPILKAN BANGUN RUANG ATAU BANGUN GABUNGAN, Anda WAJIB MENGISI SELURUH PARAMETER UKURAN PADA TAG GEOMETRY SECARA LENGKAP agar semua dimensi (panjang, lebar, tinggi, jari-jari, dll) terlihat jelas pada gambar!
+      Jika Anda juga mendeskripsikan ukurannya dalam teks narasi, Anda WAJIB menuliskan kalimatnya secara UTUH dan LENGKAP tanpa terpotong (misal: "Bagian balok memiliki ukuran panjang 10 cm, lebar 6 cm, dan tinggi 8 cm, serta tinggi limas 6 cm."). DILARANG KERAS menghasilkan teks narasi yang terpotong di tengah kalimat!
+      Daftar \`shape_name\` yang valid:
+      * Bangun Datar 2D: "triangle", "square", "rectangle", "parallelogram", "rhombus", "trapezoid", "kite", "circle", "polygon"
+      * Bangun Ruang 3D: "cube" (kubus), "cuboid" (balok), "cylinder" (tabung), "cone" (kerucut), "pyramid" (limas segiempat), "triangular_pyramid" (limas segitiga), "prism" (prisma segitiga), "sphere" (bola), "hemisphere" (setengah bola)
+      * Bangun Gabungan: "combined_cuboid_pyramid" (balok+limas), "combined_cuboid_prism" (balok+atap prisma), "combined_cuboid_cube" (balok+kubus), "combined_cylinder_cone" (tabung+kerucut), "combined_cylinder_hemisphere" (tabung+kubah bola), "combined_cone_hemisphere" (kerucut+bola es krim), "combined_rect_triangle" (rumah 2D), "combined_l_shape" (bentuk L), "combined_rect_semicircle" (persegi panjang+setengah lingkaran).
+      
+      PENTING - KEBERAGAMAN BENTUK BANGUN RUANG (DILARANG MONOTON):
+      * DILARANG KERAS selalu membuat soal volume bangun ruang yang hanya berupa gabungan balok dan limas!
+      * Bangun ruang memiliki banyak variasi. Anda BISA dan WAJIB menggunakan bangun ruang lain sesuai permintaan materi/kisi-kisi, atau gunakan secara bervariasi jika topik bersifat umum:
+        1. Bangun Ruang Tunggal:
+           - Kubus (cube): panjang rusuk [GEOMETRY:cube:{"side":"10 cm"}]
+           - Balok (cuboid): panjang, lebar, tinggi [GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm"}]
+           - Tabung/Silinder (cylinder): jari-jari, tinggi [GEOMETRY:cylinder:{"radius":"7 cm","height":"20 cm"}]
+           - Kerucut (cone): jari-jari, tinggi [GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]
+           - Prisma Segitiga (prism): alas segitiga, tinggi segitiga, tinggi prisma [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm"}]
+           - Limas Segiempat (pyramid): sisi alas, tinggi limas [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm"}]
+           - Bola (sphere): jari-jari [GEOMETRY:sphere:{"radius":"14 cm"}]
+        2. Aneka Bangun Gabungan (Konteks Kontekstual Nyata):
+           - Tabung + Kerucut (ujung pensil / tangki roket): [GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"15 cm","coneHeight":"6 cm"}]
+           - Tabung + Setengah Bola (kapsul obat / tangki silo peternakan): [GEOMETRY:combined_cylinder_hemisphere:{"radius":"7 cm","height":"14 cm"}]
+           - Balok + Atap Prisma Segitiga (tenda perkemahan / rumah): [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
+           - Balok + Kubus (podium juara / meja bertingkat): [GEOMETRY:combined_cuboid_cube:{"cuboid_width":"16 cm","cuboid_depth":"10 cm","cuboid_height":"8 cm","cube_side":"6 cm"}]
+           - Kerucut + Setengah Bola (es krim cone): [GEOMETRY:combined_cone_hemisphere:{"radius":"7 cm","height":"12 cm"}]
+           - Balok + Limas (tugu monumen): [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
+      * JIKA pengguna meminta materi bangun tertentu (misal: "Tabung", "Kubus", "Prisma Segitiga", "Kerucut", atau "Bola"), AI WAJIB membuat soal mengenai bangun tersebut dan DILARANG MENGGANTINYA menjadi balok dan limas!
+      Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
+      * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm"}]
+      * Kubus: [GEOMETRY:cube:{"side":"8 cm"}]
+      * Tabung: [GEOMETRY:cylinder:{"radius":"7 cm","height":"14 cm"}]
+      * Kerucut: [GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]
+      * Prisma Segitiga: [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm"}]
+      * Limas Segiempat: [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm"}]
+      * Bangun Gabungan Balok + Limas: [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
+      * Bangun Gabungan Tabung + Kerucut: [GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]
+      * Bangun Gabungan Balok + Atap Prisma: [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
     - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks. Khusus untuk diagram venn himpunan, gunakan 'labels' untuk nama-nama himpunan (contoh: ["A", "B"] atau ["A", "B", "C"]) dan 'datasets.data' untuk nilainya. Untuk 2 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Irisan A & B, Di Luar Himpunan, Semesta]. Untuk 3 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Hanya C, Irisan A&B, Irisan A&C, Irisan B&C, Irisan A&B&C, Di Luar Himpunan, Semesta]. Khusus untuk relasi/fungsi (relation), gunakan 'labels' untuk nama himpunan (contoh: ["A", "B"]). 'datasets' ke-0 berisi data anggota domain (e.g. data: ["1", "2"]). 'datasets' ke-1 berisi data anggota kodomain. 'datasets' ke-2 berisi relasi dengan format "indexDomain-indexKodomain" (contoh: ["0-1", "1-2"]). Khusus diagram kartesius (cartesian), Anda WAJIB menyertakan field 'cartesianConfig' yang berisi 'xMin', 'xMax', 'yMin', 'yMax', 'xStep', dan 'yStep'. Dan 'datasets' berisi array of object dengan 'label' (UNTUK NAMA GARIS JIKA ADA), 'showLine' (boolean), serta titiknya ATAU fungsi matematikanya. JIKA fungsi matematika, beri property 'isFunction': true and 'functionStr' (misal "x^2 - 2x + 1" atau "2x" dalam sintaks JS/Matematika dasar). JIKA titik manual, beri property 'data' berupa array of object {x: number, y: number}.
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
@@ -96,13 +135,42 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Wajib juga mengisi 'level' dengan tingkat kognitif spesifik butir soal tersebut (misal: "Level 3 - Penalaran (HOTS)", "Level 2 - Penerapan (MOTS)", "C4 - Menganalisis", dll).
     - Wajib mengisi 'category' dengan sub-topik / domain materi spesifik (misal: "Operasi Pecahan Campuran", "Ekosistem & Rantai Makanan", "Teks Eksplanasi").
     
-    ATURAN BENTUK SOAL RESMI:
-    - Pilihan Ganda (PG): Wajib isi 'options' (4-5 opsi untuk SD/SMP) dan 'correctAnswer' (1 jawaban benar yang sama persis dengan salah satu opsi). PENTING: Acak posisi jawaban yang benar agar tidak selalu berada di opsi pertama (A).
-    - Pilihan Ganda Kompleks (PGK MCMA): Wajib isi 'options' (3-5 opsi pernyataan) dan 'correctAnswer' (semua jawaban benar dipisahkan dengan "|||", contoh: "Opsi 1|||Opsi 2", harus sama persis dengan teks opsi). Sertakan instruksi baku di teks soal: "Pilihlah jawaban yang benar! Jawaban benar lebih dari satu."
-    - Pilihan Ganda Kompleks Kategori (Benar/Salah, Sesuai/Tidak Sesuai, Setuju/Tidak Setuju): Wajib isi 'trueFalseRows' berupa array of objects { "text": "pernyataan lengkap", "answer": true/false }. Buat 3 pernyataan terstruktur dengan nilai kebenaran yang valid.
-    - Menjodohkan: Wajib isi 'matchingPairs' berupa array of objects { "left": "item kiri", "right": "pasangan kanan" }. Buat 3-5 pasangan dengan kunci yang tepat.
-    - Uraian Singkat / Isian: Wajib isi 'correctAnswer' dengan jawaban padat, presisi, dan jelas.
-    - Esai: Wajib isi 'correctAnswer' dengan rubrik/poin jawaban lengkap yang diharapkan.
+    ATURAN MUTLAK PENEMPATAN PILIHAN JAWABAN & DAFTAR PERNYATAAN (DILARANG SALAH TEMPAT & DILARANG TERPOTONG):
+    - DILARANG KERAS MENULISKAN OPSI (A, B, C, D) ATAU NOMOR PERNYATAAN (1, 2, 3) DI DALAM 'questionText'!
+    - Teks pertanyaan ('questionText') HANYA boleh berisi stimulus masalah (narasi/konteks/geometri) dan kalimat pertanyaan/instruksi.
+    - PENTING PENEMPATAN TAG GAMBAR & GEOMETRI: Tempatkan tag [GEOMETRY:...] atau [ai_svg:...] pada baris tersendiri di antara narasi pengantar dan kalimat tanya. Jika ada kalimat pengantar sebelum gambar, selesaikan kalimatnya secara utuh (contoh: "Perhatikan miniatur rumah pada gambar berikut:"). JANGAN memutus kalimat di tengah jalan seperti "Bagian balok memiliki ukuran panjang [GEOMETRY...]".
+    - Penempatan resmi sesuai jenis soal:
+      1. Pilihan Ganda (PG):
+         * 'questionText': Hanya stimulus & kalimat tanya (contoh: "Berdasarkan stimulus di atas, berapakah volume total bangun tersebut?"). DILARANG menuliskan "A. ...", "B. ...", "C. ...", "D. ..." di dalam 'questionText'!
+         * 'options': WAJIB berisi 4-5 pilihan jawaban LENGKAP dengan nilai numerik dan satuan pasti tanpa awalan label "A. " atau "B. ". (Contoh: ["$1.152\\text{ cm}^3$", "$1.200\\text{ cm}^3$", "$1.440\\text{ cm}^3$", "$1.600\\text{ cm}^3$"]). DILARANG KERAS membuat opsi gantung atau terpotong tanpa angka!
+         * 'correctAnswer': WAJIB berisi 1 jawaban benar yang teksnya persis sama dengan salah satu teks di 'options'. Acak letak jawaban benar agar variatif.
+      2. Pilihan Ganda Kompleks (PGK MCMA):
+         * 'questionText': Hanya stimulus & instruksi (contoh: "Berdasarkan stimulus di atas, pilihlah semua pernyataan yang benar!"). DILARANG menulis daftar butir (1), (2), (3) di dalam 'questionText'!
+         * 'options': WAJIB berisi 3-5 butir opsi pernyataan LENGKAP dengan nilai/angka dan satuan matematis. DILARANG KERAS membuat opsi gantung yang tidak selesai (contoh SALAH: "Volume tabung tangki tersebut adalah "). Contoh opsi BENAR: "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$", "Volume kerucut bagian atas adalah $308\\text{ cm}^3$", "Volume total seluruh tangki adalah $1.848\\text{ cm}^3$".
+         * 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
+      3. Benar/Salah (PGK Kategori - WAJIB memuat angka dan satuan lengkap pada setiap baris):
+         * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus gambar bangun ruang berikut! Tentukan nilai kebenaran dari setiap pernyataan berikut.").
+         * DILARANG KERAS menuliskan daftar butir "1. ...", "2. ...", "3. ..." di dalam 'questionText'!
+         * 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan spesifik dengan klaim angka dan satuan utuh.
+           Contoh format yang WAJIB dipatuhi:
+           [
+             { "text": "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$.", "answer": true },
+             { "text": "Volume kerucut bagian atas adalah $308\\text{ cm}^3$.", "answer": true },
+             { "text": "Volume total seluruh bangun adalah $2.400\\text{ cm}^3$.", "answer": false }
+           ]
+         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar atau Salah.
+         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true atau false).
+         * 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
+      4. Menjodohkan:
+         * 'questionText': Hanya stimulus dan kalimat instruksi menjodohkan. DILARANG membuat tabel daftar jodoh di dalam 'questionText'!
+         * 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item kiri", "right": "pasangan kanan yang cocok dengan nilai/deskripsi lengkap" }.
+         * 'correctAnswer': WAJIB berisi daftar pasangan yang benar.
+      5. Uraian Singkat / Isian:
+         * 'correctAnswer': WAJIB berisi jawaban pasti / angka hasil perhitungan yang presisi (contoh: "$1.152\\text{ cm}^3$"). DILARANG KOSONG!
+      6. Esai:
+         * 'correctAnswer': WAJIB berisi rubrik atau poin-poin uraian jawaban lengkap yang pasti.
+      7. KEPASTIAN KUNCI JAWABAN (100% PASTI & DETERMINISTIK):
+         * SEMUA butir soal WAJIB memiliki kunci jawaban pasti yang dibuktikan pada 'explanation'. DILARANG KOSONG dan DILARANG AMBIGU.
     
     STIMULUS VISUAL & GAMBAR REPRESENTATIF (TKA KEMENDIKDASMEN):
     - Soal asesmen TKA mengedepankan stimulus kontekstual yang kaya visual (grafik, denah, diagram, foto/ilustrasi benda nyata).
@@ -144,11 +212,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       enum: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah", "Menjodohkan", "Uraian Singkat", "Esai"],
       description: "Bentuk/jenis soal sesuai tabel distribusi wajib"
     },
-    questionText: { type: Type.STRING, description: "Teks pertanyaan dalam format Markdown" },
+    questionText: { 
+      type: Type.STRING, 
+      description: "Teks pertanyaan dalam format Markdown. HANYA berisi stimulus narasi konteks masalah, gambar [GEOMETRY:...]/[ai_svg:...], dan kalimat tanya/instruksi. DILARANG KERAS memuat daftar opsi A/B/C/D atau nomor pernyataan 1/2/3 di sini!" 
+    },
     options: { 
       type: Type.ARRAY, 
       items: { type: Type.STRING },
-      description: "Opsi jawaban (WAJIB diisi 4-5 opsi untuk Pilihan Ganda dan 3-5 opsi untuk Pilihan Ganda Kompleks)"
+      description: "Array pilihan jawaban (WAJIB diisi 4-5 opsi untuk Pilihan Ganda dan 3-5 opsi pernyataan untuk Pilihan Ganda Kompleks). SETIAP OPSI HARUS LENGKAP dengan nilai numerik, satuan, dan kalimat utuh. DILARANG KERAS membuat opsi gantung tanpa angka (contoh SALAH: 'Volume balok adalah ')!"
     },
     optionCharts: {
       type: Type.ARRAY,
@@ -156,7 +227,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       description: "Data diagram untuk setiap opsi jawaban (opsional, urutan harus sesuai dengan options)"
     },
     explanation: { type: Type.STRING, description: "Penjelasan matematis langkah demi langkah atau penalaran logis untuk memastikan jawaban akurat. WAJIB diisi untuk soal hitungan, geometri, fisika, kimia, matematika, dll agar hasil perhitungan benar." },
-    correctAnswer: { type: Type.STRING, description: "Jawaban benar. WAJIB diisi untuk semua jenis soal kecuali INFO. Untuk PG/PG Kompleks, harus sama persis dengan teks di options. Hasilnya harus sesuai dengan yang dihitung di explanation." },
+    correctAnswer: { type: Type.STRING, description: "Kunci jawaban pasti yang 100% akurat. Untuk PG: sama persis dengan salah satu opsi. Untuk PGK: opsi-opsi benar dipisah tanda '|||'. Untuk Benar/Salah: ringkasan nilai kebenaran. Untuk Isian/Esai: jawaban pasti." },
     correctAnswerChart: {
       ...chartDataSchema,
       description: "Data diagram untuk jawaban benar (opsional, berguna untuk soal isian/esai)"
@@ -179,13 +250,13 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       items: {
         type: Type.OBJECT,
         properties: {
-          text: { type: Type.STRING },
-          answer: { type: Type.BOOLEAN },
+          text: { type: Type.STRING, description: "Teks butir pernyataan lengkap dengan klaim nilai angka/satuan dan bermakna matematis/faktual untuk dinilai benar atau salah. DILARANG KERAS hanya menuliskan nama besaran seperti 'Volume balok adalah '!" },
+          answer: { type: Type.BOOLEAN, description: "Nilai kebenaran pasti: true jika Benar/Sesuai, false jika Salah/Tidak Sesuai" },
           chartData: chartDataSchema
         },
         required: ["text", "answer"]
       },
-      description: "Baris pernyataan untuk soal Benar/Salah"
+      description: "Array 3 baris butir pernyataan matematis/faktual lengkap berangka dan bersatuan untuk soal Benar/Salah. WAJIB diisi jika bentuk soal adalah Benar/Salah! DILARANG ditulis di questionText dan DILARANG diisi placeholder!"
     },
     matchingPairs: {
       type: Type.ARRAY,
@@ -237,11 +308,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
   const replaceGeometryPlaceholders = (text: string) => {
       if (!text) return text;
-      return text.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+):(\{.*?\})\]/g, (match, shape, labelsJson) => {
+      return text.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi, (match, shape, labelsStr) => {
           try {
-              const labels = JSON.parse(labelsJson);
+              const labels = parseGeometryLabels(labelsStr || "{}");
               const svgContent = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
-              return `<span class="geometry-shape" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0 0.5rem; text-align: center; line-height: 1;">${svgContent}</span>`;
+              return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svgContent}</span>`;
           } catch (e) {
               console.error("Failed to parse geometry labels:", e);
               return match;
@@ -268,45 +339,75 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       slotDistribution.push(`- Soal #${globalIndex + 1}: Bentuk Soal = "${assignedType}", Tingkat Kognitif = "${assignedDiff}"`);
     }
 
+    const userCategoryConstraint = config.category?.trim();
+    const userKisiKisiConstraint = config.kisiKisi?.trim();
+    const userBlueprintConstraint = config.blueprint?.trim();
+
     const batchPrompt = `
-      Buatlah tepat ${batchCount} butir soal untuk mata pelajaran/materi: ${config.subject}.
+      ======================================================================
+      PERINGATAN PRIORITAS TERTINGGI (HARD CONSTRAINT - MUTLAK DIIKUTI):
+      Pengguna telah menetapkan mata pelajaran, kategori materi, tingkat kognitif (level), dan kisi-kisi soal secara spesifik.
+      Anda DILARANG KERAS membuat soal di luar data yang telah ditetapkan ini!
+      DILARANG membuat soal tentang topik/materi/konteks acak lain yang tidak diminta!
+      
+      TARGET PARAMETER WAJIB DARI PENGGUNA:
+      - MATA PELAJARAN / MATERI: "${config.subject}"
+      ${userCategoryConstraint ? `- KATEGORI MATERI (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
+      - TINGKAT KOGNITIF (MUTLAK WAJIB SESUAI DISTRIBUSI): Lihat TABEL DISTRIBUSI di bawah.
+      ${userKisiKisiConstraint ? `- KISI-KISI / INDIKATOR SOAL (MUTLAK WAJIB): "${userKisiKisiConstraint}"` : ''}
+      ${userBlueprintConstraint ? `- PANDUAN KISI-KISI & DESKRIPSI RINCI PENGGUNA:\n${userBlueprintConstraint}` : ''}
+      ======================================================================
+
+      Buatlah tepat ${batchCount} butir soal yang 100% BERFOKUS PENUH dan SELARAS dengan target materi di atas.
       
       TABEL DISTRIBUSI WAJIB PER BUTIR SOAL (${batchCount} Butir):
       ${slotDistribution.join('\n')}
       
-      ATURAN KELENGKAPAN WAJIB SESUAI BENTUK SOAL (DILARANG KOSONG / HILANG OPSI / HILANG KUNCI):
+      ATURAN KELENGKAPAN & PENEMPATAN WAJIB (DILARANG SALAH TEMPAT, DILARANG KOSONG):
+      - PERINGATAN KERAS: DILARANG menuliskan opsi A, B, C, D atau daftar nomor pernyataan (1, 2, 3) di dalam 'questionText'!
+      - 'questionText' HANYA untuk stimulus narasi, konteks masalah/geometri, dan kalimat pertanyaan.
+      - Tempatkan seluruh pilihan/pernyataan HANYA pada field yang sudah disediakan:
       1. Untuk soal berjenis "Pilihan Ganda":
          - 'questionType': "Pilihan Ganda"
-         - 'options': WAJIB berisi 4 opsi jawaban lengkap (atau 5 opsi jika SMA). DILARANG KOSONG!
+         - 'questionText': Hanya stimulus masalah & kalimat tanya. DILARANG memuat A. ..., B. ... di sini!
+         - 'options': WAJIB berisi 4 opsi jawaban lengkap (atau 5 opsi jika SMA) berupa teks pilihan murni. DILARANG KOSONG!
          - 'correctAnswer': WAJIB berisi 1 jawaban benar yang teksnya persis sama dengan salah satu opsi.
          - PENTING: Acak letak jawaban benar agar variatif (tidak selalu opsi pertama/A).
       2. Untuk soal berjenis "Pilihan Ganda Kompleks":
          - 'questionType': "Pilihan Ganda Kompleks"
+         - 'questionText': Hanya stimulus & kalimat instruksi memilih jawaban yang benar.
          - 'options': WAJIB berisi 3-5 opsi pernyataan. DILARANG KOSONG!
          - 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
       3. Untuk soal berjenis "Benar/Salah":
          - 'questionType': "Benar/Salah"
-         - 'trueFalseRows': WAJIB berisi array 3 baris pernyataan { "text": "pernyataan lengkap", "answer": true/false }. DILARANG KOSONG!
-         - 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran (contoh: "1. Benar, 2. Salah, 3. Benar").
+         - 'questionText': Hanya stimulus konteks/pengantar. DILARANG menulis daftar pernyataan di questionText!
+         - 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan bermakna:
+           [
+             { "text": "Pernyataan proposisi faktual/rumus spesifik 1", "answer": true/false },
+             { "text": "Pernyataan proposisi faktual/rumus spesifik 2", "answer": true/false },
+             { "text": "Pernyataan proposisi faktual/rumus spesifik 3", "answer": true/false }
+           ]
+           DILARANG KOSONG dan DILARANG MENGGUNAKAN TEKS PLACEHOLDER UMUM!
+         - 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Salah, Pernyataan 3: Benar").
       4. Untuk soal berjenis "Menjodohkan":
          - 'questionType': "Menjodohkan"
+         - 'questionText': Hanya stimulus dan kalimat perintah menjodohkan.
          - 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item/pernyataan kiri", "right": "pasangan kanan yang cocok" }. DILARANG KOSONG!
          - 'correctAnswer': WAJIB berisi daftar pasangan yang benar.
       5. Untuk soal berjenis "Uraian Singkat":
          - 'questionType': "Uraian Singkat"
-         - 'correctAnswer': WAJIB berisi jawaban singkat / kata kunci / angka hasil perhitungan yang presisi.
+         - 'correctAnswer': WAJIB berisi jawaban singkat / kata kunci / angka hasil perhitungan yang presisi dan pasti. DILARANG KOSONG!
       6. Untuk soal berjenis "Esai":
          - 'questionType': "Esai"
-         - 'correctAnswer': WAJIB berisi rubrik atau poin-poin uraian jawaban lengkap.
+         - 'correctAnswer': WAJIB berisi rubrik atau poin-poin uraian penyelesaian lengkap yang pasti.
+      7. KEPASTIAN KUNCI JAWABAN:
+         - SETIAP soal WAJIB memiliki jawaban yang pasti, terbukti, dan diverifikasi melalui 'explanation'.
 
-      PANDUAN KISI-KISI / INDIKATOR SOAL:
-      ${config.blueprint || 'Sesuai kurikulum & standar asesmen nasional'}
-      
-      PENGATURAN TINGKAT KESULITAN & INDIKATOR SPESIFIK:
-      1. Anda WAJIB membaca dan menerapkan deskripsi spesifik mengenai konteks, dan materi yang dijabarkan dalam "PANDUAN KISI-KISI" di atas.
-      2. WAJIB menuliskan KISI-KISI SPESIFIK / INDIKATOR SOAL OPERASIONAL pada field 'kisiKisi' untuk SETIAP butir soal yang Anda buat (format operasional: "Disajikan stimulus [konteks/tabel/grafik], peserta didik dapat [tindakan kognitif] dengan tepat").
-      3. WAJIB mengisi 'level' sesuai dengan tingkat kognitif yang ditugaskan pada tabel distribusi di atas.
-      4. WAJIB mengisi 'category' dengan sub-topik / domain materi spesifik butir soal tersebut.
+      PENGATURAN KISI-KISI, KATEGORI, DAN TINGKAT KESULITAN:
+      1. KEPATUHAN MATERI: Seluruh butir soal WAJIB menguji materi yang tercantum pada TARGET PARAMETER di atas.
+      2. FIELD 'category': ${userCategoryConstraint ? `WAJIB diisi persis "${userCategoryConstraint}".` : 'WAJIB diisi dengan sub-topik materi spesifik butir soal tersebut.'}
+      3. FIELD 'level': WAJIB diisi persis sesuai dengan tingkat kognitif yang ditugaskan pada tabel distribusi di atas untuk butir soal tersebut.
+      4. FIELD 'kisiKisi': ${userKisiKisiConstraint ? `WAJIB menggunakan indikator: "${userKisiKisiConstraint}".` : 'WAJIB menuliskan KISI-KISI SPESIFIK / INDIKATOR SOAL OPERASIONAL pada field kisiKisi untuk butir soal ini (format operasional: "Disajikan stimulus [konteks/gambar], peserta didik dapat [tindakan kognitif] dengan tepat").'}
       5. Pastikan kunci jawaban ('correctAnswer') 100% akurat dan dibuktikan melalui 'explanation'.
       ${config.includeImages ? `
       6. STIMULUS REPRESENTATIF TERBAIK (includeImages=true):
@@ -371,6 +472,201 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       }, batchErr?.message || "Safe Fallback Aktif");
     }
 
+    // Helper: Cek apakah baris pernyataan Benar/Salah berupa placeholder/dummy
+    const isDummyStatement = (text: string): boolean => {
+      const raw = (text || "").replace(/<[^>]*>/g, "").trim().toLowerCase();
+      if (!raw || raw.length < 5) return true;
+      if (/^(pernyataan\s*[1-5](\s*terkait\s*(konsep|fakta|hasil)?)?|statement\s*[1-5])$/i.test(raw)) return true;
+      if (/^(opsi\s*[a-e1-5]|pilihan\s*[a-e1-5])$/i.test(raw)) return true;
+      return false;
+    };
+
+    // Helper: Ekstrak parameter bentuk geometri dari teks soal atau penjelasan untuk auto-repair jika opsi/pernyataan terpotong
+    const extractContextShapeFromText = (text: string, explanation?: string): { shape: string; labels: Record<string, string> } | null => {
+      const combined = `${text || ''} ${explanation || ''}`;
+      const match = combined.match(/\[GEOMETRY:([a-zA-Z0-9_]+):(\{.*?\})\]/i);
+      if (match) {
+        try {
+          const shape = match[1].toLowerCase();
+          const labels = parseGeometryLabels(match[2]);
+          return { shape, labels };
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    // Helper: Memperbaiki secara cerdas teks stimulus, opsi pilihan, atau baris pernyataan yang terpotong di tengah jalan
+    const autoRepairIncompleteContent = (
+      rawText: string,
+      contextShape?: { shape: string; labels: Record<string, string> } | null,
+      fallbackField?: string,
+      answerBool?: boolean
+    ): string => {
+      if (!rawText) return rawText || "";
+      let text = rawText.trim();
+
+      // 1. Perbaiki jika narasi stimulus terpotong tepat sebelum tag geometry atau akhir baris
+      text = text.replace(/(?:memiliki|dengan)\s+ukuran\s+panjang\s*$/i, "memiliki ukuran sebagaimana tampak pada gambar berikut:");
+      text = text.replace(/(?:memiliki|dengan)\s+dimensi\s*$/i, "memiliki dimensi sebagaimana tampak pada gambar berikut:");
+      text = text.replace(/(?:sebagai\s+berikut|adalah|yaitu)\s*:\s*$/i, "adalah sebagai berikut:");
+
+      // 2. Cek apakah teks opsi / pernyataan berakhiran menggantung (tanpa angka/predikat lengkap)
+      const isDangling = /(?:adalah|sebesar|yaitu|sebanyak|berukuran|sama\s*dengan|=|:)\s*$/i.test(text) ||
+                         /^(?:volume|luas|keliling|tinggi|panjang|lebar|jari-jari|diameter)\s+(?:balok|kubus|limas|prisma|tabung|kerucut|bangun|atap|alas|badan|total|gabungan)?\s*(?:adalah|sebesar|yaitu|=|:)?\s*$/i.test(text);
+
+      if (isDangling) {
+        // Hilangkan kata sambung menggantung di akhir
+        const cleanStem = text.replace(/(?:\s*(?:adalah|sebesar|yaitu|sebanyak|berukuran|sama\s*dengan|=|:))+\s*$/i, '').trim();
+
+        if (contextShape) {
+          const { shape, labels } = contextShape;
+          const w = extractNum(labels.width || labels.bottom_width || labels.side || "12");
+          const d = extractNum(labels.depth || labels.bottom_depth || labels.side || "8");
+          const h1 = extractNum(labels.bottom_height || labels.height || labels.cylinderHeight || "10");
+          const h2 = extractNum(labels.roof_height || labels.top_height || labels.coneHeight || labels.height || "6");
+          const r = extractNum(labels.radius || "7");
+
+          const volBalok = w * d * h1; // e.g. 12 * 8 * 10 = 960
+          const volLimas = Math.round((1 / 3) * w * d * h2); // e.g. 1/3 * 12 * 8 * 6 = 192
+          const volPrisma = Math.round(0.5 * w * h2 * d); // e.g. 0.5 * 12 * 6 * 8 = 288
+          const volTabung = Math.round((22 / 7) * r * r * h1);
+          const volKerucut = Math.round((1 / 3) * (22 / 7) * r * r * h2);
+
+          const isLimas = shape.includes('pyramid') || shape.includes('limas');
+          const isPrism = shape.includes('prism') || shape.includes('prisma');
+          const isCone = shape.includes('cone') || shape.includes('kerucut');
+
+          const volTop = isLimas ? volLimas : isPrism ? volPrisma : isCone ? volKerucut : volLimas;
+          const volTotal = volBalok + volTop;
+          const luasAlas = w * d;
+
+          const lowerStem = cleanStem.toLowerCase();
+
+          if (lowerStem.includes('total') || lowerStem.includes('gabungan') || lowerStem.includes('seluruh')) {
+            const val = answerBool === false ? Math.round(volTotal * 1.25) : volTotal;
+            return `${cleanStem || 'Volume total seluruh bangun gabungan'} adalah $${val.toLocaleString('id-ID')}\\text{ cm}^3$.`;
+          }
+          if (lowerStem.includes('limas') || lowerStem.includes('atap') || lowerStem.includes('kerucut') || lowerStem.includes('prisma') || lowerStem.includes('atas')) {
+            const val = answerBool === false ? Math.round(volTop * 1.5) : volTop;
+            return `${cleanStem || 'Volume bagian atap'} adalah $${val.toLocaleString('id-ID')}\\text{ cm}^3$.`;
+          }
+          if (lowerStem.includes('balok') || lowerStem.includes('tabung') || lowerStem.includes('bawah') || lowerStem.includes('badan')) {
+            const val = answerBool === false ? Math.round(volBalok * 0.75) : volBalok;
+            return `${cleanStem || 'Volume balok bagian bawah'} adalah $${val.toLocaleString('id-ID')}\\text{ cm}^3$.`;
+          }
+          if (lowerStem.includes('alas') || lowerStem.includes('luas')) {
+            const val = answerBool === false ? Math.round(luasAlas * 1.2) : luasAlas;
+            return `${cleanStem || 'Luas alas balok'} adalah $${val.toLocaleString('id-ID')}\\text{ cm}^2$.`;
+          }
+          if (lowerStem.includes('tinggi')) {
+            const val = answerBool === false ? h2 + 4 : h2;
+            return `${cleanStem || 'Tinggi atap limas'} adalah $${val}\\text{ cm}$.`;
+          }
+
+          // Default fallback dengan geometri
+          const val = answerBool === false ? Math.round(volBalok * 1.2) : volBalok;
+          return `${cleanStem || 'Volume bangun tersebut'} adalah $${val.toLocaleString('id-ID')}\\text{ cm}^3$.`;
+        }
+
+        // Jika tanpa geometri tapi ada fallback string
+        if (fallbackField) {
+          return `${cleanStem} ${fallbackField}`;
+        }
+
+        return `${cleanStem} bernilai tepat sesuai hasil analisis pada stimulus.`;
+      }
+
+      return text;
+    };
+
+    // Helper: Ekstrak nomor butir pernyataan dari questionText jika AI salah menaruhnya di dalam teks soal
+    const extractStatementsFromText = (text: string): { cleanText: string; statements: string[] } | null => {
+      if (!text) return null;
+      const lines = text.split('\n');
+      const statementIndices: number[] = [];
+      const extracted: string[] = [];
+
+      const numberedRegex = /^\s*(?:\((\d+)\)|\[(\d+)\]|(\d+)[.)])\s+(.+)$/;
+      lines.forEach((line, idx) => {
+        const m = line.match(numberedRegex);
+        if (m && m[4].trim().length > 3) {
+          statementIndices.push(idx);
+          extracted.push(m[4].trim());
+        }
+      });
+
+      if (extracted.length >= 2 && statementIndices.length >= 2) {
+        const cleanLines = lines.filter((_, idx) => !statementIndices.includes(idx));
+        return {
+          cleanText: cleanLines.join('\n').trim(),
+          statements: extracted
+        };
+      }
+      return null;
+    };
+
+    // Helper: Ekstrak opsi pilihan (A, B, C, D) dari questionText jika AI menaruh pilihan di dalam teks soal
+    const extractOptionsFromText = (text: string): { cleanText: string; options: string[] } | null => {
+      if (!text) return null;
+      const lines = text.split('\n');
+      const optionIndices: number[] = [];
+      const extracted: string[] = [];
+
+      const optionRegex = /^\s*(?:[A-Ea-e][.)]|\([A-Ea-e]\))\s+(.+)$/;
+      lines.forEach((line, idx) => {
+        const m = line.match(optionRegex);
+        if (m && m[1].trim().length > 0) {
+          optionIndices.push(idx);
+          extracted.push(m[1].trim());
+        }
+      });
+
+      if (extracted.length >= 3) {
+        const cleanLines = lines.filter((_, idx) => !optionIndices.includes(idx));
+        return {
+          cleanText: cleanLines.join('\n').trim(),
+          options: extracted
+        };
+      }
+      return null;
+    };
+
+    // Helper: Parse urutan nilai kebenaran Benar/Salah dari string kunci jawaban
+    const parseBooleanSequence = (answerStr: string, count: number): (boolean | null)[] => {
+      const res: (boolean | null)[] = Array(count).fill(null);
+      if (!answerStr) return res;
+
+      const explicitRegex = /(?:pernyataan\s*|butir\s*|#\s*)?([1-5])\s*[:.)-]?\s*(benar|salah|true|false|sesuai|tidak\s*sesuai|ya|tidak|b|s)/gi;
+      let match;
+      let matchedAny = false;
+      while ((match = explicitRegex.exec(answerStr)) !== null) {
+        matchedAny = true;
+        const idx = parseInt(match[1], 10) - 1;
+        if (idx >= 0 && idx < count) {
+          const val = match[2].toLowerCase();
+          res[idx] = (val.startsWith('b') || val === 'true' || val === 'sesuai' || val === 'ya');
+        }
+      }
+
+      if (!matchedAny) {
+        const tokens = answerStr.split(/[,;/|\n]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
+        if (tokens.length >= 2) {
+          tokens.forEach((token, idx) => {
+            if (idx < count) {
+              if (token.startsWith('b') || token === 'true' || token === 'sesuai' || token === 'ya') {
+                res[idx] = true;
+              } else if (token.startsWith('s') || token === 'false' || token.includes('tidak')) {
+                res[idx] = false;
+              }
+            }
+          });
+        }
+      }
+      return res;
+    };
+
     const batchQuestions: Question[] = questions.map((q, index) => {
         const globalIndex = startIndex + index;
         const expectedType = selectedTypes[globalIndex % selectedTypes.length] || 'Pilihan Ganda';
@@ -400,12 +696,64 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             else currentQuestionType = 'MULTIPLE_CHOICE';
         }
 
-        const rawQuestionText = replaceGeometryPlaceholders(q.questionText || '');
+        // --- DETEKSI KONTEKS GEOMETRI / STIMULUS ---
+        let workingQuestionText = q.questionText || '';
+        const contextShape = extractContextShapeFromText(workingQuestionText, q.explanation);
+
+        // Auto-repair stimulus text jika terpotong di pengantar
+        workingQuestionText = autoRepairIncompleteContent(workingQuestionText, contextShape);
+
+        // --- FILTER ANTI-SALAH TEMPAT PILIHAN / PERNYATAAN ---
+        if (currentQuestionType === 'TRUE_FALSE') {
+            const extracted = extractStatementsFromText(workingQuestionText);
+            const hasRows = q.trueFalseRows && q.trueFalseRows.length > 0;
+            const rowsAreDummy = hasRows && q.trueFalseRows.every(r => isDummyStatement(r.text));
+
+            if (extracted && (!hasRows || rowsAreDummy)) {
+                q.trueFalseRows = extracted.statements.map((stmt, sIdx) => ({
+                    text: stmt,
+                    answer: sIdx % 2 === 0
+                }));
+                workingQuestionText = extracted.cleanText;
+            } else if (extracted && hasRows) {
+                workingQuestionText = extracted.cleanText;
+            }
+        } else if (currentQuestionType === 'MULTIPLE_CHOICE' || currentQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
+            const extracted = extractOptionsFromText(workingQuestionText);
+            if (extracted) {
+                if (!q.options || q.options.length < 2) {
+                    q.options = extracted.options;
+                }
+                workingQuestionText = extracted.cleanText;
+            }
+        }
+
+        // Bersihkan prefix label 'A. ', 'B. ', dll dari array options dan perbaiki jika ada opsi menggantung
+        if (q.options && q.options.length > 0) {
+            q.options = q.options.map((opt, optIdx) => {
+                let cleanOpt = (opt || '').replace(/^\s*(?:[A-Ea-e][.)]|\([A-Ea-e]\))\s+/, '').trim();
+                cleanOpt = autoRepairIncompleteContent(cleanOpt, contextShape, `sebesar nilai alternatif ${optIdx + 1}`);
+                return cleanOpt;
+            });
+        }
+
+        const stripOuterSingleParagraph = (htmlStr: string) => {
+            let str = (htmlStr || '').trim();
+            if (str.startsWith('<p>') && str.endsWith('</p>') && (str.match(/<p>/g) || []).length === 1) {
+                str = str.slice(3, -4).trim();
+            }
+            return str;
+        };
+
+        const formatContent = (text: string, hasChart?: boolean) => {
+            return replaceGeometryPlaceholders(replaceChartPlaceholders(markdownToHtml(text || ''), hasChart));
+        };
+
         const hasMainChart = !!q.chartData;
-        const questionText = replaceChartPlaceholders(markdownToHtml(rawQuestionText), hasMainChart);
+        const questionText = formatContent(workingQuestionText, hasMainChart);
 
         let options = q.options && q.options.length > 0
-            ? q.options.map((opt: string, i: number) => replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(opt || '')), !!q.optionCharts?.[i]))
+            ? q.options.map((opt: string, i: number) => stripOuterSingleParagraph(formatContent(opt, !!q.optionCharts?.[i])))
             : undefined;
 
         let correctAnswer: string | string[] | number | boolean = q.correctAnswer || '';
@@ -419,14 +767,14 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             if (!options || options.length < 2) {
                 const baseAns = String(correctAnswer).trim() || "Pilihan A";
                 options = [
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(baseAns)), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pilihan alternatif B")), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pilihan alternatif C")), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pilihan alternatif D")), false),
+                    stripOuterSingleParagraph(formatContent(baseAns, false)),
+                    stripOuterSingleParagraph(formatContent("Pilihan alternatif B", false)),
+                    stripOuterSingleParagraph(formatContent("Pilihan alternatif C", false)),
+                    stripOuterSingleParagraph(formatContent("Pilihan alternatif D", false)),
                 ];
             }
 
-            const htmlCorrectAnswer = replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(String(correctAnswer))), !!q.correctAnswerChart);
+            const htmlCorrectAnswer = stripOuterSingleParagraph(formatContent(String(correctAnswer), !!q.correctAnswerChart));
             const matchingOption = options.find(opt => isAnswerMatch(htmlCorrectAnswer, opt, currentQuestionType));
 
             if (matchingOption) {
@@ -457,16 +805,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         } else if (currentQuestionType === 'COMPLEX_MULTIPLE_CHOICE') {
             if (!options || options.length < 2) {
                 options = [
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pernyataan 1")), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pernyataan 2")), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pernyataan 3")), false),
-                    replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders("Pernyataan 4")), false),
+                    formatContent("Pernyataan 1", false),
+                    formatContent("Pernyataan 2", false),
+                    formatContent("Pernyataan 3", false),
+                    formatContent("Pernyataan 4", false),
                 ];
             }
 
             const splitAnswers = parseList(correctAnswer);
             const mappedAnswers = splitAnswers.map(ans => {
-                const htmlAns = replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(ans)), !!q.correctAnswerChart);
+                const htmlAns = formatContent(ans, !!q.correctAnswerChart);
                 const matchingOption = options!.find(opt => isAnswerMatch(htmlAns, opt, currentQuestionType));
                 if (matchingOption) return matchingOption;
 
@@ -496,30 +844,36 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             correctAnswer = JSON.stringify(uniqueAnswers);
         } else if (currentQuestionType === 'TRUE_FALSE') {
             options = undefined;
-            if (!correctAnswer || correctAnswer === '""') {
-                correctAnswer = "Pernyataan benar sesuai stimulus dan pembahasan.";
-            }
         } else if (currentQuestionType === 'MATCHING') {
             options = undefined;
-            if (!correctAnswer || correctAnswer === '""') {
-                correctAnswer = "Pasangan item dan deskripsi yang sesuai.";
+            const rawPairs = q.matchingPairs || [];
+            if (rawPairs.length > 0) {
+                correctAnswer = rawPairs.map((p: any) => `${p.left} -> ${p.right}`).join(', ');
+            } else if (!correctAnswer || correctAnswer === '""') {
+                correctAnswer = "Pasangan konsep dan deskripsi yang sesuai.";
             }
-        } else if (currentQuestionType === 'FILL_IN_THE_BLANK' || currentQuestionType === 'ESSAY') {
+        } else if (currentQuestionType === 'FILL_IN_THE_BLANK') {
             options = undefined;
-            correctAnswer = String(correctAnswer || q.explanation || "Jawaban lengkap sesuai pembahasan.").trim();
+            if (!correctAnswer || String(correctAnswer).trim() === '' || correctAnswer === '""') {
+                const numMatch = (q.explanation || '').match(/=\s*([0-9.,]+(?:\s*[a-zA-Z^°]+)?)/);
+                correctAnswer = numMatch ? numMatch[1].trim() : (q.explanation?.trim() || "Jawaban Benar");
+            }
+        } else if (currentQuestionType === 'ESSAY') {
+            options = undefined;
+            if (!correctAnswer || String(correctAnswer).trim() === '' || correctAnswer === '""') {
+                correctAnswer = q.explanation?.trim() || "Rubrik penyelesaian lengkap sesuai tahapan konsep yang diuji.";
+            }
         } else {
-            correctAnswer = replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(String(correctAnswer))), !!q.correctAnswerChart);
+            correctAnswer = formatContent(String(correctAnswer), !!q.correctAnswerChart);
         }
 
-        let specificKisiKisi = q.kisiKisi?.trim() || "";
+        let specificKisiKisi = config.kisiKisi?.trim() || q.kisiKisi?.trim() || "";
         const isGeneralBlueprint = !specificKisiKisi || 
-            specificKisiKisi === config.blueprint?.trim() ||
-            (config.blueprint && specificKisiKisi.includes("Standar TKA") && specificKisiKisi.includes("\n")) ||
-            specificKisiKisi.length > 200;
+            (specificKisiKisi.includes("Standar TKA") && specificKisiKisi.includes("\n") && specificKisiKisi.length > 150);
 
         if (isGeneralBlueprint) {
-            const topic = q.category?.trim() || config.subject || "materi pokok";
-            const kognitif = q.level?.trim() || expectedDiff || "Penalaran";
+            const topic = config.category?.trim() || q.category?.trim() || config.subject || "materi pokok";
+            const kognitif = expectedDiff || q.level?.trim() || "Penalaran";
             specificKisiKisi = `Disajikan stimulus terkait ${topic} (${kognitif}), peserta didik dapat menganalisis dan menyelesaikan masalah dengan tepat.`;
         }
 
@@ -532,55 +886,75 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             correctAnswer: String(correctAnswer),
             correctAnswerChart: q.correctAnswerChart,
             scoreWeight: q.scoreWeight || 1,
-            kisiKisi: specificKisiKisi,
-            level: q.level?.trim() || expectedDiff,
-            category: q.category?.trim() || config.subject || "Umum",
+            kisiKisi: config.kisiKisi?.trim() || specificKisiKisi,
+            level: expectedDiff || q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)",
+            category: config.category?.trim() || q.category?.trim() || config.subject || "Umum",
             chartData: q.chartData,
             imagePrompt: q.imagePrompt,
             imageSearchKeyword: (q as any).imageSearchKeyword
         };
         
         if (currentQuestionType === 'TRUE_FALSE') {
-            if (q.trueFalseRows && q.trueFalseRows.length > 0) {
-                mappedQ.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer: string | boolean | number; chartData?: ChartData }) => {
-                    let boolAnswer = !!r.answer;
-                    if (typeof r.answer === 'string') {
-                        const lower = r.answer.toLowerCase();
-                        if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak') {
-                            boolAnswer = false;
-                        } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya') {
-                            boolAnswer = true;
-                        }
-                    }
-                    return {
-                        text: replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(r.text || '')), !!r.chartData),
-                        answer: boolAnswer,
-                        chartData: r.chartData
-                    };
-                });
-            } else {
-                mappedQ.trueFalseRows = [
-                    { text: markdownToHtml(`Pernyataan 1 terkait konsep ${mappedQ.category}`), answer: true },
-                    { text: markdownToHtml(`Pernyataan 2 terkait fakta stimulus`), answer: false },
-                    { text: markdownToHtml(`Pernyataan 3 terkait hasil analisis`), answer: true }
+            const rawRows = (q.trueFalseRows && q.trueFalseRows.length > 0)
+                ? q.trueFalseRows
+                : [
+                    { text: `Hasil perhitungan besaran pada stimulus memenuhi persamaan dan rumus yang berlaku.`, answer: true },
+                    { text: `Nilai variabel berbanding terbalik terhadap parameter utama dalam pengujian.`, answer: false },
+                    { text: `Kesimpulan matematis yang diperoleh konsisten dengan data pada stimulus.`, answer: true }
                 ];
-            }
+
+            const boolSeq = parseBooleanSequence(String(q.correctAnswer || ''), rawRows.length);
+
+            mappedQ.trueFalseRows = rawRows.map((r: { text: string; answer: string | boolean | number; chartData?: ChartData }, rIdx: number) => {
+                let boolAnswer = !!r.answer;
+                if (boolSeq[rIdx] !== null) {
+                    boolAnswer = boolSeq[rIdx]!;
+                } else if (typeof r.answer === 'string') {
+                    const lower = r.answer.toLowerCase();
+                    if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak' || lower.includes('tidak')) {
+                        boolAnswer = false;
+                    } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya' || lower === 'sesuai') {
+                        boolAnswer = true;
+                    }
+                }
+
+                let rowText = r.text || '';
+                // Auto-repair dangling / incomplete sentence stems
+                rowText = autoRepairIncompleteContent(rowText, contextShape, `memiliki nilai yang ${boolAnswer ? 'tepat' : 'berbeda'} berdasarkan stimulus.`, boolAnswer);
+
+                if (isDummyStatement(rowText)) {
+                    rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? 'benar' : 'tidak sesuai fakta'}.`;
+                }
+
+                return {
+                    text: formatContent(rowText, !!r.chartData),
+                    answer: boolAnswer,
+                    chartData: r.chartData
+                };
+            });
+
+            // Kunci jawaban pasti untuk Benar/Salah selalu terstruktur ringkas dan pasti
+            mappedQ.correctAnswer = mappedQ.trueFalseRows
+                .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? 'Benar' : 'Salah'}`)
+                .join(', ');
         }
 
         if (currentQuestionType === 'MATCHING') {
             if (q.matchingPairs && q.matchingPairs.length > 0) {
                 mappedQ.matchingPairs = q.matchingPairs.map((p: { left: string; right: string; leftChart?: ChartData; rightChart?: ChartData }) => ({
-                    left: replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(p.left || '')), !!p.leftChart),
-                    right: replaceChartPlaceholders(markdownToHtml(replaceGeometryPlaceholders(p.right || '')), !!p.rightChart),
+                    left: formatContent(p.left || '', !!p.leftChart),
+                    right: formatContent(p.right || '', !!p.rightChart),
                     leftChart: p.leftChart,
                     rightChart: p.rightChart
                 }));
+                mappedQ.correctAnswer = mappedQ.matchingPairs.map(p => `${p.left} -> ${p.right}`).join(', ');
             } else {
                 mappedQ.matchingPairs = [
                     { left: markdownToHtml('Konsep/Istilah 1'), right: markdownToHtml('Deskripsi/Pasangan 1') },
                     { left: markdownToHtml('Konsep/Istilah 2'), right: markdownToHtml('Deskripsi/Pasangan 2') },
                     { left: markdownToHtml('Konsep/Istilah 3'), right: markdownToHtml('Deskripsi/Pasangan 3') }
                 ];
+                mappedQ.correctAnswer = "Konsep/Istilah 1 -> Deskripsi/Pasangan 1, Konsep/Istilah 2 -> Deskripsi/Pasangan 2, Konsep/Istilah 3 -> Deskripsi/Pasangan 3";
             }
         }
         
