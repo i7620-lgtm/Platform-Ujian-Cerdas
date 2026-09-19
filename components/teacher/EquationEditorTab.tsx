@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { XMarkIcon, FunctionIcon } from "../Icons";
+import { renderLatexToString } from "../../utils/mathRenderer";
 
 interface EquationEditorTabProps {
   isOpen: boolean;
@@ -122,14 +123,11 @@ export const EquationEditorTab: React.FC<EquationEditorTabProps> = ({
 
   useEffect(() => {
     if (previewContainerRef.current) {
-      const w = window as any;
-      if (w.katex && latexInput.trim()) {
+      if (latexInput.trim()) {
         try {
-          w.katex.render(latexInput, previewContainerRef.current, {
-            throwOnError: false,
-            displayMode: true,
-          });
-        } catch (e) {
+          const rendered = renderLatexToString(latexInput, true);
+          previewContainerRef.current.innerHTML = rendered;
+        } catch {
           previewContainerRef.current.innerText = "Format tidak valid";
         }
       } else {

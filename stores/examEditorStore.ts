@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Question, QuestionType, ExamConfig, ChartData } from '../types';
-import { parseList, isAnswerMatch } from '../components/teacher/examUtils';
+import { parseList, isAnswerMatch, repairGeometrySvgInHtml } from '../components/teacher/examUtils';
 import { useExamEditorUIStore, type ChartTarget } from './examEditorUIStore';
 
 const createNewQuestion = (type: QuestionType): Question => {
@@ -107,11 +107,21 @@ export const useExamEditorStore = create<ExamEditorState>()(
 
         setQuestions: (questions) => set((state) => {
             state.questions = (questions || []).map((q) => {
-                if (q.questionType === 'COMPLEX_MULTIPLE_CHOICE' && q.correctAnswer) {
-                    const parsed = parseList(q.correctAnswer, q.options);
-                    return { ...q, correctAnswer: JSON.stringify(parsed) };
+                const updated = { ...q };
+                if (updated.questionText) {
+                    updated.questionText = repairGeometrySvgInHtml(updated.questionText);
                 }
-                return q;
+                if (Array.isArray(updated.options)) {
+                    updated.options = updated.options.map(opt => repairGeometrySvgInHtml(opt));
+                }
+                if (updated.explanation) {
+                    updated.explanation = repairGeometrySvgInHtml(updated.explanation);
+                }
+                if (updated.questionType === 'COMPLEX_MULTIPLE_CHOICE' && updated.correctAnswer) {
+                    const parsed = parseList(updated.correctAnswer, updated.options);
+                    updated.correctAnswer = JSON.stringify(parsed);
+                }
+                return updated;
             });
         }),
 

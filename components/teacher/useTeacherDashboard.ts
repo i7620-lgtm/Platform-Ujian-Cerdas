@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useCallback, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
 import type {
   Exam,
   Question,
   ExamConfig,
   Result,
   TeacherProfile,
+  TeacherView,
 } from "../../types";
 import { generateExamCode, sanitizeHtml, parseList } from "./examUtils";
 import { storageService } from "../../services/storage";
@@ -13,6 +13,8 @@ import { useExamEditorStore } from "../../stores/examEditorStore";
 import { useTeacherDashboardStore } from "../../stores/teacherDashboardStore";
 import { useArchiveExam } from "./useArchiveExam";
 import { getExamDates } from "./timeUtils";
+
+export type { TeacherView };
 
 const DEFAULT_CONFIG: ExamConfig = {
   examMode: "UJIAN",
@@ -56,16 +58,6 @@ interface UseTeacherDashboardParams {
   onRefreshResults: () => Promise<void>;
 }
 
-export type TeacherView =
-  | "UPLOAD"
-  | "ONGOING"
-  | "UPCOMING_EXAMS"
-  | "FINISHED_EXAMS"
-  | "DRAFTS"
-  | "ADMIN_USERS"
-  | "ARCHIVE_VIEWER"
-  | "BOOK_GENERATOR";
-
 export const useTeacherDashboard = ({
   teacherProfile,
   addExam,
@@ -76,7 +68,7 @@ export const useTeacherDashboard = ({
   onRefreshExams,
   onRefreshResults,
 }: UseTeacherDashboardParams) => {
-  // Use Zustand store for UI states with useShallow to minimize subscriptions and prevent unnecessary re-renders
+  // Use Zustand store for UI states directly
   const {
     view,
     setView,
@@ -100,41 +92,12 @@ export const useTeacherDashboard = ({
     setGeneratedCode,
     manualMode,
     setManualMode,
-  } = useTeacherDashboardStore(
-    useShallow((state) => ({
-      view: state.view,
-      setView: state.setView,
-      isLoadingArchive: state.isLoadingArchive,
-      setIsLoadingArchive: state.setIsLoadingArchive,
-      selectedOngoingExam: state.selectedOngoingExam,
-      setSelectedOngoingExam: state.setSelectedOngoingExam,
-      selectedFinishedExam: state.selectedFinishedExam,
-      setSelectedFinishedExam: state.setSelectedFinishedExam,
-      isEditModalOpen: state.isEditModalOpen,
-      setIsEditModalOpen: state.setIsEditModalOpen,
-      editingExam: state.editingExam,
-      setEditingExam: state.setEditingExam,
-      isInviteOpen: state.isInviteOpen,
-      setIsInviteOpen: state.setIsInviteOpen,
-      isMainGuideModalOpen: state.isMainGuideModalOpen,
-      setIsMainGuideModalOpen: state.setIsMainGuideModalOpen,
-      resetKey: state.resetKey,
-      incrementResetKey: state.incrementResetKey,
-      generatedCode: state.generatedCode,
-      setGeneratedCode: state.setGeneratedCode,
-      manualMode: state.manualMode,
-      setManualMode: state.setManualMode,
-    }))
-  );
+  } = useTeacherDashboardStore();
 
-  const { questions, config, setQuestions, setConfig } = useExamEditorStore(
-    useShallow((state) => ({
-      questions: state.questions,
-      config: state.config,
-      setQuestions: state.setQuestions,
-      setConfig: state.setConfig,
-    }))
-  );
+  const questions = useExamEditorStore((state) => state.questions);
+  const config = useExamEditorStore((state) => state.config);
+  const setQuestions = useExamEditorStore((state) => state.setQuestions);
+  const setConfig = useExamEditorStore((state) => state.setConfig);
 
   // Logic for Organizer Name in Invitations
   const organizerName =

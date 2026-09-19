@@ -37,6 +37,8 @@ export function generateSmartFallbackQuestions(
     const question = buildSingleFallbackQuestion({
       index: itemIndex,
       subject,
+      category: config.category,
+      kisiKisi: config.kisiKisi,
       blueprint,
       qType,
       difficulty,
@@ -63,6 +65,8 @@ function mapToQuestionType(label: string): QuestionType {
 interface FallbackParams {
   index: number;
   subject: string;
+  category?: string;
+  kisiKisi?: string;
   blueprint: string;
   qType: QuestionType;
   difficulty: string;
@@ -72,7 +76,13 @@ interface FallbackParams {
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const { index, subject, blueprint, qType, difficulty, includeImages, failureReason } = params;
-  const isMath = /matematika|hitung|aritmatika|aljabar|geometri|statistika|data/i.test(subject) ||
+  const isGeometry = /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(subject) ||
+                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(blueprint) ||
+                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.category || '') ||
+                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.kisiKisi || '');
+
+  const isMath = isGeometry ||
+                 /matematika|hitung|aritmatika|aljabar|geometri|statistika|data/i.test(subject) ||
                  /hitung|grafik|diagram|tabel|angka|luas|volume|pecahan/i.test(blueprint);
   const isScience = /ipa|sains|biologi|fisika|kimia|alam|ekosistem/i.test(subject) ||
                     /tata surya|fotosintesis|rantai makanan|peredaran darah|daur/i.test(blueprint);
@@ -80,16 +90,379 @@ function buildSingleFallbackQuestion(params: FallbackParams): Question {
 
   const id = `q_fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const levelText = difficulty.includes("HOTS") ? "Level 3 - Penalaran (HOTS)" : difficulty;
-  const category = isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject;
+  const category = params.category || (isGeometry ? "Geometri Bangun Ruang" : isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
 
   // Question context generator based on Subject & Blueprint
-  if (isMath) {
-    return buildMathFallbackQuestion({ id, index, blueprint, qType, levelText, category, includeImages, failureReason });
+  if (isGeometry) {
+    return buildGeometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isMath) {
+    return buildMathFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isScience) {
-    return buildScienceFallbackQuestion({ id, index, blueprint, qType, levelText, category, includeImages, failureReason });
+    return buildScienceFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else {
-    return buildGeneralFallbackQuestion({ id, index, subject, blueprint, qType, levelText, category, includeImages, failureReason });
+    return buildGeneralFallbackQuestion({ id, index, subject, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   }
+}
+
+// 0. Geometry Fallback Generator
+function buildGeometryFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason;
+
+  const contextStr = `${args.blueprint} ${args.kisiKisi || ""} ${category}`.toLowerCase();
+
+  type ShapeConfig = {
+    tag: string;
+    lead: string;
+    detail: string;
+    kisi: string;
+    unitAns: string;
+    options: string[];
+    mcmaOptions: string[];
+    mcmaCorrect: string[];
+    tfRows: { text: string; answer: boolean }[];
+    matching: { left: string; right: string }[];
+    explanation: string;
+    shortAnswer: string;
+    essayAnswer: string;
+  };
+
+  const shapeCatalog: Record<string, ShapeConfig> = {
+    cylinder: {
+      tag: `[GEOMETRY:cylinder:{"radius":"7 cm","height":"20 cm"}]`,
+      lead: `Perhatikan gambar wadah penampung air berbentuk tabung (silinder) berikut:`,
+      detail: `<p>[GEOMETRY:cylinder:{"radius":"7 cm","height":"20 cm"}]</p><p>Sebuah wadah tabung memiliki jari-jari alas 7 cm dan tinggi 20 cm. Berapakah volume wadah penampung air tersebut? (Gunakan $\\pi = \\frac{22}{7}$)</p>`,
+      kisi: `Disajikan stimulus gambar bangun ruang tabung dengan ukuran jari-jari dan tinggi tertentu, peserta didik dapat menghitung volume tabung dengan tepat.`,
+      unitAns: "3.080 cm³",
+      options: ["3.080 cm³", "2.940 cm³", "1.540 cm³", "880 cm³"],
+      mcmaOptions: [
+        "Luas alas tabung adalah 154 cm²",
+        "Volume tabung penampung air adalah 3.080 cm³",
+        "Luas selimut tabung adalah 880 cm²",
+        "Volume tabung kurang dari 2.000 cm³"
+      ],
+      mcmaCorrect: ["Luas alas tabung adalah 154 cm²", "Volume tabung penampung air adalah 3.080 cm³", "Luas selimut tabung adalah 880 cm²"],
+      tfRows: [
+        { text: "Luas alas lingkaran tabung tersebut adalah 154 cm².", answer: true },
+        { text: "Volume tabung penampung air tersebut adalah 3.080 cm³.", answer: true },
+        { text: "Volume tabung tersebut kurang dari 2.500 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Luas Alas Tabung", right: "154 cm²" },
+        { left: "Luas Selimut Tabung", right: "880 cm²" },
+        { left: "Volume Total Tabung", right: "3.080 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Volume Tabung:**\n1. Luas alas: $L_a = \\pi \\times r^2 = \\frac{22}{7} \\times 7^2 = 154\\text{ cm}^2$.\n2. Volume tabung: $V = L_a \\times t = 154 \\times 20 = \\mathbf{3.080\\text{ cm}^3}$.`,
+      shortAnswer: "3.080",
+      essayAnswer: "L_alas = 22/7 × 7² = 154 cm². Volume = L_alas × tinggi = 154 × 20 = 3.080 cm³."
+    },
+    cube: {
+      tag: `[GEOMETRY:cube:{"side":"12 cm"}]`,
+      lead: `Perhatikan gambar wadah penyimpanan berbentuk kubus berikut:`,
+      detail: `<p>[GEOMETRY:cube:{"side":"12 cm"}]</p><p>Sebuah kotak wadah berbentuk kubus memiliki panjang rusuk 12 cm. Berapakah volume kotak kubus tersebut?</p>`,
+      kisi: `Disajikan stimulus visual bangun ruang kubus dengan panjang rusuk tertentu, peserta didik dapat menghitung volume kubus dengan benar.`,
+      unitAns: "1.728 cm³",
+      options: ["1.728 cm³", "1.440 cm³", "864 cm³", "576 cm³"],
+      mcmaOptions: [
+        "Luas salah satu sisi kubus adalah 144 cm²",
+        "Volume kotak kubus adalah 1.728 cm³",
+        "Luas permukaan seluruh kubus adalah 864 cm²",
+        "Panjang seluruh rusuk kubus adalah 120 cm"
+      ],
+      mcmaCorrect: ["Luas salah satu sisi kubus adalah 144 cm²", "Volume kotak kubus adalah 1.728 cm³", "Luas permukaan seluruh kubus adalah 864 cm²"],
+      tfRows: [
+        { text: "Luas salah satu bidang sisi kubus adalah 144 cm².", answer: true },
+        { text: "Volume kotak kubus tersebut adalah 1.728 cm³.", answer: true },
+        { text: "Volume kubus tersebut bernilai lebih dari 2.000 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Luas Satu Sisi Kubus", right: "144 cm²" },
+        { left: "Luas Permukaan Kubus", right: "864 cm²" },
+        { left: "Volume Kubus", right: "1.728 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Volume Kubus:**\n$V = s^3 = 12\\text{ cm} \\times 12\\text{ cm} \\times 12\\text{ cm} = \\mathbf{1.728\\text{ cm}^3}$.`,
+      shortAnswer: "1.728",
+      essayAnswer: "Volume Kubus = s × s × s = 12 × 12 × 12 = 1.728 cm³."
+    },
+    cuboid: {
+      tag: `[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm"}]`,
+      lead: `Perhatikan gambar kotak kemasan makanan berbentuk balok berikut:`,
+      detail: `<p>[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm"}]</p><p>Sebuah kotak kemasan memiliki ukuran panjang 15 cm, lebar 8 cm, dan tinggi 10 cm. Berapakah volume kotak kemasan tersebut?</p>`,
+      kisi: `Disajikan stimulus bangun ruang balok dengan ukuran dimensi panjang, lebar, dan tinggi, peserta didik dapat menentukan volume balok dengan cermat.`,
+      unitAns: "1.200 cm³",
+      options: ["1.200 cm³", "1.120 cm³", "960 cm³", "800 cm³"],
+      mcmaOptions: [
+        "Luas alas balok adalah 120 cm²",
+        "Volume kotak balok adalah 1.200 cm³",
+        "Keliling alas balok adalah 46 cm",
+        "Volume balok lebih kecil dari 1.000 cm³"
+      ],
+      mcmaCorrect: ["Luas alas balok adalah 120 cm²", "Volume kotak balok adalah 1.200 cm³", "Keliling alas balok adalah 46 cm"],
+      tfRows: [
+        { text: "Luas alas kotak kemasan balok adalah 120 cm².", answer: true },
+        { text: "Volume kotak balok tersebut adalah 1.200 cm³.", answer: true },
+        { text: "Volume kotak kemasan tersebut adalah 1.500 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Luas Alas Balok", right: "120 cm²" },
+        { left: "Luas Bidang Depan", right: "150 cm²" },
+        { left: "Volume Balok", right: "1.200 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Volume Balok:**\n$V = p \\times l \\times t = 15\\text{ cm} \\times 8\\text{ cm} \\times 10\\text{ cm} = \\mathbf{1.200\\text{ cm}^3}$.`,
+      shortAnswer: "1.200",
+      essayAnswer: "Volume Balok = panjang × lebar × tinggi = 15 × 8 × 10 = 1.200 cm³."
+    },
+    cone: {
+      tag: `[GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]`,
+      lead: `Perhatikan gambar cetakan tumpeng berbentuk kerucut berikut:`,
+      detail: `<p>[GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]</p><p>Sebuah kerucut memiliki jari-jari alas 7 cm dan tinggi 24 cm. Berapakah volume kerucut tersebut? (Gunakan $\\pi = \\frac{22}{7}$)</p>`,
+      kisi: `Disajikan stimulus visual bangun ruang kerucut dengan dimensi jari-jari dan tinggi, peserta didik dapat menghitung volume kerucut dengan benar.`,
+      unitAns: "1.232 cm³",
+      options: ["1.232 cm³", "1.154 cm³", "924 cm³", "616 cm³"],
+      mcmaOptions: [
+        "Luas alas kerucut adalah 154 cm²",
+        "Volume kerucut adalah 1.232 cm³",
+        "Garis pelukis (s) kerucut adalah 25 cm",
+        "Volume kerucut lebih dari 2.000 cm³"
+      ],
+      mcmaCorrect: ["Luas alas kerucut adalah 154 cm²", "Volume kerucut adalah 1.232 cm³", "Garis pelukis (s) kerucut adalah 25 cm"],
+      tfRows: [
+        { text: "Luas lingkaran alas kerucut adalah 154 cm².", answer: true },
+        { text: "Volume kerucut tersebut adalah 1.232 cm³.", answer: true },
+        { text: "Volume kerucut tersebut mencapai 2.464 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Luas Alas Kerucut", right: "154 cm²" },
+        { left: "Tinggi Kerucut", right: "24 cm" },
+        { left: "Volume Kerucut", right: "1.232 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Volume Kerucut:**\n$V = \\frac{1}{3} \\times \\pi \\times r^2 \\times t = \\frac{1}{3} \\times 154 \\times 24 = 154 \\times 8 = \\mathbf{1.232\\text{ cm}^3}$.`,
+      shortAnswer: "1.232",
+      essayAnswer: "V = 1/3 × π × r² × t = 1/3 × 154 × 24 = 1.232 cm³."
+    },
+    prism: {
+      tag: `[GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm"}]`,
+      lead: `Perhatikan gambar kemasan cokelat berbentuk prisma tegak segitiga siku-siku berikut:`,
+      detail: `<p>[GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm"}]</p><p>Alas prisma berbentuk segitiga siku-siku dengan panjang sisi siku-siku 6 cm dan 8 cm, serta panjang prisma 15 cm. Berapakah volume prisma tersebut?</p>`,
+      kisi: `Disajikan stimulus visual prisma tegak segitiga dengan ukuran alas dan tinggi prisma, peserta didik dapat menentukan volume prisma segitiga secara tepat.`,
+      unitAns: "360 cm³",
+      options: ["360 cm³", "320 cm³", "280 cm³", "180 cm³"],
+      mcmaOptions: [
+        "Luas alas segitiga prisma adalah 24 cm²",
+        "Panjang sisi miring alas segitiga adalah 10 cm",
+        "Volume prisma segitiga adalah 360 cm³",
+        "Volume prisma segitiga adalah 720 cm³"
+      ],
+      mcmaCorrect: ["Luas alas segitiga prisma adalah 24 cm²", "Panjang sisi miring alas segitiga adalah 10 cm", "Volume prisma segitiga adalah 360 cm³"],
+      tfRows: [
+        { text: "Luas alas segitiga siku-siku prisma adalah 24 cm².", answer: true },
+        { text: "Volume prisma tegak segitiga tersebut adalah 360 cm³.", answer: true },
+        { text: "Volume prisma tersebut sama dengan 720 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Luas Alas Segitiga", right: "24 cm²" },
+        { left: "Panjang Prisma", right: "15 cm" },
+        { left: "Volume Prisma", right: "360 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Volume Prisma:**\n1. Luas alas: $L_a = \\frac{1}{2} \\times 6 \\times 8 = 24\\text{ cm}^2$.\n2. Volume: $V = L_a \\times t_{\\text{prisma}} = 24 \\times 15 = \\mathbf{360\\text{ cm}^3}$.`,
+      shortAnswer: "360",
+      essayAnswer: "L_alas = 1/2 × 6 × 8 = 24 cm². Volume = 24 × 15 = 360 cm³."
+    },
+    combined_cylinder_cone: {
+      tag: `[GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]`,
+      lead: `Perhatikan gambar tangki penyimpanan berbentuk bangun ruang gabungan tabung dan kerucut berikut:`,
+      detail: `<p>[GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]</p><p>Bagian bawah berupa tabung dengan jari-jari 7 cm dan tinggi 10 cm. Bagian atas berupa kerucut dengan jari-jari sama dan tinggi 6 cm. Berapakah volume total tangki tersebut? (Gunakan $\\pi = \\frac{22}{7}$)</p>`,
+      kisi: `Disajikan stimulus visual bangun ruang gabungan tabung dan kerucut, peserta didik dapat menganalisis dan menghitung volume gabungan dengan akurat.`,
+      unitAns: "1.848 cm³",
+      options: ["1.848 cm³", "1.650 cm³", "1.540 cm³", "1.232 cm³"],
+      mcmaOptions: [
+        "Volume tabung bagian bawah adalah 1.540 cm³",
+        "Volume kerucut bagian atas adalah 308 cm³",
+        "Volume total tangki gabungan adalah 1.848 cm³",
+        "Volume kerucut lebih besar daripada volume tabung"
+      ],
+      mcmaCorrect: ["Volume tabung bagian bawah adalah 1.540 cm³", "Volume kerucut bagian atas adalah 308 cm³", "Volume total tangki gabungan adalah 1.848 cm³"],
+      tfRows: [
+        { text: "Volume tabung penyusun bagian bawah adalah 1.540 cm³.", answer: true },
+        { text: "Volume kerucut penyusun bagian atas adalah 308 cm³.", answer: true },
+        { text: "Volume total seluruh tangki melebihi 2.000 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Volume Tabung Bawah", right: "1.540 cm³" },
+        { left: "Volume Kerucut Atas", right: "308 cm³" },
+        { left: "Volume Total Tangki", right: "1.848 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Bangun Gabungan Tabung dan Kerucut:**\n1. $V_{\\text{tabung}} = \\frac{22}{7} \\times 7^2 \\times 10 = 1.540\\text{ cm}^3$.\n2. $V_{\\text{kerucut}} = \\frac{1}{3} \\times \\frac{22}{7} \\times 7^2 \\times 6 = 308\\text{ cm}^3$.\n3. $V_{\\text{total}} = 1.540 + 308 = \\mathbf{1.848\\text{ cm}^3}$.`,
+      shortAnswer: "1.848",
+      essayAnswer: "V_tabung = 1.540 cm³. V_kerucut = 308 cm³. V_total = 1.540 + 308 = 1.848 cm³."
+    },
+    combined_cuboid_pyramid: {
+      tag: `[GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"12 cm","bottom_height":"8 cm","top_height":"8 cm"}]`,
+      lead: `Perhatikan gambar miniatur monumen kayu gabungan balok dan limas segiempat berikut:`,
+      detail: `<p>[GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"12 cm","bottom_height":"8 cm","top_height":"8 cm"}]</p><p>Ukuran balok bagian bawah memiliki panjang 12 cm, lebar 12 cm, dan tinggi 8 cm. Di atas balok dipasang limas segiempat beraturan dengan alas berimpit sempurna dan tinggi limas 8 cm. Berapakah volume total bangun gabungan tersebut?</p>`,
+      kisi: `Disajikan stimulus visual bangun ruang gabungan balok dan limas segiempat berukuran dimensi tertentu, peserta didik dapat menganalisis dan menghitung volume gabungan kedua bangun tersebut dengan tepat.`,
+      unitAns: "1.536 cm³",
+      options: ["1.536 cm³", "1.440 cm³", "1.296 cm³", "1.152 cm³"],
+      mcmaOptions: [
+        "Volume balok bagian bawah adalah 1.152 cm³",
+        "Volume limas segiempat bagian atas adalah 384 cm³",
+        "Volume total bangun ruang gabungan adalah 1.536 cm³",
+        "Volume bagian limas lebih besar dari volume balok"
+      ],
+      mcmaCorrect: ["Volume balok bagian bawah adalah 1.152 cm³", "Volume limas segiempat bagian atas adalah 384 cm³", "Volume total bangun ruang gabungan adalah 1.536 cm³"],
+      tfRows: [
+        { text: "Volume balok penyusun bagian bawah adalah 1.152 cm³.", answer: true },
+        { text: "Volume limas segiempat penyusun bagian atas adalah 384 cm³.", answer: true },
+        { text: "Volume total gabungan kedua bangun ruang melebihi 1.600 cm³.", answer: false }
+      ],
+      matching: [
+        { left: "Volume Balok", right: "1.152 cm³" },
+        { left: "Volume Limas Segiempat", right: "384 cm³" },
+        { left: "Volume Total Gabungan", right: "1.536 cm³" }
+      ],
+      explanation: `**Langkah Perhitungan Geometri Bangun Gabungan:**\n1. Volume Balok: $12 \\times 12 \\times 8 = 1.152\\text{ cm}^3$.\n2. Volume Limas: $\\frac{1}{3} \\times (12 \\times 12) \\times 8 = 384\\text{ cm}^3$.\n3. Volume Total: $1.152 + 384 = \\mathbf{1.536\\text{ cm}^3}$.`,
+      shortAnswer: "1.536",
+      essayAnswer: "V_balok = 1.152 cm³. V_limas = 384 cm³. V_total = 1.152 + 384 = 1.536 cm³."
+    }
+  };
+
+  // Determine which shape to select based on user context or rotation
+  let chosenKey = "cylinder";
+  if (contextStr.includes("tabung") || contextStr.includes("silinder")) {
+    chosenKey = (contextStr.includes("kerucut") || contextStr.includes("gabungan")) ? "combined_cylinder_cone" : "cylinder";
+  } else if (contextStr.includes("kerucut")) {
+    chosenKey = contextStr.includes("gabungan") ? "combined_cylinder_cone" : "cone";
+  } else if (contextStr.includes("kubus")) {
+    chosenKey = "cube";
+  } else if (contextStr.includes("prisma")) {
+    chosenKey = "prism";
+  } else if (contextStr.includes("limas")) {
+    chosenKey = contextStr.includes("balok") ? "combined_cuboid_pyramid" : "combined_cuboid_pyramid";
+  } else if (contextStr.includes("balok")) {
+    chosenKey = (contextStr.includes("limas") || contextStr.includes("gabungan")) ? "combined_cuboid_pyramid" : "cuboid";
+  } else if (contextStr.includes("gabungan")) {
+    const combinedKeys = ["combined_cylinder_cone", "combined_cuboid_pyramid"];
+    chosenKey = combinedKeys[args.index % combinedKeys.length];
+  } else {
+    // General geometry volume topic: rotate diverse shapes per index
+    const varietyKeys = ["cylinder", "cube", "cuboid", "cone", "prism", "combined_cylinder_cone", "combined_cuboid_pyramid"];
+    chosenKey = varietyKeys[args.index % varietyKeys.length];
+  }
+
+  const cur = shapeCatalog[chosenKey] || shapeCatalog.cylinder;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : cur.kisi);
+
+  if (qType === "MULTIPLE_CHOICE") {
+    return {
+      id,
+      questionType: "MULTIPLE_CHOICE",
+      questionText: `<p>${cur.lead}</p>${cur.detail}`,
+      options: cur.options,
+      correctAnswer: cur.options[0],
+      scoreWeight: 1,
+      explanation: cur.explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+    return {
+      id,
+      questionType: "COMPLEX_MULTIPLE_CHOICE",
+      questionText: `<p>${cur.lead}</p>${cur.detail}<p>Pilihlah semua pernyataan yang benar berdasarkan ukuran bangun tersebut!</p>`,
+      options: cur.mcmaOptions,
+      correctAnswer: JSON.stringify(cur.mcmaCorrect),
+      scoreWeight: 2,
+      explanation: cur.explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>${cur.lead}</p>${cur.detail}<p>Tentukan apakah setiap pernyataan berikut bernilai <strong>Benar</strong> atau <strong>Salah</strong>!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: cur.tfRows,
+      explanation: cur.explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "MATCHING") {
+    return {
+      id,
+      questionType: "MATCHING",
+      questionText: `<p>${cur.lead}</p>${cur.detail}<p>Pasangkanlah setiap komponen bangun ruang dengan nilai besaran yang tepat!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      matchingPairs: cur.matching,
+      explanation: cur.explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "FILL_IN_THE_BLANK") {
+    return {
+      id,
+      questionType: "FILL_IN_THE_BLANK",
+      questionText: `<p>${cur.lead}</p>${cur.detail}<p>Volume bangun ruang tersebut adalah ... cm³.</p>`,
+      options: [],
+      correctAnswer: cur.shortAnswer,
+      scoreWeight: 1,
+      explanation: cur.explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  return {
+    id,
+    questionType: "ESSAY",
+    questionText: `<p>${cur.lead}</p>${cur.detail}<p>Tuliskan rumus dan langkah-langkah perhitungan sistematis untuk menghitung volume bangun ruang tersebut!</p>`,
+    options: [],
+    correctAnswer: cur.essayAnswer,
+    scoreWeight: 3,
+    explanation: cur.explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
 }
 
 // 1. Math Fallback Generator (Complete with Bar Chart, Line Chart or Geometry)
@@ -97,6 +470,7 @@ function buildMathFallbackQuestion(args: {
   id: string;
   index: number;
   blueprint: string;
+  kisiKisi?: string;
   qType: QuestionType;
   levelText: string;
   category: string;
@@ -135,7 +509,7 @@ Setiap karung beras memiliki netto 25 kg dan dijual dengan harga Rp14.000,00 per
 4. **Selisih Pendapatan Rabu dan Kamis:**
    - Selisih = Rp9.800.000 - Rp7.315.000 = **Rp2.485.000**.`;
 
-  const kisiKisi = `Disajikan diagram batang data penjualan kontekstual (Toko Beras), peserta didik dapat menganalisis dan menghitung selisih pendapatan berkondisi diskon bertingkat dengan tepat.`;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : `Disajikan diagram batang data penjualan kontekstual (Toko Beras), peserta didik dapat menganalisis dan menghitung selisih pendapatan berkondisi diskon bertingkat dengan tepat.`);
 
   if (qType === "MULTIPLE_CHOICE") {
     const options = [
@@ -273,6 +647,7 @@ function buildScienceFallbackQuestion(args: {
   id: string;
   index: number;
   blueprint: string;
+  kisiKisi?: string;
   qType: QuestionType;
   levelText: string;
   category: string;
@@ -296,7 +671,7 @@ function buildScienceFallbackQuestion(args: {
   1. Populasi **belalang akan meningkat pesat** karena berkurangnya predator alami (katak). Hal ini berdampak buruk pada produksi tanaman padi.
   2. Populasi **ular akan menurun** karena ketersediaan sumber makanan utamanya berkurang drastis.`;
 
-  const kisiKisi = `Disajikan bagan rantai makanan ekosistem sawah, peserta didik dapat memprediksi dampak perubahan populasi salah satu komponen trofik terhadap keseimbangan ekosistem dengan tepat.`;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : `Disajikan bagan rantai makanan ekosistem sawah, peserta didik dapat memprediksi dampak perubahan populasi salah satu komponen trofik terhadap keseimbangan ekosistem dengan tepat.`);
 
   if (qType === "COMPLEX_MULTIPLE_CHOICE") {
     const options = [
@@ -395,6 +770,7 @@ function buildGeneralFallbackQuestion(args: {
   index: number;
   subject: string;
   blueprint: string;
+  kisiKisi?: string;
   qType: QuestionType;
   levelText: string;
   category: string;
@@ -416,7 +792,7 @@ function buildGeneralFallbackQuestion(args: {
 - Paragraf menjelaskan bahwa teknologi digital meningkatkan efektivitas dan motivasi belajar peserta didik.
 - Namun keberhasilan tersebut memiliki syarat penting, yaitu adanya pendampingan guru dan pembiasaan etika berinternet secara sehat.`;
 
-  const kisiKisi = `Disajikan teks bacaan informatif mengenai transformasi pendidikan digital, peserta didik dapat menentukan simpulan pokok isi teks dengan tepat.`;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : `Disajikan teks bacaan informatif mengenai transformasi pendidikan digital, peserta didik dapat menentukan simpulan pokok isi teks dengan tepat.`);
 
   if (qType === "COMPLEX_MULTIPLE_CHOICE") {
     const options = [

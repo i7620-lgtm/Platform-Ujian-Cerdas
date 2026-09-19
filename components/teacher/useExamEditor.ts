@@ -1,5 +1,4 @@
 import { useRef, useEffect, useMemo, useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
 import type { Question } from "../../types";
 import { useExamEditorStore } from "../../stores/examEditorStore";
 import { useExamEditorUIStore } from "../../stores/examEditorUIStore";
@@ -15,15 +14,15 @@ export const useExamEditor = ({
   isEditing,
   generatedCode,
 }: UseExamEditorParams) => {
-  // Select state and actions using useShallow to minimize subscriptions and prevent unnecessary re-renders
+  // Select state and actions directly from store
   const {
     questions,
     config,
     setQuestions,
     setConfig,
     reset,
-    handleAddClassTagAction,
-    handleAddClassTagsAction,
+    handleAddClassTag: handleAddClassTagAction,
+    handleAddClassTags: handleAddClassTagsAction,
     removeClassTag,
     handleConfigChangeManual,
     handleSubjectSelect,
@@ -49,42 +48,7 @@ export const useExamEditor = ({
     handleAddMatchingPair,
     handleDeleteMatchingPair,
     handleDeleteChart,
-  } = useExamEditorStore(
-    useShallow((s) => ({
-      questions: s.questions,
-      config: s.config,
-      setQuestions: s.setQuestions,
-      setConfig: s.setConfig,
-      reset: s.reset,
-      handleAddClassTagAction: s.handleAddClassTag,
-      handleAddClassTagsAction: s.handleAddClassTags,
-      removeClassTag: s.removeClassTag,
-      handleConfigChangeManual: s.handleConfigChangeManual,
-      handleSubjectSelect: s.handleSubjectSelect,
-      handleSaveChart: s.handleSaveChart,
-      handleQuestionTextChange: s.handleQuestionTextChange,
-      handleCategoryChange: s.handleCategoryChange,
-      handleLevelChange: s.handleLevelChange,
-      handleKisiKisiChange: s.handleKisiKisiChange,
-      handleScoreWeightChange: s.handleScoreWeightChange,
-      handleTypeChange: s.handleTypeChange,
-      handleOptionTextChange: s.handleOptionTextChange,
-      handleCorrectAnswerChange: s.handleCorrectAnswerChange,
-      handleComplexCorrectAnswerChange: s.handleComplexCorrectAnswerChange,
-      handleDeleteQuestion: s.handleDeleteQuestion,
-      handleSelectQuestionType: s.handleSelectQuestionType,
-      handleAddOption: s.handleAddOption,
-      handleDeleteOption: s.handleDeleteOption,
-      handleTrueFalseRowTextChange: s.handleTrueFalseRowTextChange,
-      handleTrueFalseRowAnswerChange: s.handleTrueFalseRowAnswerChange,
-      handleAddTrueFalseRow: s.handleAddTrueFalseRow,
-      handleDeleteTrueFalseRow: s.handleDeleteTrueFalseRow,
-      handleMatchingPairChange: s.handleMatchingPairChange,
-      handleAddMatchingPair: s.handleAddMatchingPair,
-      handleDeleteMatchingPair: s.handleDeleteMatchingPair,
-      handleDeleteChart: s.handleDeleteChart,
-    }))
-  );
+  } = useExamEditorStore();
 
   const {
     classTagInput,
@@ -105,28 +69,7 @@ export const useExamEditor = ({
     setExamTypeModalOpen,
     setInsertIndex,
     setIsGeneratingId,
-  } = useExamEditorUIStore(
-    useShallow((s) => ({
-      classTagInput: s.classTagInput,
-      isTypeSelectionModalOpen: s.isTypeSelectionModalOpen,
-      editingChartTarget: s.editingChartTarget,
-      isSubjectModalOpen: s.isSubjectModalOpen,
-      isClassModalOpen: s.isClassModalOpen,
-      isCertificateModalOpen: s.isCertificateModalOpen,
-      isExamTypeModalOpen: s.isExamTypeModalOpen,
-      insertIndex: s.insertIndex,
-      isGeneratingId: s.isGeneratingId,
-      setClassTagInput: s.setClassTagInput,
-      setTypeSelectionModalOpen: s.setTypeSelectionModalOpen,
-      setEditingChartTarget: s.setEditingChartTarget,
-      setSubjectModalOpen: s.setSubjectModalOpen,
-      setClassModalOpen: s.setClassModalOpen,
-      setCertificateModalOpen: s.setCertificateModalOpen,
-      setExamTypeModalOpen: s.setExamTypeModalOpen,
-      setInsertIndex: s.setInsertIndex,
-      setIsGeneratingId: s.setIsGeneratingId,
-    }))
-  );
+  } = useExamEditorUIStore();
 
   const questionsSectionRef = useRef<HTMLDivElement>(null);
   const generatedCodeSectionRef = useRef<HTMLDivElement>(null);
@@ -178,15 +121,27 @@ export const useExamEditor = ({
                     ? "Uraian Singkat"
                     : "Esai";
 
-        const cognitiveLevel = q.level || "Level 3 - Penalaran (Reasoning / HOTS)";
+        const cognitiveLevel = q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)";
         const cleanContext = (q.questionText || "").replace(/<[^>]+>/g, " ").trim();
-        const blueprintPrompt = q.kisiKisi
-          ? q.kisiKisi
-          : (cleanContext ? `Buat variasi soal baru yang berbeda atau perbarui dari topik ini: "${cleanContext.slice(0, 200)}"` : "");
+        const userKisiKisi = q.kisiKisi?.trim() || "";
+        const userCategory = q.category?.trim() || "";
+        
+        let blueprintPrompt = userKisiKisi;
+        if (!blueprintPrompt) {
+          if (userCategory) {
+            blueprintPrompt = `Buat butir soal baru yang bervariasi mengenai materi "${userCategory}" sesuai dengan level kognitif yang ditentukan tanpa terpaku pada satu bentuk bangun tertentu.`;
+          } else if (cleanContext) {
+            blueprintPrompt = `Buat variasi soal baru yang berbeda dari topik ini: "${cleanContext.slice(0, 200)}"`;
+          }
+        }
 
         const includeImages = includeImagesConfig ?? true;
-        const aiConfig = {
-          subject: q.category || subject || "Umum",
+        const aiSubject = [subject, userCategory].filter(Boolean).join(" - ") || "Umum";
+
+        const aiConfig: QuizConfig = {
+          subject: aiSubject,
+          category: userCategory || undefined,
+          kisiKisi: userKisiKisi || undefined,
           count: 1,
           type: questionTypeLabel,
           types: [questionTypeLabel],
@@ -214,10 +169,10 @@ export const useExamEditor = ({
                     chartData: newQ.chartData ?? undefined,
                     trueFalseRows: newQ.trueFalseRows || undefined,
                     matchingPairs: newQ.matchingPairs || undefined,
-                    category: newQ.category || q.category,
-                    level: newQ.level || q.level,
-                    kisiKisi: newQ.kisiKisi || q.kisiKisi,
-                    scoreWeight: newQ.scoreWeight || q.scoreWeight || 1,
+                    category: userCategory || newQ.category || q.category,
+                    level: q.level?.trim() ? q.level : (newQ.level || q.level),
+                    kisiKisi: userKisiKisi || newQ.kisiKisi || q.kisiKisi,
+                    scoreWeight: q.scoreWeight || newQ.scoreWeight || 1,
                   }
                 : question,
             ),

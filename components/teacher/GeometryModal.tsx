@@ -732,7 +732,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                       <>
                         <input
                           type="text"
-                          placeholder="Lebar Alas (P.panjang)"
+                          placeholder="Lebar Alas (misal: 12 cm)"
                           value={labels.rectWidth || ""}
                           onChange={(e) =>
                             handleLabelChange("rectWidth", e.target.value)
@@ -741,7 +741,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                         />
                         <input
                           type="text"
-                          placeholder="Tinggi Persegi Panjang"
+                          placeholder="Tinggi Persegi Panjang (misal: 8 cm)"
                           value={labels.rectHeight || ""}
                           onChange={(e) =>
                             handleLabelChange("rectHeight", e.target.value)
@@ -750,7 +750,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                         />
                         <input
                           type="text"
-                          placeholder="Tinggi Segitiga"
+                          placeholder="Tinggi Atap Segitiga (misal: 5 cm)"
                           value={labels.triHeight || ""}
                           onChange={(e) =>
                             handleLabelChange("triHeight", e.target.value)
@@ -759,10 +759,389 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                         />
                         <input
                           type="text"
-                          placeholder="Sisi Miring Segitiga"
+                          placeholder="Sisi Miring Atap (misal: 7 cm)"
                           value={labels.triSide || ""}
                           onChange={(e) =>
                             handleLabelChange("triSide", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "tube_cone" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Jari-jari Alas r (misal: 7 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Tabung t1 (misal: 10 cm)"
+                          value={labels.cylinderHeight || ""}
+                          onChange={(e) =>
+                            handleLabelChange("cylinderHeight", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Kerucut t2 (misal: 6 cm)"
+                          value={labels.coneHeight || ""}
+                          onChange={(e) =>
+                            handleLabelChange("coneHeight", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {(shape === "capsule" || shape === "capsule2") && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Jari-jari r (misal: 7 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Tabung (misal: 14 cm)"
+                          value={labels.cylinderHeight || labels.height || ""}
+                          onChange={(e) => {
+                            handleLabelChange("cylinderHeight", e.target.value);
+                            handleLabelChange("height", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "icecream" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Jari-jari Bola r (misal: 5 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Kerucut (misal: 12 cm)"
+                          value={labels.coneHeight || labels.height || ""}
+                          onChange={(e) => {
+                            handleLabelChange("coneHeight", e.target.value);
+                            handleLabelChange("height", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Garis Pelukis s (misal: 13 cm)"
+                          value={labels.side || ""}
+                          onChange={(e) =>
+                            handleLabelChange("side", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "cone_cone" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Jari-jari r (misal: 6 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Kerucut Atas (misal: 8 cm)"
+                          value={labels.height1 || ""}
+                          onChange={(e) =>
+                            handleLabelChange("height1", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Kerucut Bawah (misal: 10 cm)"
+                          value={labels.height2 || ""}
+                          onChange={(e) =>
+                            handleLabelChange("height2", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {(shape === "block_pyramid" || shape === "cube_pyramid") && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Lebar Alas / Sisi (misal: 10 cm)"
+                          value={labels.bottom_width || labels.side || ""}
+                          onChange={(e) => {
+                            handleLabelChange("bottom_width", e.target.value);
+                            handleLabelChange("side", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Balok/Kubus (misal: 8 cm)"
+                          value={labels.bottom_height || labels.height || ""}
+                          onChange={(e) => {
+                            handleLabelChange("bottom_height", e.target.value);
+                            handleLabelChange("height", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Limas (misal: 6 cm)"
+                          value={labels.top_height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("top_height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "block_roof" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Lebar Balok (misal: 12 cm)"
+                          value={labels.width || ""}
+                          onChange={(e) =>
+                            handleLabelChange("width", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Panjang/Kedalaman (misal: 15 cm)"
+                          value={labels.depth || ""}
+                          onChange={(e) =>
+                            handleLabelChange("depth", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Balok Bawah (misal: 8 cm)"
+                          value={labels.bottom_height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("bottom_height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Atap Prisma (misal: 5 cm)"
+                          value={labels.roof_height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("roof_height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "combined_cuboid_cube" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Lebar Balok Bawah (misal: 14 cm)"
+                          value={labels.bottom_width || ""}
+                          onChange={(e) =>
+                            handleLabelChange("bottom_width", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Balok Bawah (misal: 6 cm)"
+                          value={labels.bottom_height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("bottom_height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Sisi Kubus Atas (misal: 6 cm)"
+                          value={labels.top_side || ""}
+                          onChange={(e) =>
+                            handleLabelChange("top_side", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "tube_tubes" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Jari-jari Tabung Bawah r1 (misal: 8 cm)"
+                          value={labels.radius1 || labels.radius || ""}
+                          onChange={(e) => {
+                            handleLabelChange("radius1", e.target.value);
+                            handleLabelChange("radius", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Tabung Bawah t1 (misal: 10 cm)"
+                          value={labels.height1 || labels.cylinderHeight || ""}
+                          onChange={(e) => {
+                            handleLabelChange("height1", e.target.value);
+                            handleLabelChange("cylinderHeight", e.target.value);
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Jari-jari Tabung Atas r2 (misal: 5 cm)"
+                          value={labels.radius2 || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius2", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Tabung Atas t2 (misal: 8 cm)"
+                          value={labels.height2 || ""}
+                          onChange={(e) =>
+                            handleLabelChange("height2", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "combined_rect_semicircle" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Lebar Persegi Panjang (misal: 14 cm)"
+                          value={labels.width || ""}
+                          onChange={(e) =>
+                            handleLabelChange("width", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Persegi Panjang (misal: 10 cm)"
+                          value={labels.height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Jari-jari 1/2 Lingkaran (misal: 7 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "combined_l_shape" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Sisi Bawah Alas (misal: 12 cm)"
+                          value={labels.bottom || ""}
+                          onChange={(e) =>
+                            handleLabelChange("bottom", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Sisi Kiri (misal: 10 cm)"
+                          value={labels.left || ""}
+                          onChange={(e) =>
+                            handleLabelChange("left", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Kanan Bawah (misal: 4 cm)"
+                          value={labels.right_bottom || ""}
+                          onChange={(e) =>
+                            handleLabelChange("right_bottom", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Lebar Sisi Atas (misal: 5 cm)"
+                          value={labels.top || ""}
+                          onChange={(e) =>
+                            handleLabelChange("top", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {shape === "combined_rect_rect" && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Lebar Balok Atas (misal: 14 cm)"
+                          value={labels.top_width || ""}
+                          onChange={(e) =>
+                            handleLabelChange("top_width", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tinggi Tiang Bawah (misal: 10 cm)"
+                          value={labels.bottom_height || ""}
+                          onChange={(e) =>
+                            handleLabelChange("bottom_height", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                      </>
+                    )}
+                    {(shape === "shaded_circle_in_square" ||
+                      shape === "shaded_square_in_circle") && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Sisi Persegi (misal: 14 cm)"
+                          value={labels.side || ""}
+                          onChange={(e) =>
+                            handleLabelChange("side", e.target.value)
+                          }
+                          className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Jari-jari Lingkaran (misal: 7 cm)"
+                          value={labels.radius || ""}
+                          onChange={(e) =>
+                            handleLabelChange("radius", e.target.value)
                           }
                           className="w-full px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-sm placeholder:text-gray-400"
                         />
@@ -825,6 +1204,11 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                   canUndo={historyIndex > 0}
                   canRedo={historyIndex < historyLength - 1}
                   onClear={clearAll}
+                  onSnapAttach={canvasHook.snapAttachShapes}
+                  hasPresets={
+                    canvasHook.elements.filter((e) => e.type === "preset")
+                      .length >= 2
+                  }
                 />
 
                 <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700/80 flex flex-col gap-2">
