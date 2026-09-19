@@ -1,6 +1,5 @@
 import { create } from "zustand";
-import type { Exam } from "../types";
-import type { TeacherView } from "../components/teacher/useTeacherDashboard";
+import type { Exam, TeacherView } from "../types";
 
 export interface DashboardUIState {
   view: TeacherView;
