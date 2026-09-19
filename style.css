@@ -169,19 +169,49 @@
 
   /* Ensure images, tables, and diagrams inside options don't overflow */
   .option-content img,
-  .option-content svg:not(.katex *):not(.math-visual *),
+  .option-content svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .option-content canvas,
   .wysiwyg-content img,
-  .wysiwyg-content svg:not(.katex *):not(.math-visual *),
+  .wysiwyg-content svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .wysiwyg-content canvas,
   .prose img,
-  .prose svg:not(.katex *):not(.math-visual *),
+  .prose svg:not(.katex *):not(.math-visual *):not(.geometry-shape *):not(.geometry-shape),
   .prose canvas {
     max-width: 100%;
     height: auto;
     display: block;
     margin: 1.5rem auto;
     border-radius: 0.75rem;
+  }
+
+  /* Compact & Non-Intrusive Geometry Diagram Styling */
+  .geometry-shape {
+    display: block !important;
+    text-align: center;
+    margin: 0.35rem auto !important;
+    max-width: 250px !important;
+    width: auto;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .geometry-shape svg {
+    display: block !important;
+    margin: 0 auto !important;
+    max-width: 250px !important;
+    max-height: 160px !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0 !important;
+  }
+
+  /* Compact paragraph margin when paragraph holds a geometry diagram */
+  .wysiwyg-content p:has(> .geometry-shape),
+  .prose p:has(> .geometry-shape),
+  .option-content p:has(> .geometry-shape) {
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.35rem !important;
+    text-align: center;
   }
   
   .wysiwyg-content table,
@@ -438,12 +468,37 @@
 }
 .katex .frac-line {
   border-bottom-style: solid;
-  border-bottom-width: 1px !important;
+  border-bottom-width: 1.5px !important;
 }
 .katex-display {
-  overflow: auto hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding-top: 0.2rem;
   padding-bottom: 0.2rem;
+}
+
+.math-visual {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: normal;
+  max-width: 100%;
+}
+
+.option-content .math-visual,
+.option-content .katex {
+  white-space: nowrap;
+}
+
+.option-content .math-visual {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.math-visual .katex-display {
+  display: block;
+  margin: 0.35rem 0;
 }
 
 /* --- Student Exam Margins & Line Normalization --- */
@@ -455,6 +510,10 @@
   margin-bottom: 0 !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+.option-content p {
+  display: inline;
 }
 
 .option-content p:not(:last-child) {

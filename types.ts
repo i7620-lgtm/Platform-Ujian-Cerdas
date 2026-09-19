@@ -10,6 +10,8 @@ export interface QuizConfig {
   difficulties?: string[];
   blueprint: string;
   includeImages: boolean;
+  category?: string;
+  kisiKisi?: string;
 }
 
 export interface CartesianConfig {
@@ -241,3 +243,13 @@ export interface ArchiveViewerProps {
     onReuseExam: (exam: Exam) => void;
     teacherProfile: any;
 }
+
+export type TeacherView =
+  | "UPLOAD"
+  | "ONGOING"
+  | "UPCOMING_EXAMS"
+  | "FINISHED_EXAMS"
+  | "DRAFTS"
+  | "ADMIN_USERS"
+  | "ARCHIVE_VIEWER"
+  | "BOOK_GENERATOR";

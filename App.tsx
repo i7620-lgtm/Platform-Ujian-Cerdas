@@ -14,6 +14,7 @@ import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { supabase } from './lib/supabase';
+import { hydrateMathInContainer } from './utils/mathRenderer';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -113,55 +114,32 @@ const App: React.FC = () => {
 
   // Global Math Hydration Effect
   useEffect(() => {
-    const renderMath = (el: Element) => {
-      const latex = el.getAttribute('data-latex');
-      if (latex && el.innerHTML.trim() === '') {
-        const w = window as any;
-        if (w.katex) {
-            try {
-                const displayMode = (el as HTMLElement).style.display === 'block';
-                el.innerHTML = w.katex.renderToString(latex, { throwOnError: false, displayMode });
-            } catch(e) { }
-        }
-      }
-    };
-
-    // Hydrate everything
-    const hydrateAll = () => {
-        document.querySelectorAll('.math-visual[data-latex]').forEach(renderMath);
-    };
-
-    // Initial check (maybe katex is already here)
-    hydrateAll();
-
-    // Polling mechanism to wait for window.katex to load
-    const katexInterval = setInterval(() => {
-        const w = window as any;
-        if (w.katex) {
-            clearInterval(katexInterval);
-            hydrateAll(); // Guarantee we render existing equations
-        }
-    }, 500);
+    // Initial hydration
+    hydrateMathInContainer(document.body);
 
     // Observe changes for dynamic rendering
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const observer = new MutationObserver((mutations) => {
       let shouldRender = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
-            shouldRender = true;
-            break;
+          shouldRender = true;
+          break;
         }
       }
       if (shouldRender) {
-        hydrateAll();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          hydrateMathInContainer(document.body);
+        }, 50);
       }
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
     
     return () => {
-        observer.disconnect();
-        clearInterval(katexInterval);
+      observer.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, []);
 
