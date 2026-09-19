@@ -82,6 +82,25 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
         styleInstruction += `\nDIREKTIF KEPATUTAN KURIKULUM: ${safety.educationalSafetyDirective}`;
     }
 
+    const isGeometryMode = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga/i.test(prompt);
+
+    let layoutInstruction = "";
+    if (isGeometryMode) {
+        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI MURNI (BUKAN POSTER):
+   - DILARANG KERAS MEMBUAT KARTU HEADER, BANNER POSTER, ATAU KOTAK JUDUL ATAS! Ini adalah stimulus soal matematika/geometri resmi.
+   - Posisikan bangun geometri di tengah kanvas (center: x sekitar 425, y sekitar 280).
+   - BANGUN GABUNGAN: Jika diminta bangun gabungan (misal balok dan limas, tabung dan kerucut, persegi dan segitiga), kedua bangun HARUS MENYATU RAPI DAN BERHIMPIT TEPAT (koordinat sisi temu sama persis), DILARANG terpisah atau renggang!
+   - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak atau bidang batas pertemuan.
+   - Anotasi Ukuran: Gambarkan garis dimensi berpanah dengan teks ukuran jelas (contoh: '12 cm', '8 cm', 't = 15 cm', 'r = 7 cm').
+   - Sudut & Titik Sudut: Berikan label titik sudut (A, B, C, D, ...) dan tanda siku-siku pada sudut 90°.
+   - Stroke utama: stroke="#1e293b" ketebalan 2 sampai 2.5, fill transparan atau pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
+    } else {
+        layoutInstruction = `4. TATA LETAK HEADER ATAS (y=25 sampai y=90):
+   - Gunakan wadah header elegan di bagian atas: <rect x="40" y="25" width="770" height="65" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+   - Judul Utama: 1 baris ringkas, jelas (maksimal 35 karakter), font-size="20-22" font-weight="800", text-anchor="middle" di x="425" y="55".
+   - Subjudul materi: 1 baris, font-size="12-13", text-anchor="middle" di x="425" y="78".`;
+    }
+
     const systemInstruction = `Anda adalah Ahli Desain Grafis Vektor dan Ilustrator Edukasi SVG profesional kelas dunia untuk kurikulum sekolah Indonesia (K-12).
 Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, dan 100% edukatif.
 
@@ -95,17 +114,14 @@ MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO-TOLERANCE SAFETY POLICY):
 INSTRUKSI GAYA KHUSUS:
 ${styleInstruction}
 
-PANDUAN TATA LETAK & KEJELASAN TEKS SVG (MENCEGAH TEKS BERTUMPUK / TERLEWAT):
+PANDUAN TATA LETAK & KEJELASAN TEKS SVG:
 1. Kembalikan HANYA kode SVG valid yang diawali dengan <svg> dan diakhiri dengan </svg>. JANGAN sertakan penjelasan teks dan JANGAN gunakan markdown codeblock.
 2. Atribut elemen <svg> WAJIB:
    viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
 3. Latar Belakang & Ruang Aman:
    - Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="16" />
    - Batas konten aman: koordinat X antara 40 dan 810, koordinat Y antara 30 dan 530.
-4. TATA LETAK HEADER ATAS (y=25 sampai y=90):
-   - Gunakan wadah header elegan di bagian atas: <rect x="40" y="25" width="770" height="65" rx="12" ... />
-   - Judul Utama: 1 baris ringkas, jelas (maksimal 35 karakter), font-size="20-22" font-weight="800", text-anchor="middle" di x="425" y="55".
-   - Subjudul materi: 1 baris, font-size="12-13", text-anchor="middle" di x="425" y="78".
+${layoutInstruction}
 5. RUANG DIAGRAM UTAMA LAPANG (y=105 sampai y=520):
    - Berikan ruang vertikal luas (415px) agar bentuk, organ, alur proses, atau kartu diagram tidak berdesakan.
    - SEMUA LABEL HARUS SINGKAT & PADAT (1 sampai 4 kata saja). DILARANG membuat paragraf panjang atau uraian narasi di dalam diagram!
@@ -235,6 +251,7 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                   contents: prompt,
                   config: {
                     systemInstruction: systemInstruction,
+                    temperature: 0.2,
                     responseMimeType: "application/json",
                     responseSchema: {
                       type: Type.ARRAY,
