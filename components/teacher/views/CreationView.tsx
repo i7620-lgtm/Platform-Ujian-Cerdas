@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Question } from "../../../types";
 import {
   PencilIcon,
@@ -14,8 +14,11 @@ import {
   BrainCircuit,
   ListChecks,
   FileCheck2,
+  BookOpen,
+  Filter,
 } from "lucide-react";
 import { useCreationView } from "../useCreationView";
+import { TKA_PRESETS, type TKAPreset } from "../../../utils/tkaPresets";
 
 interface CreationViewProps {
   onQuestionsGenerated: (
@@ -235,6 +238,31 @@ export const CreationView: React.FC<CreationViewProps> = ({
     setAiConfig({ ...aiConfig, count: clamped });
   };
 
+  const [selectedPresetFilter, setSelectedPresetFilter] = useState<string>("SEMUA");
+
+  const applyTKAPreset = (preset: TKAPreset) => {
+    setAiConfig({
+      ...aiConfig,
+      subject: preset.subject,
+      difficulties: [...preset.difficulties],
+      difficulty: preset.difficulties[0],
+      types: [...preset.types],
+      type: preset.types[0],
+      blueprint: preset.blueprint,
+    });
+  };
+
+  const filteredPresets = TKA_PRESETS.filter((p) => {
+    if (selectedPresetFilter === "SEMUA") return true;
+    if (selectedPresetFilter === "SD") return p.jenjang === "SD";
+    if (selectedPresetFilter === "SMP") return p.jenjang === "SMP";
+    if (selectedPresetFilter === "SMA_MIPA") return p.jenjang === "SMA" && p.category === "MIPA";
+    if (selectedPresetFilter === "SMA_SOSHUM") return p.jenjang === "SMA" && p.category === "SOSHUM";
+    if (selectedPresetFilter === "SMA_BAHASA_UMUM") return p.jenjang === "SMA" && (p.category === "BAHASA" || p.category === "UMUM");
+    if (selectedPresetFilter === "SMK") return p.jenjang === "SMK";
+    return true;
+  });
+
   return (
     <div className="w-full max-w-full mx-auto animate-fade-in space-y-12">
       <div className="space-y-8">
@@ -436,29 +464,11 @@ export const CreationView: React.FC<CreationViewProps> = ({
                       setAiConfig({ ...aiConfig, subject: e.target.value })
                     }
                     className="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-sm text-slate-800 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all"
-                    placeholder="Contoh: Matematika SD - Operasi Hitung Pecahan Campuran & Perbandingan"
+                    placeholder="Contoh: Matematika SMA (TKA) - Dimensi Tiga & Transformasi Geometri"
                   />
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="text-[11px] text-gray-500 dark:text-slate-400 self-center mr-1">
-                      Saran:
-                    </span>
-                    {[
-                      "Matematika SD (TKA)",
-                      "Matematika SMP (TKA)",
-                      "IPA SD - Rantai Makanan & Adaptasi",
-                      "Bahasa Indonesia - Literasi Membaca",
-                      "Numerasi Data & Statistika",
-                    ].map((topic) => (
-                      <button
-                        key={topic}
-                        type="button"
-                        onClick={() => setAiConfig({ ...aiConfig, subject: topic })}
-                        className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-md transition-colors"
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                    Ketik materi spesifik Anda di atas, atau pilih dari daftar <strong>Preset Standar TKA</strong> di bagian bawah untuk otomatisasi instan.
+                  </p>
                 </div>
 
                 {/* Enhanced Question Count Field */}
@@ -656,10 +666,10 @@ export const CreationView: React.FC<CreationViewProps> = ({
                   </div>
                 </div>
 
-                {/* Sub-Group 1: Standar TKA Kemendikdasmen No. 047/H/AN/2025 */}
+                {/* Sub-Group 1: Standar TKA Kemendikdasmen No. 047/H/AN/2025 (SD & SMP) & No. 045/H/AN/2025 (SMA & SMK) */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Standar TKA Kemendikdasmen No. 047/H/AN/2025
+                    Standar TKA Kemendikdasmen No. 047/H/AN/2025 (SD/SMP) & No. 045/H/AN/2025 (SMA/SMK)
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                     {TKA_DIFFICULTY_OPTIONS.map((item) => {
@@ -733,85 +743,108 @@ export const CreationView: React.FC<CreationViewProps> = ({
               </div>
 
               {/* Section 4: Blueprint & Specific Kisi-kisi Guidance */}
-              <div className="space-y-2">
+              <div className="space-y-3.5 bg-slate-50/60 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                    <FileCheck2 className="w-4 h-4 text-primary" />
-                    <span>Panduan Kisi-kisi & Konteks Tambahan</span>
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiConfig({
-                          ...aiConfig,
-                          subject: aiConfig.subject || "Matematika SD (TKA)",
-                          difficulties: [
-                            "Level 3 - Penalaran (Reasoning / HOTS)",
-                            "Level 2 - Penerapan (Applying / MOTS)",
-                          ],
-                          types: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah"],
-                          blueprint:
-                            "Standar TKA Matematika SD Kemendikdasmen No. 047/H/AN/2025:\n- Domain Bilangan, Geometri & Pengukuran, Aljabar, Data & Ketidakpastian\n- Menggunakan stimulus kontekstual nyata & multi-langkah penalaran\n- Pengecoh (distraktor) logis & hitungan akurat 100%",
-                        });
-                      }}
-                      className="text-primary hover:underline text-[11px] font-semibold bg-primary/10 px-2 py-0.5 rounded"
-                    >
-                      + Preset TKA SD
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiConfig({
-                          ...aiConfig,
-                          subject: aiConfig.subject || "Matematika SMP (TKA)",
-                          difficulties: ["Level 3 - Penalaran (Reasoning / HOTS)"],
-                          types: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah"],
-                          blueprint:
-                            "Standar TKA Matematika SMP Kemendikdasmen No. 047/H/AN/2025:\n- Aljabar, Bilangan Real & Berpangkat, Geometri Ruang/Datar, Peluang & Statistika\n- Menguji penalaran model fisis, perbandingan, dan pemecahan masalah non-rutin\n- Notasi matematika baku LaTeX",
-                        });
-                      }}
-                      className="text-primary hover:underline text-[11px] font-semibold bg-primary/10 px-2 py-0.5 rounded"
-                    >
-                      + Preset TKA SMP
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiConfig({
-                          ...aiConfig,
-                          subject: aiConfig.subject || "Bahasa Indonesia - Literasi Membaca",
-                          types: ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Benar/Salah"],
-                          difficulties: [
-                            "Level 3 - Penalaran (Reasoning / HOTS)",
-                            "Level 2 - Penerapan (Applying / MOTS)",
-                          ],
-                          blueprint:
-                            "Asesmen Literasi Membaca TKA:\n- Teks fiksi/fabel bermuatan budi pekerti atau teks informasi sains/lingkungan hidup\n- Menemukan informasi tersirat, menganalisis watak tokoh, dan menyimpulkan ide pokok",
-                        });
-                      }}
-                      className="text-primary hover:underline text-[11px] font-semibold bg-primary/10 px-2 py-0.5 rounded"
-                    >
-                      + Literasi Membaca
-                    </button>
+                  <div>
+                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <FileCheck2 className="w-4 h-4 text-primary" />
+                      <span>Preset Kisi-kisi Standar TKA Kemendikdasmen</span>
+                    </label>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Pilih preset spesifik per mata pelajaran untuk otomatisasi mata uji, tipe soal, level kognitif, dan blueprint resmi.
+                    </p>
                   </div>
                 </div>
 
-                <textarea
-                  value={aiConfig.blueprint}
-                  onChange={(e) =>
-                    setAiConfig({ ...aiConfig, blueprint: e.target.value })
-                  }
-                  className="w-full h-24 p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-sm resize-y text-slate-800 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all font-mono text-xs leading-relaxed"
-                  placeholder="Contoh: Standar TKA Kemendikdasmen - Operasi hitung pecahan campuran, stimulus fabel/kegiatan sosial, penalaran bertingkat..."
-                />
+                {/* Preset Filter Tabs */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 mr-1">
+                    <Filter className="w-3 h-3 text-slate-400" />
+                    Jenjang:
+                  </span>
+                  {[
+                    { id: "SEMUA", label: "Semua Preset" },
+                    { id: "SD", label: "SD / MI" },
+                    { id: "SMP", label: "SMP / MTs" },
+                    { id: "SMA_MIPA", label: "SMA MIPA" },
+                    { id: "SMA_SOSHUM", label: "SMA IPS / Soshum" },
+                    { id: "SMA_BAHASA_UMUM", label: "SMA Bahasa & Umum" },
+                    { id: "SMK", label: "SMK Vokasi" },
+                  ].map((tab) => {
+                    const isActive = selectedPresetFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setSelectedPresetFilter(tab.id)}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all ${
+                          isActive
+                            ? "bg-primary text-white shadow-sm shadow-primary/20"
+                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Preset Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                  {filteredPresets.map((preset) => {
+                    const isSelected = aiConfig.subject === preset.subject;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => applyTKAPreset(preset)}
+                        className={`text-left p-2.5 rounded-xl border transition-all flex flex-col justify-between group ${
+                          isSelected
+                            ? "border-primary bg-primary/10 dark:bg-primary/20 ring-1 ring-primary text-primary"
+                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:border-primary/50 text-slate-700 dark:text-slate-200 hover:shadow-sm"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1.5 mb-1">
+                          <span className="font-bold text-xs leading-snug group-hover:text-primary transition-colors">
+                            {preset.name}
+                          </span>
+                          {isSelected ? (
+                            <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 shrink-0">
+                              {preset.jenjang}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                          {preset.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Blueprint Textarea */}
+                <div className="pt-2">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Detail Blueprint & Kisi-kisi yang Dikirim ke AI:
+                  </label>
+                  <textarea
+                    value={aiConfig.blueprint}
+                    onChange={(e) =>
+                      setAiConfig({ ...aiConfig, blueprint: e.target.value })
+                    }
+                    className="w-full h-28 p-3 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-xs resize-y text-slate-800 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all font-mono leading-relaxed"
+                    placeholder="Pilih salah satu preset di atas atau ketik kisi-kisi custom Anda di sini..."
+                  />
+                </div>
 
                 {/* Specific Kisi-kisi Feature Note Banner */}
                 <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 flex items-start gap-2.5 text-xs text-blue-900 dark:text-blue-200">
                   <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold">Penulisan Kisi-kisi Spesifik Otomatis:</span>{" "}
-                    AI akan secara otomatis merumuskan indikator capaian kompetensi operasional (kisi-kisi spesifik per butir soal) yang lengkap dengan stimulus, kondisi, dan performa yang diuji untuk setiap soal yang dibuat.
+                    AI akan secara otomatis merumuskan indikator capaian kompetensi operasional (kisi-kisi spesifik per butir soal) yang lengkap dengan stimulus, kondisi, dan performa yang diuji untuk setiap butir soal.
                   </div>
                 </div>
               </div>
