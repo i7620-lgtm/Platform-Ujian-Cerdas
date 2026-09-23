@@ -55,13 +55,23 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   // Derived state for absent/NIS limit
   const { limit: absentLimit } = parseClassConfig(studentClass);
 
+  const normalizeClassName = (raw: string) => {
+    if (!raw) return "";
+    const parsed = parseClassConfig(raw);
+    return (parsed.name || raw).trim().toLowerCase();
+  };
+
+  const normalizeSchoolName = (raw: string) => {
+    return (raw || "").trim().toLowerCase();
+  };
+
   const availableSchools = useMemo(() => {
-    if (registeredData.length > 0) {
-      return Array.from(
-        new Set(registeredData.map((r) => r.school_name).filter(Boolean)),
-      );
-    }
     const schools = new Set<string>();
+    if (registeredData.length > 0) {
+      registeredData.forEach((r) => {
+        if (r.school_name) schools.add(r.school_name);
+      });
+    }
     availableClasses.forEach((c) => {
       const parsed = parseClassConfig(c);
       if (parsed.schoolName) schools.add(parsed.schoolName);
@@ -70,35 +80,238 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   }, [availableClasses, registeredData]);
 
   const filteredClasses = useMemo(() => {
-    if (registeredData.length > 0) {
-      if (!schoolName) return [];
-      return Array.from(
-        new Set(
-          registeredData
-            .filter((r) => r.school_name === schoolName)
-            .map((r) => r.class_name)
-            .filter(Boolean),
-        ),
-      );
-    }
-    if (!schoolName) return availableClasses;
-    return availableClasses.filter((c) => {
+    const classSet = new Set<string>();
+    const currentSchoolNorm = normalizeSchoolName(schoolName);
+
+    // From availableClasses (targetClasses in exam)
+    availableClasses.forEach((c) => {
       const parsed = parseClassConfig(c);
-      return !parsed.schoolName || parsed.schoolName === schoolName;
+      if (!currentSchoolNorm || !parsed.schoolName || normalizeSchoolName(parsed.schoolName) === currentSchoolNorm) {
+        classSet.add(c);
+      }
     });
+
+    // From registeredData
+    if (registeredData.length > 0) {
+      registeredData.forEach((r) => {
+        if (!currentSchoolNorm || !r.school_name || normalizeSchoolName(r.school_name) === currentSchoolNorm) {
+          if (r.class_name) {
+            const exists = Array.from(classSet).some(
+              (c) => normalizeClassName(c) === normalizeClassName(r.class_name)
+            );
+            if (!exists) {
+              classSet.add(r.class_name);
+            }
+          }
+        }
+      });
+    }
+
+    return Array.from(classSet);
   }, [availableClasses, schoolName, registeredData]);
 
   const filteredStudents = useMemo(() => {
-    if (registeredData.length > 0 && schoolName && studentClass) {
-      return registeredData.filter(
-        (r) =>
-          r.school_name === schoolName &&
-          r.class_name === studentClass &&
-          r.student_name,
+    if (registeredData.length === 0 || !studentClass) {
+      return [];
+    }
+    const currentClassNorm = normalizeClassName(studentClass);
+    const currentSchoolNorm = normalizeSchoolName(schoolName);
+
+    return registeredData.filter((r) => {
+      if (!r.student_name) return false;
+
+      if (currentSchoolNorm && r.school_name) {
+        if (normalizeSchoolName(r.school_name) !== currentSchoolNorm) {
+          return false;
+        }
+      }
+
+      const rClassNorm = normalizeClassName(r.class_name);
+      return rClassNorm === currentClassNorm;
+    });
+  }, [registeredData, schoolName, studentClass]);
+
+  const nameSuggestions = useMemo(() => {
+    if (registeredData.length === 0) return [];
+    const currentSchoolNorm = normalizeSchoolName(schoolName);
+    const currentClassNorm = studentClass ? normalizeClassName(studentClass) : null;
+
+    const filtered = registeredData.filter((r) => {
+      if (!r.student_name) return false;
+
+      if (currentSchoolNorm && r.school_name) {
+        if (normalizeSchoolName(r.school_name) !== currentSchoolNorm) {
+          return false;
+        }
+      }
+
+      if (currentClassNorm) {
+        if (normalizeClassName(r.class_name) !== currentClassNorm) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Sort by class name then absent number
+    return filtered.sort((a, b) => {
+      const classCmp = (a.class_name || "").localeCompare(b.class_name || "");
+      if (classCmp !== 0) return classCmp;
+      const numA = parseInt(a.absent_number || "0", 10);
+      const numB = parseInt(b.absent_number || "0", 10);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== 0 && numB !== 0) {
+        return numA - numB;
+      }
+      return (a.student_name || "").localeCompare(b.student_name || "");
+    });
+  }, [registeredData, schoolName, studentClass]);
+
+  const findStudentByAbsent = (absentNum: string, targetClass = studentClass) => {
+    if (!absentNum || !targetClass || registeredData.length === 0) return null;
+    const cleanAbsent = absentNum.trim();
+    const targetClassNorm = normalizeClassName(targetClass);
+    const targetSchoolNorm = normalizeSchoolName(schoolName);
+
+    return registeredData.find((r) => {
+      if (!r.student_name) return false;
+
+      if (targetSchoolNorm && r.school_name) {
+        if (normalizeSchoolName(r.school_name) !== targetSchoolNorm) {
+          return false;
+        }
+      }
+
+      if (normalizeClassName(r.class_name) !== targetClassNorm) {
+        return false;
+      }
+
+      const rAbsent = String(r.absent_number ?? "").trim();
+      if (!rAbsent) return false;
+
+      return (
+        rAbsent === cleanAbsent ||
+        parseInt(rAbsent, 10) === parseInt(cleanAbsent, 10)
       );
+    });
+  };
+
+  const findStudentByName = (name: string, targetClass = studentClass) => {
+    if (!name || registeredData.length === 0) return null;
+    const cleanName = name.trim().toLowerCase();
+    const targetClassNorm = targetClass ? normalizeClassName(targetClass) : null;
+    const targetSchoolNorm = normalizeSchoolName(schoolName);
+
+    return registeredData.find((r) => {
+      if (!r.student_name) return false;
+
+      if (targetSchoolNorm && r.school_name) {
+        if (normalizeSchoolName(r.school_name) !== targetSchoolNorm) {
+          return false;
+        }
+      }
+
+      if (targetClassNorm && normalizeClassName(r.class_name) !== targetClassNorm) {
+        return false;
+      }
+
+      return r.student_name.trim().toLowerCase() === cleanName;
+    });
+  };
+
+  const handleSelectStudent = (student: {
+    student_name: string;
+    class_name: string;
+    absent_number?: string | number | null;
+    school_name?: string;
+  }) => {
+    setFullName(student.student_name);
+    if (student.school_name && !schoolName) {
+      setSchoolName(student.school_name);
+    }
+    if (student.class_name) {
+      const matchTag = availableClasses.find(
+        (c) => normalizeClassName(c) === normalizeClassName(student.class_name)
+      );
+      setStudentClass(matchTag || student.class_name);
+    }
+    if (student.absent_number != null && student.absent_number !== "") {
+      setAbsentNumber(String(student.absent_number));
+    }
+  };
+
+  const handleAbsentNumberChange = (newAbsent: string) => {
+    setAbsentNumber(newAbsent);
+    if (newAbsent) {
+      const student = findStudentByAbsent(newAbsent);
+      if (student && student.student_name) {
+        setFullName(student.student_name);
+      }
+    }
+  };
+
+  const handleClassChange = (newClass: string) => {
+    setStudentClass(newClass);
+    const parsed = parseClassConfig(newClass);
+    if (parsed.schoolName && !schoolName) {
+      setSchoolName(parsed.schoolName);
+    }
+    if (absentNumber) {
+      const student = findStudentByAbsent(absentNumber, newClass);
+      if (student && student.student_name) {
+        setFullName(student.student_name);
+      }
+    }
+  };
+
+  const handleFullNameChange = (newName: string) => {
+    setFullName(newName);
+    if (newName) {
+      const student = findStudentByName(newName);
+      if (student) {
+        if (student.absent_number != null && student.absent_number !== "") {
+          setAbsentNumber(String(student.absent_number));
+        }
+        if (!studentClass && student.class_name) {
+          const matchTag = availableClasses.find(
+            (c) => normalizeClassName(c) === normalizeClassName(student.class_name)
+          );
+          setStudentClass(matchTag || student.class_name);
+        }
+        if (student.school_name && !schoolName) {
+          setSchoolName(student.school_name);
+        }
+      }
+    }
+  };
+
+  const absentOptions = useMemo(() => {
+    if (filteredStudents.length > 0) {
+      const sorted = [...filteredStudents].sort((a, b) => {
+        const numA = parseInt(a.absent_number || "0", 10);
+        const numB = parseInt(b.absent_number || "0", 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== 0 && numB !== 0) {
+          return numA - numB;
+        }
+        return (a.absent_number || "").localeCompare(b.absent_number || "");
+      });
+      return sorted
+        .filter((s) => s.absent_number != null && s.absent_number !== "")
+        .map((s) => ({
+          value: String(s.absent_number),
+          label: String(s.absent_number),
+          studentName: s.student_name,
+        }));
+    }
+    if (absentLimit && absentLimit > 0) {
+      return Array.from({ length: absentLimit }, (_, i) => ({
+        value: String(i + 1),
+        label: String(i + 1),
+        studentName: "",
+      }));
     }
     return [];
-  }, [registeredData, schoolName, studentClass]);
+  }, [filteredStudents, absentLimit]);
 
   // Auto-fetch config and load scoped student data when code changes
   useEffect(() => {
@@ -130,10 +343,36 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
 
           if (!isMounted) return;
 
-          if (regData && regData.length > 0) {
-            setRegisteredData(regData);
+          const combinedRegData = regData ? [...regData] : [];
+          if (config && config.registeredStudents && config.registeredStudents.length > 0) {
+            config.registeredStudents.forEach((cs: any, idx: number) => {
+              const sName = cs.student_name || cs.fullName || "";
+              const cName = cs.class_name || cs.className || "";
+              const aNum = cs.absent_number || cs.absentNumber || "";
+              const sSchool = cs.school_name || cs.schoolName || "";
+              const already = combinedRegData.some(
+                (r) =>
+                  (r.student_name || "").trim().toLowerCase() === sName.trim().toLowerCase() &&
+                  normalizeClassName(r.class_name) === normalizeClassName(cName)
+              );
+              if (!already) {
+                combinedRegData.push({
+                  id: cs.id || `cfg-${idx}`,
+                  exam_code: cleanCode,
+                  school_name: sSchool,
+                  class_name: cName,
+                  student_name: sName,
+                  absent_number: aNum,
+                  is_active: false,
+                });
+              }
+            });
+          }
+
+          if (combinedRegData.length > 0) {
+            setRegisteredData(combinedRegData);
             const schools = Array.from(
-              new Set(regData.map((r) => r.school_name).filter(Boolean)),
+              new Set(combinedRegData.map((r) => r.school_name).filter(Boolean)),
             );
             if (schools.length === 1) {
               setSchoolName(schools[0]);
@@ -155,7 +394,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
               return prev;
             });
 
-            if (!regData || regData.length === 0) {
+            if (combinedRegData.length === 0) {
               const schools = new Set<string>();
               config.targetClasses.forEach((c) => {
                 const parsed = parseClassConfig(c);
@@ -485,6 +724,12 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
     examCodeInputRef,
     nameInputRef,
     absentLimit,
+    absentOptions,
+    handleAbsentNumberChange,
+    handleClassChange,
+    handleFullNameChange,
+    handleSelectStudent,
+    nameSuggestions,
     availableSchools,
     filteredClasses,
     filteredStudents,
