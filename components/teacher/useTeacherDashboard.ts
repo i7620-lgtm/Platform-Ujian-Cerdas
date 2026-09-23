@@ -459,6 +459,7 @@ export const useTeacherDashboard = ({
       }
     }
 
+    const isEditPR = (exam.config.examMode || "").trim().toUpperCase() === "PR";
     if (isEditPR) {
       localEndTime = exam.config.endTime || localEndTime || "23:59";
     }
