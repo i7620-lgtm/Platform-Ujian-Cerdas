@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { Question, QuestionType, ExamConfig, ChartData } from '../types';
+import type { Question, QuestionType, ExamConfig, ChartData, RegisteredStudentConfig } from '../types';
 import { parseList, isAnswerMatch, repairGeometrySvgInHtml } from '../components/teacher/examUtils';
 import { useExamEditorUIStore, type ChartTarget } from './examEditorUIStore';
 
@@ -32,6 +32,8 @@ interface ExamEditorState {
     handleAddClassTag: (newTag: string) => void;
     handleAddClassTags: (newTags: string[]) => void;
     removeClassTag: (tag: string) => void;
+    setRegisteredStudents: (students: RegisteredStudentConfig[]) => void;
+    addRegisteredStudents: (newStudents: RegisteredStudentConfig[]) => void;
     handleConfigChangeManual: (updater: (prev: ExamConfig) => ExamConfig) => void;
     handleSubjectSelect: (subject: string) => void;
     handleSaveChart: (data: ChartData) => void;
@@ -96,6 +98,7 @@ export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     subject: 'Lainnya',
     classLevel: 'Lainnya',
     targetClasses: [],
+    registeredStudents: [],
     examType: 'Lainnya',
     description: '',
 };
@@ -158,6 +161,30 @@ export const useExamEditorStore = create<ExamEditorState>()(
 
         removeClassTag: (tag) => set((state) => {
             state.config.targetClasses = state.config.targetClasses?.filter(t => t !== tag) || [];
+        }),
+
+        setRegisteredStudents: (students) => set((state) => {
+            state.config.registeredStudents = students;
+        }),
+
+        addRegisteredStudents: (newStudents) => set((state) => {
+            const current = state.config.registeredStudents || [];
+            const map = new Map<string, RegisteredStudentConfig>();
+            current.forEach(s => {
+                const sName = s.student_name || s.fullName || '';
+                const cName = s.class_name || s.className || '';
+                const aNum = s.absent_number || s.absentNumber || '';
+                const key = `${cName}_${aNum}_${sName}`.toLowerCase();
+                map.set(key, s);
+            });
+            newStudents.forEach(s => {
+                const sName = s.student_name || s.fullName || '';
+                const cName = s.class_name || s.className || '';
+                const aNum = s.absent_number || s.absentNumber || '';
+                const key = `${cName}_${aNum}_${sName}`.toLowerCase();
+                map.set(key, s);
+            });
+            state.config.registeredStudents = Array.from(map.values());
         }),
 
         handleConfigChangeManual: (updater) => set((state) => {
