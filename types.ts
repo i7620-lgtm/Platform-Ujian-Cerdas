@@ -88,6 +88,18 @@ export interface Question {
   }[];
 }
 
+export interface RegisteredStudentConfig {
+  id?: string;
+  student_name: string;
+  fullName?: string;
+  absent_number: string;
+  absentNumber?: string;
+  class_name: string;
+  className?: string;
+  school_name?: string;
+  schoolName?: string;
+}
+
 export interface ExamConfig {
   examMode: 'PR' | 'UJIAN'; // NEW: Mode PR atau Ujian
   startDate?: string; // NEW: Tanggal mulai (hanya untuk Ujian)
@@ -120,6 +132,7 @@ export interface ExamConfig {
   subject: string;
   classLevel: string;
   targetClasses?: string[]; 
+  registeredStudents?: RegisteredStudentConfig[];
   examType: string;
   description: string;
   manualParticipantCount?: number; // Added for manual override in archives
