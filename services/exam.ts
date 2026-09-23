@@ -616,6 +616,7 @@ export class ExamService {
 
             if (partialData && partialData.length > 0) {
                 console.log("Partial update successful!");
+                await this.syncRegisteredStudents(exam);
                 return;
             }
 
@@ -648,6 +649,35 @@ export class ExamService {
                 console.error("Fallback upsert failed:", upsertError);
                 throw new Error(`Gagal menyimpan perubahan. Izin ditolak oleh server (RLS). Pastikan Anda login atau memiliki akses edit yang valid. (Error: ${upsertError.message})`);
             }
+        }
+
+        await this.syncRegisteredStudents(exam);
+    }
+
+    private async syncRegisteredStudents(exam: Exam): Promise<void> {
+        if (!exam.config || !exam.config.registeredStudents || exam.config.registeredStudents.length === 0) {
+            return;
+        }
+        try {
+            const recordsToInsert = exam.config.registeredStudents.map((s) => ({
+                exam_code: exam.code,
+                school_name: s.school_name || s.schoolName || exam.authorSchool || '',
+                class_name: s.class_name || s.className || '',
+                student_name: s.student_name || s.fullName || '',
+                absent_number: s.absent_number || s.absentNumber || null,
+                is_active: false,
+            }));
+
+            // Clean up existing records for this exam to prevent duplicate or conflicting data
+            await supabase.from('registered_students').delete().eq('exam_code', exam.code);
+            const { error: regErr } = await supabase.from('registered_students').insert(recordsToInsert);
+            if (regErr) {
+                console.warn("Sync to registered_students failed:", regErr);
+            } else {
+                console.log(`Berhasil menyinkronkan ${recordsToInsert.length} data siswa ke tabel registered_students.`);
+            }
+        } catch (syncErr) {
+            console.warn("Gagal menyinkronkan registered_students:", syncErr);
         }
     }
 

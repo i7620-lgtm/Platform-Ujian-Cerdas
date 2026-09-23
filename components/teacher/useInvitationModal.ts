@@ -241,7 +241,7 @@ export const useInvitationModal = ({
 
       if (error) throw error;
 
-      if (parsedClasses.length > 0) {
+      if (parsedClasses.length > 0 || students.length > 0) {
         const currentTargetClasses = exam.config.targetClasses || [];
         const newClasses = parsedClasses.map(
           (c) => `${parsedSchoolName} - ${c}`,
@@ -251,17 +251,28 @@ export const useInvitationModal = ({
           new Set([...currentTargetClasses, ...newClasses]),
         );
 
-        if (updatedClasses.length !== currentTargetClasses.length) {
-          await supabase
-            .from("exams")
-            .update({
-              config: {
-                ...exam.config,
-                targetClasses: updatedClasses,
-              },
-            })
-            .eq("code", exam.code);
-        }
+        const currentRegistered = exam.config.registeredStudents || [];
+        const formattedStudents = students.map((s) => ({
+          student_name: s.fullName,
+          fullName: s.fullName,
+          absent_number: s.absentNumber,
+          absentNumber: s.absentNumber,
+          class_name: s.className,
+          className: s.className,
+          school_name: s.schoolName || parsedSchoolName,
+          schoolName: s.schoolName || parsedSchoolName,
+        }));
+
+        await supabase
+          .from("exams")
+          .update({
+            config: {
+              ...exam.config,
+              targetClasses: updatedClasses,
+              registeredStudents: [...currentRegistered, ...formattedStudents],
+            },
+          })
+          .eq("code", exam.code);
       }
 
       alert("Pendaftaran sekolah berhasil!");

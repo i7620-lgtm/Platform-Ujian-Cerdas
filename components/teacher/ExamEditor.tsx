@@ -299,6 +299,7 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
           handleAddClassTag={handleAddClassTag}
           hasManualGrading={hasManualGrading}
           isPremium={isPremium}
+          examCode={generatedCode}
         />
       </div>
 

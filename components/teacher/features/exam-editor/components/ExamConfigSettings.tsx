@@ -7,7 +7,9 @@ import {
   DocumentArrowUpIcon,
   CheckCircleIcon,
 } from "../../../../Icons";
-import type { ExamConfig } from "../../../../../types";
+import type { ExamConfig, RegisteredStudentConfig } from "../../../../../types";
+import { useExamEditorStore } from "../../../../../stores/examEditorStore";
+import { supabase } from "../../../../../lib/supabase";
 import {
   downloadStudentDataTemplate,
   parseStudentDataExcel,
@@ -20,6 +22,7 @@ interface ExamConfigSettingsProps {
   handleAddClassTag: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   hasManualGrading: boolean;
   isPremium?: boolean;
+  examCode?: string;
 }
 
 export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
@@ -29,6 +32,7 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
   handleAddClassTag,
   hasManualGrading,
   isPremium,
+  examCode,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -47,21 +51,62 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
 
     try {
       const parsed = await parseStudentDataExcel(file);
-      if (parsed.targetClassTags.length > 0) {
-        if (typeof store.handleAddClassTags === "function") {
-          store.handleAddClassTags(parsed.targetClassTags);
-        } else {
-          parsed.targetClassTags.forEach((tag: string) => {
-            if (typeof store.handleAddClassTagAction === "function") {
-              store.handleAddClassTagAction(tag);
-            } else if (typeof store.handleAddClassTag === "function") {
-              store.handleAddClassTag(tag);
-            }
-          });
+      if (parsed.targetClassTags.length > 0 || (parsed.students && parsed.students.length > 0)) {
+        if (parsed.targetClassTags.length > 0) {
+          if (typeof store.handleAddClassTags === "function") {
+            store.handleAddClassTags(parsed.targetClassTags);
+          } else {
+            parsed.targetClassTags.forEach((tag: string) => {
+              if (typeof store.handleAddClassTagAction === "function") {
+                store.handleAddClassTagAction(tag);
+              } else if (typeof store.handleAddClassTag === "function") {
+                store.handleAddClassTag(tag);
+              }
+            });
+          }
         }
+
+        // Save registered students list into exam configuration & Supabase
+        if (parsed.students && parsed.students.length > 0) {
+          const formatted: RegisteredStudentConfig[] = parsed.students.map((s, idx) => ({
+            id: `excel-${Date.now()}-${idx}`,
+            student_name: s.fullName,
+            fullName: s.fullName,
+            absent_number: s.absentNumber,
+            absentNumber: s.absentNumber,
+            class_name: s.className,
+            className: s.className,
+            school_name: s.schoolName || parsed.schoolName || "",
+            schoolName: s.schoolName || parsed.schoolName || "",
+          }));
+
+          if (typeof store.addRegisteredStudents === "function") {
+            store.addRegisteredStudents(formatted);
+          } else {
+            useExamEditorStore.getState().addRegisteredStudents(formatted);
+          }
+
+          const targetCode = examCode || store?.generatedCode;
+          if (targetCode) {
+            try {
+              const records = formatted.map((s) => ({
+                exam_code: targetCode,
+                school_name: s.school_name || parsed.schoolName || "",
+                class_name: s.class_name,
+                student_name: s.student_name,
+                absent_number: s.absent_number || null,
+                is_active: false,
+              }));
+              await supabase.from("registered_students").insert(records);
+            } catch (err) {
+              console.warn("Gagal sinkron data siswa ke Supabase langsung:", err);
+            }
+          }
+        }
+
         const schoolMsg = parsed.schoolName ? `Sekolah: ${parsed.schoolName}. ` : "";
         setUploadSuccessMessage(
-          `Berhasil! ${schoolMsg}${parsed.classes.length} kelas & ${parsed.students.length} siswa berhasil dimuat.`
+          `Berhasil! ${schoolMsg}${parsed.classes.length} kelas & ${parsed.students.length} siswa berhasil dimuat dan terdaftar.`
         );
       } else {
         alert("File Excel dibaca, namun tidak ditemukan data kelas atau siswa.");

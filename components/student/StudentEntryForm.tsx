@@ -56,6 +56,12 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     examCodeInputRef,
     nameInputRef,
     absentLimit,
+    absentOptions,
+    handleAbsentNumberChange,
+    handleClassChange,
+    handleFullNameChange,
+    handleSelectStudent,
+    nameSuggestions,
     availableSchools,
     filteredClasses,
     filteredStudents,
@@ -65,6 +71,21 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     setIsLocked, pendingStudentData, setPendingStudentData,
     setIsLoading
   } = useStudentEntryForm({ initialCode, onLoginSuccess });
+
+  const [isNameDropdownOpen, setIsNameDropdownOpen] = useState(false);
+
+  const filteredSuggestions = useMemo(() => {
+    if (!nameSuggestions || nameSuggestions.length === 0) return [];
+    if (!fullName || fullName.trim() === "") return nameSuggestions;
+    const q = fullName.toLowerCase().trim();
+    const matches = nameSuggestions.filter((s) => {
+      const matchName = s.student_name.toLowerCase().includes(q);
+      const matchAbsent = String(s.absent_number || "").includes(q);
+      const matchClass = (s.class_name || "").toLowerCase().includes(q);
+      return matchName || matchAbsent || matchClass;
+    });
+    return matches.length > 0 ? matches : nameSuggestions;
+  }, [nameSuggestions, fullName]);
 
   if (isLocked) {
     return (
@@ -210,62 +231,112 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               </div>
 
               <div
-                className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === "name" ? "bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20" : "border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900"}`}
+                className={`relative transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${
+                  isFocused === "name" || isNameDropdownOpen
+                    ? "bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20"
+                    : "border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900"
+                }`}
               >
                 <div className="px-4 pt-2">
-                  <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5 text-left">
                     Nama Lengkap
                   </label>
-                  {filteredStudents.length > 0 ? (
-                    <div className="relative group">
-                      <select
-                        value={fullName}
-                        onChange={(e) => {
-                          const selectedName = e.target.value;
-                          setFullName(selectedName);
-                          const student = filteredStudents.find(
-                            (s) => s.student_name === selectedName,
-                          );
-                          if (student && student.absent_number) {
-                            setAbsentNumber(student.absent_number);
-                          }
-                        }}
-                        onFocus={() => setIsFocused("name")}
-                        onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
-                        required
-                      >
-                        <option value="" disabled className="dark:bg-slate-900">
-                          Pilih Nama...
-                        </option>
-                        {filteredStudents.map((s) => (
-                          <option
-                            key={s.id}
-                            value={s.student_name}
-                            className="dark:bg-slate-900"
-                          >
-                            {s.student_name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute right-0 top-0 text-slate-400 pointer-events-none">
-                        <ChevronDownIcon className="w-4 h-4" />
-                      </div>
-                    </div>
-                  ) : (
+                  <div className="relative flex items-center">
                     <input
                       ref={nameInputRef}
                       type="text"
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      onFocus={() => setIsFocused("name")}
-                      onBlur={() => setIsFocused(null)}
-                      className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
-                      placeholder="Ketik nama anda..."
+                      onChange={(e) => {
+                        handleFullNameChange(e.target.value);
+                        setIsNameDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        setIsFocused("name");
+                        setIsNameDropdownOpen(true);
+                      }}
+                      onBlur={() => {
+                        setIsFocused(null);
+                        setTimeout(() => setIsNameDropdownOpen(false), 200);
+                      }}
+                      className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
+                      placeholder="Ketik atau pilih nama..."
                       required
                     />
-                  )}
+                    {nameSuggestions.length > 0 && (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setIsNameDropdownOpen((prev) => !prev)}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 pb-2 pl-2 focus:outline-none cursor-pointer"
+                      >
+                        <ChevronDownIcon
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            isNameDropdownOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {isNameDropdownOpen && filteredSuggestions.length > 0 && (
+                  <div
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-h-56 overflow-y-auto z-50 py-1.5 divide-y divide-slate-100 dark:divide-slate-800"
+                  >
+                    {filteredSuggestions.map((s) => {
+                      const isSelected =
+                        fullName.trim().toLowerCase() ===
+                        s.student_name.trim().toLowerCase();
+                      return (
+                        <div
+                          key={s.id || `${s.class_name}-${s.absent_number}-${s.student_name}`}
+                          onClick={() => {
+                            handleSelectStudent(s);
+                            setIsNameDropdownOpen(false);
+                          }}
+                          className={`px-4 py-2.5 text-left transition-colors flex items-center justify-between gap-3 cursor-pointer ${
+                            isSelected
+                              ? "bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200"
+                              : "hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-800 dark:text-slate-200"
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0 text-left">
+                            <span className="text-sm font-semibold truncate text-left">
+                              {s.student_name}
+                            </span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 text-left">
+                              {!studentClass ? (
+                                <>
+                                  Kelas{" "}
+                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                    {s.class_name}
+                                  </span>{" "}
+                                  • No. Absen:{" "}
+                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                    {s.absent_number || "-"}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  No. Absen:{" "}
+                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                    {s.absent_number || "-"}
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+                          {s.absent_number != null && s.absent_number !== "" && (
+                            <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-medium">
+                              #{s.absent_number}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -273,7 +344,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                   className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === "class" ? "bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20" : "border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900"}`}
                 >
                   <div className="px-4 pt-2">
-                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">
+                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5 text-left">
                       Kelas
                     </label>
 
@@ -282,25 +353,16 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                       <div className="relative group">
                         <select
                           value={studentClass}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setStudentClass(val);
-                            setFullName("");
-                            setAbsentNumber("");
-                            const parsed = parseClassConfig(val);
-                            if (parsed.schoolName && !schoolName) {
-                              setSchoolName(parsed.schoolName);
-                            }
-                          }}
+                          onChange={(e) => handleClassChange(e.target.value)}
                           onFocus={() => setIsFocused("class")}
                           onBlur={() => setIsFocused(null)}
-                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer"
+                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
                           required
                         >
                           <option
                             value=""
                             disabled
-                            className="dark:bg-slate-900"
+                            className="dark:bg-slate-900 text-left"
                           >
                             Pilih...
                           </option>
@@ -315,7 +377,7 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                               <option
                                 key={c}
                                 value={c}
-                                className="dark:bg-slate-900"
+                                className="dark:bg-slate-900 text-left"
                               >
                                 {displayName}
                               </option>
@@ -330,10 +392,10 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                       <input
                         type="text"
                         value={studentClass}
-                        onChange={(e) => setStudentClass(e.target.value)}
+                        onChange={(e) => handleClassChange(e.target.value)}
                         onFocus={() => setIsFocused("class")}
                         onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none"
+                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left"
                         placeholder="Contoh: 9A"
                         required
                       />
@@ -345,44 +407,33 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                   className={`transition-all duration-300 rounded-xl bg-slate-50 dark:bg-slate-950 border ${isFocused === "absent" ? "bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.1)] ring-4 ring-indigo-500/5 dark:ring-indigo-500/20" : "border-transparent dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900"}`}
                 >
                   <div className="px-4 pt-2">
-                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5 font-sans leading-none">
+                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5 font-sans leading-none text-left">
                       No. Absen / NIS
                     </label>
-                    {filteredStudents.length > 0 ? (
-                      <input
-                        type="text"
-                        value={absentNumber}
-                        readOnly
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none text-center cursor-not-allowed opacity-70"
-                        placeholder="-"
-                      />
-                    ) : absentLimit && absentLimit > 0 ? (
+                    {absentOptions.length > 0 ? (
                       <div className="relative group">
                         <select
                           value={absentNumber}
-                          onChange={(e) => setAbsentNumber(e.target.value)}
+                          onChange={(e) => handleAbsentNumberChange(e.target.value)}
                           onFocus={() => setIsFocused("absent")}
                           onBlur={() => setIsFocused(null)}
-                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-center"
+                          className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:ring-0 outline-none appearance-none cursor-pointer text-left"
                           required
                         >
                           <option
                             value=""
                             disabled
-                            className="dark:bg-slate-900"
+                            className="dark:bg-slate-900 text-left"
                           >
                             No...
                           </option>
-                          {Array.from(
-                            { length: absentLimit },
-                            (_, i) => i + 1,
-                          ).map((num) => (
+                          {absentOptions.map((opt) => (
                             <option
-                              key={num}
-                              value={num.toString()}
-                              className="dark:bg-slate-900"
+                              key={opt.value}
+                              value={opt.value}
+                              className="dark:bg-slate-900 text-left"
                             >
-                              {num}
+                              {opt.label}
                             </option>
                           ))}
                         </select>
@@ -394,10 +445,10 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
                       <input
                         type="text"
                         value={absentNumber}
-                        onChange={(e) => setAbsentNumber(e.target.value)}
+                        onChange={(e) => handleAbsentNumberChange(e.target.value)}
                         onFocus={() => setIsFocused("absent")}
                         onBlur={() => setIsFocused(null)}
-                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-center font-mono"
+                        className="block w-full bg-transparent border-none p-0 pb-2 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-0 outline-none text-left font-mono"
                         placeholder="00 / NIS"
                         required
                       />
