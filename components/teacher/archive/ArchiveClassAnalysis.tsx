@@ -4,17 +4,7 @@ import { ChartBarIcon, SparklesIcon } from "../../Icons";
 import { formatDuration, filterEvaluationSection } from "./archiveUtils";
 import { archiveService } from "../../../services/archive";
 import Markdown from "react-markdown";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Legend,
-} from "recharts";
+import { ClassPerformanceDistribution } from "./ClassPerformanceDistribution";
 
 interface QuestionTypeStat {
   type: string;
@@ -63,57 +53,6 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
     if (selectedSchool === "ALL") return results;
     return results.filter(r => (r.student.schoolName || exam.authorSchool || 'Unknown School') === selectedSchool);
   }, [results, selectedSchool, exam.authorSchool]);
-
-  const chartData = useMemo(() => {
-    return filteredResults.map(r => ({
-      name: r.student.fullName || "Siswa",
-      nilai: Number(r.score) || 0,
-      kelas: r.student.class || "Tanpa Kelas",
-    }));
-  }, [filteredResults]);
-
-  const stats = useMemo(() => {
-    if (filteredResults.length === 0) return { mean: 0, stdDev: 0, count: 0 };
-    const scores = filteredResults.map(r => Number(r.score) || 0);
-    const n = scores.length;
-    const mean = scores.reduce((sum, val) => sum + val, 0) / n;
-    const variance = scores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (n > 1 ? n - 1 : 1);
-    const stdDev = Math.sqrt(variance);
-    return {
-      mean: Math.round(mean * 10) / 10,
-      stdDev: Math.round(stdDev * 10) / 10 || 5,
-      count: n
-    };
-  }, [filteredResults]);
-
-  const normalCurveData = useMemo(() => {
-    if (filteredResults.length === 0) return [];
-
-    const scores = filteredResults.map(r => Number(r.score) || 0);
-    const n = scores.length;
-    const mean = stats.mean;
-    const stdDev = stats.stdDev || 5;
-
-    const points = Array.from({ length: 11 }, (_, i) => i * 10);
-    
-    return points.map(x => {
-      const minVal = x === 0 ? 0 : x - 5;
-      const maxVal = x === 100 ? 100 : x + 4.99;
-      
-      const actualCount = scores.filter(s => s >= minVal && s <= maxVal).length;
-
-      const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2));
-      const pdf = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
-      const theoreticalFrequency = Number((pdf * n * 10).toFixed(2));
-
-      return {
-        score: x,
-        label: `Nilai ${x}`,
-        "Frekuensi Aktual": actualCount,
-        "Kurva Normal": theoreticalFrequency,
-      };
-    });
-  }, [filteredResults, stats]);
 
   const handlePrintAI = () => {
     const printContent = document.getElementById("ai-analysis-print-content");
@@ -164,73 +103,11 @@ export const ArchiveClassAnalysis: React.FC<ArchiveClassAnalysisProps> = ({
   const renderClassPerformanceChart = () => {
     if (filteredResults.length === 0) return null;
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-        <div className="h-[380px] w-full">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <LineChart
-              data={normalCurveData}
-              margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-              <XAxis
-                dataKey="score"
-                tick={{ fill: '#64748b', fontSize: 10 }}
-                label={{ value: 'Nilai Ujian', position: 'insideBottomRight', offset: -5, fill: '#64748b', fontSize: 10 }}
-              />
-              <YAxis
-                tick={{ fill: '#64748b', fontSize: 10 }}
-                label={{ value: 'Frekuensi (Siswa)', angle: -90, position: 'insideLeft', offset: 10, fill: '#64748b', fontSize: 10 }}
-              />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg text-xs">
-                        <p className="font-bold text-slate-800 dark:text-slate-100 mb-2">Rentang Nilai Sekitar: {label}</p>
-                        <div className="space-y-1">
-                          <p className="flex justify-between gap-4 text-slate-600 dark:text-slate-300">
-                            <span>Frekuensi Aktual:</span>
-                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{data["Frekuensi Aktual"]} siswa</span>
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Legend verticalAlign="top" height={36} />
-              
-              {exam.config.kkm && (
-                <ReferenceLine
-                  x={exam.config.kkm}
-                  stroke="#f43f5e"
-                  strokeDasharray="4 4"
-                  strokeWidth={1.5}
-                  label={{
-                    value: `Batas KKM (${exam.config.kkm})`,
-                    fill: '#f43f5e',
-                    fontSize: 9,
-                    position: 'insideTopRight',
-                    offset: 5
-                  }}
-                />
-              )}
-
-              <Line
-                type="monotone"
-                dataKey="Frekuensi Aktual"
-                stroke="#4f46e5"
-                strokeWidth={2.5}
-                activeDot={{ r: 6, strokeWidth: 0 }}
-                dot={{ fill: '#4f46e5', r: 3, strokeWidth: 0 }}
-                name="Frekuensi Aktual (Siswa)"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <ClassPerformanceDistribution
+        results={filteredResults}
+        kkm={exam.config.kkm}
+        subject={exam.config.subject}
+      />
     );
   };
 
