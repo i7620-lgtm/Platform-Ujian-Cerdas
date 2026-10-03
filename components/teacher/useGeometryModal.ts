@@ -68,6 +68,7 @@ export const useGeometryModal = ({
   const [strokeColor, setStrokeColor] = useState<string>("#374151");
   const [showAngles, setShowAngles] = useState<boolean>(false);
   const [showLines, setShowLines] = useState<boolean>(true);
+  const [showVertices, setShowVertices] = useState<boolean>(false);
   const [simulate, setSimulate] = useState<boolean>(false);
   const [showGrid, setShowGrid] = useState<boolean>(true);
 
@@ -94,10 +95,17 @@ export const useGeometryModal = ({
     setLabels({});
     setShowAngles(false);
     setShowLines(true);
+    setShowVertices(false);
   };
 
   const handleLabelChange = (key: string, value: string) => {
-    setLabels({ ...labels, [key]: value });
+    const updated = { ...labels, [key]: value };
+    if (key === "vertices") {
+      if (value.trim()) {
+        setShowVertices(true);
+      }
+    }
+    setLabels(updated);
   };
 
   const handleAddPresetToCanvasState = () => {
@@ -109,6 +117,7 @@ export const useGeometryModal = ({
       showAngles,
       simulate,
       showLines,
+      showVertices,
     );
     const name = shapes.find((s) => s.id === shape)?.name || "Geometri";
     canvasHook.addPresetShape(svgContent, name);
@@ -197,6 +206,7 @@ export const useGeometryModal = ({
         showAngles,
         simulate,
         showLines,
+        showVertices,
       );
     } else {
       finalSvg = generateCanvasCombinedSVG(canvasHook.elements, 500, 350);
@@ -238,6 +248,8 @@ export const useGeometryModal = ({
     setShowAngles,
     showLines,
     setShowLines,
+    showVertices,
+    setShowVertices,
     simulate,
     workspaceMode,
     setWorkspaceMode,
