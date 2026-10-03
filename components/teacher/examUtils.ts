@@ -2563,13 +2563,14 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             processedHtml += newHtml;
           }
         } else if (typedData.type === "cartesian") {
-          const config = typedData.cartesianConfig || {
+          const config = {
             xMin: -10,
             xMax: 10,
             yMin: -10,
             yMax: 10,
             xStep: 1,
             yStep: 1,
+            ...(typedData.cartesianConfig || {}),
           };
           const w = 400;
           const h = 400;
@@ -2577,8 +2578,8 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
           const graphW = w - 2 * padding;
           const graphH = h - 2 * padding;
 
-          const xRange = config.xMax - config.xMin;
-          const yRange = config.yMax - config.yMin;
+          const xRange = config.xMax - config.xMin || 1;
+          const yRange = config.yMax - config.yMin || 1;
 
           // Origin coords in SVG
           const originX = padding + (Math.abs(config.xMin) / xRange) * graphW;
@@ -2646,64 +2647,127 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             "#82ca9d",
           ];
           (typedData.datasets || []).forEach((ds: any, dIdx: number) => {
-            let points = ds.data as { x: number; y: number }[];
             const color =
+              ds.borderColor?.[0] ||
               ds.backgroundColor?.[0] ||
               cartesianColors[dIdx % cartesianColors.length];
+            const fillColor = ds.fillColor || `${color}25`;
+            const strokeWidth = ds.lineWidth || (ds.isPolygon ? 2 : 2.5);
+            const dashAttr = ds.lineStyle === "dashed" ? ' stroke-dasharray="6,4"' : ds.lineStyle === "dotted" ? ' stroke-dasharray="2,3"' : "";
 
+            // CIRCLE
+            if (ds.isCircle && ds.circleRadius && ds.circleRadius > 0) {
+              const rawCenter = (ds.data?.[0] as any) || { x: 0, y: 0 };
+              const cx = Number(rawCenter.x) || 0;
+              const cy = Number(rawCenter.y) || 0;
+              const rVal = ds.circleRadius;
+              const rxPx = (rVal / xRange) * graphW;
+              const ryPx = (rVal / yRange) * graphH;
+              const cPxX = mapX(cx);
+              const cPxY = mapY(cy);
+              const ePxX = mapX(cx + rVal);
+              datasetsHtml += `
+                <ellipse cx="${cPxX}" cy="${cPxY}" rx="${rxPx}" ry="${ryPx}" fill="${fillColor}" stroke="${color}" stroke-width="${strokeWidth}"${dashAttr} />
+                <line x1="${cPxX}" y1="${cPxY}" x2="${ePxX}" y2="${cPxY}" stroke="${color}" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="${(cPxX + ePxX) / 2}" y="${cPxY - 4}" font-size="10" font-weight="bold" fill="${color}" text-anchor="middle">r = ${rVal}</text>
+                <circle cx="${cPxX}" cy="${cPxY}" r="3.5" fill="${color}" stroke="#fff" stroke-width="1" />
+                <text x="${cPxX + 6}" y="${cPxY + 12}" font-size="10" font-weight="bold" fill="${color}">${rawCenter.label || `P(${cx}, ${cy})`}</text>
+              `;
+              return;
+            }
+
+            // FUNCTION
             let isFuncPlot = false;
+            let points: any[] = [];
             if (ds.isFunction && ds.functionStr) {
               isFuncPlot = true;
-              points = [];
-              const step = (config.xMax - config.xMin) / 100;
-              for (let x = config.xMin; x <= config.xMax; x += step) {
+              const startX = typeof ds.domainMin === "number" ? Math.max(config.xMin, ds.domainMin) : config.xMin;
+              const endX = typeof ds.domainMax === "number" ? Math.min(config.xMax, ds.domainMax) : config.xMax;
+              const step = (endX - startX) / 180;
+              for (let x = startX; x <= endX + step * 0.5; x += step) {
                 try {
                   let fStr = ds.functionStr.toLowerCase().replace(/\s+/g, "");
                   if (fStr.startsWith("y=")) fStr = fStr.substring(2);
                   else if (fStr.startsWith("f(x)=")) fStr = fStr.substring(5);
-                  else if (fStr.endsWith("=0"))
-                    fStr = fStr.substring(0, fStr.length - 2);
+                  else if (fStr.endsWith("=0")) fStr = fStr.substring(0, fStr.length - 2);
                   else if (fStr.startsWith("0=")) fStr = fStr.substring(2);
-                  else if (fStr.endsWith("=y"))
-                    fStr = fStr.substring(0, fStr.length - 2);
-                  let f = fStr.replace(/(\d+)x/g, "$1*x").replace(/\^/g, "**");
+                  else if (fStr.endsWith("=y")) fStr = fStr.substring(0, fStr.length - 2);
+                  let f = fStr
+                    .replace(/(\d+)x/g, "$1*x")
+                    .replace(/x(\d+)/g, "x*$1")
+                    .replace(/\)\(/g, ")*(")
+                    .replace(/(\d+)\(/g, "$1*(")
+                    .replace(/\)(x|\d+)/g, ")*$1")
+                    .replace(/\^/g, "**");
                   const mathFuncs = [
-                    "sin",
-                    "cos",
-                    "tan",
-                    "asin",
-                    "acos",
-                    "atan",
-                    "sqrt",
-                    "abs",
-                    "log",
-                    "exp",
+                    "sin", "cos", "tan", "asin", "acos", "atan", "sqrt", "cbrt", "abs", "log10", "log", "exp"
                   ];
                   mathFuncs.forEach((mf: string) => {
                     f = f.split(mf).join(`Math.${mf}`);
                     f = f.split(`Math.Math.${mf}`).join(`Math.${mf}`);
                   });
-                  const calc = new Function("x", `return ${f}`);
-                  const y = calc(x);
-                  if (typeof y === "number" && !isNaN(y) && isFinite(y)) {
+                  f = f.replace(/\bpi\b/g, "Math.PI").replace(/\be\b/g, "Math.E");
+                  const calc = new Function("x", `"use strict"; return (${f});`);
+                  const y = Number(calc(x));
+                  if (!isNaN(y) && isFinite(y) && Math.abs(y) <= Math.max(Math.abs(config.yMax), Math.abs(config.yMin)) * 4) {
                     points.push({ x, y });
                   }
-                } catch (e) {
-                  // ignore errors
+                } catch {
+                  // ignore
                 }
               }
+            } else {
+              points = (ds.data || []).map((p: any) => {
+                if (typeof p === "object" && p !== null && "x" in p && "y" in p) {
+                  return { x: Number(p.x) || 0, y: Number(p.y) || 0, label: p.label, pointStyle: p.pointStyle, color: p.color };
+                }
+                if (Array.isArray(p) && p.length >= 2) return { x: Number(p[0]) || 0, y: Number(p[1]) || 0 };
+                return { x: 0, y: 0 };
+              });
             }
 
             if (!points || points.length === 0) return;
 
-            if ((ds.showLine || isFuncPlot) && points.length > 1) {
-              datasetsHtml += `<polyline points="${points.map((pt) => `${mapX(pt.x)},${mapY(pt.y)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="2.5" />`;
+            // POLYGON
+            if (ds.isPolygon && points.length >= 3) {
+              const polyPointsStr = points.map((pt) => `${mapX(pt.x)},${mapY(pt.y)}`).join(" ");
+              datasetsHtml += `<polygon points="${polyPointsStr}" fill="${fillColor}" stroke="${color}" stroke-width="${strokeWidth}"${dashAttr} stroke-linejoin="round" />`;
+              points.forEach((pt: any, pIdx: number) => {
+                const ptColor = pt.color || color;
+                const vLabel = pt.label || (points.length <= 8 ? String.fromCharCode(65 + pIdx) : "");
+                datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${pt.pointStyle === "hollow" ? "#fff" : ptColor}" stroke="${ptColor}" stroke-width="1.5" />`;
+                if (vLabel) {
+                  datasetsHtml += `<text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="11" font-weight="bold" fill="${ptColor}">${vLabel}</text>`;
+                }
+              });
+              if (ds.label && ds.label !== `Dataset ${dIdx + 1}`) {
+                const cX = points.reduce((acc, p) => acc + p.x, 0) / points.length;
+                const cY = points.reduce((acc, p) => acc + p.y, 0) / points.length;
+                datasetsHtml += `<text x="${mapX(cX)}" y="${mapY(cY)}" font-size="10" font-weight="bold" fill="${color}" text-anchor="middle">${ds.label}</text>`;
+              }
+              return;
             }
+
+            // LINE / FUNCTION
+            if ((ds.showLine || isFuncPlot || ds.kind === "line") && points.length > 1) {
+              datasetsHtml += `<polyline points="${points.map((pt) => `${mapX(pt.x)},${mapY(pt.y)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"${dashAttr} stroke-linecap="round" stroke-linejoin="round" />`;
+            }
+
+            // POINTS
             if (!isFuncPlot) {
               points.forEach((pt: any) => {
-                datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="${color}" stroke="#fff" stroke-width="1" /><text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="12" font-weight="bold" fill="${color}">(${pt.x},${pt.y})</text>`;
+                if (pt.pointStyle === "none") return;
+                const ptColor = pt.color || color;
+                if (pt.pointStyle === "hollow") {
+                  datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4.5" fill="#fff" stroke="${ptColor}" stroke-width="2" />`;
+                } else {
+                  datasetsHtml += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4.5" fill="${ptColor}" stroke="#fff" stroke-width="1.5" />`;
+                }
+                const labelText = pt.label || `(${pt.x}, ${pt.y})`;
+                datasetsHtml += `<text x="${mapX(pt.x) + 6}" y="${mapY(pt.y) - 6}" font-size="11" font-weight="bold" fill="${ptColor}">${labelText}</text>`;
               });
             }
+
             if (
               ds.label &&
               ds.label !== `Dataset ${dIdx + 1}` &&
@@ -2712,7 +2776,7 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
             ) {
               const midPt = points[Math.floor(points.length / 2)];
               if (midPt) {
-                datasetsHtml += `<text x="${mapX(midPt.x)}" y="${mapY(midPt.y) - 10}" font-size="12" font-weight="bold" fill="${color}">${ds.label}</text>`;
+                datasetsHtml += `<text x="${mapX(midPt.x)}" y="${mapY(midPt.y) - 10}" font-size="11" font-weight="bold" fill="${color}" text-anchor="middle">${ds.label}</text>`;
               }
             }
           });
