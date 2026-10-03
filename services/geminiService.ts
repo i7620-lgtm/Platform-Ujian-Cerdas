@@ -111,12 +111,18 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
       * Diagram Venn: gunakan 'labels' untuk nama himpunan (["A", "B"] atau ["A", "B", "C"]). 'datasets.data' berisi nilai area (Hanya A, Hanya B, Irisan A&B, Di Luar, Semesta).
       * Relasi/Fungsi: 'datasets'[0] = anggota Domain, 'datasets'[1] = Kodomain, 'datasets'[2] = pasangan "indexDomain-indexKodomain".
-      * Diagram Kartesius (Cartesian): Anda WAJIB menyertakan 'cartesianConfig': {"xMin": -10, "xMax": 10, "yMin": -10, "yMax": 10, "xStep": 1, "yStep": 1}. Field 'datasets' berisi array elemen yang ingin digambar:
-        1. Bangun Datar / Poligon Geometri (Segitiga, Persegi, Trapesium): {"label": "Segitiga ABC", "kind": "polygon", "isPolygon": true, "fillColor": "rgba(37,99,235,0.25)", "backgroundColor": ["#2563eb"], "borderColor": ["#2563eb"], "data": [{"x": 1, "y": 1, "label": "A"}, {"x": 5, "y": 1, "label": "B"}, {"x": 3, "y": 4, "label": "C"}]}
-        2. Ruas Garis / Sinar / Vektor: {"label": "Garis g", "kind": "line", "showLine": true, "showArrows": true, "lineStyle": "solid", "backgroundColor": ["#dc2626"], "data": [{"x": -2, "y": -1, "label": "P"}, {"x": 4, "y": 3, "label": "Q"}]}
-        3. Titik Koordinat: {"label": "Titik Koordinat", "kind": "point", "showLine": false, "data": [{"x": 2, "y": 3, "label": "A(2,3)", "pointStyle": "solid"}, {"x": -3, "y": 1, "label": "B(-3,1)", "pointStyle": "hollow"}]}
-        4. Kurva Fungsi f(x): {"label": "f(x) = x^2 - 4", "kind": "function", "isFunction": true, "functionStr": "x^2 - 4", "backgroundColor": ["#7c3aed"], "data": []}
-        5. Lingkaran: {"label": "Lingkaran", "kind": "circle", "isCircle": true, "circleRadius": 4, "fillColor": "rgba(8,145,178,0.2)", "data": [{"x": 0, "y": 0, "label": "P(0,0)"}]}
+      * Diagram Kartesius (Cartesian):
+        PERINGATAN KERAS & MUTLAK: JIKA kisi-kisi, indikator, atau materi berkaitan dengan "Fungsi Kuadrat", "Titik Puncak", "Sumbu Simetri", "Parabola", "Fungsi Linear", "Persamaan Garis", "Koordinat Titik", atau "Bidang Kartesius", Anda WAJIB MENGGUNAKAN 'chartData.type': "cartesian", DILARANG KERAS menggunakan "bar" (diagram batang) atau "pie"!
+        Struktur 'chartData' untuk kartesius:
+        - 'type': "cartesian"
+        - 'title': "Grafik Fungsi Kuadrat f(x)" (atau judul relevan)
+        - 'cartesianConfig': {"xMin": -6, "xMax": 6, "yMin": -6, "yMax": 10, "xStep": 1, "yStep": 1, "showGrid": true, "showAxisNumbers": true}
+        - 'datasets': array elemen visual:
+          1. Kurva Fungsi Kuadrat: {"label": "f(x) = x^2 - 2x - 3", "kind": "function", "isFunction": true, "functionStr": "x^2 - 2*x - 3", "backgroundColor": ["#2563eb"], "showLine": true, "data": []}
+          2. Titik Puncak / Titik Potong: {"label": "Titik Puncak P(1, -4)", "kind": "point", "backgroundColor": ["#dc2626"], "showLine": false, "data": [{"x": 1, "y": -4, "label": "P(1,-4)"}, {"x": -1, "y": 0, "label": "(-1,0)"}, {"x": 3, "y": 0, "label": "(3,0)"}]}
+          3. Bangun Datar / Poligon (Segitiga, Segiempat, Trapesium): {"label": "Segitiga ABC", "kind": "polygon", "isPolygon": true, "fillColor": "rgba(37,99,235,0.25)", "backgroundColor": ["#2563eb"], "data": [{"x": 1, "y": 1, "label": "A"}, {"x": 5, "y": 1, "label": "B"}, {"x": 3, "y": 4, "label": "C"}]}
+          4. Ruas Garis / Sinar: {"label": "Garis g", "kind": "line", "showLine": true, "showArrows": true, "backgroundColor": ["#dc2626"], "data": [{"x": -2, "y": -1, "label": "P"}, {"x": 4, "y": 3, "label": "Q"}]}
+          5. Lingkaran: {"label": "Lingkaran", "kind": "circle", "isCircle": true, "circleRadius": 4, "fillColor": "rgba(8,145,178,0.2)", "data": [{"x": 0, "y": 0, "label": "P(0,0)"}]}
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
       * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie/venn/relation).
@@ -129,7 +135,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk seluruh konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), peta/denah konseptual, bagan alur proses (flowchart), infografis materi, atau ilustrasi kontekstual. Tuliskan deskripsi gambar ilmiah yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("infographic", "diagram", "flowchart", "geometry", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
-    - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3.
+    - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3. Untuk rumus matematika multi-baris bertingkat / sistem persamaan, Anda dapat menggunakan pemisah baris (\\n) atau '\\\\\\' dan '&' untuk penyejajaran.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
     - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi stimulus dan soal yang harus dijawab oleh siswa.
     - PENTING (KUNCI JAWABAN WAJIB & PRESISI TINGGI):
@@ -202,26 +208,90 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - WAJIB mengisi field 'questionType', 'correctAnswer', 'kisiKisi', 'level', dan 'category' untuk SETIAP butir soal.
   `;
 
+  const cartesianPointSchema = {
+    type: Type.OBJECT,
+    properties: {
+      x: { type: Type.NUMBER, description: "Koordinat sumbu X" },
+      y: { type: Type.NUMBER, description: "Koordinat sumbu Y" },
+      label: { type: Type.STRING, description: "Label titik (misal: 'P(1,-4)' atau 'A')" },
+      pointStyle: { type: Type.STRING, enum: ["solid", "hollow", "cross", "none"] },
+      color: { type: Type.STRING }
+    },
+    required: ["x", "y"]
+  };
+
+  const chartDatasetSchema = {
+    type: Type.OBJECT,
+    properties: {
+      label: { type: Type.STRING, description: "Label dataset / nama elemen / persamaan grafik" },
+      kind: {
+        type: Type.STRING,
+        enum: ["function", "point", "line", "polygon", "circle"],
+        description: "Jenis elemen: 'function' (kurva fungsi kuadrat/linear), 'point' (titik koordinat), 'line' (ruas garis/panah), 'polygon' (bangun datar), 'circle' (lingkaran)"
+      },
+      isFunction: { type: Type.BOOLEAN, description: "True jika menggambar kurva fungsi matematis" },
+      functionStr: { type: Type.STRING, description: "Ekspresi rumus f(x) dalam variabel x, misal: 'x^2 - 2*x - 3' atau '2*x + 1'" },
+      domainMin: { type: Type.NUMBER, description: "Batas kiri domain plotting kurva" },
+      domainMax: { type: Type.NUMBER, description: "Batas kanan domain plotting kurva" },
+      isPolygon: { type: Type.BOOLEAN, description: "True jika poligon bangun datar tertutup" },
+      isCircle: { type: Type.BOOLEAN, description: "True jika menggambar lingkaran" },
+      circleRadius: { type: Type.NUMBER, description: "Jari-jari lingkaran jika kind='circle'" },
+      fillColor: { type: Type.STRING, description: "Warna arsiran fill (misal: 'rgba(37,99,235,0.25)')" },
+      lineStyle: { type: Type.STRING, enum: ["solid", "dashed", "dotted"] },
+      lineWidth: { type: Type.NUMBER },
+      showLine: { type: Type.BOOLEAN, description: "Hubungkan titik dengan garis / tampilkan kurva" },
+      showArrows: { type: Type.BOOLEAN, description: "Tampilkan panah di ujung garis" },
+      backgroundColor: { type: Type.ARRAY, items: { type: Type.STRING } },
+      borderColor: { type: Type.ARRAY, items: { type: Type.STRING } },
+      data: {
+        type: Type.ARRAY,
+        items: cartesianPointSchema,
+        description: "Array koordinat titik [{'x': 1, 'y': -4, 'label': 'P(1,-4)'}] untuk kartesius"
+      },
+      dataValues: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Array data teks/angka untuk diagram batang, garis, lingkaran, venn, atau relasi"
+      }
+    },
+    required: ["label"]
+  };
+
+  const cartesianConfigSchema = {
+    type: Type.OBJECT,
+    properties: {
+      xMin: { type: Type.NUMBER, description: "Batas minimum X (default: -6)" },
+      xMax: { type: Type.NUMBER, description: "Batas maksimum X (default: 6)" },
+      yMin: { type: Type.NUMBER, description: "Batas minimum Y (default: -6)" },
+      yMax: { type: Type.NUMBER, description: "Batas maksimum Y (default: 10)" },
+      xStep: { type: Type.NUMBER, description: "Langkah grid X (default: 1)" },
+      yStep: { type: Type.NUMBER, description: "Langkah grid Y (default: 1)" },
+      showGrid: { type: Type.BOOLEAN, description: "Tampilkan grid kotak-kotak" },
+      showAxisNumbers: { type: Type.BOOLEAN, description: "Tampilkan angka pada sumbu" },
+      xLabel: { type: Type.STRING, description: "Label sumbu X (default: 'X')" },
+      yLabel: { type: Type.STRING, description: "Label sumbu Y (default: 'Y')" }
+    }
+  };
+
   const chartDataSchema = {
     type: Type.OBJECT,
     properties: {
-      type: { type: Type.STRING, enum: ["bar", "line", "pie", "venn", "relation"] },
-      title: { type: Type.STRING },
-      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+      type: { 
+        type: Type.STRING, 
+        enum: ["cartesian", "bar", "line", "pie", "venn", "relation"],
+        description: "Jenis diagram: 'cartesian' untuk fungsi kuadrat/linear, parabola, titik puncak, sumbu simetri, koordinat, bangun geometri kartesius; 'bar'/'pie'/'line' untuk statistik; 'venn' untuk himpunan; 'relation' untuk pemetaan domain-kodomain"
+      },
+      title: { type: Type.STRING, description: "Judul diagram" },
+      labels: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Label sumbu/kategori (untuk kartesius: ['X', 'Y'])" },
+      cartesianConfig: cartesianConfigSchema,
       datasets: {
         type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            label: { type: Type.STRING },
-            data: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["label", "data"]
-        }
+        items: chartDatasetSchema,
+        description: "Daftar dataset atau elemen visual kartesius"
       }
     },
-    required: ["type", "labels", "datasets"],
-    description: "Data untuk membuat diagram (batang, garis, lingkaran, venn, atau relasi)"
+    required: ["type", "datasets"],
+    description: "Data untuk membuat diagram (kartesius, batang, garis, lingkaran, venn, atau relasi)"
   };
 
   const properties = {
