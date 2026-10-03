@@ -76,12 +76,17 @@ interface FallbackParams {
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const { index, subject, blueprint, qType, difficulty, includeImages, failureReason } = params;
-  const isGeometry = /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(subject) ||
+  const isCartesian = /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(subject) ||
+                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(blueprint) ||
+                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(params.category || '') ||
+                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(params.kisiKisi || '');
+
+  const isGeometry = !isCartesian && (/geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(subject) ||
                      /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(blueprint) ||
                      /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.category || '') ||
-                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.kisiKisi || '');
+                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.kisiKisi || ''));
 
-  const isMath = isGeometry ||
+  const isMath = isCartesian || isGeometry ||
                  /matematika|hitung|aritmatika|aljabar|geometri|statistika|data/i.test(subject) ||
                  /hitung|grafik|diagram|tabel|angka|luas|volume|pecahan/i.test(blueprint);
   const isScience = /ipa|sains|biologi|fisika|kimia|alam|ekosistem/i.test(subject) ||
@@ -90,10 +95,12 @@ function buildSingleFallbackQuestion(params: FallbackParams): Question {
 
   const id = `q_fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const levelText = difficulty.includes("HOTS") ? "Level 3 - Penalaran (HOTS)" : difficulty;
-  const category = params.category || (isGeometry ? "Geometri Bangun Ruang" : isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
+  const category = params.category || (isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
 
   // Question context generator based on Subject & Blueprint
-  if (isGeometry) {
+  if (isCartesian) {
+    return buildCartesianFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isGeometry) {
     return buildGeometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isMath) {
     return buildMathFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
@@ -639,6 +646,355 @@ Setiap karung beras memiliki netto 25 kg dan dijual dengan harga Rp14.000,00 per
     category,
     isFallback: true,
     fallbackReason
+  } as any;
+}
+
+// 1b. Cartesian Diagram Fallback Generator
+function buildCartesianFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, includeImages, failureReason } = args;
+  const fallbackReason = failureReason;
+
+  const isQuadraticTopic = /fungsi kuadrat|titik puncak|sumbu simetri|parabola|persamaan kuadrat/i.test(
+    `${args.blueprint} ${args.kisiKisi || ''} ${category}`
+  );
+
+  if (isQuadraticTopic) {
+    const quadChartData: ChartData = {
+      type: "cartesian",
+      title: "Grafik Fungsi Kuadrat f(x) = x² - 2x - 3",
+      labels: ["X", "Y"],
+      cartesianConfig: {
+        xMin: -4,
+        xMax: 6,
+        yMin: -6,
+        yMax: 8,
+        xStep: 1,
+        yStep: 1,
+        showGrid: true,
+        showAxisNumbers: true,
+      },
+      datasets: [
+        {
+          label: "f(x) = x² - 2x - 3",
+          kind: "function",
+          isFunction: true,
+          functionStr: "x^2 - 2*x - 3",
+          backgroundColor: ["#2563eb"],
+          borderColor: ["#2563eb"],
+          lineWidth: 2.5,
+          showLine: true,
+          data: [],
+        },
+        {
+          label: "Titik Puncak P(1, -4)",
+          kind: "point",
+          backgroundColor: ["#dc2626"],
+          borderColor: ["#dc2626"],
+          showLine: false,
+          data: [
+            { x: 1, y: -4, label: "P(1, -4)", pointStyle: "solid" },
+            { x: -1, y: 0, label: "(-1, 0)", pointStyle: "solid" },
+            { x: 3, y: 0, label: "(3, 0)", pointStyle: "solid" },
+          ],
+        },
+      ],
+    };
+
+    const quadLead = `Perhatikan gambar grafik fungsi kuadrat $f(x) = x^2 - 2x - 3$ pada bidang koordinat kartesius berikut:`;
+    const quadDetail = `${CHART_PLACEHOLDER_HTML}
+Berdasarkan grafik fungsi kuadrat di atas, koordinat titik puncak (titik balik minimum) dan persamaan sumbu simetri kurva parabola tersebut berturut-turut adalah...`;
+
+    const quadExplanation = `**Langkah Penyelesaian Sistematis:**
+1. **Bentuk Umum Fungsi Kuadrat:**
+   - $f(x) = ax^2 + bx + c$
+   - Dari grafik, $f(x) = x^2 - 2x - 3$, sehingga $a = 1$, $b = -2$, dan $c = -3$.
+2. **Persamaan Sumbu Simetri ($x_p$):**
+   - $x_p = -\\frac{b}{2a} = -\\frac{-2}{2(1)} = \\mathbf{1}$.
+3. **Nilai Optimum / Titik Puncak ($y_p$):**
+   - $y_p = f(x_p) = (1)^2 - 2(1) - 3 = 1 - 2 - 3 = \\mathbf{-4}$.
+4. **Koordinat Titik Puncak ($P$):**
+   - Koordinat titik puncak adalah $\\mathbf{P(1, -4)}$ dan persamaan sumbu simetri adalah $\\mathbf{x = 1}$.`;
+
+    const quadKisiKisi = args.kisiKisi || `Disajikan stimulus grafik fungsi kuadrat pada bidang kartesius, peserta didik dapat menentukan koordinat titik puncak dan persamaan sumbu simetri parabola dengan tepat.`;
+
+    if (qType === "MULTIPLE_CHOICE") {
+      return {
+        id,
+        questionType: "MULTIPLE_CHOICE",
+        questionText: `<p>${quadLead}</p>${quadDetail}`,
+        options: [
+          "Titik puncak $(1, -4)$ dan sumbu simetri $x = 1$",
+          "Titik puncak $(-1, -4)$ dan sumbu simetri $x = -1$",
+          "Titik puncak $(1, 4)$ dan sumbu simetri $x = 1$",
+          "Titik puncak $(2, -3)$ dan sumbu simetri $x = 2$"
+        ],
+        correctAnswer: "Titik puncak $(1, -4)$ dan sumbu simetri $x = 1$",
+        scoreWeight: 1,
+        chartData: includeImages ? quadChartData : undefined,
+        explanation: quadExplanation,
+        kisiKisi: quadKisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason,
+      } as any;
+    }
+
+    if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+      return {
+        id,
+        questionType: "COMPLEX_MULTIPLE_CHOICE",
+        questionText: `<p>${quadLead}</p>${CHART_PLACEHOLDER_HTML}<p>Berdasarkan grafik fungsi kuadrat $f(x) = x^2 - 2x - 3$ di atas, pilihlah seluruh pernyataan yang BENAR!</p>`,
+        options: [
+          "Kurva parabola terbuka ke atas karena nilai $a = 1 > 0$.",
+          "Titik puncak (titik balik minimum) parabola berada pada koordinat $(1, -4)$.",
+          "Persamaan sumbu simetri kurva adalah $x = 1$.",
+          "Grafik memotong sumbu X di titik $(2, 0)$ dan $(-3, 0)$."
+        ],
+        correctAnswer: JSON.stringify([
+          "Kurva parabola terbuka ke atas karena nilai $a = 1 > 0$.",
+          "Titik puncak (titik balik minimum) parabola berada pada koordinat $(1, -4)$.",
+          "Persamaan sumbu simetri kurva adalah $x = 1$."
+        ]),
+        scoreWeight: 2,
+        chartData: includeImages ? quadChartData : undefined,
+        explanation: quadExplanation,
+        kisiKisi: quadKisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason,
+      } as any;
+    }
+
+    if (qType === "TRUE_FALSE") {
+      return {
+        id,
+        questionType: "TRUE_FALSE",
+        questionText: `<p>${quadLead}</p>${CHART_PLACEHOLDER_HTML}<p>Tentukan nilai kebenaran (Benar atau Salah) dari setiap pernyataan berikut terkait grafik fungsi kuadrat $f(x) = x^2 - 2x - 3$:</p>`,
+        options: [],
+        trueFalseRows: [
+          { text: "Kurva parabola memiliki sumbu simetri pada garis $x = 1$.", answer: true },
+          { text: "Titik puncak kurva berada pada koordinat $(1, -4)$.", answer: true },
+          { text: "Grafik parabola terbuka ke bawah dan memiliki nilai maksimum $y = 4$.", answer: false }
+        ],
+        correctAnswer: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah",
+        scoreWeight: 2,
+        chartData: includeImages ? quadChartData : undefined,
+        explanation: quadExplanation,
+        kisiKisi: quadKisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason,
+      } as any;
+    }
+
+    if (qType === "MATCHING") {
+      return {
+        id,
+        questionType: "MATCHING",
+        questionText: `<p>${quadLead}</p>${CHART_PLACEHOLDER_HTML}<p>Pasangkanlah karakteristik grafik fungsi kuadrat $f(x) = x^2 - 2x - 3$ berikut dengan nilai/persamaan yang tepat:</p>`,
+        options: [],
+        matchingPairs: [
+          { leftText: "Persamaan sumbu simetri", rightText: "$x = 1$" },
+          { leftText: "Koordinat titik puncak", rightText: "$(1, -4)$" },
+          { leftText: "Titik potong sumbu Y", rightText: "$(0, -3)$" }
+        ],
+        correctAnswer: "Persamaan sumbu simetri -> $x = 1$, Koordinat titik puncak -> $(1, -4)$, Titik potong sumbu Y -> $(0, -3)$",
+        scoreWeight: 2,
+        chartData: includeImages ? quadChartData : undefined,
+        explanation: quadExplanation,
+        kisiKisi: quadKisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason,
+      } as any;
+    }
+
+    return {
+      id,
+      questionType: "FILL_IN_THE_BLANK",
+      questionText: `<p>${quadLead}</p>${quadDetail}`,
+      options: [],
+      correctAnswer: "(1, -4)",
+      scoreWeight: 1,
+      chartData: includeImages ? quadChartData : undefined,
+      explanation: quadExplanation,
+      kisiKisi: quadKisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason,
+    } as any;
+  }
+
+  const chartData: ChartData = {
+    type: "cartesian",
+    title: "Bidang Koordinat Kartesius: Segitiga ABC",
+    labels: ["X", "Y"],
+    cartesianConfig: {
+      xMin: -2,
+      xMax: 6,
+      yMin: -2,
+      yMax: 6,
+      xStep: 1,
+      yStep: 1,
+      showGrid: true,
+      showProjections: true,
+      showCoordinates: true,
+    },
+    datasets: [
+      {
+        label: "Segitiga ABC",
+        shapeType: "polygon",
+        closed: true,
+        fill: true,
+        fillColor: "rgba(37, 99, 235, 0.25)",
+        backgroundColor: ["#2563eb"],
+        borderColor: ["#2563eb"],
+        data: [
+          { x: 1, y: 1, label: "A" },
+          { x: 5, y: 1, label: "B" },
+          { x: 2, y: 5, label: "C" },
+        ],
+      },
+    ],
+  };
+
+  const questionLead = `Perhatikan bidang koordinat kartesius yang memuat segitiga ABC dengan titik-titik sudut $A(1, 1)$, $B(5, 1)$, dan $C(2, 5)$ berikut:`;
+  const questionDetail = `${CHART_PLACEHOLDER_HTML}
+Diketahui segitiga ABC memiliki alas pada garis horizontal dari titik $A(1, 1)$ ke titik $B(5, 1)$, dan titik puncak berada pada titik $C(2, 5)$. Berapakah luas daerah segitiga ABC tersebut?`;
+
+  const explanation = `**Langkah Penyelesaian Sistematis:**
+1. **Panjang Alas Segitiga ($a$):**
+   - Jarak horizontal dari titik $A(1, 1)$ ke $B(5, 1)$ adalah:
+   - $a = x_B - x_A = 5 - 1 = 4\\text{ satuan}$.
+2. **Tinggi Segitiga ($t$):**
+   - Jarak vertikal dari garis alas ($y = 1$) ke titik puncak $C(2, 5)$ adalah:
+   - $t = y_C - y_A = 5 - 1 = 4\\text{ satuan}$.
+3. **Luas Segitiga ABC:**
+   - $L = \\frac{1}{2} \\times \\text{alas} \\times \\text{tinggi}$
+   - $L = \\frac{1}{2} \\times 4 \\times 4 = \\mathbf{8\\text{ satuan luas}}$.`;
+
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : `Disajikan stimulus diagram kartesius memuat bangun poligon segitiga dengan titik koordinat tertentu, peserta didik dapat menentukan luas bangun datar tersebut secara tepat.`);
+
+  if (qType === "MULTIPLE_CHOICE") {
+    return {
+      id,
+      questionType: "MULTIPLE_CHOICE",
+      questionText: `<p>${questionLead}</p>${questionDetail}`,
+      options: ["8 satuan luas", "10 satuan luas", "12 satuan luas", "16 satuan luas"],
+      correctAnswer: "8 satuan luas",
+      scoreWeight: 1,
+      chartData: includeImages ? chartData : undefined,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason,
+    } as any;
+  }
+
+  if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+    return {
+      id,
+      questionType: "COMPLEX_MULTIPLE_CHOICE",
+      questionText: `<p>${questionLead}</p>${CHART_PLACEHOLDER_HTML}<p>Tentukan seluruh pernyataan yang BENAR mengenai bangun segitiga ABC pada bidang kartesius di atas! (Pilihan ganda kompleks)</p>`,
+      options: [
+        "Panjang alas segitiga (ruas garis AB) adalah 4 satuan.",
+        "Tinggi segitiga ABC yang ditarik dari titik C ke garis AB adalah 4 satuan.",
+        "Luas daerah segitiga ABC adalah 8 satuan luas.",
+        "Titik sudut A terletak pada koordinat (5, 1)."
+      ],
+      correctAnswer: JSON.stringify([
+        "Panjang alas segitiga (ruas garis AB) adalah 4 satuan.",
+        "Tinggi segitiga ABC yang ditarik dari titik C ke garis AB adalah 4 satuan.",
+        "Luas daerah segitiga ABC adalah 8 satuan luas."
+      ]),
+      scoreWeight: 2,
+      chartData: includeImages ? chartData : undefined,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason,
+    } as any;
+  }
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>${questionLead}</p>${CHART_PLACEHOLDER_HTML}<p>Tentukan Benar atau Salah untuk setiap pernyataan berikut terkait koordinat segitiga ABC:</p>`,
+      options: [],
+      trueFalseRows: [
+        { text: "Panjang ruas garis AB pada sumbu mendatar adalah 4 satuan.", answer: true },
+        { text: "Luas daerah segitiga ABC pada bidang kartesius tersebut adalah 8 satuan luas.", answer: true },
+        { text: "Tinggi segitiga ABC dari alas AB adalah 5 satuan.", answer: false }
+      ],
+      correctAnswer: "Benar, Benar, Salah",
+      scoreWeight: 2,
+      chartData: includeImages ? chartData : undefined,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason,
+    } as any;
+  }
+
+  if (qType === "MATCHING") {
+    return {
+      id,
+      questionType: "MATCHING",
+      questionText: `<p>${questionLead}</p>${CHART_PLACEHOLDER_HTML}<p>Pasangkanlah unsur geometri segitiga ABC pada bidang kartesius berikut dengan nilai ukuran yang tepat:</p>`,
+      options: [],
+      matchingPairs: [
+        { leftText: "Panjang alas (AB)", rightText: "4 satuan" },
+        { leftText: "Tinggi segitiga", rightText: "4 satuan" },
+        { leftText: "Luas segitiga ABC", rightText: "8 satuan luas" }
+      ],
+      correctAnswer: "1-A, 2-B, 3-C",
+      scoreWeight: 2,
+      chartData: includeImages ? chartData : undefined,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason,
+    } as any;
+  }
+
+  return {
+    id,
+    questionType: "FILL_IN_THE_BLANK",
+    questionText: `<p>${questionLead}</p>${questionDetail}`,
+    options: [],
+    correctAnswer: "8",
+    scoreWeight: 1,
+    chartData: includeImages ? chartData : undefined,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason,
   } as any;
 }
 
