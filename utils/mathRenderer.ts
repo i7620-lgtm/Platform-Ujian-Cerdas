@@ -36,6 +36,27 @@ export const normalizeLatex = (latex: string): string => {
   clean = clean.replace(/\\text\{\s*dm\s*\}\^([23])/g, "\\text{ dm}^$1");
   clean = clean.replace(/\\text\{\s*mm\s*\}\^([23])/g, "\\text{ mm}^$1");
 
+  // Handle multiline math with newline (\n) or dangling \\
+  // If text contains newlines (\n) and is not already wrapped in a math environment (\begin{...})
+  if (
+    clean.includes("\n") &&
+    !/\\begin\{(aligned|gathered|align|gather|cases|matrix|pmatrix|bmatrix|vmatrix|Vmatrix|array)\}/i.test(clean)
+  ) {
+    const rawLines = clean
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (rawLines.length > 1) {
+      // Clean up any trailing \\ from manual input before joining with \\
+      const formattedLines = rawLines.map((l) =>
+        l.endsWith("\\\\") ? l.slice(0, -2).trim() : l,
+      );
+      const hasAlignAmpersand = formattedLines.some((l) => l.includes("&"));
+      const env = hasAlignAmpersand ? "aligned" : "gathered";
+      clean = `\\begin{${env}}\n${formattedLines.join(" \\\\\n")}\n\\end{${env}}`;
+    }
+  }
+
   return clean;
 };
 
