@@ -90,8 +90,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
            - Kerucut + Setengah Bola (es krim cone): [GEOMETRY:combined_cone_hemisphere:{"radius":"7 cm","height":"12 cm"}]
            - Balok + Limas (tugu monumen): [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
       * JIKA pengguna meminta materi bangun tertentu (misal: "Tabung", "Kubus", "Prisma Segitiga", "Kerucut", atau "Bola"), AI WAJIB membuat soal mengenai bangun tersebut dan DILARANG MENGGANTINYA menjadi balok dan limas!
+      * NAMA TITIK SUDUT DAN SUDUT BANGUN (SANGAT DIANJURKAN UNTUK KEJELASAN):
+        Anda BISA dan SANGAT DIANJURKAN menambahkan field 'vertices' (nama titik sudut bangun) dan/atau sudut ('angleA', 'angleB', 'angleC') pada tag [GEOMETRY:...] untuk memperjelas konteks soal:
+        - Kubus ABCD.EFGH: [GEOMETRY:cube:{"side":"10 cm","vertices":"ABCD.EFGH"}]
+        - Balok KLMN.OPQR: [GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"KLMN.OPQR"}]
+        - Limas T.ABCD: [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm","vertices":"T.ABCD"}]
+        - Prisma ABC.DEF: [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm","vertices":"ABC.DEF"}]
+        - Segitiga ABC: [GEOMETRY:triangle:{"bottom":"12 cm","left":"10 cm","right":"10 cm","vertices":"ABC","angleA":"60°","angleB":"60°"}]
+        - Persegi Panjang ABCD: [GEOMETRY:rectangle:{"width":"14 cm","height":"8 cm","vertices":"ABCD"}]
       Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
-      * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm"}]
+      * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm","vertices":"ABCD.EFGH"}]
       * Kubus: [GEOMETRY:cube:{"side":"8 cm"}]
       * Tabung: [GEOMETRY:cylinder:{"radius":"7 cm","height":"14 cm"}]
       * Kerucut: [GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]
