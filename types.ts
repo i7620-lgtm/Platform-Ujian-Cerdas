@@ -21,11 +21,18 @@ export interface CartesianConfig {
   yMax: number;
   xStep: number;
   yStep: number;
+  showGrid?: boolean;
+  showAxisNumbers?: boolean;
+  xLabel?: string;
+  yLabel?: string;
 }
 
 export interface ChartPoint {
   x: number;
   y: number;
+  label?: string;
+  pointStyle?: 'solid' | 'hollow' | 'cross' | 'none';
+  color?: string;
 }
 
 export interface ChartDataset {
@@ -35,8 +42,18 @@ export interface ChartDataset {
   borderColor?: string[];
   showLine?: boolean;
   fill?: boolean;
+  fillColor?: string;
+  isPolygon?: boolean;
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  lineWidth?: number;
+  showArrows?: boolean;
   isFunction?: boolean;
   functionStr?: string;
+  domainMin?: number;
+  domainMax?: number;
+  isCircle?: boolean;
+  circleRadius?: number;
+  kind?: 'point' | 'line' | 'polygon' | 'function' | 'circle';
   icon?: string;
 }
 
