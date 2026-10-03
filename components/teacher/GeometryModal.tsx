@@ -24,6 +24,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
     showAngles,
     simulate,
     showLines,
+    showVertices,
     showGrid,
     setWorkspaceMode,
     setShape,
@@ -33,6 +34,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
     setShowAngles,
     setSimulate,
     setShowLines,
+    setShowVertices,
     setShowGrid,
     shapes,
     svgRef,
@@ -200,6 +202,29 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                 </div>
 
                 <div className="mb-4 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="showVertices"
+                      checked={showVertices || Boolean(labels.vertices)}
+                      onChange={(e) => {
+                        setShowVertices(e.target.checked);
+                        if (!e.target.checked && labels.vertices) {
+                          handleLabelChange("vertices", "");
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                    />
+                    <label
+                      htmlFor="showVertices"
+                      className="text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>🏷️ Tampilkan Nama Titik Sudut</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded font-bold font-mono">
+                        ABCD
+                      </span>
+                    </label>
+                  </div>
                   {category === "2d" && shape !== "circle" && (
                     <div className="flex items-center gap-2">
                       <input
@@ -251,6 +276,203 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                       </div>
                     )}
                 </div>
+
+                {/* Dedicated Vertex Naming Panel */}
+                {(showVertices || Boolean(labels.vertices) || ["cube", "cuboid", "pyramid", "prism", "triangle", "triangle_right", "square", "rectangle", "parallelogram", "trapezoid", "trapezoid_right", "trapezoid_isosceles", "rhombus", "kite"].includes(shape)) && (
+                  <div className="mb-4 p-3 bg-indigo-50/70 dark:bg-slate-700/60 rounded-xl border border-indigo-100 dark:border-slate-600">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-indigo-900 dark:text-indigo-300 uppercase flex items-center gap-1.5">
+                        <span>🏷️ Nama Titik Sudut Bangun</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextVal = !(showVertices || Boolean(labels.vertices));
+                          setShowVertices(nextVal);
+                          if (!nextVal) handleLabelChange("vertices", "");
+                        }}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors ${
+                          showVertices || Boolean(labels.vertices)
+                            ? "bg-indigo-600 text-white"
+                            : "bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {showVertices || Boolean(labels.vertices) ? "Aktif" : "Nonaktif"}
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-gray-500 dark:text-slate-300 mb-2 leading-relaxed">
+                      Beri nama huruf pada titik sudut bangun (misal: Kubus ABCD.EFGH, Limas T.ABCD, Segitiga ABC).
+                    </p>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={
+                          ["cube", "cuboid"].includes(shape)
+                            ? "Contoh: ABCD.EFGH atau KLMN.OPQR"
+                            : shape === "pyramid"
+                              ? "Contoh: T.ABCD atau Limas T.ABCD"
+                              : shape === "prism"
+                                ? "Contoh: ABC.DEF atau PQR.STU"
+                                : ["triangle", "triangle_right"].includes(shape)
+                                  ? "Contoh: ABC atau PQR"
+                                  : "Contoh: ABCD atau KLMN"
+                        }
+                        value={labels.vertices || ""}
+                        onChange={(e) => {
+                          handleLabelChange("vertices", e.target.value);
+                          if (e.target.value.trim() && !showVertices) {
+                            setShowVertices(true);
+                          }
+                        }}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-600 rounded-lg text-sm placeholder:text-gray-400 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-mono"
+                      />
+                      {labels.vertices && (
+                        <button
+                          type="button"
+                          onClick={() => handleLabelChange("vertices", "")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 text-xs px-1"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick preset chips for instant 1-click vertex naming */}
+                    <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold mr-0.5">
+                        Pilihan Cepat:
+                      </span>
+                      {["cube", "cuboid"].includes(shape) && (
+                        <>
+                          {["ABCD.EFGH", "KLMN.OPQR", "PQRS.TUVW"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {shape === "pyramid" && (
+                        <>
+                          {["T.ABCD", "T.KLMN", "P.ABCD"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {shape === "prism" && (
+                        <>
+                          {["ABC.DEF", "PQR.STU", "KLM.NOP"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {["triangle", "triangle_right"].includes(shape) && (
+                        <>
+                          {["ABC", "PQR", "KLM"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {["square", "rectangle", "parallelogram", "trapezoid", "trapezoid_right", "trapezoid_isosceles", "rhombus", "kite"].includes(shape) && (
+                        <>
+                          {["ABCD", "KLMN", "PQRS"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {shape === "circle" && (
+                        <>
+                          {["O, A, B", "P, A, B"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                handleLabelChange("vertices", p);
+                                setShowVertices(true);
+                              }}
+                              className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold transition-all border ${
+                                labels.vertices === p
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-slate-600 hover:bg-indigo-100 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase border-b border-gray-100 dark:border-slate-700 pb-1">
@@ -1166,6 +1388,7 @@ export const GeometryModal: React.FC<GeometryModalProps> = ({
                       showAngles,
                       simulate,
                       showLines,
+                      showVertices,
                     ),
                   }}
                 />

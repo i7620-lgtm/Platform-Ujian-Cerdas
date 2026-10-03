@@ -90,8 +90,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
            - Kerucut + Setengah Bola (es krim cone): [GEOMETRY:combined_cone_hemisphere:{"radius":"7 cm","height":"12 cm"}]
            - Balok + Limas (tugu monumen): [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
       * JIKA pengguna meminta materi bangun tertentu (misal: "Tabung", "Kubus", "Prisma Segitiga", "Kerucut", atau "Bola"), AI WAJIB membuat soal mengenai bangun tersebut dan DILARANG MENGGANTINYA menjadi balok dan limas!
+      * NAMA TITIK SUDUT DAN SUDUT BANGUN (SANGAT DIANJURKAN UNTUK KEJELASAN):
+        Anda BISA dan SANGAT DIANJURKAN menambahkan field 'vertices' (nama titik sudut bangun) dan/atau sudut ('angleA', 'angleB', 'angleC') pada tag [GEOMETRY:...] untuk memperjelas konteks soal:
+        - Kubus ABCD.EFGH: [GEOMETRY:cube:{"side":"10 cm","vertices":"ABCD.EFGH"}]
+        - Balok KLMN.OPQR: [GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"KLMN.OPQR"}]
+        - Limas T.ABCD: [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm","vertices":"T.ABCD"}]
+        - Prisma ABC.DEF: [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm","vertices":"ABC.DEF"}]
+        - Segitiga ABC: [GEOMETRY:triangle:{"bottom":"12 cm","left":"10 cm","right":"10 cm","vertices":"ABC","angleA":"60°","angleB":"60°"}]
+        - Persegi Panjang ABCD: [GEOMETRY:rectangle:{"width":"14 cm","height":"8 cm","vertices":"ABCD"}]
       Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
-      * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm"}]
+      * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm","vertices":"ABCD.EFGH"}]
       * Kubus: [GEOMETRY:cube:{"side":"8 cm"}]
       * Tabung: [GEOMETRY:cylinder:{"radius":"7 cm","height":"14 cm"}]
       * Kerucut: [GEOMETRY:cone:{"radius":"7 cm","height":"24 cm"}]
@@ -100,7 +108,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       * Bangun Gabungan Balok + Limas: [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
       * Bangun Gabungan Tabung + Kerucut: [GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]
       * Bangun Gabungan Balok + Atap Prisma: [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
-    - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks. Khusus untuk diagram venn himpunan, gunakan 'labels' untuk nama-nama himpunan (contoh: ["A", "B"] atau ["A", "B", "C"]) dan 'datasets.data' untuk nilainya. Untuk 2 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Irisan A & B, Di Luar Himpunan, Semesta]. Untuk 3 himpunan, urutan nilai adalah: [Hanya A, Hanya B, Hanya C, Irisan A&B, Irisan A&C, Irisan B&C, Irisan A&B&C, Di Luar Himpunan, Semesta]. Khusus untuk relasi/fungsi (relation), gunakan 'labels' untuk nama himpunan (contoh: ["A", "B"]). 'datasets' ke-0 berisi data anggota domain (e.g. data: ["1", "2"]). 'datasets' ke-1 berisi data anggota kodomain. 'datasets' ke-2 berisi relasi dengan format "indexDomain-indexKodomain" (contoh: ["0-1", "1-2"]). Khusus diagram kartesius (cartesian), Anda WAJIB menyertakan field 'cartesianConfig' yang berisi 'xMin', 'xMax', 'yMin', 'yMax', 'xStep', dan 'yStep'. Dan 'datasets' berisi array of object dengan 'label' (UNTUK NAMA GARIS JIKA ADA), 'showLine' (boolean), serta titiknya ATAU fungsi matematikanya. JIKA fungsi matematika, beri property 'isFunction': true and 'functionStr' (misal "x^2 - 2x + 1" atau "2x" dalam sintaks JS/Matematika dasar). JIKA titik manual, beri property 'data' berupa array of object {x: number, y: number}.
+    - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
+      * Diagram Venn: gunakan 'labels' untuk nama himpunan (["A", "B"] atau ["A", "B", "C"]). 'datasets.data' berisi nilai area (Hanya A, Hanya B, Irisan A&B, Di Luar, Semesta).
+      * Relasi/Fungsi: 'datasets'[0] = anggota Domain, 'datasets'[1] = Kodomain, 'datasets'[2] = pasangan "indexDomain-indexKodomain".
+      * Diagram Kartesius (Cartesian): Anda WAJIB menyertakan 'cartesianConfig': {"xMin": -10, "xMax": 10, "yMin": -10, "yMax": 10, "xStep": 1, "yStep": 1}. Field 'datasets' berisi array elemen yang ingin digambar:
+        1. Bangun Datar / Poligon Geometri (Segitiga, Persegi, Trapesium): {"label": "Segitiga ABC", "kind": "polygon", "isPolygon": true, "fillColor": "rgba(37,99,235,0.25)", "backgroundColor": ["#2563eb"], "borderColor": ["#2563eb"], "data": [{"x": 1, "y": 1, "label": "A"}, {"x": 5, "y": 1, "label": "B"}, {"x": 3, "y": 4, "label": "C"}]}
+        2. Ruas Garis / Sinar / Vektor: {"label": "Garis g", "kind": "line", "showLine": true, "showArrows": true, "lineStyle": "solid", "backgroundColor": ["#dc2626"], "data": [{"x": -2, "y": -1, "label": "P"}, {"x": 4, "y": 3, "label": "Q"}]}
+        3. Titik Koordinat: {"label": "Titik Koordinat", "kind": "point", "showLine": false, "data": [{"x": 2, "y": 3, "label": "A(2,3)", "pointStyle": "solid"}, {"x": -3, "y": 1, "label": "B(-3,1)", "pointStyle": "hollow"}]}
+        4. Kurva Fungsi f(x): {"label": "f(x) = x^2 - 4", "kind": "function", "isFunction": true, "functionStr": "x^2 - 4", "backgroundColor": ["#7c3aed"], "data": []}
+        5. Lingkaran: {"label": "Lingkaran", "kind": "circle", "isCircle": true, "circleRadius": 4, "fillColor": "rgba(8,145,178,0.2)", "data": [{"x": 0, "y": 0, "label": "P(0,0)"}]}
     - INSTRUKSI KHUSUS DALAM KURUNG: Jika dalam referensi materi / kisi-kisi terdapat instruksi yang diapit dengan tanda kurung biasa '()' atau kurung siku '[]' (misal: "(sertakan diagram lingkaran)", "(sertakan tabel frekuensi)", atau "[sertakan gambar...]"), Anda WAJIB mematuhinya!
       * Jika diminta tabel: Buatlah tabel menggunakan format tabel Markdown murni.
       * Jika diminta diagram/grafik: Anda WAJIB mengisi property 'chartData' sesuai jenis diagram (bar/line/pie/venn/relation).

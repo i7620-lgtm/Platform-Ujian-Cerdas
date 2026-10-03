@@ -167,9 +167,9 @@ function buildGeometryFallbackQuestion(args: {
       essayAnswer: "L_alas = 22/7 × 7² = 154 cm². Volume = L_alas × tinggi = 154 × 20 = 3.080 cm³."
     },
     cube: {
-      tag: `[GEOMETRY:cube:{"side":"12 cm"}]`,
-      lead: `Perhatikan gambar wadah penyimpanan berbentuk kubus berikut:`,
-      detail: `<p>[GEOMETRY:cube:{"side":"12 cm"}]</p><p>Sebuah kotak wadah berbentuk kubus memiliki panjang rusuk 12 cm. Berapakah volume kotak kubus tersebut?</p>`,
+      tag: `[GEOMETRY:cube:{"side":"12 cm","vertices":"ABCD.EFGH"}]`,
+      lead: `Perhatikan gambar wadah penyimpanan berbentuk kubus ABCD.EFGH berikut:`,
+      detail: `<p>[GEOMETRY:cube:{"side":"12 cm","vertices":"ABCD.EFGH"}]</p><p>Sebuah kotak wadah berbentuk kubus ABCD.EFGH memiliki panjang rusuk 12 cm. Berapakah volume kotak kubus tersebut?</p>`,
       kisi: `Disajikan stimulus visual bangun ruang kubus dengan panjang rusuk tertentu, peserta didik dapat menghitung volume kubus dengan benar.`,
       unitAns: "1.728 cm³",
       options: ["1.728 cm³", "1.440 cm³", "864 cm³", "576 cm³"],
@@ -195,9 +195,9 @@ function buildGeometryFallbackQuestion(args: {
       essayAnswer: "Volume Kubus = s × s × s = 12 × 12 × 12 = 1.728 cm³."
     },
     cuboid: {
-      tag: `[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm"}]`,
-      lead: `Perhatikan gambar kotak kemasan makanan berbentuk balok berikut:`,
-      detail: `<p>[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm"}]</p><p>Sebuah kotak kemasan memiliki ukuran panjang 15 cm, lebar 8 cm, dan tinggi 10 cm. Berapakah volume kotak kemasan tersebut?</p>`,
+      tag: `[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"ABCD.EFGH"}]`,
+      lead: `Perhatikan gambar kotak kemasan makanan berbentuk balok ABCD.EFGH berikut:`,
+      detail: `<p>[GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"ABCD.EFGH"}]</p><p>Sebuah kotak kemasan memiliki ukuran panjang 15 cm, lebar 8 cm, dan tinggi 10 cm. Berapakah volume kotak kemasan tersebut?</p>`,
       kisi: `Disajikan stimulus bangun ruang balok dengan ukuran dimensi panjang, lebar, dan tinggi, peserta didik dapat menentukan volume balok dengan cermat.`,
       unitAns: "1.200 cm³",
       options: ["1.200 cm³", "1.120 cm³", "960 cm³", "800 cm³"],

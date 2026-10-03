@@ -93,6 +93,72 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     uniqueSchoolsInResults,
   } = useOngoingExamModal({ exam, teacherProfile, onClose, isPremium });
 
+  // Auto-scroll student list table in live monitoring (smooth top-to-bottom and bottom-to-top)
+  const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(true);
+  const [isInteracting, setIsInteracting] = React.useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const isHoveredRef = React.useRef(false);
+  const animFrameRef = React.useRef<number | null>(null);
+  const lastTimeRef = React.useRef<number | null>(null);
+  const directionRef = React.useRef<"down" | "up">("down");
+  const pauseUntilRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || !autoScrollEnabled) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      return;
+    }
+
+    lastTimeRef.current = performance.now();
+    pauseUntilRef.current = performance.now() + 1500; // brief initial reading pause
+
+    const speed = 26; // comfortable, gentle scrolling speed (px/sec)
+
+    const step = (now: number) => {
+      if (!lastTimeRef.current) lastTimeRef.current = now;
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1);
+      lastTimeRef.current = now;
+
+      if (autoScrollEnabled && !isHoveredRef.current && el) {
+        const maxScroll = el.scrollHeight - el.clientHeight;
+        if (maxScroll > 15) {
+          if (now >= pauseUntilRef.current) {
+            if (directionRef.current === "down") {
+              el.scrollTop += speed * dt;
+              if (el.scrollTop >= maxScroll - 1) {
+                el.scrollTop = maxScroll;
+                directionRef.current = "up";
+                pauseUntilRef.current = now + 2000; // pause 2s at bottom
+              }
+            } else {
+              el.scrollTop -= speed * dt;
+              if (el.scrollTop <= 1) {
+                el.scrollTop = 0;
+                directionRef.current = "down";
+                pauseUntilRef.current = now + 2000; // pause 2s at top
+              }
+            }
+          }
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(step);
+    };
+
+    animFrameRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
+  }, [autoScrollEnabled, sortedResults]);
+
   if (!displayExam) return null;
 
   return createPortal(
@@ -318,8 +384,34 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
           {/* Content Section */}
           <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-6 font-sans">
             {/* Main Student List Board */}
-            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex-1 overflow-hidden flex flex-col">
-              <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div
+                ref={scrollContainerRef}
+                onMouseEnter={() => {
+                  isHoveredRef.current = true;
+                  setIsInteracting(true);
+                }}
+                onMouseLeave={() => {
+                  isHoveredRef.current = false;
+                  setIsInteracting(false);
+                  lastTimeRef.current = performance.now();
+                  pauseUntilRef.current = performance.now() + 1000;
+                }}
+                onTouchStart={() => {
+                  isHoveredRef.current = true;
+                  setIsInteracting(true);
+                }}
+                onTouchEnd={() => {
+                  isHoveredRef.current = false;
+                  setIsInteracting(false);
+                  lastTimeRef.current = performance.now();
+                  pauseUntilRef.current = performance.now() + 1000;
+                }}
+                onWheel={() => {
+                  pauseUntilRef.current = performance.now() + 2500;
+                }}
+                className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar"
+              >
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10">
                     <tr>
@@ -601,8 +693,47 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                   </tbody>
                 </table>
               </div>
-              <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex justify-between items-center sticky bottom-0">
-                <span>Total: {totalScopedCount} Siswa</span>
+              <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-medium flex flex-wrap justify-between items-center gap-2 sticky bottom-0">
+                <div className="flex items-center gap-3">
+                  <span>Total: {totalScopedCount} Siswa</span>
+                  {sortedResults.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setAutoScrollEnabled(!autoScrollEnabled)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-bold transition-all shadow-xs ${
+                        autoScrollEnabled
+                          ? isInteracting
+                            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+                            : "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
+                          : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                      }`}
+                      title={
+                        autoScrollEnabled
+                          ? isInteracting
+                            ? "Auto-scroll dijeda otomatis karena kursor berada di atas tabel"
+                            : "Auto-scroll sedang aktif (akan otomatis berhenti jika kursor diarahkan)"
+                          : "Klik untuk mengaktifkan auto-scroll"
+                      }
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          autoScrollEnabled
+                            ? isInteracting
+                              ? "bg-amber-500"
+                              : "bg-indigo-500 animate-pulse"
+                            : "bg-slate-400"
+                        }`}
+                      ></span>
+                      <span>
+                        {autoScrollEnabled
+                          ? isInteracting
+                            ? "Auto-Scroll: Jeda (Kursor Aktif)"
+                            : "Auto-Scroll: Aktif"
+                          : "Auto-Scroll: Nonaktif"}
+                      </span>
+                    </button>
+                  )}
+                </div>
                 <span>Updated: {new Date().toLocaleTimeString()}</span>
               </div>
             </div>

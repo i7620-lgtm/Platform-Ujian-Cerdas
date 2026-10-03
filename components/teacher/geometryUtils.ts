@@ -7,11 +7,51 @@ export const extractNum = (val: any, defaultVal: number): number => {
   return isNaN(num) || num <= 0 ? defaultVal : num;
 };
 
+// Helper: Parse vertex letters string/array into uppercase letter list
+export const parseVertexLetters = (raw: any, defaultLetters: string[] = []): string[] => {
+  if (!raw) return defaultLetters;
+  if (Array.isArray(raw)) {
+    const arr = raw.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+    return arr.length > 0 ? arr.concat(defaultLetters.slice(arr.length)) : defaultLetters;
+  }
+  let str = String(raw).trim();
+  if (!str) return defaultLetters;
+
+  // Remove common Indonesian shape prefix words (e.g. "Kubus ABCD.EFGH" -> "ABCD.EFGH", "Limas T.ABCD" -> "T.ABCD", "Prisma ABC.DEF" -> "ABC.DEF")
+  str = str.replace(/^(kubus|balok|limas|prisma|segitiga|persegi\s+panjang|persegi|trapesium|jajargenjang|belah\s+ketupat|layang-layang|lingkaran|tabung|kerucut|bangun|titik|sudut)\s+/i, "").trim();
+
+  // If separated by commas, semicolons, or dashes (e.g. "A, B, C, D" or "A-B-C-D")
+  if (str.includes(",") || str.includes(";") || str.includes("-")) {
+    const parts = str.split(/[-,;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (parts.length > 0) {
+      return parts.concat(defaultLetters.slice(parts.length));
+    }
+  }
+
+  // If separated by spaces and parts are short identifiers (e.g. "A B C D" or "O1 O2 A B")
+  if (str.includes(" ")) {
+    const parts = str.split(/\s+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (parts.length > 1 && parts.every((p) => p.length <= 4)) {
+      return parts.concat(defaultLetters.slice(parts.length));
+    }
+  }
+
+  // Dot notation like "ABCD.EFGH" or "T.ABCD" or "ABC.DEF" or plain letters like "ABCD"
+  const letters = str.replace(/[^A-Za-z0-9_]/g, "").split("").map((s) => s.toUpperCase()).filter(Boolean);
+  if (letters.length > 0) {
+    return letters.concat(defaultLetters.slice(letters.length));
+  }
+
+  return defaultLetters;
+};
+
 export const normalizeLabels = (raw: any = {}): any => {
   if (!raw || typeof raw !== "object") return {};
   const l: any = { ...raw };
 
   // Indonesian / English aliases normalization
+  const verticesVal = l.vertices ?? l.titik ?? l.titik_sudut ?? l.vertex_labels ?? l.nama ?? l.nama_bangun ?? l.titikSudut ?? l.namaTitik ?? l.nama_titik;
+  const anglesVal = l.showAngles ?? l.tampilkanSudut ?? l.tampilkan_sudut;
   const widthVal = l.width ?? l.panjang ?? l.length ?? l.p ?? l.bottom_width ?? l.bottom ?? l.w;
   const heightVal = l.height ?? l.tinggi ?? l.t ?? l.h;
   const depthVal = l.depth ?? l.lebar ?? l.l ?? l.tebal ?? l.tebal_balok ?? l.bottom_depth ?? l.d;
@@ -35,6 +75,10 @@ export const normalizeLabels = (raw: any = {}): any => {
   const cylinderHeightVal = l.cylinderHeight ?? l.cylinder_height ?? l.tinggi_tabung ?? l.bottom_height ?? l.height ?? l.tinggi ?? l.h;
   const coneHeightVal = l.coneHeight ?? l.cone_height ?? l.tinggi_kerucut ?? l.top_height ?? l.height ?? l.tinggi ?? l.h;
   const roofHeightVal = l.roof_height ?? l.roofHeight ?? l.tinggi_atap ?? l.tinggi_prisma ?? l.top_height;
+
+  if (verticesVal !== undefined && l.vertices === undefined) l.vertices = String(verticesVal).trim();
+  if (l.showVertices === undefined && Boolean(verticesVal)) l.showVertices = true;
+  if (anglesVal !== undefined && l.showAngles === undefined) l.showAngles = Boolean(anglesVal);
 
   if (widthVal !== undefined && l.width === undefined) l.width = widthVal;
   if (heightVal !== undefined && l.height === undefined) l.height = heightVal;
@@ -164,10 +208,27 @@ export const generateGeometrySVG = (
   showAngles: boolean = false,
   simulate: boolean = false,
   showLines: boolean = true,
+  showVertices: boolean = false,
 ) => {
   if (!labels) labels = {};
   labels = normalizeLabels(labels);
   shape = normalizeShapeName(shape);
+
+  const shouldShowVertices =
+    showVertices ||
+    Boolean(labels.showVertices) ||
+    Boolean(labels.vertices) ||
+    Boolean(labels.titik) ||
+    Boolean(labels.namaTitik);
+
+  const shouldShowAngles =
+    showAngles ||
+    Boolean(labels.showAngles) ||
+    Boolean(labels.angleA) ||
+    Boolean(labels.angleB) ||
+    Boolean(labels.angleC) ||
+    Boolean(labels.angleD) ||
+    Boolean(labels.angle);
 
   let vMinX = 0,
     vMinY = 0,
@@ -193,24 +254,46 @@ export const generateGeometrySVG = (
     return s;
   };
 
-  // Render vertex dot with letter (e.g. A, B, C, D, T)
-  const drawVertex = (x: number, y: number, letter?: string, pos: "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right" = "top-left") => {
-    let out = `<circle cx="${Math.round(x)}" cy="${Math.round(y)}" r="2.5" fill="${strokeColor}" />`;
+  // Render vertex dot with letter (e.g. A, B, C, D, T) with clear halo outline
+  const drawVertex = (
+    x: number,
+    y: number,
+    letter?: string,
+    pos: "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right" = "top-left",
+    radius: number = 3.2
+  ) => {
+    let out = `<circle cx="${Math.round(x)}" cy="${Math.round(y)}" r="${radius}" fill="${strokeColor}" stroke="#ffffff" stroke-width="1.2" />`;
     if (letter && String(letter).trim()) {
       let ox = 0, oy = 0;
       switch (pos) {
-        case "top": oy = -10; break;
-        case "bottom": oy = 11; break;
-        case "left": ox = -10; break;
-        case "right": ox = 10; break;
-        case "top-left": ox = -9; oy = -9; break;
-        case "top-right": ox = 9; oy = -9; break;
-        case "bottom-left": ox = -9; oy = 9; break;
-        case "bottom-right": ox = 9; oy = 9; break;
+        case "top": oy = -12; break;
+        case "bottom": oy = 13; break;
+        case "left": ox = -13; break;
+        case "right": ox = 13; break;
+        case "top-left": ox = -11; oy = -11; break;
+        case "top-right": ox = 11; oy = -11; break;
+        case "bottom-left": ox = -11; oy = 11; break;
+        case "bottom-right": ox = 11; oy = 11; break;
       }
-      out += `<text x="${Math.round(x + ox)}" y="${Math.round(y + oy)}" fill="${strokeColor}" font-size="11" font-weight="800" font-family="system-ui, -apple-system, sans-serif" text-anchor="middle" dominant-baseline="central">${letter}</text>`;
+      out += `<text x="${Math.round(x + ox)}" y="${Math.round(y + oy)}" fill="${strokeColor}" font-size="11.5" font-weight="800" font-family="system-ui, -apple-system, sans-serif" text-anchor="middle" dominant-baseline="central" style="paint-order: stroke fill; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round;">${letter}</text>`;
     }
     return out;
+  };
+
+  // Render angle arc indicator at vertex
+  const drawAngleArc = (
+    cx: number,
+    cy: number,
+    startAngleRad: number,
+    endAngleRad: number,
+    radius: number = 14
+  ) => {
+    const x1 = Math.round(cx + radius * Math.cos(startAngleRad));
+    const y1 = Math.round(cy + radius * Math.sin(startAngleRad));
+    const x2 = Math.round(cx + radius * Math.cos(endAngleRad));
+    const y2 = Math.round(cy + radius * Math.sin(endAngleRad));
+    const largeArc = Math.abs(endAngleRad - startAngleRad) > Math.PI ? 1 : 0;
+    return `<path d="M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="${strokeColor}" stroke-width="1.2" stroke-linecap="round"/>`;
   };
 
   let svgBody = "";
@@ -252,6 +335,13 @@ export const generateGeometrySVG = (
         if (labels.left) svgBody += drawLabel(ox - 16, oy - h / 2, labels.left);
         if (labels.hypotenuse || labels.right) svgBody += drawLabel(ox + w / 2 + 14, oy - h / 2 - 10, labels.hypotenuse || labels.right);
       }
+
+      if (shouldShowVertices) {
+        const v = parseVertexLetters(labels.vertices, ["A", "B", "C"]);
+        svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
+        svgBody += drawVertex(ox + w, oy, v[1] || "B", "bottom-right");
+        svgBody += drawVertex(ox, oy - h, v[2] || "C", "top-left");
+      }
     } else {
       const cp = (a * a + b * b - c * c) / (2 * a);
       const hp = Math.sqrt(Math.max(0, b * b - cp * cp)) || 90;
@@ -276,11 +366,19 @@ export const generateGeometrySVG = (
         if (labels.left) svgBody += drawLabel(ox + dx / 2 - 16, oy - dh / 2, labels.left);
         if (labels.right) svgBody += drawLabel(ox + (dw + dx) / 2 + 16, oy - dh / 2, labels.right);
       }
+
+      if (shouldShowVertices) {
+        const v = parseVertexLetters(labels.vertices, ["A", "B", "C"]);
+        svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
+        svgBody += drawVertex(ox + dw, oy, v[1] || "B", "bottom-right");
+        svgBody += drawVertex(ox + dx, oy - dh, v[2] || "C", "top");
+      }
     }
 
-    if (showAngles) {
+    if (shouldShowAngles) {
       if (labels.angleA) svgBody += drawLabel(ox + 18, oy - 12, labels.angleA, true);
-      if (labels.angleB) svgBody += drawLabel(ox + 90, oy - 12, labels.angleB, true);
+      if (labels.angleB) svgBody += drawLabel(ox + (isRight ? 130 : 90), oy - 12, labels.angleB, true);
+      if (labels.angleC) svgBody += drawLabel(ox + (isRight ? 18 : 50), oy - (isRight ? 80 : 70), labels.angleC, true);
     }
   } else if (shape === "square" || shape === "rectangle") {
     const isSquare = shape === "square";
@@ -298,6 +396,21 @@ export const generateGeometrySVG = (
     if (showLines) {
       if (labels.width || labels.side) svgBody += drawLabel(ox + w / 2, oy + h + 16, labels.width || labels.side);
       if (labels.height && !isSquare) svgBody += drawLabel(ox - 18, oy + h / 2, labels.height);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D"]);
+      svgBody += drawVertex(ox, oy + h, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + w, oy + h, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + w, oy, v[2] || "C", "top-right");
+      svgBody += drawVertex(ox, oy, v[3] || "D", "top-left");
+    }
+
+    if (shouldShowAngles) {
+      if (labels.angleA) svgBody += drawLabel(ox + 16, oy + h - 16, labels.angleA, true);
+      if (labels.angleB) svgBody += drawLabel(ox + w - 16, oy + h - 16, labels.angleB, true);
+      if (labels.angleC) svgBody += drawLabel(ox + w - 16, oy + 16, labels.angleC, true);
+      if (labels.angleD) svgBody += drawLabel(ox + 16, oy + 16, labels.angleD, true);
     }
   } else if (shape === "parallelogram") {
     let base = extractNum(labels.base || labels.width, 110);
@@ -321,6 +434,21 @@ export const generateGeometrySVG = (
     if (showLines) {
       if (labels.base || labels.bottom) svgBody += drawLabel(ox + base / 2, oy + height + 16, labels.base || labels.bottom);
       if (labels.side || labels.left) svgBody += drawLabel(ox + offset / 2 - 16, oy + height / 2, labels.side || labels.left);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D"]);
+      svgBody += drawVertex(ox, oy + height, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + base, oy + height, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + base + offset, oy, v[2] || "C", "top-right");
+      svgBody += drawVertex(ox + offset, oy, v[3] || "D", "top-left");
+    }
+
+    if (shouldShowAngles) {
+      if (labels.angleA) svgBody += drawLabel(ox + 16, oy + height - 14, labels.angleA, true);
+      if (labels.angleB) svgBody += drawLabel(ox + base - 16, oy + height - 14, labels.angleB, true);
+      if (labels.angleC) svgBody += drawLabel(ox + base + offset - 16, oy + 14, labels.angleC, true);
+      if (labels.angleD) svgBody += drawLabel(ox + offset + 16, oy + 14, labels.angleD, true);
     }
   } else if (shape === "trapezoid" || shape === "trapezoid_isosceles" || shape === "trapezoid_right") {
     const isRight = shape === "trapezoid_right";
@@ -352,6 +480,21 @@ export const generateGeometrySVG = (
       if (labels.left) svgBody += drawLabel(ox + dif / 2 - 16, oy + h / 2, labels.left);
       if (labels.right) svgBody += drawLabel(ox + a - dif / 2 + 16, oy + h / 2, labels.right);
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D"]);
+      svgBody += drawVertex(ox, oy + h, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + a, oy + h, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + a - (isRight ? a - b : dif), oy, v[2] || "C", "top-right");
+      svgBody += drawVertex(ox + dif, oy, v[3] || "D", "top-left");
+    }
+
+    if (shouldShowAngles) {
+      if (labels.angleA) svgBody += drawLabel(ox + 16, oy + h - 14, labels.angleA, true);
+      if (labels.angleB) svgBody += drawLabel(ox + a - 16, oy + h - 14, labels.angleB, true);
+      if (labels.angleC) svgBody += drawLabel(ox + a - (isRight ? a - b : dif) - 14, oy + 14, labels.angleC, true);
+      if (labels.angleD) svgBody += drawLabel(ox + dif + 14, oy + 14, labels.angleD, true);
+    }
   } else if (shape === "rhombus" || shape === "kite") {
     let d1 = extractNum(labels.d1, 120);
     let d2 = extractNum(labels.d2, 90);
@@ -376,6 +519,21 @@ export const generateGeometrySVG = (
       if (labels.d2) svgBody += drawLabel(110 + 16, 110 - d2 / 4, labels.d2);
       if (labels.side) svgBody += drawLabel(110 + d1 / 4 + 14, 110 - d2 / 4 - 8, labels.side);
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D"]);
+      svgBody += drawVertex(110, 110 - d2 / 2, v[0] || "A", "top");
+      svgBody += drawVertex(110 + d1 / 2, 110 + yOffset, v[1] || "B", "right");
+      svgBody += drawVertex(110, 110 + d2 / 2, v[2] || "C", "bottom");
+      svgBody += drawVertex(110 - d1 / 2, 110 + yOffset, v[3] || "D", "left");
+    }
+
+    if (shouldShowAngles) {
+      if (labels.angleA) svgBody += drawLabel(110, 110 - d2 / 2 + 16, labels.angleA, true);
+      if (labels.angleB) svgBody += drawLabel(110 + d1 / 2 - 16, 110 + yOffset, labels.angleB, true);
+      if (labels.angleC) svgBody += drawLabel(110, 110 + d2 / 2 - 16, labels.angleC, true);
+      if (labels.angleD) svgBody += drawLabel(110 - d1 / 2 + 16, 110 + yOffset, labels.angleD, true);
+    }
   } else if (shape === "circle") {
     let r = extractNum(labels.radius, 58);
     if (labels.diameter) r = extractNum(labels.diameter, r * 2) / 2;
@@ -392,6 +550,17 @@ export const generateGeometrySVG = (
         svgBody += drawLabel(110 + r / 2, 110 - 12, labels.radius);
       }
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["O", "A", "B"]);
+      svgBody += drawVertex(110, 110, v[0] || "O", "top-left");
+      if (labels.diameter) {
+        svgBody += drawVertex(110 - r, 110, v[1] || "A", "left");
+        svgBody += drawVertex(110 + r, 110, v[2] || "B", "right");
+      } else {
+        svgBody += drawVertex(110 + r, 110, v[1] || "A", "right");
+      }
+    }
   } else if (shape === "polygon") {
     let n = parseInt(labels.nSides) || 6;
     n = Math.max(3, Math.min(12, n));
@@ -404,6 +573,28 @@ export const generateGeometrySVG = (
     svgBody += `<polygon points="${pts.join(" ")}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="round"/>`;
     if (showLines && labels.side) {
       svgBody += drawLabel(110, 110 + r + 16, labels.side);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A","B","C","D","E","F","G","H","I","J","K","L"]);
+      for (let i = 0; i < n; i++) {
+        const angle = (i * 2 * Math.PI) / n - Math.PI / 2;
+        const px = 110 + r * Math.cos(angle);
+        const py = 110 + r * Math.sin(angle);
+        let pos: any = "top";
+        if (Math.abs(Math.sin(angle)) < 0.25) {
+          pos = Math.cos(angle) > 0 ? "right" : "left";
+        } else if (Math.sin(angle) > 0) {
+          pos = Math.cos(angle) > 0.3 ? "bottom-right" : Math.cos(angle) < -0.3 ? "bottom-left" : "bottom";
+        } else {
+          pos = Math.cos(angle) > 0.3 ? "top-right" : Math.cos(angle) < -0.3 ? "top-left" : "top";
+        }
+        svgBody += drawVertex(px, py, v[i] || String.fromCharCode(65 + i), pos);
+      }
+    }
+
+    if (shouldShowAngles && labels.angle) {
+      svgBody += drawLabel(110, 110, labels.angle, true);
     }
   }
 
@@ -462,20 +653,16 @@ export const generateGeometrySVG = (
     svgBody += `<polygon points="${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.2" fill-opacity="0.65" stroke-linejoin="round"/>`;
 
     // Optional Vertices (Titik Sudut: ABCD.EFGH)
-    if (labels.vertices || labels.titik || labels.showVertices) {
-      const vLetters = typeof labels.vertices === "string" 
-        ? labels.vertices.replace(/[^A-Za-z]/g, "").split("")
-        : Array.isArray(labels.vertices) ? labels.vertices : ["A","B","C","D","E","F","G","H"];
-      if (vLetters.length >= 8) {
-        svgBody += drawVertex(p1.x, p1.y, vLetters[0], "bottom-left");
-        svgBody += drawVertex(p2.x, p2.y, vLetters[1], "bottom-right");
-        svgBody += drawVertex(p6.x, p6.y, vLetters[2], "bottom-right");
-        svgBody += drawVertex(p5.x, p5.y, vLetters[3], "top-left");
-        svgBody += drawVertex(p4.x, p4.y, vLetters[4], "top-left");
-        svgBody += drawVertex(p3.x, p3.y, vLetters[5], "top-right");
-        svgBody += drawVertex(p7.x, p7.y, vLetters[6], "top-right");
-        svgBody += drawVertex(p8.x, p8.y, vLetters[7], "top-left");
-      }
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A","B","C","D","E","F","G","H"]);
+      svgBody += drawVertex(p1.x, p1.y, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(p2.x, p2.y, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(p6.x, p6.y, v[2] || "C", "bottom-right");
+      svgBody += drawVertex(p5.x, p5.y, v[3] || "D", "top-left");
+      svgBody += drawVertex(p4.x, p4.y, v[4] || "E", "top-left");
+      svgBody += drawVertex(p3.x, p3.y, v[5] || "F", "top-right");
+      svgBody += drawVertex(p7.x, p7.y, v[6] || "G", "top-right");
+      svgBody += drawVertex(p8.x, p8.y, v[7] || "H", "top-left");
     }
 
     // Dimensions labels
@@ -536,6 +723,14 @@ export const generateGeometrySVG = (
       }
       if (labels.height) svgBody += drawLabel(cx + rx + 20, 110, labels.height);
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D"]);
+      svgBody += drawVertex(cx, cyTop, v[0] || "A", "top");
+      svgBody += drawVertex(cx + rx, cyTop, v[1] || "B", "right");
+      svgBody += drawVertex(cx, cyBase, v[2] || "C", "bottom");
+      svgBody += drawVertex(cx + rx, cyBase, v[3] || "D", "right");
+    }
   } else if (shape === "cone") {
     let r = extractNum(labels.radius, 48);
     if (labels.diameter) r = extractNum(labels.diameter, r * 2) / 2;
@@ -576,6 +771,16 @@ export const generateGeometrySVG = (
         svgBody += drawLabel(cx + rx / 2 + 18, 110 - h / 4, labels.slant || labels.side || labels.garisPelukis);
       }
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["T", "O", "A", "B"]);
+      svgBody += drawVertex(cx, cyApex, v[0] || "T", "top");
+      svgBody += drawVertex(cx, cyBase, v[1] || "O", "bottom");
+      svgBody += drawVertex(cx + rx, cyBase, v[2] || "A", "bottom-right");
+      if (v[3] && v[3] !== "B") {
+        svgBody += drawVertex(cx - rx, cyBase, v[3], "bottom-left");
+      }
+    }
   } else if (shape === "sphere") {
     let r = extractNum(labels.radius, 58);
     r = Math.max(30, Math.min(70, r));
@@ -607,6 +812,12 @@ export const generateGeometrySVG = (
 
     if (showLines && (labels.radius || labels.r)) {
       svgBody += drawLabel(cx + r / 2, cy - 12, labels.radius || labels.r);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["O", "A"]);
+      svgBody += drawVertex(cx, cy, v[0] || "O", "top-left");
+      svgBody += drawVertex(cx + r, cy, v[1] || "A", "right");
     }
   } else if (shape === "pyramid") {
     let w = extractNum(labels.side || labels.width || labels.base, 85);
@@ -656,6 +867,32 @@ export const generateGeometrySVG = (
     if (showLines) {
       if (labels.side || labels.width || labels.base) svgBody += drawLabel(ox + w / 2, oy + 16, labels.side || labels.width || labels.base);
       if (labels.height) svgBody += drawLabel(apexX + 16, apexY + h / 2, labels.height);
+    }
+
+    if (shouldShowVertices) {
+      // Standard Indonesian math: Limas T.ABCD
+      let apexLetter = "T";
+      let baseLetters = ["A", "B", "C", "D"];
+      const v = parseVertexLetters(labels.vertices);
+      if (v.length >= 5) {
+        apexLetter = v[0];
+        baseLetters = [v[1], v[2], v[3], v[4]];
+      } else if (v.length === 4) {
+        baseLetters = v;
+      } else if (v.length > 0) {
+        apexLetter = v[0];
+        if (v.length > 1) baseLetters[0] = v[1];
+        if (v.length > 2) baseLetters[1] = v[2];
+        if (v.length > 3) baseLetters[2] = v[3];
+      }
+      svgBody += drawVertex(apexX, apexY, apexLetter, "top");
+      svgBody += drawVertex(p1.x, p1.y, baseLetters[0] || "A", "bottom-left");
+      svgBody += drawVertex(p2.x, p2.y, baseLetters[1] || "B", "bottom-right");
+      svgBody += drawVertex(p3.x, p3.y, baseLetters[2] || "C", "bottom-right");
+      svgBody += drawVertex(p4.x, p4.y, baseLetters[3] || "D", "top-left");
+      if (v.length >= 6 || labels.showCenter) {
+        svgBody += drawVertex(pCenter.x, pCenter.y, v[5] || "O", "bottom");
+      }
     }
   } else if (shape === "prism") {
     // Triangular prism with complete 5 faces & dashed hidden lines
@@ -707,6 +944,17 @@ export const generateGeometrySVG = (
       if (labels.height) svgBody += drawLabel(p3.x - 18, oy - h / 2, labels.height);
       if (labels.depth || labels.length) svgBody += drawLabel(ox + w + dx / 2 + 16, oy - dy / 2 + 6, labels.depth || labels.length);
     }
+
+    if (shouldShowVertices) {
+      // Standard Indonesian math: Prisma ABC.DEF
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D", "E", "F"]);
+      svgBody += drawVertex(p1.x, p1.y, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(p2.x, p2.y, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(p3.x, p3.y, v[2] || "C", "top");
+      svgBody += drawVertex(p4.x, p4.y, v[3] || "D", "top-left");
+      svgBody += drawVertex(p5.x, p5.y, v[4] || "E", "bottom-right");
+      svgBody += drawVertex(p6.x, p6.y, v[5] || "F", "top-right");
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -737,6 +985,15 @@ export const generateGeometrySVG = (
       if (labels.rectHeight || labels.bottom_height) svgBody += drawLabel(ox - 18, oy - hRect / 2, labels.rectHeight || labels.bottom_height);
       if (labels.triHeight || labels.top_height) svgBody += drawLabel(ox + w / 2 + 18, yRoofBase - hTri / 2, labels.triHeight || labels.top_height);
       if (labels.triSide) svgBody += drawLabel(ox + w * 0.8 + 14, yRoofBase - hTri / 2, labels.triSide);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D", "E"]);
+      svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + w, oy, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + w, yRoofBase, v[2] || "C", "bottom-right");
+      svgBody += drawVertex(ox + w / 2, yApex, v[3] || "D", "top");
+      svgBody += drawVertex(ox, yRoofBase, v[4] || "E", "top-left");
     }
   }
 
@@ -1007,6 +1264,19 @@ export const generateGeometrySVG = (
         svgBody += drawLabel((ox + w + apexX) / 2 + 18, (oy - h1 + apexY) / 2 - 6, formatDim("s", labelSlant));
       }
     }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["T", "A", "B", "C", "D", "E", "F", "G", "H"]);
+      svgBody += drawVertex(apexX, apexY, v[0] || "T", "top");
+      svgBody += drawVertex(ox, oy, v[1] || "A", "bottom-left");
+      svgBody += drawVertex(ox + w, oy, v[2] || "B", "bottom-right");
+      svgBody += drawVertex(ox + w + d, oy - d, v[3] || "C", "bottom-right");
+      svgBody += drawVertex(ox + d, oy - d, v[4] || "D", "top-left");
+      svgBody += drawVertex(ox, oy - h1, v[5] || "E", "top-left");
+      svgBody += drawVertex(ox + w, oy - h1, v[6] || "F", "bottom-right");
+      svgBody += drawVertex(ox + w + d, oy - h1 - d, v[7] || "G", "top-right");
+      svgBody += drawVertex(ox + d, oy - h1 - d, v[8] || "H", "top-left");
+    }
   }
 
   // H. Balok + Prisma Segitiga (Atap Rumah 3D)
@@ -1055,6 +1325,16 @@ export const generateGeometrySVG = (
       if (lH1) svgBody += drawLabel(ox - 20, oy - h1 / 2, formatDim("t", lH1));
       if (lH2) svgBody += drawLabel(ridgeFrontX, ridgeFrontY - 9, formatDim("t_atap", lH2));
       if (lD) svgBody += drawLabel(ox + w + d / 2 + 18, oy - d / 2 + 8, formatDim("l", lD));
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D", "E", "F"]);
+      svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + w, oy, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + w + d, oy - d, v[2] || "C", "bottom-right");
+      svgBody += drawVertex(ox + d, oy - d, v[3] || "D", "top-left");
+      svgBody += drawVertex(ridgeFrontX, ridgeFrontY, v[4] || "E", "top");
+      svgBody += drawVertex(ridgeBackX, ridgeFrontY - d * 0.4, v[5] || "F", "top-right");
     }
   }
 
@@ -1181,6 +1461,16 @@ export const generateGeometrySVG = (
       if (labels.left) svgBody += drawLabel(ox - 18, oy - h2 / 2, labels.left);
       if (labels.right_bottom) svgBody += drawLabel(ox + w1 + 18, oy - h1 / 2, labels.right_bottom);
       if (labels.top) svgBody += drawLabel(ox + w2 / 2, oy - h2 - 14, labels.top);
+    }
+
+    if (shouldShowVertices) {
+      const v = parseVertexLetters(labels.vertices, ["A", "B", "C", "D", "E", "F"]);
+      svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
+      svgBody += drawVertex(ox + w1, oy, v[1] || "B", "bottom-right");
+      svgBody += drawVertex(ox + w1, oy - h1, v[2] || "C", "bottom-right");
+      svgBody += drawVertex(ox + w2, oy - h1, v[3] || "D", "top-left");
+      svgBody += drawVertex(ox + w2, oy - h2, v[4] || "E", "top-right");
+      svgBody += drawVertex(ox, oy - h2, v[5] || "F", "top-left");
     }
   }
 
