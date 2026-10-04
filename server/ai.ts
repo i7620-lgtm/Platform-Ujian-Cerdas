@@ -28,8 +28,7 @@ export const FLASH_MODELS_CASCADE = [
     'gemini-3.8-flash',
     'gemini-2.5-flash',
     'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
-    'gemini-2.5-flash-lite'
+    'gemini-3.1-flash-lite'
 ];
 
 export async function generateAIAnalysisOnServer(prompt: string): Promise<string> {
@@ -254,23 +253,53 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
             attempts++;
             try {
                 console.log(`Mencoba membuat soal menggunakan model: ${currentModel} (Percobaan ${attempts}/${maxAttempts})`);
-                response = await ai.models.generateContent({
-                  model: currentModel,
-                  contents: prompt,
-                  config: {
-                    systemInstruction: systemInstruction,
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: properties,
-                        required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category"]
-                      },
+                const configObj: any = {
+                  systemInstruction: systemInstruction,
+                  temperature: 0.2,
+                  responseMimeType: "application/json"
+                };
+
+                // Use clean, flat top-level schema to ensure 100% compatibility across all Gemini models
+                configObj.responseSchema = {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      questionType: { type: Type.STRING },
+                      questionText: { type: Type.STRING },
+                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      correctAnswer: { type: Type.STRING },
+                      scoreWeight: { type: Type.NUMBER },
+                      kisiKisi: { type: Type.STRING },
+                      level: { type: Type.STRING },
+                      category: { type: Type.STRING },
+                      explanation: { type: Type.STRING }
                     },
-                  },
-                });
+                    required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category"]
+                  }
+                };
+
+                try {
+                  response = await ai.models.generateContent({
+                    model: currentModel,
+                    contents: prompt,
+                    config: configObj,
+                  });
+                } catch (schemaErr: any) {
+                  const schemaErrMsg = schemaErr?.message?.toLowerCase() || "";
+                  if (schemaErr?.status === 400 || schemaErrMsg.includes("invalid argument") || schemaErrMsg.includes("schema")) {
+                    delete configObj.responseSchema;
+                    response = await ai.models.generateContent({
+                      model: currentModel,
+                      contents: prompt,
+                      config: configObj,
+                    });
+                  } else {
+                    throw schemaErr;
+                  }
+                }
+
                 lastError = null;
                 success = true;
                 break;
