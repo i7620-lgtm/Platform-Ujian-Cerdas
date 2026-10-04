@@ -76,14 +76,28 @@ PANDUAN TATA LETAK & KEJELASAN TEKS SVG (MENCEGAH TEKS BERTUMPUK / TERLEWAT):
   * Gunakan font-family="system-ui, -apple-system, sans-serif".
   * Bahasa Indonesia baku yang jelas, ejaan EYD tepat.`;
 
-      const resp = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: trimmed,
-        config: { systemInstruction, temperature: 0.2 },
-      });
+      const modelsToTry = [
+        'gemini-3.8-flash',
+        'gemini-2.5-flash',
+        'gemini-flash-latest',
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash-lite'
+      ];
 
-      if (resp.text) {
-        return cleanSvgString(resp.text);
+      for (const model of modelsToTry) {
+        try {
+          const resp = await ai.models.generateContent({
+            model,
+            contents: trimmed,
+            config: { systemInstruction, temperature: 0.2 },
+          });
+
+          if (resp.text) {
+            return cleanSvgString(resp.text);
+          }
+        } catch (modelErr) {
+          console.log(`[SVG Client Fallback] Model ${model} unavailable, trying next...`);
+        }
       }
     }
   } catch (clientErr: any) {
