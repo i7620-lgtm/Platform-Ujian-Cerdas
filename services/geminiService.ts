@@ -428,24 +428,27 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       const globalIndex = startIndex + i;
       const assignedType = selectedTypes[globalIndex % selectedTypes.length];
       const assignedDiff = selectedDifficulties[globalIndex % selectedDifficulties.length];
-      slotDistribution.push(`- Soal #${globalIndex + 1}: Bentuk Soal = "${assignedType}", Tingkat Kognitif = "${assignedDiff}"`);
+      const assignedWeight = (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : 1;
+      slotDistribution.push(`- Soal #${globalIndex + 1}: Bentuk Soal = "${assignedType}", Tingkat Kognitif = "${assignedDiff}", Bobot Nilai = ${assignedWeight}${config.category?.trim() ? `, Kategori = "${config.category.trim()}"` : ''}${config.kisiKisi?.trim() ? `, Kisi-Kisi = "${config.kisiKisi.trim()}"` : ''}`);
     }
 
     const userCategoryConstraint = config.category?.trim();
     const userKisiKisiConstraint = config.kisiKisi?.trim();
     const userBlueprintConstraint = config.blueprint?.trim();
+    const userScoreWeightConstraint = config.scoreWeight;
 
     const batchPrompt = `
       ======================================================================
       PERINGATAN PRIORITAS TERTINGGI (HARD CONSTRAINT - MUTLAK DIIKUTI):
-      Pengguna telah menetapkan mata pelajaran, kategori materi, tingkat kognitif (level), dan kisi-kisi soal secara spesifik.
-      Anda DILARANG KERAS membuat soal di luar data yang telah ditetapkan ini!
+      Pengguna telah menetapkan mata pelajaran, kategori materi, tingkat kognitif (level), bobot nilai, jenis soal, dan kisi-kisi soal secara spesifik.
+      Anda DILARANG KERAS membuat soal di luar parameter yang telah ditetapkan ini!
       DILARANG membuat soal tentang topik/materi/konteks acak lain yang tidak diminta!
       
       TARGET PARAMETER WAJIB DARI PENGGUNA:
       - MATA PELAJARAN / MATERI: "${config.subject}"
-      ${userCategoryConstraint ? `- KATEGORI MATERI (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
-      - TINGKAT KOGNITIF (MUTLAK WAJIB SESUAI DISTRIBUSI): Lihat TABEL DISTRIBUSI di bawah.
+      ${userCategoryConstraint ? `- KATEGORI MATERI / SUB-TOPIK (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
+      - TINGKAT KOGNITIF & BENTUK SOAL: Sesuai TABEL DISTRIBUSI di bawah (WAJIB dipatuhi persis).
+      ${userScoreWeightConstraint !== undefined ? `- BOBOT NILAI (SCORE WEIGHT): ${userScoreWeightConstraint}` : ''}
       ${userKisiKisiConstraint ? `- KISI-KISI / INDIKATOR SOAL (MUTLAK WAJIB): "${userKisiKisiConstraint}"` : ''}
       ${userBlueprintConstraint ? `- PANDUAN KISI-KISI & DESKRIPSI RINCI PENGGUNA:\n${userBlueprintConstraint}` : ''}
       ======================================================================
@@ -1265,7 +1268,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             optionCharts: q.optionCharts,
             correctAnswer: String(correctAnswer),
             correctAnswerChart: q.correctAnswerChart,
-            scoreWeight: q.scoreWeight || 1,
+            scoreWeight: (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : (q.scoreWeight || 1),
             kisiKisi: config.kisiKisi?.trim() || specificKisiKisi,
             level: expectedDiff || q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)",
             category: config.category?.trim() || q.category?.trim() || config.subject || "Umum",
