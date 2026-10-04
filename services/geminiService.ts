@@ -537,7 +537,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => {
+        try {
+          controller.abort(new Error("Batas waktu koneksi AI terlampaui. Mengaktifkan Safe Fallback."));
+        } catch (_) {}
+      }, 60000);
 
       const res = await fetch("/api/generate-questions", {
           method: "POST",
@@ -559,11 +563,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       }
       questions = JSON.parse(data.text || "[]");
     } catch (batchErr: any) {
-      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, batchErr?.message);
+      const isAbort = batchErr?.name === "AbortError" || (batchErr?.message && batchErr.message.toLowerCase().includes("aborted"));
+      const cleanReason = isAbort
+        ? "Batas waktu koneksi AI terlampaui (Timeout). Safe Fallback aktif."
+        : (batchErr?.message || "Layanan AI tidak merespons. Safe Fallback Aktif.");
+      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, cleanReason);
       return generateSmartFallbackQuestions({
         ...config,
         count: batchCount,
-      }, batchErr?.message || "Safe Fallback Aktif");
+      }, cleanReason);
     }
 
     // Helper: Cek apakah baris pernyataan Benar/Salah berupa placeholder/dummy
