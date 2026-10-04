@@ -80,8 +80,7 @@ PANDUAN TATA LETAK & KEJELASAN TEKS SVG (MENCEGAH TEKS BERTUMPUK / TERLEWAT):
         'gemini-3.8-flash',
         'gemini-2.5-flash',
         'gemini-flash-latest',
-        'gemini-3.1-flash-lite',
-        'gemini-2.5-flash-lite'
+        'gemini-3.1-flash-lite'
       ];
 
       for (const model of modelsToTry) {
