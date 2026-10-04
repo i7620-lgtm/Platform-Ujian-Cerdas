@@ -42,6 +42,7 @@ export function generateSmartFallbackQuestions(
       blueprint,
       qType,
       difficulty,
+      scoreWeight: config.scoreWeight,
       includeImages: config.includeImages ?? true,
       failureReason,
     });
@@ -70,12 +71,13 @@ interface FallbackParams {
   blueprint: string;
   qType: QuestionType;
   difficulty: string;
+  scoreWeight?: number;
   includeImages: boolean;
   failureReason: string;
 }
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
-  const { index, subject, blueprint, qType, difficulty, includeImages, failureReason } = params;
+  const { index, subject, blueprint, qType, difficulty, includeImages, failureReason, scoreWeight } = params;
   const isCartesian = /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(subject) ||
                       /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(blueprint) ||
                       /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(params.category || '') ||
@@ -97,18 +99,24 @@ function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const levelText = difficulty.includes("HOTS") ? "Level 3 - Penalaran (HOTS)" : difficulty;
   const category = params.category || (isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
 
+  let q: Question;
   // Question context generator based on Subject & Blueprint
   if (isCartesian) {
-    return buildCartesianFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+    q = buildCartesianFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isGeometry) {
-    return buildGeometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+    q = buildGeometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isMath) {
-    return buildMathFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+    q = buildMathFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isScience) {
-    return buildScienceFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+    q = buildScienceFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else {
-    return buildGeneralFallbackQuestion({ id, index, subject, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+    q = buildGeneralFallbackQuestion({ id, index, subject, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   }
+
+  if (scoreWeight && scoreWeight > 0) {
+    q.scoreWeight = scoreWeight;
+  }
+  return q;
 }
 
 // 0. Geometry Fallback Generator
