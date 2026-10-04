@@ -138,7 +138,9 @@ export const useExamEditor = ({
         }
 
         const includeImages = includeImagesConfig ?? true;
-        const aiSubject = [subject, userCategory].filter(Boolean).join(" - ") || "Umum";
+        const aiSubject = userCategory
+          ? (subject ? `${subject} - ${userCategory}` : userCategory)
+          : (subject || "Umum");
 
         const aiConfig: QuizConfig = {
           subject: aiSubject,
