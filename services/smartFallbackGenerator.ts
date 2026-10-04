@@ -140,7 +140,7 @@ function buildGeometryFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
 
   const contextStr = `${args.blueprint} ${args.kisiKisi || ""} ${category}`.toLowerCase();
 
@@ -501,7 +501,7 @@ function buildMathFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, index, qType, levelText, category, includeImages, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
 
   const chartData: ChartData = {
     type: "bar",
@@ -678,7 +678,7 @@ function buildCartesianFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, includeImages, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
 
   const isQuadraticTopic = /fungsi kuadrat|titik puncak|sumbu simetri|parabola|persamaan kuadrat/i.test(
     `${args.blueprint} ${args.kisiKisi || ''} ${category}`
@@ -1027,7 +1027,7 @@ function buildScienceFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
 
   const questionText = `<p>Perhatikan rantai makanan pada ekosistem sawah berikut:</p>
 <p style="text-align: center; margin: 16px 0;">
@@ -1150,7 +1150,7 @@ function buildGeneralFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, index, subject, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
 
   const readingText = `
 <div style="padding: 14px 18px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 6px; margin-bottom: 14px; font-style: normal; line-height: 1.6;">
@@ -1269,6 +1269,7 @@ function buildProbabilityFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "SMA TKA - Menghitung penyusunan objek menggunakan aturan perkalian, permutasi, atau kombinasi");
 
   const questionText = `<p>Dari 7 orang pengurus organisasi siswa yang terdiri atas 4 siswa laki-laki dan 3 siswa perempuan, akan dipilih susunan kepengurusan inti yang terdiri atas <strong>Ketua</strong>, <strong>Sekretaris</strong>, dan <strong>Bendahara</strong>.</p><p>Jika posisi Ketua harus diisi oleh siswa laki-laki dan tidak boleh ada jabatan rangkap, banyak cara pemilihan susunan pengurus inti tersebut adalah ....</p>`;
