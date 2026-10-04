@@ -1413,7 +1413,7 @@ function buildMatrixFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan matriks ordo 2x2, peserta didik dapat menentukan determinan dan invers matriks dengan tepat.");
 
   const questionText = `<p>Diketahui matriks $A = \\begin{pmatrix} 3 & 2 \\\\ 4 & 3 \\end{pmatrix}$ dan matriks $B = \\begin{pmatrix} 1 & -2 \\\\ 0 & 4 \\end{pmatrix}$.</p><p>Determinan dari matriks hasil perkalian $(A \\times B)$ adalah ....</p>`;
@@ -1422,6 +1422,28 @@ function buildMatrixFallbackQuestion(args: {
 1. Determinan matriks $A$: $\\det(A) = (3 \\times 3) - (2 \\times 4) = 9 - 8 = 1$.
 2. Determinan matriks $B$: $\\det(B) = (1 \\times 4) - (-2 \\times 0) = 4 - 0 = 4$.
 3. Berdasarkan sifat determinan: $\\det(A \\times B) = \\det(A) \\times \\det(B) = 1 \\times 4 = \\mathbf{4}$.`;
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Diketahui matriks $A = \\begin{pmatrix} 3 & 2 \\\\ 4 & 3 \\end{pmatrix}$ dan matriks $B = \\begin{pmatrix} 1 & -2 \\\\ 0 & 4 \\end{pmatrix}$. Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: [
+        { text: "Determinan dari matriks A bernilai 1.", answer: true },
+        { text: "Determinan dari matriks B bernilai 4.", answer: true },
+        { text: "Determinan hasil perkalian matriks (A × B) bernilai negatif.", answer: false }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
 
   const options = ["4", "1", "6", "8", "12"];
 
@@ -1454,7 +1476,7 @@ function buildSequenceFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan permasalahan kontekstual barisan dan deret, peserta didik dapat menentukan suku ke-n atau jumlah n suku pertama dengan tepat.");
 
   const questionText = `<p>Suatu gedung pertunjukan memiliki barisan kursi penonton. Baris terdepan memuat 14 kursi, baris kedua memuat 18 kursi, baris ketiga memuat 22 kursi, dan seterusnya bertambah secara konstan.</p><p>Jika gedung pertunjukan tersebut memiliki 15 baris kursi, total kapasitas seluruh kursi penonton di dalam gedung tersebut adalah ....</p>`;
@@ -1464,6 +1486,28 @@ function buildSequenceFallbackQuestion(args: {
 2. Rumus jumlah $n$ suku pertama ($S_n$):
    $$S_n = \\frac{n}{2} \\times [2a + (n - 1)b]$$
    $$S_{15} = \\frac{15}{2} \\times [2(14) + (14)(4)] = \\frac{15}{2} \\times [28 + 56] = \\frac{15}{2} \\times 84 = 15 \\times 42 = \\mathbf{630\\text{ kursi}}$$`;
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Suatu gedung pertunjukan memiliki barisan kursi penonton. Baris terdepan memuat 14 kursi, baris kedua memuat 18 kursi, baris ketiga memuat 22 kursi, dan seterusnya bertambah secara konstan (15 baris total). Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: [
+        { text: "Beda bertambahnya kursi setiap baris berurutan adalah 4 kursi.", answer: true },
+        { text: "Banyak kursi pada baris ke-15 adalah 70 kursi.", answer: true },
+        { text: "Total kapasitas seluruh kursi di dalam gedung pertunjukan tersebut adalah 630 kursi.", answer: true }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
 
   const options = ["630 kursi", "580 kursi", "640 kursi", "660 kursi", "720 kursi"];
 
@@ -1496,7 +1540,7 @@ function buildTrigonometryFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan segitiga dan sudut elevasi kontekstual, peserta didik dapat menerapkan perbandingan trigonometri untuk memecahkan masalah.");
 
   const questionText = `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki sebuah menara pemancar. Dari posisi pengamat, puncak menara terlihat dengan sudut elevasi $30^\\circ$. Jika tinggi mata pengamat dari tanah adalah $1,5\\text{ m}$, tinggi menara pemancar tersebut adalah ....</p>`;
@@ -1506,6 +1550,28 @@ function buildTrigonometryFallbackQuestion(args: {
 2. Nilai $\\tan(30^\\circ) = \\frac{1}{\\sqrt{3}} = \\frac{1}{3}\\sqrt{3}$.
 3. Maka $h = 24 \\times \\frac{1}{3}\\sqrt{3} = 8\\sqrt{3}\\text{ m}$.
 4. Tinggi total menara dari tanah = $(1,5 + 8\\sqrt{3})\\text{ m}$.`;
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki menara pemancar (sudut elevasi $30^\\circ$, tinggi mata $1,5\\text{ m}$). Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: [
+        { text: "Tinggi menara di atas ketinggian mata pengamat dapat dihitung menggunakan perbandingan tangen.", answer: true },
+        { text: "Tinggi menara di atas ketinggian mata pengamat adalah $8\\sqrt{3}\\text{ m}$.", answer: true },
+        { text: "Tinggi total menara pemancar dari tanah adalah $(1,5 + 8\\sqrt{3})\\text{ m}$.", answer: true }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
 
   const options = ["$(1,5 + 8\\sqrt{3})\\text{ m}$", "$(1,5 + 12\\sqrt{3})\\text{ m}$", "$(1,5 + 24\\sqrt{3})\\text{ m}$", "$8\\sqrt{3}\\text{ m}$", "$12\\sqrt{3}\\text{ m}$"];
 
@@ -1538,7 +1604,7 @@ function buildAlgebraFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
-  const fallbackReason = failureReason;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan sistem persamaan linear kontekstual, peserta didik dapat menentukan himpunan penyelesaian dan nilai variabel dengan tepat.");
 
   const questionText = `<p>Di sebuah toko alat tulis, Danu membeli 3 buku tulis dan 2 pensil seharga Rp22.000,00. Di toko yang sama, Dina membeli 2 buku tulis dan 3 pensil seharga Rp18.000,00.</p><p>Jika Mira ingin membeli 4 buku tulis dan 1 pensil, total biaya yang harus dibayar oleh Mira adalah ....</p>`;
@@ -1555,6 +1621,28 @@ function buildAlgebraFallbackQuestion(args: {
    * $3(6.000) + 2y = 22.000 \\Rightarrow 18.000 + 2y = 22.000 \\Rightarrow 2y = 4.000 \\Rightarrow y = 2.000$ (Harga 1 pensil).
 4. Biaya belanja Mira:
    * $4x + 1y = 4(6.000) + 1(2.000) = 24.000 + 2.000 = \\mathbf{Rp26.000,00}$.`;
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Di sebuah toko alat tulis, Danu membeli 3 buku dan 2 pensil seharga Rp22.000,00, sedangkan Dina membeli 2 buku dan 3 pensil seharga Rp18.000,00. Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: [
+        { text: "Harga 1 buah buku tulis adalah Rp6.000,00.", answer: true },
+        { text: "Harga 1 buah pensil adalah Rp2.000,00.", answer: true },
+        { text: "Total biaya belanja 4 buku tulis dan 1 pensil adalah Rp26.000,00.", answer: true }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
 
   const options = ["Rp26.000,00", "Rp24.000,00", "Rp28.000,00", "Rp30.000,00", "Rp22.000,00"];
 
