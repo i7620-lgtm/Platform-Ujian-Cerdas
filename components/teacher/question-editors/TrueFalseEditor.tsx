@@ -16,7 +16,32 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
   const handleAddTrueFalseRow = useExamEditorStore((s) => s.handleAddTrueFalseRow);
   const setEditingChartTarget = useExamEditorUIStore((s) => s.setEditingChartTarget);
 
-  if (!q.trueFalseRows) return null;
+  React.useEffect(() => {
+    if (!q.trueFalseRows || q.trueFalseRows.length === 0) {
+      useExamEditorStore.setState((state) => ({
+        questions: state.questions.map((question) =>
+          question.id === q.id
+            ? {
+                ...question,
+                trueFalseRows: [
+                  { text: "Pernyataan 1 terkait materi soal", answer: true },
+                  { text: "Pernyataan 2 terkait materi soal", answer: false },
+                  { text: "Pernyataan 3 terkait materi soal", answer: true },
+                ],
+              }
+            : question
+        ),
+      }));
+    }
+  }, [q.id, q.trueFalseRows]);
+
+  const activeRows = q.trueFalseRows && q.trueFalseRows.length > 0
+    ? q.trueFalseRows
+    : [
+        { text: "Pernyataan 1 terkait materi soal", answer: true },
+        { text: "Pernyataan 2 terkait materi soal", answer: false },
+        { text: "Pernyataan 3 terkait materi soal", answer: true },
+      ];
 
   return (
     <div className="mt-6 space-y-3">
@@ -28,7 +53,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
         </div>
       </label>
       <div className="space-y-3">
-        {q.trueFalseRows.map((row, rIndex) => (
+        {activeRows.map((row, rIndex) => (
           <div
             key={`tf-${q.id}-${rIndex}`}
             className="flex gap-2 items-start"
@@ -79,7 +104,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
                 ></div>
               </label>
             </div>
-            {q.trueFalseRows!.length > 1 && (
+            {activeRows.length > 1 && (
               <button
                 type="button"
                 onClick={() => handleDeleteTrueFalseRow(q.id, rIndex)}
@@ -92,7 +117,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
           </div>
         ))}
       </div>
-      {q.trueFalseRows.length < 10 && (
+      {activeRows.length < 10 && (
         <button
           type="button"
           onClick={() => handleAddTrueFalseRow(q.id)}
