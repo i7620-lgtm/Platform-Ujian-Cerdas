@@ -78,35 +78,43 @@ interface FallbackParams {
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const { index, subject, blueprint, qType, difficulty, includeImages, failureReason, scoreWeight } = params;
-  const isCartesian = /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(subject) ||
-                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(blueprint) ||
-                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(params.category || '') ||
-                      /kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat/i.test(params.kisiKisi || '');
+  const contextStr = `${subject} ${blueprint} ${params.category || ''} ${params.kisiKisi || ''}`.toLowerCase();
 
-  const isGeometry = !isCartesian && (/geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(subject) ||
-                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(blueprint) ||
-                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.category || '') ||
-                     /geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(params.kisiKisi || ''));
+  const isProbability = /peluang|permutasi|kombinasi|pencacahan|kaidah perkalian|ruang sampel|kejadian majemuk|dadu|koin|kartu bridge/i.test(contextStr);
+  const isMatrix = !isProbability && /matriks|determinan|invers matriks|ordo/i.test(contextStr);
+  const isSequence = !isProbability && !isMatrix && /barisan|deret|aritmatika|aritmetika|geometri|bunga majemuk|anuitas/i.test(contextStr);
+  const isTrig = !isProbability && !isMatrix && !isSequence && /trigonometri|sinus|cosinus|tangen|aturan sinus|sudut istimewa/i.test(contextStr);
+  const isAlgebra = !isProbability && !isMatrix && !isSequence && !isTrig && /aljabar|spltv|spls|persamaan linear|pertidaksamaan|sistem persamaan/i.test(contextStr);
 
-  const isMath = isCartesian || isGeometry ||
-                 /matematika|hitung|aritmatika|aljabar|geometri|statistika|data/i.test(subject) ||
-                 /hitung|grafik|diagram|tabel|angka|luas|volume|pecahan/i.test(blueprint);
-  const isScience = /ipa|sains|biologi|fisika|kimia|alam|ekosistem/i.test(subject) ||
-                    /tata surya|fotosintesis|rantai makanan|peredaran darah|daur/i.test(blueprint);
-  const isIndonesian = /bahasa indonesia|literasi|teks|fabel|cerpen|puisi|bacaan/i.test(subject);
+  const isCartesian = !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra &&
+                      (/kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat|parabola/i.test(contextStr));
+
+  const isGeometry = !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra && !isCartesian &&
+                     (/geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(contextStr));
+
+  const isScience = /ipa|sains|biologi|fisika|kimia|alam|ekosistem|organ|tata surya|fotosintesis|rantai makanan|peredaran darah|daur/i.test(contextStr);
+  const isIndonesian = /bahasa indonesia|literasi|teks|fabel|cerpen|puisi|bacaan|artikel|paragraf/i.test(contextStr);
 
   const id = `q_fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const levelText = difficulty.includes("HOTS") ? "Level 3 - Penalaran (HOTS)" : difficulty;
-  const category = params.category || (isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isMath ? "Matematika & Analisis Data" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
+  const category = params.category || (isProbability ? "Peluang & Kaidah Pencacahan" : isMatrix ? "Matriks" : isSequence ? "Barisan dan Deret" : isTrig ? "Trigonometri" : isAlgebra ? "Aljabar & Sistem Persamaan" : isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
 
   let q: Question;
   // Question context generator based on Subject & Blueprint
-  if (isCartesian) {
+  if (isProbability) {
+    q = buildProbabilityFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isMatrix) {
+    q = buildMatrixFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isSequence) {
+    q = buildSequenceFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isTrig) {
+    q = buildTrigonometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isAlgebra) {
+    q = buildAlgebraFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isCartesian) {
     q = buildCartesianFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isGeometry) {
     q = buildGeometryFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
-  } else if (isMath) {
-    q = buildMathFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isScience) {
     q = buildScienceFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else {
@@ -1243,6 +1251,319 @@ function buildGeneralFallbackQuestion(args: {
     kisiKisi,
     level: levelText,
     category: subject || category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
+// 4. Probability & Combinatorics Fallback Generator
+function buildProbabilityFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "SMA TKA - Menghitung penyusunan objek menggunakan aturan perkalian, permutasi, atau kombinasi");
+
+  const questionText = `<p>Dari 7 orang pengurus organisasi siswa yang terdiri atas 4 siswa laki-laki dan 3 siswa perempuan, akan dipilih susunan kepengurusan inti yang terdiri atas <strong>Ketua</strong>, <strong>Sekretaris</strong>, dan <strong>Bendahara</strong>.</p><p>Jika posisi Ketua harus diisi oleh siswa laki-laki dan tidak boleh ada jabatan rangkap, banyak cara pemilihan susunan pengurus inti tersebut adalah ....</p>`;
+
+  const explanation = `**Langkah Perhitungan Menggunakan Aturan Perkalian / Permutasi:**
+1. **Pemilihan Ketua (dari 4 siswa laki-laki):** Ada $4$ kemungkinan pilihan.
+2. **Sisa Calon Pengurus:** Dari total 7 orang, telah terpilih 1 orang sebagai Ketua, sehingga tersisa $(7 - 1) = 6$ orang calon.
+3. **Pemilihan Sekretaris:** Dari 6 orang yang tersisa, ada $6$ pilihan.
+4. **Pemilihan Bendahara:** Dari 5 orang yang tersisa, ada $5$ pilihan.
+5. **Total Susunan Pengurus Inti:**
+   $$\\text{Banyak Cara} = 4 \\times 6 \\times 5 = \\mathbf{120\\text{ cara}}$$`;
+
+  if (qType === "MULTIPLE_CHOICE") {
+    const options = ["120 cara", "90 cara", "180 cara", "210 cara", "60 cara"];
+    return {
+      id,
+      questionType: "MULTIPLE_CHOICE",
+      questionText,
+      options,
+      correctAnswer: options[0],
+      scoreWeight: 1,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+    const options = [
+      "Banyak cara memilih Ketua dari calon laki-laki adalah 4 kemungkinan.",
+      "Banyak cara memilih Sekretaris dan Bendahara setelah Ketua terpilih adalah $P(6, 2) = 30$ cara.",
+      "Total variasi susunan pengurus inti yang dapat terbentuk adalah 120 cara.",
+      "Jika tidak ada syarat jenis kelamin untuk Ketua, banyak susunan yang terbentuk adalah $P(7, 3) = 210$ cara."
+    ];
+    return {
+      id,
+      questionType: "COMPLEX_MULTIPLE_CHOICE",
+      questionText: `<p>Dari 7 pengurus (4 laki-laki, 3 perempuan), akan dipilih Ketua (harus laki-laki), Sekretaris, dan Bendahara tanpa jabatan rangkap. Pilihlah semua pernyataan yang BENAR!</p>`,
+      options,
+      correctAnswer: JSON.stringify([options[0], options[1], options[2], options[3]]),
+      scoreWeight: 2,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Dari 7 pengurus (4 laki-laki, 3 perempuan), akan dipilih Ketua (harus laki-laki), Sekretaris, dan Bendahara. Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      trueFalseRows: [
+        { text: "Banyak pilihan untuk mengisi posisi Ketua adalah 4 cara.", answer: true },
+        { text: "Banyak pilihan untuk memilih Sekretaris dan Bendahara setelah Ketua terpilih adalah 30 cara.", answer: true },
+        { text: "Total susunan kepengurusan inti yang dapat dibentuk melebihi 150 cara.", answer: false }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "MATCHING") {
+    return {
+      id,
+      questionType: "MATCHING",
+      questionText: `<p>Pasangkanlah tahapan pemilihan pengurus inti dengan banyak kemungkinan cara yang sesuai!</p>`,
+      options: [],
+      correctAnswer: "",
+      scoreWeight: 1,
+      matchingPairs: [
+        { left: "Pemilihan Ketua (siswa laki-laki)", right: "4 cara" },
+        { left: "Pemilihan Sekretaris & Bendahara", right: "30 cara" },
+        { left: "Total susunan pengurus inti", right: "120 cara" }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "FILL_IN_THE_BLANK") {
+    return {
+      id,
+      questionType: "FILL_IN_THE_BLANK",
+      questionText,
+      options: [],
+      correctAnswer: "120",
+      scoreWeight: 1,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  return {
+    id,
+    questionType: "ESSAY",
+    questionText: `<p>Dari 7 orang pengurus organisasi siswa (4 laki-laki dan 3 perempuan), akan dipilih susunan kepengurusan inti yang terdiri atas Ketua, Sekretaris, dan Bendahara. Posisi Ketua harus diisi oleh siswa laki-laki. Tuliskan rumus dan langkah-langkah sistematis untuk menentukan banyak kemungkinan susunan pengurus inti yang dapat dibentuk!</p>`,
+    options: [],
+    correctAnswer: "Banyak cara memilih Ketua = 4 cara. Sisa calon = 6 orang. Banyak cara memilih Sekretaris dan Bendahara = P(6, 2) = 6 × 5 = 30 cara. Total susunan = 4 × 30 = 120 cara.",
+    scoreWeight: 3,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
+// 5. Matrix Fallback Generator
+function buildMatrixFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan matriks ordo 2x2, peserta didik dapat menentukan determinan dan invers matriks dengan tepat.");
+
+  const questionText = `<p>Diketahui matriks $A = \\begin{pmatrix} 3 & 2 \\\\ 4 & 3 \\end{pmatrix}$ dan matriks $B = \\begin{pmatrix} 1 & -2 \\\\ 0 & 4 \\end{pmatrix}$.</p><p>Determinan dari matriks hasil perkalian $(A \\times B)$ adalah ....</p>`;
+
+  const explanation = `**Langkah Penyelesaian Determinan Matriks:**
+1. Determinan matriks $A$: $\\det(A) = (3 \\times 3) - (2 \\times 4) = 9 - 8 = 1$.
+2. Determinan matriks $B$: $\\det(B) = (1 \\times 4) - (-2 \\times 0) = 4 - 0 = 4$.
+3. Berdasarkan sifat determinan: $\\det(A \\times B) = \\det(A) \\times \\det(B) = 1 \\times 4 = \\mathbf{4}$.`;
+
+  const options = ["4", "1", "6", "8", "12"];
+
+  return {
+    id,
+    questionType: qType,
+    questionText,
+    options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+    correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "4",
+    scoreWeight: 1,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
+// 6. Sequence & Series Fallback Generator
+function buildSequenceFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan permasalahan kontekstual barisan dan deret, peserta didik dapat menentukan suku ke-n atau jumlah n suku pertama dengan tepat.");
+
+  const questionText = `<p>Suatu gedung pertunjukan memiliki barisan kursi penonton. Baris terdepan memuat 14 kursi, baris kedua memuat 18 kursi, baris ketiga memuat 22 kursi, dan seterusnya bertambah secara konstan.</p><p>Jika gedung pertunjukan tersebut memiliki 15 baris kursi, total kapasitas seluruh kursi penonton di dalam gedung tersebut adalah ....</p>`;
+
+  const explanation = `**Langkah Penyelesaian Deret Aritmetika:**
+1. Suku pertama ($a$) = 14, beda ($b$) = $18 - 14 = 4$, banyak baris ($n$) = 15.
+2. Rumus jumlah $n$ suku pertama ($S_n$):
+   $$S_n = \\frac{n}{2} \\times [2a + (n - 1)b]$$
+   $$S_{15} = \\frac{15}{2} \\times [2(14) + (14)(4)] = \\frac{15}{2} \\times [28 + 56] = \\frac{15}{2} \\times 84 = 15 \\times 42 = \\mathbf{630\\text{ kursi}}$$`;
+
+  const options = ["630 kursi", "580 kursi", "640 kursi", "660 kursi", "720 kursi"];
+
+  return {
+    id,
+    questionType: qType,
+    questionText,
+    options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+    correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "630 kursi",
+    scoreWeight: 1,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
+// 7. Trigonometry Fallback Generator
+function buildTrigonometryFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan segitiga dan sudut elevasi kontekstual, peserta didik dapat menerapkan perbandingan trigonometri untuk memecahkan masalah.");
+
+  const questionText = `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki sebuah menara pemancar. Dari posisi pengamat, puncak menara terlihat dengan sudut elevasi $30^\\circ$. Jika tinggi mata pengamat dari tanah adalah $1,5\\text{ m}$, tinggi menara pemancar tersebut adalah ....</p>`;
+
+  const explanation = `**Langkah Perhitungan Trigonometri:**
+1. Gunakan perbandingan tangen: $\\tan(30^\\circ) = \\frac{\\text{tinggi menara di atas mata}}{\\text{jarak horizontal}} = \\frac{h}{24}$.
+2. Nilai $\\tan(30^\\circ) = \\frac{1}{\\sqrt{3}} = \\frac{1}{3}\\sqrt{3}$.
+3. Maka $h = 24 \\times \\frac{1}{3}\\sqrt{3} = 8\\sqrt{3}\\text{ m}$.
+4. Tinggi total menara dari tanah = $(1,5 + 8\\sqrt{3})\\text{ m}$.`;
+
+  const options = ["$(1,5 + 8\\sqrt{3})\\text{ m}$", "$(1,5 + 12\\sqrt{3})\\text{ m}$", "$(1,5 + 24\\sqrt{3})\\text{ m}$", "$8\\sqrt{3}\\text{ m}$", "$12\\sqrt{3}\\text{ m}$"];
+
+  return {
+    id,
+    questionType: qType,
+    questionText,
+    options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+    correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "$(1,5 + 8\\sqrt{3})\\text{ m}$",
+    scoreWeight: 1,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
+// 8. Algebra & Systems Fallback Generator
+function buildAlgebraFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, qType, levelText, category, failureReason } = args;
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan sistem persamaan linear kontekstual, peserta didik dapat menentukan himpunan penyelesaian dan nilai variabel dengan tepat.");
+
+  const questionText = `<p>Di sebuah toko alat tulis, Danu membeli 3 buku tulis dan 2 pensil seharga Rp22.000,00. Di toko yang sama, Dina membeli 2 buku tulis dan 3 pensil seharga Rp18.000,00.</p><p>Jika Mira ingin membeli 4 buku tulis dan 1 pensil, total biaya yang harus dibayar oleh Mira adalah ....</p>`;
+
+  const explanation = `**Langkah Penyelesaian Sistem Persamaan Linear Dua Variabel (SPLDV):**
+1. Misalkan harga 1 buku tulis = $x$ dan harga 1 pensil = $y$:
+   * $3x + 2y = 22.000$ (Persamaan 1)
+   * $2x + 3y = 18.000$ (Persamaan 2)
+2. Eliminasi $y$:
+   * $(3x + 2y = 22.000) \\times 3 \\Rightarrow 9x + 6y = 66.000$
+   * $(2x + 3y = 18.000) \\times 2 \\Rightarrow 4x + 6y = 36.000$
+   * Selisih: $5x = 30.000 \\Rightarrow x = 6.000$ (Harga 1 buku).
+3. Substitusi $x = 6.000$ ke Persamaan 1:
+   * $3(6.000) + 2y = 22.000 \\Rightarrow 18.000 + 2y = 22.000 \\Rightarrow 2y = 4.000 \\Rightarrow y = 2.000$ (Harga 1 pensil).
+4. Biaya belanja Mira:
+   * $4x + 1y = 4(6.000) + 1(2.000) = 24.000 + 2.000 = \\mathbf{Rp26.000,00}$.`;
+
+  const options = ["Rp26.000,00", "Rp24.000,00", "Rp28.000,00", "Rp30.000,00", "Rp22.000,00"];
+
+  return {
+    id,
+    questionType: qType,
+    questionText,
+    options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+    correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "Rp26.000,00",
+    scoreWeight: 1,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
     isFallback: true,
     fallbackReason
   } as any;
