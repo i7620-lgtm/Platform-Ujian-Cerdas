@@ -12,6 +12,7 @@ export interface QuizConfig {
   includeImages: boolean;
   category?: string;
   kisiKisi?: string;
+  scoreWeight?: number;
 }
 
 export interface CartesianConfig {
