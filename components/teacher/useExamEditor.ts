@@ -151,6 +151,7 @@ export const useExamEditor = ({
           difficulties: [cognitiveLevel],
           blueprint: blueprintPrompt,
           includeImages,
+          scoreWeight: q.scoreWeight || 1,
         };
 
         const generatedQuestions = await generateQuestions(aiConfig);
