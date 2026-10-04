@@ -24,8 +24,16 @@ export function getAI(): GoogleGenAI {
   return aiInstance;
 }
 
+export const FLASH_MODELS_CASCADE = [
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash-lite'
+];
+
 export async function generateAIAnalysisOnServer(prompt: string): Promise<string> {
-    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = [...FLASH_MODELS_CASCADE];
     
     for (const model of modelsToTry) {
         let attempts = 0;
@@ -61,7 +69,7 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
         throw new Error(safety.reason || "Permintaan tidak sesuai dengan standar etika pendidikan sekolah.");
     }
 
-    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash'];
+    const modelsToTry = [...FLASH_MODELS_CASCADE];
     
     let styleInstruction = "";
     if (style === "infographic") {
@@ -218,20 +226,20 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
     let response = null;
     let lastError: unknown = null;
   
-    // Cascade of modern valid Gemini models
-    const fallbackCascade = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-    const validModels = (modelsToTry && modelsToTry.length > 0 ? modelsToTry : fallbackCascade)
+    // Cascade of modern valid Flash & Flash Lite models from highest to lowest
+    const inputModels = (modelsToTry && modelsToTry.length > 0 ? modelsToTry : FLASH_MODELS_CASCADE)
         .map(m => (m === 'gemini-3.5-flash' || m === 'gemini-3.7-flash') ? 'gemini-3.8-flash' : m)
-        .filter(m => m !== 'gemini-flash-latest' && m !== 'gemini-2.0-flash' && m !== 'gemini-1.5-flash' && m !== 'gemini-2.5-pro');
+        .filter(m => m !== 'gemini-2.0-flash' && m !== 'gemini-1.5-flash' && m !== 'gemini-2.5-pro');
     
-    for (const m of fallbackCascade) {
-        if (!validModels.includes(m)) {
-            validModels.push(m);
+    const combinedModels = [...inputModels];
+    for (const m of FLASH_MODELS_CASCADE) {
+        if (!combinedModels.includes(m)) {
+            combinedModels.push(m);
         }
     }
 
-    // Deduplicate and prioritize active, non-exhausted models
-    const uniqueModels = Array.from(new Set(validModels));
+    // Deduplicate and prioritize active, non-exhausted models while maintaining highest-to-lowest order
+    const uniqueModels = Array.from(new Set(combinedModels));
     const sortedModels = [
         ...uniqueModels.filter(m => !isModelTemporarilyExhausted(m)),
         ...uniqueModels.filter(m => isModelTemporarilyExhausted(m))
