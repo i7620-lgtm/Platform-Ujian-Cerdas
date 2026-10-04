@@ -266,7 +266,7 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                       items: {
                         type: Type.OBJECT,
                         properties: properties,
-                        required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category", "options"]
+                        required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category"]
                       },
                     },
                   },
