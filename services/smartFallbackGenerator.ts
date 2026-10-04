@@ -1412,6 +1412,7 @@ function buildMatrixFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason;
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan matriks ordo 2x2, peserta didik dapat menentukan determinan dan invers matriks dengan tepat.");
 
   const questionText = `<p>Diketahui matriks $A = \\begin{pmatrix} 3 & 2 \\\\ 4 & 3 \\end{pmatrix}$ dan matriks $B = \\begin{pmatrix} 1 & -2 \\\\ 0 & 4 \\end{pmatrix}$.</p><p>Determinan dari matriks hasil perkalian $(A \\times B)$ adalah ....</p>`;
@@ -1452,6 +1453,7 @@ function buildSequenceFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason;
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan permasalahan kontekstual barisan dan deret, peserta didik dapat menentukan suku ke-n atau jumlah n suku pertama dengan tepat.");
 
   const questionText = `<p>Suatu gedung pertunjukan memiliki barisan kursi penonton. Baris terdepan memuat 14 kursi, baris kedua memuat 18 kursi, baris ketiga memuat 22 kursi, dan seterusnya bertambah secara konstan.</p><p>Jika gedung pertunjukan tersebut memiliki 15 baris kursi, total kapasitas seluruh kursi penonton di dalam gedung tersebut adalah ....</p>`;
@@ -1493,6 +1495,7 @@ function buildTrigonometryFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason;
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan segitiga dan sudut elevasi kontekstual, peserta didik dapat menerapkan perbandingan trigonometri untuk memecahkan masalah.");
 
   const questionText = `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki sebuah menara pemancar. Dari posisi pengamat, puncak menara terlihat dengan sudut elevasi $30^\\circ$. Jika tinggi mata pengamat dari tanah adalah $1,5\\text{ m}$, tinggi menara pemancar tersebut adalah ....</p>`;
@@ -1534,6 +1537,7 @@ function buildAlgebraFallbackQuestion(args: {
   failureReason: string;
 }): Question {
   const { id, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason;
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan sistem persamaan linear kontekstual, peserta didik dapat menentukan himpunan penyelesaian dan nilai variabel dengan tepat.");
 
   const questionText = `<p>Di sebuah toko alat tulis, Danu membeli 3 buku tulis dan 2 pensil seharga Rp22.000,00. Di toko yang sama, Dina membeli 2 buku tulis dan 3 pensil seharga Rp18.000,00.</p><p>Jika Mira ingin membeli 4 buku tulis dan 1 pensil, total biaya yang harus dibayar oleh Mira adalah ....</p>`;
