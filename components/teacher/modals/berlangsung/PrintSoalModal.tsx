@@ -1,10 +1,265 @@
 import React, { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Exam } from "../../../../types";
+import { Exam, ChartData } from "../../../../types";
 import { XMarkIcon, PrinterIcon } from "../../../Icons";
 import { sanitizeHtml } from "../../examUtils";
-import { ChartRenderer } from "../../../ChartRenderer";
 import { renderMathInHtml } from "../../../../utils/mathRenderer";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import { CartesianChart } from "../../../charts/CartesianChart";
+import { VennChart } from "../../../charts/VennChart";
+import { RelationChart } from "../../../charts/RelationChart";
+
+const CHART_COLORS = [
+  "#2563eb", // blue-600
+  "#059669", // emerald-600
+  "#d97706", // amber-600
+  "#dc2626", // red-600
+  "#7c3aed", // violet-600
+  "#0891b2", // cyan-600
+];
+
+interface PrintChartRendererProps {
+  data: ChartData;
+}
+
+const PrintChartRenderer: React.FC<PrintChartRendererProps> = ({ data }) => {
+  const { type, title, labels = [], datasets = [] } = data;
+
+  // Transform data for Bar & Line
+  const chartData = React.useMemo(() => {
+    return labels.map((label, index) => {
+      const entry: Record<string, any> = { name: label };
+      datasets.forEach((dataset) => {
+        entry[dataset.label || "Data"] = Number(dataset.data[index]) || 0;
+      });
+      return entry;
+    });
+  }, [labels, datasets]);
+
+  const pieData = React.useMemo(() => {
+    if (type !== "pie") return [];
+    return labels.map((label, index) => ({
+      name: label,
+      value: Number(datasets[0]?.data[index]) || 0,
+    }));
+  }, [type, labels, datasets]);
+
+  // Y-axis tick calculation
+  const { yTicks, yDomain } = React.useMemo(() => {
+    let max = 0;
+    datasets.forEach((d) => {
+      d.data.forEach((v) => {
+        const num = Number(v);
+        if (!isNaN(num) && num > max) max = num;
+      });
+    });
+    if (max === 0) return { yTicks: undefined, yDomain: undefined };
+
+    let interval = 5;
+    if (max > 50 && max <= 100) interval = 10;
+    else if (max > 100 && max <= 500) interval = 50;
+    else if (max > 500) interval = 100;
+
+    const ticks: number[] = [];
+    const maxTick = Math.ceil(max / interval) * interval;
+    for (let i = 0; i <= maxTick; i += interval) {
+      ticks.push(i);
+    }
+    return { yTicks: ticks, yDomain: [0, maxTick] as [number, number] };
+  }, [datasets]);
+
+  const legendItems = React.useMemo(() => {
+    if (type === "venn" || type === "relation" || type === "cartesian") {
+      return [];
+    }
+    if (type === "pie") {
+      return labels.map((label, index) => {
+        const val = datasets[0]?.data[index] ?? 0;
+        return {
+          value: `${label} (${val})`,
+          color: CHART_COLORS[index % CHART_COLORS.length],
+        };
+      });
+    } else {
+      return datasets.map((dataset, index) => ({
+        value: dataset.label || "Data",
+        color:
+          dataset.backgroundColor?.[0] ||
+          dataset.borderColor?.[0] ||
+          CHART_COLORS[index % CHART_COLORS.length],
+      }));
+    }
+  }, [type, labels, datasets]);
+
+  const renderContent = () => {
+    switch (type) {
+      case "bar":
+        return (
+          <BarChart
+            width={400}
+            height={190}
+            data={chartData}
+            margin={{ top: 10, right: 15, left: -15, bottom: 20 }}
+            barCategoryGap="20%"
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              interval={0}
+              angle={-25}
+              textAnchor="end"
+              height={36}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              ticks={yTicks}
+              domain={yDomain}
+              width={40}
+            />
+            {datasets.map((dataset, index) => (
+              <Bar
+                key={dataset.label || index}
+                dataKey={dataset.label || "Data"}
+                fill={
+                  dataset.backgroundColor?.[0] ||
+                  CHART_COLORS[index % CHART_COLORS.length]
+                }
+                maxBarSize={45}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
+        );
+
+      case "line":
+        return (
+          <LineChart
+            width={400}
+            height={190}
+            data={chartData}
+            margin={{ top: 10, right: 15, left: -15, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.7} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              interval={0}
+              angle={-25}
+              textAnchor="end"
+              height={36}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }}
+              axisLine={{ stroke: "#64748b", strokeWidth: 1.2 }}
+              tickLine={{ stroke: "#64748b" }}
+              ticks={yTicks}
+              domain={yDomain}
+              width={40}
+            />
+            {datasets.map((dataset, index) => (
+              <Line
+                key={dataset.label || index}
+                type="monotone"
+                dataKey={dataset.label || "Data"}
+                stroke={
+                  dataset.borderColor?.[0] ||
+                  CHART_COLORS[index % CHART_COLORS.length]
+                }
+                strokeWidth={3}
+                dot={{ r: 4, strokeWidth: 1.5, fill: "#fff" }}
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        );
+
+      case "pie":
+        return (
+          <PieChart width={400} height={190} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              outerRadius={65}
+              innerRadius={25}
+              paddingAngle={3}
+              fill="#8884d8"
+              dataKey="value"
+              isAnimationActive={false}
+              label={({ name, percent }: any) =>
+                percent && percent > 0 ? `${name} (${(percent * 100).toFixed(0)}%)` : ""
+              }
+            >
+              {pieData.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  stroke="#fff"
+                  strokeWidth={1}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        );
+
+      case "cartesian":
+        return <CartesianChart data={data} className="w-full max-w-[360px] mx-auto" />;
+
+      case "venn":
+        return <VennChart data={data} />;
+
+      case "relation":
+        return <RelationChart data={data} />;
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="print-chart-container my-3 mx-auto w-full max-w-[420px] p-2.5 bg-white border border-slate-300 rounded-lg shadow-none flex flex-col items-center">
+      {title && (
+        <h4 className="text-center font-bold text-xs sm:text-sm text-slate-800 mb-1 leading-tight">
+          {title}
+        </h4>
+      )}
+      <div className="w-full flex justify-center items-center overflow-hidden">
+        {renderContent()}
+      </div>
+      {legendItems.length > 0 && (
+        <div className="mt-1 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-700">
+          {legendItems.map((item, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <span
+                className="w-2.5 h-2.5 rounded-full inline-block"
+                style={{ backgroundColor: item.color }}
+              />
+              <span>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface PrintSoalModalProps {
   isOpen: boolean;
@@ -161,23 +416,32 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           }
 
           /* Compact Chart Container for Print */
-          .print-chart-container, .print-chart-container > div {
-            max-height: 200px !important;
-            min-height: auto !important;
-            height: auto !important;
-            padding: 4px !important;
-            margin: 4px auto !important;
-            border: 1px solid #cbd5e1 !important;
+          .print-chart-container {
+            width: 100% !important;
+            max-width: 400px !important;
+            margin: 6px auto !important;
+            padding: 4px 6px !important;
+            border: 1px solid #94a3b8 !important;
             border-radius: 6px !important;
-            overflow: hidden !important;
             background: #ffffff !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
             box-shadow: none !important;
           }
+
           .print-chart-container svg {
-            max-height: 180px !important;
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: 200px !important;
             overflow: hidden !important;
           }
-          .print-chart-container h3 {
+
+          .print-chart-container h4 {
             font-size: 10pt !important;
             margin-bottom: 2px !important;
           }
@@ -367,11 +631,9 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                     dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                   />
 
-                  {/* Chart Visual Stimulus (Compact Print Height) */}
+                  {/* Chart Visual Stimulus (Dedicated Print Chart Renderer) */}
                   {q.chartData && (
-                    <div className="print-chart-container my-2 max-w-md mx-auto flex justify-center">
-                      <ChartRenderer data={q.chartData} />
-                    </div>
+                    <PrintChartRenderer data={q.chartData} />
                   )}
 
                   {/* Image Stimulus */}
