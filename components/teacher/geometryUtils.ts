@@ -303,8 +303,8 @@ export const generateGeometrySVG = (
   // --------------------------------------------------------------------------
   if (shape === "triangle" || shape === "triangle_right") {
     const isRight = shape === "triangle_right" || Boolean(labels.isRight);
-    let a = extractNum(labels.bottom || labels.base || labels.alas, 130);
-    let b = extractNum(labels.left || labels.height || labels.tinggi, 100);
+    let a = extractNum(labels.bottom || labels.base || labels.alas || labels.samping, 130);
+    let b = extractNum(labels.left || labels.height || labels.tinggi || labels.depan, 100);
     let c = extractNum(labels.right || labels.hypotenuse || labels.miring, 100);
 
     if (!isRight && (a + b <= c || a + c <= b || b + c <= a)) {
@@ -327,20 +327,70 @@ export const generateGeometrySVG = (
       pTop = `${ox},${oy - h}`;
       
       svgBody += `<polygon points="${pBottomLeft} ${pBottomRight} ${pTop}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="round"/>`;
-      // Right angle symbol
-      svgBody += `<polyline points="${ox},${oy - 14} ${ox + 14},${oy - 14} ${ox + 14},${oy}" fill="none" stroke="${strokeColor}" stroke-width="1.5" />`;
+      // Right angle square mark at the 90 degree vertex
+      svgBody += `<polyline points="${ox},${oy - 14} ${ox + 14},${oy - 14} ${ox + 14},${oy}" fill="none" stroke="${strokeColor}" stroke-width="1.8" />`;
       
+      // Arc for the acute angle at bottom-right (e.g. elevation angle / theta)
+      const hasRightAcuteAngle = Boolean(labels.angleRight || labels.angleB || labels.elevationAngle || labels.angleC || labels.theta);
+      if (hasRightAcuteAngle) {
+        const arcR = Math.min(26, w * 0.25);
+        svgBody += `<path d="M ${ox + w - arcR} ${oy} A ${arcR} ${arcR} 0 0 0 ${ox + w - arcR * 0.8} ${oy - arcR * 0.6}" fill="none" stroke="#dc2626" stroke-width="1.5" />`;
+      }
+
       if (showLines) {
-        if (labels.bottom) svgBody += drawLabel(ox + w / 2, oy + 16, labels.bottom);
-        if (labels.left) svgBody += drawLabel(ox - 16, oy - h / 2, labels.left);
-        if (labels.hypotenuse || labels.right) svgBody += drawLabel(ox + w / 2 + 14, oy - h / 2 - 10, labels.hypotenuse || labels.right);
+        const bottomText = labels.bottom || labels.base || labels.alas || labels.samping;
+        const leftText = labels.left || labels.height || labels.tinggi || labels.depan;
+        const hypText = labels.hypotenuse || labels.right || labels.miring;
+
+        if (bottomText) svgBody += drawLabel(ox + w / 2, oy + 16, bottomText);
+        if (leftText) svgBody += drawLabel(ox - 20, oy - h / 2, leftText);
+        if (hypText) svgBody += drawLabel(ox + w / 2 + 16, oy - h / 2 - 10, hypText);
       }
 
       if (shouldShowVertices) {
-        const v = parseVertexLetters(labels.vertices, ["A", "B", "C"]);
-        svgBody += drawVertex(ox, oy, v[0] || "A", "bottom-left");
-        svgBody += drawVertex(ox + w, oy, v[1] || "B", "bottom-right");
-        svgBody += drawVertex(ox, oy - h, v[2] || "C", "top-left");
+        const rawLetters = parseVertexLetters(labels.vertices, ["A", "B", "C"]);
+        const rightAngleAt = (labels.rightAngleAt || "").toString().trim().toUpperCase();
+
+        let vCorner = rawLetters[0] || "A"; // 90° corner
+        let vRight = rawLetters[1] || "B";  // Acute right corner
+        let vTop = rawLetters[2] || "C";    // Acute top corner
+
+        // If right angle is explicitly at 'B' (very common in Indonesian curricula: "Segitiga ABC siku-siku di B")
+        if (rightAngleAt === "B" || (rawLetters.length >= 3 && rawLetters.join("") === "ABC" && (labels.angleB === "90°" || labels.angleB === "90"))) {
+          vCorner = "B";
+          vRight = "C";
+          vTop = "A";
+        } else if (rightAngleAt === "C" || labels.angleC === "90°" || labels.angleC === "90") {
+          vCorner = "C";
+          vRight = "B";
+          vTop = "A";
+        } else if (rightAngleAt === "A" || labels.angleA === "90°" || labels.angleA === "90") {
+          vCorner = "A";
+          vRight = "B";
+          vTop = "C";
+        }
+
+        svgBody += drawVertex(ox, oy, vCorner, "bottom-left");
+        svgBody += drawVertex(ox + w, oy, vRight, "bottom-right");
+        svgBody += drawVertex(ox, oy - h, vTop, "top-left");
+      }
+
+      if (shouldShowAngles) {
+        // Dynamic angle label positioning for right triangle
+        const rightAngleAt = (labels.rightAngleAt || "").toString().trim().toUpperCase();
+        const angleCorner = rightAngleAt === "B" ? labels.angleB : rightAngleAt === "C" ? labels.angleC : labels.angleA;
+        const angleRight = (rightAngleAt === "B" ? labels.angleC : rightAngleAt === "C" ? labels.angleB : labels.angleB) || labels.angleRight || labels.elevationAngle || labels.theta;
+        const angleTop = (rightAngleAt === "B" ? labels.angleA : rightAngleAt === "C" ? labels.angleA : labels.angleC) || labels.angleTop;
+
+        if (angleCorner && angleCorner !== "90°" && angleCorner !== "90") {
+          svgBody += drawLabel(ox + 18, oy - 16, angleCorner, true);
+        }
+        if (angleRight) {
+          svgBody += drawLabel(ox + w - 30, oy - 14, angleRight, true);
+        }
+        if (angleTop) {
+          svgBody += drawLabel(ox + 18, oy - h + 24, angleTop, true);
+        }
       }
     } else {
       const cp = (a * a + b * b - c * c) / (2 * a);
@@ -373,12 +423,12 @@ export const generateGeometrySVG = (
         svgBody += drawVertex(ox + dw, oy, v[1] || "B", "bottom-right");
         svgBody += drawVertex(ox + dx, oy - dh, v[2] || "C", "top");
       }
-    }
 
-    if (shouldShowAngles) {
-      if (labels.angleA) svgBody += drawLabel(ox + 18, oy - 12, labels.angleA, true);
-      if (labels.angleB) svgBody += drawLabel(ox + (isRight ? 130 : 90), oy - 12, labels.angleB, true);
-      if (labels.angleC) svgBody += drawLabel(ox + (isRight ? 18 : 50), oy - (isRight ? 80 : 70), labels.angleC, true);
+      if (shouldShowAngles) {
+        if (labels.angleA) svgBody += drawLabel(ox + 18, oy - 12, labels.angleA, true);
+        if (labels.angleB) svgBody += drawLabel(ox + dw - 24, oy - 12, labels.angleB, true);
+        if (labels.angleC) svgBody += drawLabel(ox + dx, oy - dh + 22, labels.angleC, true);
+      }
     }
   } else if (shape === "square" || shape === "rectangle") {
     const isSquare = shape === "square";
