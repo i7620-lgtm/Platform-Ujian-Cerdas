@@ -67,9 +67,27 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       SETIAP KALI MENAMPILKAN BANGUN RUANG ATAU BANGUN GABUNGAN, Anda WAJIB MENGISI SELURUH PARAMETER UKURAN PADA TAG GEOMETRY SECARA LENGKAP agar semua dimensi (panjang, lebar, tinggi, jari-jari, dll) terlihat jelas pada gambar!
       Jika Anda juga mendeskripsikan ukurannya dalam teks narasi, Anda WAJIB menuliskan kalimatnya secara UTUH dan LENGKAP tanpa terpotong (misal: "Bagian balok memiliki ukuran panjang 10 cm, lebar 6 cm, dan tinggi 8 cm, serta tinggi limas 6 cm."). DILARANG KERAS menghasilkan teks narasi yang terpotong di tengah kalimat!
       Daftar \`shape_name\` yang valid:
-      * Bangun Datar 2D: "triangle", "square", "rectangle", "parallelogram", "rhombus", "trapezoid", "kite", "circle", "polygon"
+      * Bangun Datar 2D: "triangle", "triangle_right" (segitiga siku-siku trigonometri), "square", "rectangle", "parallelogram", "rhombus", "trapezoid", "kite", "circle", "polygon"
       * Bangun Ruang 3D: "cube" (kubus), "cuboid" (balok), "cylinder" (tabung), "cone" (kerucut), "pyramid" (limas segiempat), "triangular_pyramid" (limas segitiga), "prism" (prisma segitiga), "sphere" (bola), "hemisphere" (setengah bola)
       * Bangun Gabungan: "combined_cuboid_pyramid" (balok+limas), "combined_cuboid_prism" (balok+atap prisma), "combined_cuboid_cube" (balok+kubus), "combined_cylinder_cone" (tabung+kerucut), "combined_cylinder_hemisphere" (tabung+kubah bola), "combined_cone_hemisphere" (kerucut+bola es krim), "combined_rect_triangle" (rumah 2D), "combined_l_shape" (bentuk L), "combined_rect_semicircle" (persegi panjang+setengah lingkaran).
+
+      PANDUAN KHUSUS SOAL TRIGONOMETRI (KONSISTENSI TOTAL 100% ANTARA SOAL DAN GAMBAR):
+      * JIKA SOAL TRIGONOMETRI (sudut elevasi/depresi, perbandingan sin/cos/tan, atau segitiga siku-siku):
+        Gunakan tag [GEOMETRY:triangle_right:{"bottom":"24 m","left":"8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
+      * KONSISTENSI MUTLAK TITIK SUDUT SIKU-SIKU:
+        - Jika narasi soal menyebutkan "segitiga ABC siku-siku di B", maka field 'rightAngleAt' WAJIB diisi "B". Sisi miring (hipotenusa) adalah AC ($AC^2 = AB^2 + BC^2$). DILARANG KERAS narasi menulis siku-siku di B tetapi gambar siku-siku di A!
+      * KONSISTENSI NILAI SUDUT DAN PERBANDINGAN SISI:
+        - Sisi miring ('hypotenuse') WAJIB sisi yang terpanjang.
+        - Sudut elevasi $30^\\circ$: perbandingan depan : samping : miring = $1 : \\sqrt{3} : 2$. Contoh: tinggi depan $8\\sqrt{3}\\text{ m}$, alas samping $24\\text{ m}$, miring $16\\sqrt{3}\\text{ m}$. Nilai $\\tan(30^\\circ) = \\frac{8\\sqrt{3}}{24} = \\frac{1}{3}\\sqrt{3}$ (KONSISTEN 100%).
+        - Sudut elevasi $45^\\circ$: sisi depan = sisi samping ($1 : 1 : \\sqrt{2}$).
+        - Sudut elevasi $60^\\circ$: perbandingan $\\sqrt{3} : 1 : 2$.
+        - DILARANG KERAS gambar menampilkan angka/sudut yang bertentangan dengan teks soal dan opsi jawaban!
+      
+      PANDUAN BANGUN GEOMETRI SULIT (DILARANG MEMBUAT SLIDE PPT):
+      * JIKA SOAL MENGUJI BANGUN GEOMETRI SULIT ATAU 3D DIMENSI TIGA YANG KOMPLEKS (seperti: "Limas Terpancung", "Irisan Bidang pada Kubus/Balok/Prisma", "Frustum Kerucut", "Prisma Segi Enam Beraturan", "Jaring-jaring Kompleks"):
+        Gunakan cara 'ai_svg' atau sisipkan tag [ai_svg: Gambar teknis 3D isometrik ...] dengan 'svgStyle': "geometry".
+        Tuliskan deskripsi teknis geometri presisi: misal "Gambar teknis 3D isometrik limas terpancung ABCD.EFGH dengan alas persegi 10x10 cm, tutup atas 6x6 cm, tinggi t = 8 cm, rusuk belakang putus-putus, label titik sudut dan dimensi berpanah".
+        PERINGATAN KERAS & MUTLAK: DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT! Gambar yang dihasilkan harus murni bentuk fisik geometri 3D matematika presisi.
       
       PENTING - KEBERAGAMAN BENTUK BANGUN RUANG (DILARANG MONOTON):
       * DILARANG KERAS selalu membuat soal volume bangun ruang yang hanya berupa gabungan balok dan limas!
@@ -96,6 +114,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         - Balok KLMN.OPQR: [GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"KLMN.OPQR"}]
         - Limas T.ABCD: [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm","vertices":"T.ABCD"}]
         - Prisma ABC.DEF: [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm","vertices":"ABC.DEF"}]
+        - Segitiga Siku-Siku ABC: [GEOMETRY:triangle_right:{"bottom":"24 m","left":"8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
         - Segitiga ABC: [GEOMETRY:triangle:{"bottom":"12 cm","left":"10 cm","right":"10 cm","vertices":"ABC","angleA":"60°","angleB":"60°"}]
         - Persegi Panjang ABCD: [GEOMETRY:rectangle:{"width":"14 cm","height":"8 cm","vertices":"ABCD"}]
       Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
@@ -108,7 +127,19 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       * Bangun Gabungan Balok + Limas: [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
       * Bangun Gabungan Tabung + Kerucut: [GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]
       * Bangun Gabungan Balok + Atap Prisma: [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
-    - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
+    - Diagram (Charts) & STATISTIKA INFORMATIF LENGKAP:
+      JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
+      * PANDUAN MUTLAK DIAGRAM STATISTIKA (WAJIB JELAS, LENGKAP, DAN KONSISTEN):
+        1. JUDUL DIAGRAM LENGKAP: Field 'chartData.title' WAJIB spesifik memuat topik, subjek, satuan, dan periode/tahun jika ada (Contoh: "Diagram Batang: Frekuensi Nilai Ulangan Matematika Siswa Kelas VIII", "Hasil Panen Padi Desa Sukamaju 2020-2024 (Ton)"). DILARANG menuliskan judul kosong atau sekadar "Diagram"!
+        2. SUMBU KATEGORI & SATUAN DATA:
+           - Sumbu X ('labels'): Tuliskan kategori yang jelas (contoh: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] atau ["Nilai 60", "Nilai 70", "Nilai 80", "Nilai 90", "Nilai 100"]).
+           - Dataset label ('datasets[0].label'): Cantumkan nama besaran dan satuan (contoh: "Frekuensi (Siswa)" atau "Hasil Panen (Ton)").
+        3. KONSISTENSI DATA NUMERIK 100%:
+           - Angka di 'datasets[0].data' HARUS sama persis dengan angka yang dirujuk dalam teks narasi soal, pertanyaan, perhitungan mean/median/modus pada explanation, dan opsi jawaban. DILARANG grafik menampilkan nilai 15 tetapi di soal tertulis 20!
+        4. DIAGRAM LINGKARAN (PIE CHART):
+           - Nilai data harus bulat dan jelas apakah berupa frekuensi asli atau persentase.
+           - Jika persentase, total seluruh juring WAJIB tepat 100%. Jika derajat, total sudut WAJIB tepat 360°.
+           - Tuliskan total populasi di teks soal (contoh: "Diagram lingkaran di samping menunjukkan kegiatan ekstrakurikuler 120 siswa SMP Nusantara:").
       * Diagram Venn: gunakan 'labels' untuk nama himpunan (["A", "B"] atau ["A", "B", "C"]). 'datasets.data' berisi nilai area (Hanya A, Hanya B, Irisan A&B, Di Luar, Semesta).
       * Relasi/Fungsi: 'datasets'[0] = anggota Domain, 'datasets'[1] = Kodomain, 'datasets'[2] = pasangan "indexDomain-indexKodomain".
       * Diagram Kartesius (Cartesian):
@@ -132,7 +163,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         2. Cara 'chart' (Diagram Statistik & Hubungan): Gunakan tag [CHART] dan isi 'chartData' jika butir soal menguji data statistik (batang/garis/lingkaran), relasi/fungsi, diagram venn, atau kurva/titik koordinat kartesius. Set 'visualStimulusType': "chart".
         3. Cara 'table' (Tabel Markdown): Gunakan tabel data terstruktur Markdown untuk daftar frekuensi nilai, jadwal, atau perbandingan tekstual. Set 'visualStimulusType': "table".
         4. Cara 'wikimedia_photo' (Foto Otentik Nyata): Gunakan jika soal membutuhkan foto riil sejarah/tokoh pahlawan (Soekarno, Cut Nyak Dien), candi/monumen nyata (Borobudur, Prambanan, Monas), atau flora/fauna endemik nyata (Komodo, Rafflesia). Tuliskan 1-2 kata kunci bahasa Inggris pada 'imageSearchKeyword'. Set 'visualStimulusType': "wikimedia_photo".
-        5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk seluruh konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), peta/denah konseptual, bagan alur proses (flowchart), infografis materi, atau ilustrasi kontekstual. Tuliskan deskripsi gambar ilmiah yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("infographic", "diagram", "flowchart", "geometry", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
+        5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk:
+           a) Konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), bagan alur proses (flowchart).
+           b) BANGUN GEOMETRI SULIT / 3D DIMENSI TIGA (Limas Terpancung, Irisan Bidang Kubus/Balok, Frustum Kerucut, Prisma Segi Enam Beraturan, Jaring-jaring Kompleks). WAJIB pilih 'svgStyle': "geometry" dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
+           Tuliskan deskripsi gambar yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("geometry", "diagram", "infographic", "flowchart", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar teknis/ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
     - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3. Untuk rumus matematika multi-baris bertingkat / sistem persamaan, Anda dapat menggunakan pemisah baris (\\n) atau '\\\\\\' dan '&' untuk penyejajaran.
