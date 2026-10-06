@@ -1543,21 +1543,24 @@ function buildTrigonometryFallbackQuestion(args: {
   const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
   const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan segitiga dan sudut elevasi kontekstual, peserta didik dapat menerapkan perbandingan trigonometri untuk memecahkan masalah.");
 
-  const questionText = `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki sebuah menara pemancar. Dari posisi pengamat, puncak menara terlihat dengan sudut elevasi $30^\\circ$. Jika tinggi mata pengamat dari tanah adalah $1,5\\text{ m}$, tinggi menara pemancar tersebut adalah ....</p>`;
+  const trigGeometryTag = `[GEOMETRY:triangle_right:{"bottom":"24 m","left":"h = 8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°","showVertices":true}]`;
+  const questionText = `<p>Perhatikan sketsa pengukuran berikut:</p>\n<p>${trigGeometryTag}</p>\n<p>Seorang pengamat berdiri sejauh 24 meter dari kaki sebuah menara pemancar (titik B). Dari posisi pengamat (titik C), puncak menara (titik A) terlihat dengan sudut elevasi $30^\\circ$. Jika tinggi mata pengamat dari tanah adalah $1,5\\text{ m}$, tinggi menara pemancar tersebut adalah ....</p>`;
 
   const explanation = `**Langkah Perhitungan Trigonometri:**
-1. Gunakan perbandingan tangen: $\\tan(30^\\circ) = \\frac{\\text{tinggi menara di atas mata}}{\\text{jarak horizontal}} = \\frac{h}{24}$.
-2. Nilai $\\tan(30^\\circ) = \\frac{1}{\\sqrt{3}} = \\frac{1}{3}\\sqrt{3}$.
-3. Maka $h = 24 \\times \\frac{1}{3}\\sqrt{3} = 8\\sqrt{3}\\text{ m}$.
-4. Tinggi total menara dari tanah = $(1,5 + 8\\sqrt{3})\\text{ m}$.`;
+1. Gunakan segitiga siku-siku ABC yang siku-siku di titik B (kaki menara).
+2. Perbandingan tangen sudut elevasi di titik C ($30^\\circ$):
+   $$\\tan(30^\\circ) = \\frac{\\text{sisi depan (tinggi menara di atas mata)}}{\\text{sisi samping (jarak horizontal)}} = \\frac{h}{24}$$
+3. Nilai $\\tan(30^\\circ) = \\frac{1}{3}\\sqrt{3}$.
+4. Maka tinggi di atas mata: $h = 24 \\times \\frac{1}{3}\\sqrt{3} = 8\\sqrt{3}\\text{ m}$.
+5. Tinggi total menara pemancar dari tanah = $(1,5 + 8\\sqrt{3})\\text{ m}$.`;
 
   if (qType === "TRUE_FALSE") {
     return {
       id,
       questionType: "TRUE_FALSE",
-      questionText: `<p>Seorang pengamat berdiri sejauh 24 meter dari kaki menara pemancar (sudut elevasi $30^\\circ$, tinggi mata $1,5\\text{ m}$). Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      questionText: `<p>Perhatikan sketsa pengukuran menara berikut:</p>\n<p>${trigGeometryTag}</p>\n<p>Seorang pengamat berdiri sejauh 24 meter dari kaki menara pemancar (sudut elevasi $30^\\circ$, tinggi mata $1,5\\text{ m}$). Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
       options: [],
-      correctAnswer: "",
+      correctAnswer: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Benar",
       scoreWeight: 1,
       trueFalseRows: [
         { text: "Tinggi menara di atas ketinggian mata pengamat dapat dihitung menggunakan perbandingan tangen.", answer: true },
