@@ -61,6 +61,12 @@ export function generateContextualEducationalSvg(prompt: string, style?: string)
     return createFlowchartSvg(prompt);
   }
 
+  // Pure Technical Mathematical & 3D Geometry Diagram (ZERO PPT / NO SLIDE CARDS)
+  const isGeometry = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|dimensi\s*tiga|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga|terpancung|frustum|irisan|bidang\s*iris|rusuk|diagonal|jaring-jaring|segi\s*(enam|delapan|lima)|heksagon|oktagon|poligon|sudut|trigonometri|tembereng|juring|bola|lingkaran|elips|parabola|jajargenjang|belah\s*ketupat|layang|trapezoid|pyramid|prism|cylinder|cone|cube|cuboid|tetrahedron|oktahedron|isometrik|proyeksi|cross\s*section/i.test(prompt);
+  if (isGeometry) {
+    return createComplexGeometrySvg(prompt);
+  }
+
   // Universal High-Quality Educational Infographic
   return createGenericInfographicSvg(prompt);
 }
@@ -889,5 +895,267 @@ function createGenericInfographicSvg(prompt: string): string {
       <tspan x="100" dy="18">• Amati setiap diagram dan data pendukung untuk menyimpulkan prinsip atau jawaban yang paling tepat.</tspan>
     </text>
   </g>
+</svg>`;
+}
+
+// 12. Complex Technical Geometry SVG Generator (STRICTLY NO PPT SLIDES)
+function createComplexGeometrySvg(prompt: string): string {
+  const p = (prompt || "").toLowerCase();
+  const safeCaption = escapeXml(truncate(prompt, 70));
+
+  // A. Irisan Bidang pada Kubus / Balok (Cross-Section Plane)
+  if (p.includes("irisan") || p.includes("bidang iris") || p.includes("cross section") || p.includes("memotong rusuk")) {
+    return `<svg viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+  
+  <!-- Technical Legend / Subtitle -->
+  <text x="50" y="45" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#0f172a">DIAGRAM GEOMETRI RUANG: Irisan Bidang pada Kubus ABCD.EFGH</text>
+  <text x="50" y="68" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">${safeCaption}</text>
+
+  <!-- Markers for dimension arrows -->
+  <defs>
+    <marker id="arr-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 8 2 L 2 5 L 8 8" fill="none" stroke="#2563eb" stroke-width="1.5" />
+    </marker>
+    <marker id="arr-end" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 2 2 L 8 5 L 2 8" fill="none" stroke="#2563eb" stroke-width="1.5" />
+    </marker>
+  </defs>
+
+  <!-- Isometric Cube Coordinates: Center around x=420, y=280 -->
+  <!-- Base ABCD: A(300, 390), B(520, 390), C(590, 330), D(370, 330) -->
+  <!-- Top EFGH: E(300, 190), F(520, 190), G(590, 130), H(370, 130) -->
+
+  <!-- Hidden / Back Edges (Dashed) -->
+  <line x1="370" y1="330" x2="300" y2="390" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DA -->
+  <line x1="370" y1="330" x2="590" y2="330" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DC -->
+  <line x1="370" y1="330" x2="370" y2="130" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DH -->
+
+  <!-- Shaded Cross-Section Slice Plane (P-Q-R) -->
+  <!-- P on AE (300, 290), Q on CG (590, 230), R on FG (555, 160), S on AB (410, 390) -->
+  <polygon points="300,290 410,390 590,260 555,160 370,180" fill="rgba(239, 68, 68, 0.25)" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="3 3" />
+  
+  <!-- Slice Plane Boundary Hatching Lines -->
+  <line x1="300" y1="290" x2="590" y2="260" stroke="#dc2626" stroke-width="1.5" stroke-opacity="0.6" stroke-dasharray="4 4" />
+  <line x1="410" y1="390" x2="555" y2="160" stroke="#dc2626" stroke-width="1.5" stroke-opacity="0.6" stroke-dasharray="4 4" />
+
+  <!-- Visible Outer Edges (Solid 3D Line) -->
+  <polygon points="300,390 520,390 520,190 300,190" fill="rgba(59, 130, 246, 0.04)" stroke="#0f172a" stroke-width="2.5" /> <!-- Front Face ABFE -->
+  <polygon points="520,390 590,330 590,130 520,190" fill="rgba(59, 130, 246, 0.08)" stroke="#0f172a" stroke-width="2.5" /> <!-- Right Face BCGF -->
+  <polygon points="300,190 520,190 590,130 370,130" fill="rgba(59, 130, 246, 0.12)" stroke="#0f172a" stroke-width="2.5" /> <!-- Top Face EFGH -->
+
+  <!-- Vertices Circles & Letters -->
+  <circle cx="300" cy="390" r="4" fill="#0f172a" /><text x="282" y="405" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">A</text>
+  <circle cx="520" cy="390" r="4" fill="#0f172a" /><text x="532" y="405" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">B</text>
+  <circle cx="590" cy="330" r="4" fill="#0f172a" /><text x="605" y="335" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">C</text>
+  <circle cx="370" cy="330" r="3.5" fill="#64748b" /><text x="352" y="330" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#64748b">D</text>
+  
+  <circle cx="300" cy="190" r="4" fill="#0f172a" /><text x="282" y="185" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">E</text>
+  <circle cx="520" cy="190" r="4" fill="#0f172a" /><text x="532" y="185" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">F</text>
+  <circle cx="590" cy="130" r="4" fill="#0f172a" /><text x="605" y="130" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">G</text>
+  <circle cx="370" cy="130" r="4" fill="#0f172a" /><text x="355" y="125" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">H</text>
+
+  <!-- Slice Intersection Points P, Q, R -->
+  <circle cx="300" cy="290" r="5" fill="#dc2626" /><text x="278" y="295" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#dc2626">P</text>
+  <circle cx="410" cy="390" r="5" fill="#dc2626" /><text x="410" y="415" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#dc2626">Q</text>
+  <circle cx="555" cy="160" r="5" fill="#dc2626" /><text x="568" y="165" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#dc2626">R</text>
+
+  <!-- Dimension Annotation Lines -->
+  <line x1="300" y1="425" x2="520" y2="425" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-start)" marker-end="url(#arr-end)" />
+  <text x="410" y="445" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="middle">s = 8 cm</text>
+
+  <line x1="260" y1="390" x2="260" y2="190" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-start)" marker-end="url(#arr-end)" />
+  <text x="245" y="295" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="end">t = 8 cm</text>
+
+  <!-- Technical Explanatory Note Box (Clean Badge) -->
+  <rect x="50" y="485" width="750" height="42" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+  <text x="65" y="511" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#334155">Keterangan: Daerah terarsir merah adalah bidang irisan yang memotong rusuk kubus pada titik P, Q, dan R.</text>
+</svg>`;
+  }
+
+  // B. Limas Terpancung (Frustum of a Pyramid)
+  if (p.includes("terpancung") || p.includes("frustum") || (p.includes("limas") && (p.includes("atap") || p.includes("potong")))) {
+    return `<svg viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+  
+  <text x="50" y="45" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#0f172a">DIAGRAM GEOMETRI RUANG: Limas Terpancung ABCD.EFGH</text>
+  <text x="50" y="68" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">${safeCaption}</text>
+
+  <defs>
+    <marker id="arr-geom" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
+    </marker>
+  </defs>
+
+  <!-- Base ABCD: A(260, 420), B(560, 420), C(660, 330), D(360, 330) -->
+  <!-- Top EFGH: E(340, 200), F(480, 200), G(530, 160), H(390, 160) -->
+
+  <!-- Dashed Back Edges -->
+  <line x1="360" y1="330" x2="260" y2="420" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DA -->
+  <line x1="360" y1="330" x2="660" y2="330" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DC -->
+  <line x1="360" y1="330" x2="390" y2="160" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- DH -->
+  
+  <!-- Dashed Height Center Altitude Line -->
+  <line x1="460" y1="375" x2="460" y2="180" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 4" />
+  <polyline points="460,360 475,360 475,375" fill="none" stroke="#dc2626" stroke-width="1.5" />
+  <text x="475" y="280" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#dc2626">t = 12 cm</text>
+
+  <!-- Visible Faces -->
+  <polygon points="260,420 560,420 480,200 340,200" fill="rgba(59, 130, 246, 0.06)" stroke="#0f172a" stroke-width="2.5" /> <!-- Front ABFE -->
+  <polygon points="560,420 660,330 530,160 480,200" fill="rgba(59, 130, 246, 0.12)" stroke="#0f172a" stroke-width="2.5" /> <!-- Right BCGF -->
+  <polygon points="340,200 480,200 530,160 390,160" fill="rgba(16, 185, 129, 0.15)" stroke="#059669" stroke-width="2.5" /> <!-- Top EFGH -->
+
+  <!-- Vertices Labels -->
+  <circle cx="260" cy="420" r="4" fill="#0f172a" /><text x="242" y="435" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">A</text>
+  <circle cx="560" cy="420" r="4" fill="#0f172a" /><text x="575" y="435" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">B</text>
+  <circle cx="660" cy="330" r="4" fill="#0f172a" /><text x="675" y="335" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">C</text>
+  <circle cx="360" cy="330" r="3.5" fill="#64748b" /><text x="342" y="330" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#64748b">D</text>
+
+  <circle cx="340" cy="200" r="4" fill="#0f172a" /><text x="322" y="198" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">E</text>
+  <circle cx="480" cy="200" r="4" fill="#0f172a" /><text x="492" y="198" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">F</text>
+  <circle cx="530" cy="160" r="4" fill="#0f172a" /><text x="545" y="160" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">G</text>
+  <circle cx="390" cy="160" r="4" fill="#0f172a" /><text x="375" y="155" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#0f172a">H</text>
+
+  <!-- Dimension Annotations -->
+  <!-- Bottom Base Dimension -->
+  <line x1="260" y1="455" x2="560" y2="455" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-geom)" marker-end="url(#arr-geom)" />
+  <text x="410" y="475" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="middle">sisi alas = 14 cm</text>
+
+  <!-- Top Base Dimension -->
+  <line x1="340" y1="180" x2="480" y2="180" stroke="#059669" stroke-width="1.8" marker-start="url(#arr-geom)" marker-end="url(#arr-geom)" />
+  <text x="410" y="172" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#059669" text-anchor="middle">sisi atas = 7 cm</text>
+
+  <rect x="50" y="495" width="750" height="38" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+  <text x="65" y="519" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#334155">Bidang alas dan bidang atas berbentuk persegi sejajar dengan tinggi limas terpancung t = 12 cm.</text>
+</svg>`;
+  }
+
+  // C. Prisma Segi Enam Beraturan (Hexagonal Prism)
+  if (p.includes("segi enam") || p.includes("heksagon") || p.includes("hexagonal")) {
+    return `<svg viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+  
+  <text x="50" y="45" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#0f172a">DIAGRAM GEOMETRI RUANG: Prisma Segi Enam Beraturan</text>
+  <text x="50" y="68" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">${safeCaption}</text>
+
+  <defs>
+    <marker id="arr-hex" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
+    </marker>
+  </defs>
+
+  <!-- Bottom Hexagon ABCDEF:
+       Center at (425, 400).
+       A(320, 390), B(375, 430), C(475, 430), D(530, 390), E(475, 350), F(375, 350)
+  -->
+  <!-- Top Hexagon GHIJKL:
+       Center at (425, 180), height = 220
+       G(320, 170), H(375, 210), I(475, 210), J(530, 170), K(475, 130), L(375, 130)
+  -->
+
+  <!-- Dashed Back Lines -->
+  <line x1="375" y1="350" x2="320" y2="390" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- FA -->
+  <line x1="375" y1="350" x2="475" y2="350" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- FE -->
+  <line x1="475" y1="350" x2="530" y2="390" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- ED -->
+  <line x1="375" y1="350" x2="375" y2="130" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- FL -->
+  <line x1="475" y1="350" x2="475" y2="130" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" /> <!-- EK -->
+
+  <!-- Visible Lateral Faces -->
+  <polygon points="320,390 375,430 375,210 320,170" fill="rgba(59, 130, 246, 0.05)" stroke="#0f172a" stroke-width="2.5" />
+  <polygon points="375,430 475,430 475,210 375,210" fill="rgba(59, 130, 246, 0.10)" stroke="#0f172a" stroke-width="2.5" />
+  <polygon points="475,430 530,390 530,170 475,210" fill="rgba(59, 130, 246, 0.15)" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Top Hexagon (Fully Visible) -->
+  <polygon points="320,170 375,210 475,210 530,170 475,130 375,130" fill="rgba(99, 102, 241, 0.2)" stroke="#4338ca" stroke-width="2.5" />
+
+  <!-- Outer Front Outline -->
+  <polyline points="320,170 320,390 375,430 475,430 530,390 530,170" fill="none" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Vertices Labels -->
+  <circle cx="320" cy="390" r="4" fill="#0f172a" /><text x="300" y="400" font-family="system-ui, sans-serif" font-size="13" font-weight="800">A</text>
+  <circle cx="375" cy="430" r="4" fill="#0f172a" /><text x="370" y="450" font-family="system-ui, sans-serif" font-size="13" font-weight="800">B</text>
+  <circle cx="475" cy="430" r="4" fill="#0f172a" /><text x="475" y="450" font-family="system-ui, sans-serif" font-size="13" font-weight="800">C</text>
+  <circle cx="530" cy="390" r="4" fill="#0f172a" /><text x="545" y="400" font-family="system-ui, sans-serif" font-size="13" font-weight="800">D</text>
+
+  <circle cx="320" cy="170" r="4" fill="#4338ca" /><text x="300" y="165" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#4338ca">G</text>
+  <circle cx="375" cy="210" r="4" fill="#4338ca" /><text x="365" y="228" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#4338ca">H</text>
+  <circle cx="475" cy="210" r="4" fill="#4338ca" /><text x="475" y="228" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#4338ca">I</text>
+  <circle cx="530" cy="170" r="4" fill="#4338ca" /><text x="545" y="165" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#4338ca">J</text>
+
+  <!-- Dimension Annotations -->
+  <line x1="375" y1="465" x2="475" y2="465" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-hex)" marker-end="url(#arr-hex)" />
+  <text x="425" y="485" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="middle">rusuk alas = 6 cm</text>
+
+  <line x1="280" y1="390" x2="280" y2="170" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-hex)" marker-end="url(#arr-hex)" />
+  <text x="265" y="285" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="end">tinggi = 15 cm</text>
+
+  <rect x="50" y="505" width="750" height="35" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+  <text x="65" y="527" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#334155">Prisma segi enam beraturan memiliki 8 bidang sisi, 18 rusuk, dan 12 titik sudut.</text>
+</svg>`;
+  }
+
+  // D. General Precise 3D Solid (Balok + Limas Gabungan / Kerucut 3D)
+  return `<svg viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+  
+  <text x="50" y="45" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#0f172a">DIAGRAM GEOMETRI RUANG PRESISI 3D</text>
+  <text x="50" y="68" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">${safeCaption}</text>
+
+  <defs>
+    <marker id="arr-gen" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
+    </marker>
+  </defs>
+
+  <!-- Cuboid + Pyramid Combined Solid (Tugu / Bangun Gabungan 3D) -->
+  <!-- Base Balok: A(280, 420), B(540, 420), C(620, 350), D(360, 350) -->
+  <!-- Mid Balok: E(280, 260), F(540, 260), G(620, 190), H(360, 190) -->
+  <!-- Pyramid Apex: T(450, 100) -->
+
+  <!-- Dashed Back Edges of Cuboid -->
+  <line x1="360" y1="350" x2="280" y2="420" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" />
+  <line x1="360" y1="350" x2="620" y2="350" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" />
+  <line x1="360" y1="350" x2="360" y2="190" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" />
+  
+  <!-- Dashed Back Edge of Pyramid -->
+  <line x1="360" y1="190" x2="450" y2="100" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5 5" />
+  
+  <!-- Dashed Pyramid Height -->
+  <line x1="450" y1="225" x2="450" y2="100" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 4" />
+  <text x="465" y="150" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#dc2626">t limas = 6 cm</text>
+
+  <!-- Visible Solid Faces -->
+  <polygon points="280,420 540,420 540,260 280,260" fill="rgba(59, 130, 246, 0.08)" stroke="#0f172a" stroke-width="2.5" />
+  <polygon points="540,420 620,350 620,190 540,260" fill="rgba(59, 130, 246, 0.15)" stroke="#0f172a" stroke-width="2.5" />
+  
+  <!-- Pyramid Slanted Faces -->
+  <polygon points="280,260 540,260 450,100" fill="rgba(245, 158, 11, 0.15)" stroke="#b45309" stroke-width="2.5" />
+  <polygon points="540,260 620,190 450,100" fill="rgba(245, 158, 11, 0.22)" stroke="#b45309" stroke-width="2.5" />
+
+  <!-- Intersection Boundary Line -->
+  <line x1="280" y1="260" x2="540" y2="260" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="540" y1="260" x2="620" y2="190" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Vertices -->
+  <circle cx="450" cy="100" r="4.5" fill="#b45309" /><text x="445" y="85" font-family="system-ui, sans-serif" font-size="14" font-weight="900" fill="#b45309">T</text>
+  <circle cx="280" cy="420" r="4" fill="#0f172a" /><text x="262" y="435" font-family="system-ui, sans-serif" font-size="13" font-weight="800">A</text>
+  <circle cx="540" cy="420" r="4" fill="#0f172a" /><text x="555" y="435" font-family="system-ui, sans-serif" font-size="13" font-weight="800">B</text>
+  <circle cx="620" cy="350" r="4" fill="#0f172a" /><text x="635" y="355" font-family="system-ui, sans-serif" font-size="13" font-weight="800">C</text>
+  <circle cx="280" cy="260" r="4" fill="#0f172a" /><text x="262" y="260" font-family="system-ui, sans-serif" font-size="13" font-weight="800">E</text>
+  <circle cx="540" cy="260" r="4" fill="#0f172a" /><text x="552" y="265" font-family="system-ui, sans-serif" font-size="13" font-weight="800">F</text>
+  <circle cx="620" cy="190" r="4" fill="#0f172a" /><text x="635" y="195" font-family="system-ui, sans-serif" font-size="13" font-weight="800">G</text>
+
+  <!-- Dimension Lines -->
+  <line x1="280" y1="450" x2="540" y2="450" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-gen)" marker-end="url(#arr-gen)" />
+  <text x="410" y="470" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="middle">panjang = 12 cm</text>
+
+  <line x1="565" y1="440" x2="635" y2="375" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-gen)" marker-end="url(#arr-gen)" />
+  <text x="615" y="425" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb">lebar = 8 cm</text>
+
+  <line x1="240" y1="420" x2="240" y2="260" stroke="#2563eb" stroke-width="1.8" marker-start="url(#arr-gen)" marker-end="url(#arr-gen)" />
+  <text x="225" y="345" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#2563eb" text-anchor="end">t balok = 10 cm</text>
+
+  <rect x="50" y="500" width="750" height="38" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+  <text x="65" y="524" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#334155">Bangun gabungan terdiri atas balok berukuran 12 cm × 8 cm × 10 cm dan limas beraturan dengan tinggi 6 cm.</text>
 </svg>`;
 }
