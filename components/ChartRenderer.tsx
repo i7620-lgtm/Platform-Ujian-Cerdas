@@ -15,6 +15,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 import { ChartData } from "../types";
 
@@ -72,7 +73,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return null;
 };
 
-const BAR_CHART_MARGIN = { top: 20, right: 20, left: -20, bottom: 0 };
+const BAR_CHART_MARGIN = { top: 30, right: 25, left: -10, bottom: 5 };
 
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
@@ -135,8 +136,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   }, [type, labels, datasets]);
 
   const renderPieLabel = React.useCallback((props: any) => {
-    const { name, percent, x, y, textAnchor, fill } = props;
+    const { name, percent, x, y, textAnchor, fill, value } = props;
     if (!percent || percent === 0) return null;
+    const valueText = value !== undefined && value !== null ? `${value} ` : "";
     return (
       <text
         x={x}
@@ -147,7 +149,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         fontWeight={700}
         style={{ fontSize: "clamp(9px, 2.5vw, 13px)" }}
       >
-        {`${name}: ${(percent * 100).toFixed(0)}%`}
+        {`${name}: ${valueText}(${(percent * 100).toFixed(0)}%)`}
       </text>
     );
   }, []);
@@ -253,7 +255,16 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   }
                   maxBarSize={80}
                   isAnimationActive={false}
-                />
+                >
+                  <LabelList
+                    dataKey={dataset.label}
+                    position="top"
+                    fill="#1e293b"
+                    fontSize={12}
+                    fontWeight={800}
+                    offset={6}
+                  />
+                </Bar>
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -313,7 +324,16 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   dot={{ r: 6, strokeWidth: 2, fill: "#fff" }}
                   activeDot={{ r: 8, strokeWidth: 0 }}
                   isAnimationActive={false}
-                />
+                >
+                  <LabelList
+                    dataKey={dataset.label}
+                    position="top"
+                    fill="#1e293b"
+                    fontSize={11}
+                    fontWeight={800}
+                    offset={8}
+                  />
+                </Line>
               ))}
             </LineChart>
           </ResponsiveContainer>
