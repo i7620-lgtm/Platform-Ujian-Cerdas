@@ -510,7 +510,7 @@ function buildMathFallbackQuestion(args: {
     datasets: [
       {
         label: "Jumlah Karung Beras Terjual",
-        data: ["16", "20", "28", "22", "30"]
+        data: [16, 20, 28, 22, 30]
       }
     ]
   };
