@@ -70,8 +70,21 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
 
     const modelsToTry = [...FLASH_MODELS_CASCADE];
     
+    const isGeometryMode = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|dimensi\s*tiga|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga|terpancung|frustum|irisan|bidang\s*iris|rusuk|diagonal|jaring-jaring|segi\s*(enam|delapan|lima)|heksagon|oktagon|poligon|sudut|trigonometri|tembereng|juring|bola|lingkaran|elips|parabola|jajargenjang|belah\s*ketupat|layang|trapezoid|pyramid|prism|cylinder|cone|cube|cuboid|tetrahedron|oktahedron|isometrik|proyeksi|cross\s*section/i.test(prompt);
+
     let styleInstruction = "";
-    if (style === "infographic") {
+    if (isGeometryMode) {
+        styleInstruction = `PERINGATAN KERAS & ATURAN MUTLAK: DILARANG KERAS MEMBUAT PRESENTASI PPT, KARTU INFOGRAFIS '1. KONSEP DASAR', '2. PROSES & FUNGSI', SLIDE MATERI, ATAU KOTAK KESIMPULAN RANGKUMAN!
+Tugas Anda adalah menggambar BENTUK BANGUN GEOMETRI 2D/3D TEKNIS MATEMATIS MURNI:
+- Bangun Geometri Sulit / 3D Ruang (Limas Terpancung, Irisan Bidang, Prisma Segi-6, Frustum Kerucut, Bangun Gabungan 3D, dsb.):
+  * Gambarkan bentuk fisik 3D secara isometrik atau proyeksi miring presisi.
+  * Rusuk depan/terlihat: garis tegas stroke="#0f172a" ketebalan 2.5.
+  * Rusuk belakang/tersembunyi: WAJIB garis putus-putus (stroke-dasharray="5 5") stroke="#64748b" ketebalan 1.8.
+  * Bidang irisan (jika diminta irisan bidang): gunakan arsiran transparan (contoh fill="rgba(239, 68, 68, 0.25)" stroke="#dc2626") yang memotong rusuk-rusuk secara tepat.
+  * Bangun terpancung (limas/kerucut terpancung): gambarkan bidang alas bawah dan bidang atas sejajar dengan ukuran berbeda, dihubungkan rusuk tegak miring, garis tinggi tegak, dan apotema.
+  * Garis dimensi berpanah: cantumkan ukuran panjang rusuk, tinggi, jari-jari, apotema dengan teks angka dan satuan jelas.
+  * Titik sudut: cantumkan huruf kapital tegas (A, B, C, D, E, F, G, H, T, P, Q, R) pada setiap sudut pertemuan rusuk.`;
+    } else if (style === "infographic") {
         styleInstruction = "Fokuskan pada infografis edukasi modern: judul topik yang jelas, 2-3 kartu konsep simetris dengan ikon dan poin-poin materi, serta kotak kesimpulan/rangkuman rapi di bagian bawah.";
     } else if (style === "diagram") {
         styleInstruction = "Fokuskan pada diagram ilmiah berlabel lengkap dengan panah penunjuk, bagian-bagian objek/organ/alam, dan teks label keterangan yang jelas dan mudah dipahami siswa.";
@@ -79,28 +92,25 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
         styleInstruction = "Fokuskan pada bagan alur proses bertahap atau diagram siklus (daur air, rantai makanan, metamorfosis) dengan panah penghubung, ikon sederhana, dan penomoran langkah yang rapi.";
     } else if (style === "flat_art") {
         styleInstruction = "Gunakan gaya ilustrasi vektor modern datar (flat design) dengan warna-warna cerah, bentuk ramah edukasi, dan tampilan visual menarik untuk siswa sekolah.";
-    } else if (style === "geometry") {
-        styleInstruction = "Fokuskan pada gambar geometri matematika yang presisi, dimensi ukuran yang jelas (panjang, lebar, tinggi, jari-jari), sudut, atau grafik kartesius yang terstruktur rapi.";
     } else {
-        styleInstruction = "Buat infografis atau diagram materi pendidikan yang jelas, rapi, dengan label keterangan dan warna kontras yang edukatif.";
+        styleInstruction = "Buat diagram materi pendidikan yang jelas, rapi, dengan label keterangan dan bentuk yang edukatif.";
     }
 
     if (safety.educationalSafetyDirective) {
         styleInstruction += `\nDIREKTIF KEPATUTAN KURIKULUM: ${safety.educationalSafetyDirective}`;
     }
 
-    const isGeometryMode = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga/i.test(prompt);
-
     let layoutInstruction = "";
     if (isGeometryMode) {
-        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI MURNI (BUKAN POSTER):
-   - DILARANG KERAS MEMBUAT KARTU HEADER, BANNER POSTER, ATAU KOTAK JUDUL ATAS! Ini adalah stimulus soal matematika/geometri resmi.
-   - Posisikan bangun geometri di tengah kanvas (center: x sekitar 425, y sekitar 280).
-   - BANGUN GABUNGAN: Jika diminta bangun gabungan (misal balok dan limas, tabung dan kerucut, persegi dan segitiga), kedua bangun HARUS MENYATU RAPI DAN BERHIMPIT TEPAT (koordinat sisi temu sama persis), DILARANG terpisah atau renggang!
-   - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak atau bidang batas pertemuan.
+        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI TEKNIS MURNI (BUKAN SLIDE PPT / BUKAN POSTER):
+   - DILARANG KERAS MEMBUAT KARTU PRESENTASI, SLIDE PPT, KARTU KONSEP 1-2-3, ATAU KOTAK KESIMPULAN!
+   - Posisikan gambar bangun geometri di tengah kanvas (center x=425, y=280).
+   - Di pojok kiri atas (x=45, y=40), hanya berikan teks judul teknis kecil (maks 1 baris, font-size="14-16", font-weight="800", fill="#0f172a").
+   - Bangun gabungan: kedua bangun harus menempel berhimpit presisi tanpa celah.
+   - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak.
    - Anotasi Ukuran: Gambarkan garis dimensi berpanah dengan teks ukuran jelas (contoh: '12 cm', '8 cm', 't = 15 cm', 'r = 7 cm').
    - Sudut & Titik Sudut: Berikan label titik sudut (A, B, C, D, ...) dan tanda siku-siku pada sudut 90°.
-   - Stroke utama: stroke="#1e293b" ketebalan 2 sampai 2.5, fill transparan atau pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
+   - Stroke utama: stroke="#0f172a" ketebalan 2 sampai 2.5, fill transparan pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
     } else {
         layoutInstruction = `4. TATA LETAK HEADER ATAS (y=25 sampai y=90):
    - Gunakan wadah header elegan di bagian atas: <rect x="40" y="25" width="770" height="65" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
