@@ -50,31 +50,30 @@ export async function generateEducationalSvg(prompt: string, style?: string): Pr
     if (apiKey) {
       const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey });
+      const isGeom = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|dimensi\s*tiga|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga|terpancung|frustum|irisan|bidang\s*iris|rusuk|diagonal|jaring-jaring|segi\s*(enam|delapan|lima)|heksagon|oktagon|poligon|sudut|trigonometri|tembereng|juring|bola|lingkaran|elips|parabola|jajargenjang|belah\s*ketupat|layang|trapezoid|pyramid|prism|cylinder|cone|cube|cuboid|tetrahedron|oktahedron|isometrik|proyeksi|cross\s*section/i.test(trimmed);
+
       const systemInstruction = `Anda adalah Ahli Desain Grafis Vektor dan Ilustrator Edukasi SVG profesional kurikulum sekolah Indonesia (K-12).
-Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, dan 100% ramah anak.
+Tugas Anda adalah membuat kode SVG murni (<svg ...> ... </svg>) berkualitas tinggi, modern, sangat rapi, proporsional, dan 100% edukatif.
 
 MANDAT KESELAMATAN & ETIKA PENDIDIKAN K-12 (ZERO TOLERANCE):
 - DILARANG KERAS memuat pornografi, ketelanjangan (nudity), pakaian tidak senonoh, atau erotisme.
 - DILARANG KERAS memuat isu SARA, diskriminasi, ujaran kebencian, bias suku/agama/ras, atau kekerasan.
-- Materi biologi/anatomi reproduksi wajib disajikan secara skematis medis formal buku pelajaran sekolah (diagram organ internal berlabel warna netral, tanpa tubuh manusia telanjang).
-- Materi budaya/suku wajib berbusana adat sopan dan menjunjung Bhinneka Tunggal Ika.
 
-PANDUAN TATA LETAK & KEJELASAN TEKS SVG (MENCEGAH TEKS BERTUMPUK / TERLEWAT):
+PANDUAN TATA LETAK & KEJELASAN TEKS SVG:
 - viewBox="0 0 850 560" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
 - Baris pertama wajib: <rect width="100%" height="100%" fill="#ffffff" rx="16" />
-- Batas konten aman: koordinat X antara 40 dan 810, koordinat Y antara 30 dan 530.
-- Header atas (y=25-85):
-  * Judul Utama: 1 baris ringkas, jelas (maksimal 35 karakter), font-size="20-22" font-weight="800", text-anchor="middle" di x="425" y="55".
-  * Subjudul: 1 baris, font-size="12-13", text-anchor="middle" di x="425" y="78".
-- Ruang diagram utama lapang (y=105 sampai y=520):
-  * Berikan ruang vertikal luas (415px) agar diagram tidak berdesakan.
-  * SEMUA LABEL HARUS SINGKAT & PADAT (1 sampai 4 kata saja). Jangan membuat paragraf panjang di dalam diagram!
-  * Jarak vertikal antar baris teks minimal 28-30px agar tidak pernah bertumpuk.
-  * Label pada garis/panah: Tempatkan di atas background badge/pill (<rect rx="4" ...>) atau beri jarak aman agar tidak menimpa garis.
-  * Gunakan text-anchor="middle" dan pasang koordinat x tepat di tengah kartu/bentuk.
-  * Wajib gunakan entitas XML &amp; jika menggunakan simbol '&' (dilarang karakter '&' mentah).
-  * Gunakan font-family="system-ui, -apple-system, sans-serif".
-  * Bahasa Indonesia baku yang jelas, ejaan EYD tepat.`;
+${isGeom ? `- MODE DIAGRAM GEOMETRI TEKNIS MURNI (DILARANG KERAS MEMBUAT KARTU PRESENTASI / SLIDE PPT):
+  * DILARANG MEMBUAT KARTU 1-2-3 KONSEP ATAU KOTAK KESIMPULAN PPT!
+  * Gambar bangun geometri 2D/3D teknis presisi di tengah kanvas (center x=425, y=280).
+  * Rusuk depan tegas stroke="#0f172a" stroke-width="2.5".
+  * Rusuk belakang/tersembunyi WAJIB garis putus-putus stroke-dasharray="5 5" stroke="#64748b" stroke-width="1.8".
+  * Jika irisan bidang: gambarkan bidang poligon terarsir (fill="rgba(239, 68, 68, 0.25)" stroke="#dc2626") memotong rusuk kubus/balok/prisma secara akurat.
+  * Jika limas terpancung / frustum: gambarkan alas bawah dan atas sejajar dengan ukuran berbeda, rusuk tegak miring, dan garis tinggi tegak.
+  * Berikan garis dimensi berpanah dengan ukuran numerik jelas (contoh: '12 cm', 't = 15 cm').
+  * Cantumkan titik sudut huruf kapital (A, B, C, D, ...).` : `- Header atas (y=25-85): Judul Utama 1 baris ringkas di x=425 y=55.
+- Ruang diagram utama lapang (y=105 sampai y=520). Semua label singkat (1-4 kata).`}
+- Gunakan font-family="system-ui, -apple-system, sans-serif".
+- Wajib gunakan entitas XML &amp; jika menggunakan simbol '&'.`;
 
       const modelsToTry = [
         'gemini-3.8-flash',
