@@ -117,6 +117,22 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         - Segitiga Siku-Siku ABC: [GEOMETRY:triangle_right:{"bottom":"24 m","left":"8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
         - Segitiga ABC: [GEOMETRY:triangle:{"bottom":"12 cm","left":"10 cm","right":"10 cm","vertices":"ABC","angleA":"60°","angleB":"60°"}]
         - Persegi Panjang ABCD: [GEOMETRY:rectangle:{"width":"14 cm","height":"8 cm","vertices":"ABCD"}]
+      * PANDUAN MUTLAK SOAL TRIGONOMETRI & SEGITIGA SIKU-SIKU (KONSISTENSI VISUAL & MATEMATIS 100%):
+        JIKA soal berkaitan dengan Trigonometri (perbandingan sin, cos, tan, csc, sec, cot, sudut elevasi/depresi, aturan sinus/cosinus, tinggi pohon/gedung/tiang, tangga bersandar):
+        1. WAJIB menggunakan tag: [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
+        2. PEMETAAN SISI & SUDUT YANG WAJIB KONSISTEN:
+           - "bottom": sisi mendatar/samping (alas).
+           - "left": sisi tegak/depan (tinggi).
+           - "hypotenuse": sisi miring terpanjang di depan sudut siku-siku.
+           - "rightAngleAt": nama titik sudut siku-siku (misal "B").
+           - "angleC": sudut lancip pada alas kanan (misal sudut elevasi pengamat).
+        3. KONSISTENSI TOTAL DENGAN NARASI DAN OPSI:
+           - DILARANG KERAS gambar bertentangan dengan teks soal (misal teks menulis "siku-siku di B" tetapi gambar siku-siku di A, atau teks menulis sin C = 3/5 tetapi gambar perbandingan sisinya berbeda).
+           - Perbandingan trigonometri: sin = depan/miring, cos = samping/miring, tan = depan/samping.
+           - Soal kontekstual elevasi: Jika pengamat dengan tinggi mata h_mata (misal 1,5 m) melihat puncak gedung dari jarak d dengan sudut elevasi α:
+             * Tinggi segitiga (sisi depan) = d * tan α.
+             * Tinggi gedung total = tinggi segitiga + h_mata.
+             * Pastikan seluruh angka pada narasi, visual, opsi, dan explanation terverifikasi matematis 100%!
       Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
       * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm","vertices":"ABCD.EFGH"}]
       * Kubus: [GEOMETRY:cube:{"side":"8 cm"}]
@@ -129,14 +145,23 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       * Bangun Gabungan Balok + Atap Prisma: [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
     - Diagram (Charts) & STATISTIKA INFORMATIF LENGKAP:
       JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
-      * PANDUAN MUTLAK DIAGRAM STATISTIKA (WAJIB JELAS, LENGKAP, DAN KONSISTEN):
-        1. JUDUL DIAGRAM LENGKAP: Field 'chartData.title' WAJIB spesifik memuat topik, subjek, satuan, dan periode/tahun jika ada (Contoh: "Diagram Batang: Frekuensi Nilai Ulangan Matematika Siswa Kelas VIII", "Hasil Panen Padi Desa Sukamaju 2020-2024 (Ton)"). DILARANG menuliskan judul kosong atau sekadar "Diagram"!
-        2. SUMBU KATEGORI & SATUAN DATA:
-           - Sumbu X ('labels'): Tuliskan kategori yang jelas (contoh: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] atau ["Nilai 60", "Nilai 70", "Nilai 80", "Nilai 90", "Nilai 100"]).
+      * PANDUAN MUTLAK DIAGRAM STATISTIKA (WAJIB JELAS, LENGKAP, DATA LENGKAP DAPAT DIHITUNG, DAN KONSISTEN):
+        1. JUDUL DIAGRAM LENGKAP & SPESIFIK:
+           Field 'chartData.title' WAJIB spesifik memuat topik, subjek, satuan, dan periode/tahun jika ada (Contoh: "Diagram Batang: Distribusi Frekuensi Nilai Ulangan Matematika Siswa Kelas VIII", "Hasil Panen Padi Desa Sukamaju 2020-2024 (Ton)"). DILARANG menuliskan judul kosong atau sekadar "Diagram"!
+        2. ATURAN MUTLAK RENTANG KELAS INTERVAL (HISTOGRAM & DATA BERKELOMPOK):
+           - JIKA SOAL ATAU PILIHAN JAWABAN MENANYAKAN/MEMUAT BENTUK RENTANG NILAI (misal: "Rentang nilai manakah yang...", "Berapa banyak siswa dalam rentang...", atau opsi jawaban berupa interval: ["41 - 50", "51 - 60", "61 - 70", "71 - 80"]):
+             * Sumbu X ('chartData.labels') WAJIB MENULISKAN LABEL RENTANG SECARA EKSPLISIT DAN LENGKAP PADA SETIAP BATANG!
+               Contoh BENAR: ["41 - 50", "51 - 60", "61 - 70", "71 - 80", "81 - 90"] atau ["140 - 149 cm", "150 - 159 cm", "160 - 169 cm"].
+             * DILARANG KERAS hanya menuliskan angka tunggal (seperti ["1", "2", "3", "4", "5"] atau ["45", "55", "65"]) jika pertanyaan atau opsi meminta rentang kelas!
+             * OPSI JAWABAN HARUS PERSIS SAMA DENGAN LABEL RENTANG PADA DIAGRAM (Jika diagram memuat kelas "51 - 60", opsi jawaban harus "51 - 60", bukan rentang lain yang membingungkan siswa).
+        3. KELENGKAPAN DATA 100% (SOAL WAJIB DAPAT DIHITUNG SECARA PASTI / SOLVABLE):
+           - Seluruh nilai frekuensi untuk SETIAP kelas/kategori WAJIB tercantum pasti pada 'datasets[0].data' (dan angka frekuensi tersebut akan otomatis ditampilkan tegas di atas setiap batang diagram).
+           - DILARANG KERAS membuat soal yang menanyakan ukuran pemusatan (mean/rata-rata, median, modus, kuartil, jangkauan, persentase lulus, selisih frekuensi) jika data frekuensi pada diagram tidak lengkap atau ada kelas yang informasinya terpotong!
+           - JUMLAH TOTAL POPULASI KONSISTEN: Jika teks soal menyatakan "Data nilai dari 40 siswa...", maka jumlah nilai seluruh elemen pada 'datasets[0].data' WAJIB TEPAT bernilai 40 (misal: [4, 8, 14, 10, 4] = 40). DILARANG ADA KETIDAKCOCOKAN DATA!
+        4. SUMBU KATEGORI & SATUAN DATA:
+           - Sumbu X ('labels'): Tuliskan kategori/rentang yang jelas (contoh: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] atau ["41 - 50", "51 - 60", "61 - 70", "71 - 80", "81 - 90"]).
            - Dataset label ('datasets[0].label'): Cantumkan nama besaran dan satuan (contoh: "Frekuensi (Siswa)" atau "Hasil Panen (Ton)").
-        3. KONSISTENSI DATA NUMERIK 100%:
-           - Angka di 'datasets[0].data' HARUS sama persis dengan angka yang dirujuk dalam teks narasi soal, pertanyaan, perhitungan mean/median/modus pada explanation, dan opsi jawaban. DILARANG grafik menampilkan nilai 15 tetapi di soal tertulis 20!
-        4. DIAGRAM LINGKARAN (PIE CHART):
+        5. DIAGRAM LINGKARAN (PIE CHART):
            - Nilai data harus bulat dan jelas apakah berupa frekuensi asli atau persentase.
            - Jika persentase, total seluruh juring WAJIB tepat 100%. Jika derajat, total sudut WAJIB tepat 360°.
            - Tuliskan total populasi di teks soal (contoh: "Diagram lingkaran di samping menunjukkan kegiatan ekstrakurikuler 120 siswa SMP Nusantara:").
@@ -541,11 +566,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       6. STIMULUS REPRESENTATIF TERBAIK (includeImages=true):
          - Fitur 'Sertakan Gambar, Geometri Bangun & Diagram Representatif' AKTIF.
          - Analisis materi soal dan tentukan CARA TERBAIK:
-           * Geometri bangun datar/ruang/gabungan berdimensi angka? Pilih 'geometry' dan sertakan tag [GEOMETRY:...].
-           * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'.
+           * Geometri bangun datar/ruang/gabungan berdimensi angka? Pilih 'geometry' dan sertakan tag [GEOMETRY:...]. Untuk Trigonometri, WAJIB gunakan [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"..."}] dengan konsistensi 100% antara narasi, sisi, sudut, dan rasio sin/cos/tan.
+           * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'. Jika opsi atau pertanyaan berbentuk rentang/interval, Sumbu X WAJIB menuliskan rentang kelas lengkap (contoh: ["41 - 50", "51 - 60", "61 - 70", "71 - 80"]) dan seluruh frekuensi harus lengkap agar soal dapat dihitung pasti.
            * Tabel data terstruktur / daftar frekuensi? Pilih 'table' (tabel Markdown murni).
            * Foto pahlawan/tempat/monumen/spesies otentik nyata? Pilih 'wikimedia_photo' dan isi 'imageSearchKeyword'.
-           * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'. Generator Gambar AI akan langsung menggambar vektor SVG tajam stimulus tersebut secara otomatis!
+           * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'.
+           * BANGUN GEOMETRI SULIT (Limas Terpancung, Frustum Kerucut, Irisan Bidang Kubus/Balok, Prisma Segi Enam, Bangun Gabungan 3D)? WAJIB pilih 'ai_svg', set 'svgStyle': "geometry", dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
       ` : ''}
     `;
 
