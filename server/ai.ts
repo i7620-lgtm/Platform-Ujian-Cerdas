@@ -269,23 +269,72 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                   responseMimeType: "application/json"
                 };
 
-                // Use clean, flat top-level schema to ensure 100% compatibility across all Gemini models
+                // Gunakan properties lengkap agar diagram statistik (chartData), tabel, dan geometri ter-generate secara utuh
+                const fullProperties = (properties && Object.keys(properties).length > 0) ? properties : {
+                  id: { type: Type.STRING },
+                  questionType: { type: Type.STRING },
+                  questionText: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctAnswer: { type: Type.STRING },
+                  scoreWeight: { type: Type.NUMBER },
+                  kisiKisi: { type: Type.STRING },
+                  level: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                  visualStimulusType: { type: Type.STRING },
+                  svgPrompt: { type: Type.STRING },
+                  svgStyle: { type: Type.STRING },
+                  chartData: {
+                    type: Type.OBJECT,
+                    properties: {
+                      type: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      datasets: {
+                        type: Type.ARRAY,
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            label: { type: Type.STRING },
+                            data: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                            dataValues: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            backgroundColor: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            borderColor: { type: Type.ARRAY, items: { type: Type.STRING } }
+                          },
+                          required: ["label"]
+                        }
+                      }
+                    }
+                  },
+                  trueFalseRows: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        answer: { type: Type.BOOLEAN }
+                      },
+                      required: ["text", "answer"]
+                    }
+                  },
+                  matchingPairs: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        left: { type: Type.STRING },
+                        right: { type: Type.STRING }
+                      },
+                      required: ["left", "right"]
+                    }
+                  }
+                };
+
                 configObj.responseSchema = {
                   type: Type.ARRAY,
                   items: {
                     type: Type.OBJECT,
-                    properties: {
-                      id: { type: Type.STRING },
-                      questionType: { type: Type.STRING },
-                      questionText: { type: Type.STRING },
-                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      correctAnswer: { type: Type.STRING },
-                      scoreWeight: { type: Type.NUMBER },
-                      kisiKisi: { type: Type.STRING },
-                      level: { type: Type.STRING },
-                      category: { type: Type.STRING },
-                      explanation: { type: Type.STRING }
-                    },
+                    properties: fullProperties,
                     required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category"]
                   }
                 };
