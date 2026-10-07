@@ -55,6 +55,7 @@ interface ExamEditorState {
     handleTrueFalseRowAnswerChange: (qId: string, idx: number, val: boolean) => void;
     handleAddTrueFalseRow: (qId: string) => void;
     handleDeleteTrueFalseRow: (qId: string, idx: number) => void;
+    handleCategoryLabelsChange: (qId: string, labels: [string, string]) => void;
 
     handleMatchingPairChange: (qId: string, idx: number, field: 'left' | 'right', value: string) => void;
     handleAddMatchingPair: (qId: string) => void;
@@ -437,6 +438,13 @@ export const useExamEditorStore = create<ExamEditorState>()(
             const q = state.questions.find(item => item.id === qId);
             if (q && q.trueFalseRows && q.trueFalseRows.length > 1) {
                 q.trueFalseRows = q.trueFalseRows.filter((_, i) => i !== idx);
+            }
+        }),
+
+        handleCategoryLabelsChange: (qId, labels) => set((state) => {
+            const q = state.questions.find(item => item.id === qId);
+            if (q) {
+                q.categoryLabels = labels;
             }
         }),
 
