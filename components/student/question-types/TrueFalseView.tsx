@@ -15,7 +15,10 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
   onAnswerChange,
   optimizeHtml,
 }) => {
-  const { id: qId, trueFalseRows } = question;
+  const { id: qId, trueFalseRows, categoryLabels } = question;
+
+  const trueLabel = (categoryLabels && categoryLabels[0]) || "Benar";
+  const falseLabel = (categoryLabels && categoryLabels[1]) || "Salah";
 
   if (!trueFalseRows) return null;
 
@@ -58,7 +61,7 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
                 }`}
               >
                 {isTrue && <CheckCircleIcon className="w-4 h-4" />}
-                Benar
+                {trueLabel}
               </button>
               <button
                 type="button"
@@ -80,7 +83,7 @@ export const TrueFalseView: React.FC<TrueFalseViewProps> = ({
                 }`}
               >
                 {isFalse && <CheckCircleIcon className="w-4 h-4" />}
-                Salah
+                {falseLabel}
               </button>
             </div>
           </div>
