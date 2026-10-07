@@ -427,6 +427,7 @@ function buildGeometryFallbackQuestion(args: {
       options: [],
       correctAnswer: "",
       scoreWeight: 1,
+      categoryLabels: ["Benar", "Salah"],
       trueFalseRows: cur.tfRows,
       explanation: cur.explanation,
       kisiKisi,
@@ -592,6 +593,7 @@ Setiap karung beras memiliki netto 25 kg dan dijual dengan harga Rp14.000,00 per
       correctAnswer: "",
       scoreWeight: 1,
       chartData: includeImages ? chartData : undefined,
+      categoryLabels: ["Benar", "Salah"],
       trueFalseRows: [
         { text: "Penjualan tertinggi terjadi pada hari Jumat sebanyak 30 karung beras.", answer: true },
         { text: "Rata-rata penjualan beras per hari dari Senin sampai Jumat adalah 23,2 karung.", answer: true },

@@ -233,8 +233,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
          * 'options': WAJIB berisi 3-5 butir opsi pernyataan LENGKAP dengan nilai/angka dan satuan matematis. DILARANG KERAS membuat opsi gantung yang tidak selesai (contoh SALAH: "Volume tabung tangki tersebut adalah "). Contoh opsi BENAR: "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$", "Volume kerucut bagian atas adalah $308\\text{ cm}^3$", "Volume total seluruh tangki adalah $1.848\\text{ cm}^3$".
          * 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
       3. Benar/Salah (PGK Kategori - WAJIB memuat angka dan satuan lengkap pada setiap baris):
-         * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus gambar bangun ruang berikut! Tentukan nilai kebenaran dari setiap pernyataan berikut.").
+         * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus berikut! Tentukan nilai kebenaran/kesesuaian dari setiap pernyataan berikut.").
          * DILARANG KERAS menuliskan daftar butir "1. ...", "2. ...", "3. ..." di dalam 'questionText'!
+         * 'categoryLabels': Array 2 string untuk teks opsi kategori [Label Opsi 1 (True), Label Opsi 2 (False)]. DEFAULT: ["Benar", "Salah"].
+           Anda DAPAT menyesuaikan redaksi label kategori ini secara otomatis sesuai konteks stimulus materi:
+           - Literasi / Kesesuaian Teks AKM / Asesmen Nasional: ["Sesuai", "Tidak Sesuai"]
+           - Pertanyaan Konfirmasi / Ya-Tidak: ["Ya", "Tidak"]
+           - Sikap / Pendapat / Survei Karakter: ["Setuju", "Tidak Setuju"]
+           - Penilaian Ketepatan: ["Tepat", "Tidak Tepat"]
+           - Analisis Fakta/Opini: ["Fakta", "Opini"]
+           - Sains / Matematika Fakta Baku: ["Benar", "Salah"] (Default)
          * 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan spesifik dengan klaim angka dan satuan utuh.
            Contoh format yang WAJIB dipatuhi:
            [
@@ -242,9 +250,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
              { "text": "Volume kerucut bagian atas adalah $308\\text{ cm}^3$.", "answer": true },
              { "text": "Volume total seluruh bangun adalah $2.400\\text{ cm}^3$.", "answer": false }
            ]
-         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar atau Salah.
-         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true atau false).
-         * 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
+         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar/Salah atau Sesuai/Tidak Sesuai.
+         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true untuk label pertama, false untuk label kedua).
+         * 'correctAnswer': WAJIB berisi ringkasan nilai pasti (contoh jika categoryLabels ["Sesuai", "Tidak Sesuai"]: "Pernyataan 1: Sesuai, Pernyataan 2: Sesuai, Pernyataan 3: Tidak Sesuai"; atau jika ["Benar", "Salah"]: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
       4. Menjodohkan:
          * 'questionText': Hanya stimulus dan kalimat instruksi menjodohkan. DILARANG membuat tabel daftar jodoh di dalam 'questionText'!
          * 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item kiri", "right": "pasangan kanan yang cocok dengan nilai/deskripsi lengkap" }.
@@ -392,6 +400,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     category: { 
       type: Type.STRING, 
       description: "Sub-kategori atau domain materi spesifik untuk soal ini (Contoh: 'Operasi Pecahan', 'Geometri & Pengukuran', 'Ekosistem')" 
+    },
+    categoryLabels: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Array 2 teks label kategori untuk soal Benar/Salah (contoh: ['Benar', 'Salah'], ['Sesuai', 'Tidak Sesuai'], ['Ya', 'Tidak'], ['Setuju', 'Tidak Setuju'], ['Fakta', 'Opini']). Default jika kosong: ['Benar', 'Salah']."
     },
     trueFalseRows: {
       type: Type.ARRAY,
@@ -1341,10 +1354,21 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             category: config.category?.trim() || q.category?.trim() || config.subject || "Umum",
             chartData: q.chartData,
             imagePrompt: q.imagePrompt,
-            imageSearchKeyword: (q as any).imageSearchKeyword
+            imageSearchKeyword: (q as any).imageSearchKeyword,
+            categoryLabels: (q as any).categoryLabels
         };
         
         if (currentQuestionType === 'TRUE_FALSE') {
+            if ((q as any).categoryLabels && Array.isArray((q as any).categoryLabels) && (q as any).categoryLabels.length >= 2) {
+                const l1 = String((q as any).categoryLabels[0] || '').trim();
+                const l2 = String((q as any).categoryLabels[1] || '').trim();
+                if (l1 && l2) {
+                    mappedQ.categoryLabels = [l1, l2];
+                }
+            }
+            const trueLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[0]) || 'Benar';
+            const falseLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[1]) || 'Salah';
+
             const rawRows = (q.trueFalseRows && q.trueFalseRows.length > 0)
                 ? q.trueFalseRows
                 : [
@@ -1361,9 +1385,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                     boolAnswer = boolSeq[rIdx]!;
                 } else if (typeof r.answer === 'string') {
                     const lower = r.answer.toLowerCase();
-                    if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak' || lower.includes('tidak')) {
+                    if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak' || lower === falseLabel.toLowerCase() || lower.includes('tidak')) {
                         boolAnswer = false;
-                    } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya' || lower === 'sesuai') {
+                    } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya' || lower === 'sesuai' || lower === trueLabel.toLowerCase()) {
                         boolAnswer = true;
                     }
                 }
@@ -1373,7 +1397,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 rowText = autoRepairIncompleteContent(rowText, contextShape, `memiliki nilai yang ${boolAnswer ? 'tepat' : 'berbeda'} berdasarkan stimulus.`, boolAnswer);
 
                 if (isDummyStatement(rowText)) {
-                    rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? 'benar' : 'tidak sesuai fakta'}.`;
+                    rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? trueLabel : falseLabel}.`;
                 }
 
                 return {
@@ -1385,7 +1409,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
             // Kunci jawaban pasti untuk Benar/Salah selalu terstruktur ringkas dan pasti
             mappedQ.correctAnswer = mappedQ.trueFalseRows
-                .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? 'Benar' : 'Salah'}`)
+                .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? trueLabel : falseLabel}`)
                 .join(', ');
         }
 
