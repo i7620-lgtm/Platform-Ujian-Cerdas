@@ -531,7 +531,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
               Pratinjau Cetak Naskah Soal
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {exam.config.subject || "Ujian"} • {exam.questions.length} Butir Soal • Format Cetak Hemat Kertas
+              {exam.config?.subject || "Ujian"} • {(exam.questions || []).length} Butir Soal • Format Cetak Hemat Kertas
             </p>
           </div>
         </div>
@@ -592,21 +592,21 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
           </div>
 
           <h1 className="text-base font-black uppercase tracking-wider text-black text-center my-1.5">
-            {exam.config.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config.subject || ""}
+            {exam.config?.examType || "PENILAIAN AKHIR SEMESTER"} - {exam.config?.subject || ""}
           </h1>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-left text-xs font-medium border-t border-slate-300 pt-2 mt-2">
             <div>
-              <span className="font-bold">Mata Pelajaran:</span> {exam.config.subject || "-"}
+              <span className="font-bold">Mata Pelajaran:</span> {exam.config?.subject || "-"}
             </div>
             <div>
-              <span className="font-bold">Alokasi Waktu:</span> {exam.config.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
+              <span className="font-bold">Alokasi Waktu:</span> {exam.config?.timeLimit ? `${exam.config.timeLimit} Menit` : "Sesuai Jadwal"}
             </div>
             <div>
-              <span className="font-bold">Kelas / Jenjang:</span> {exam.config.classLevel || "-"}
+              <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
             </div>
             <div>
-              <span className="font-bold">Jumlah Soal:</span> {exam.questions.length} Butir ({exam.code})
+              <span className="font-bold">Jumlah Soal:</span> {(exam.questions || []).length} Butir ({exam.code})
             </div>
           </div>
         </div>
@@ -744,8 +744,12 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                         <thead>
                           <tr className="bg-slate-100">
                             <th className="border border-black px-3 py-1.5 text-left font-bold w-full">Pernyataan</th>
-                            <th className="border border-black px-2 py-1.5 w-16 text-center font-bold">Benar</th>
-                            <th className="border border-black px-2 py-1.5 w-16 text-center font-bold">Salah</th>
+                            <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                              {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
+                            </th>
+                            <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                              {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
