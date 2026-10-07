@@ -284,6 +284,7 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
                   visualStimulusType: { type: Type.STRING },
                   svgPrompt: { type: Type.STRING },
                   svgStyle: { type: Type.STRING },
+                  categoryLabels: { type: Type.ARRAY, items: { type: Type.STRING } },
                   chartData: {
                     type: Type.OBJECT,
                     properties: {
