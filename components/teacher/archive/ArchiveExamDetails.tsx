@@ -130,7 +130,9 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
                             <td
                               className={`p-2 text-center font-bold ${row.answer ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20" : "text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20"}`}
                             >
-                              {row.answer ? "Benar" : "Salah"}
+                              {row.answer
+                                ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
+                                : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
                             </td>
                           </tr>
                         ))}
