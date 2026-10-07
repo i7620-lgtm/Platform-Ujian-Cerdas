@@ -2967,12 +2967,14 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
         }
       } else if (q.questionType === "TRUE_FALSE") {
         if (q.trueFalseRows) {
+          const tfTrue = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+          const tfFalse = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
           htmlContent += `<table class="w-full mt-2 mb-4 border border-slate-300">
                         <thead>
                             <tr class="bg-slate-100">
                                 <th class="p-2 border border-slate-300 text-left">Pernyataan</th>
-                                <th class="p-2 border border-slate-300 w-24 text-center">Benar</th>
-                                <th class="p-2 border border-slate-300 w-24 text-center">Salah</th>
+                                <th class="p-2 border border-slate-300 w-24 text-center">${tfTrue}</th>
+                                <th class="p-2 border border-slate-300 w-24 text-center">${tfFalse}</th>
                             </tr>
                         </thead>
                         <tbody>`;
@@ -3036,10 +3038,12 @@ export const generateQuestionsPDF = async (exam: Exam): Promise<void> => {
           .join(", ");
       } else if (q.questionType === "TRUE_FALSE") {
         if (q.trueFalseRows) {
+          const tfTrue = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+          const tfFalse = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
           ansStr = q.trueFalseRows
             .map(
               (r) =>
-                `${r.text}: <strong>${r.answer ? "Benar" : "Salah"}</strong>`,
+                `${r.text}: <strong>${r.answer ? tfTrue : tfFalse}</strong>`,
             )
             .join("<br/>");
         }

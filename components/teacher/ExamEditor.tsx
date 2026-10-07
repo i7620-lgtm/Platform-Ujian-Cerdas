@@ -429,10 +429,12 @@ export const ExamEditor: React.FC<ExamEditorProps> = ({
       {store.editingChartTarget && (
         <Suspense fallback={<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"><div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl flex items-center gap-4"><div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-primary animate-spin"></div><div className="text-slate-600 dark:text-slate-300 font-medium">Memuat Editor Grafik...</div></div></div>}>
           <ChartConfigModal
+            key={`chart-modal-${store.editingChartTarget?.qId}-${store.editingChartTarget?.type}-${store.editingChartTarget?.index ?? 'main'}-${store.editingChartTarget?.subIndex ?? ''}-${store.editingChartTarget?.preferredType ?? ''}`}
             isOpen={!!store.editingChartTarget}
             onClose={() => store.setEditingChartTarget(null)}
             onSave={(data) => store.handleSaveChart(data)}
             onDelete={() => store.handleDeleteChart()}
+            initialType={store.editingChartTarget?.preferredType}
             initialData={(() => {
               if (!store.editingChartTarget) return undefined;
               const { qId, type, index, subIndex } = store.editingChartTarget;

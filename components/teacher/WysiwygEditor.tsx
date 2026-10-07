@@ -253,7 +253,7 @@ export const WysiwygEditor: React.FC<{
   placeholder?: string;
   minHeight?: string;
   showTabs?: boolean;
-  onChartClick?: () => void;
+  onChartClick?: (chartType?: "cartesian") => void;
   chartData?: ChartData;
 }> = ({
   value,

@@ -189,6 +189,7 @@ export const useExamEditor = ({
                     explanation: newQ.explanation || "",
                     chartData: newQ.chartData ?? undefined,
                     trueFalseRows: resolvedTrueFalseRows,
+                    categoryLabels: newQ.categoryLabels || q.categoryLabels || undefined,
                     matchingPairs: newQ.matchingPairs || q.matchingPairs || undefined,
                     category: userCategory || newQ.category || q.category,
                     level: q.level?.trim() ? q.level : (newQ.level || q.level),

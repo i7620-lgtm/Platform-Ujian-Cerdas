@@ -256,10 +256,11 @@ export const QuestionCard = React.memo(
                         : "Tulis pertanyaan di sini..."
                     }
                     minHeight="80px"
-                    onChartClick={() =>
+                    onChartClick={(chartType) =>
                       setEditingChartTarget({
                         qId: q.id,
                         type: "question",
+                        preferredType: chartType,
                       })
                     }
                     chartData={q.chartData}

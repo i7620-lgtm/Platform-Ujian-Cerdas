@@ -194,14 +194,19 @@ export const getFormattedAnswerText = (q: any): string => {
 
   if (questionType === "TRUE_FALSE" || questionType === "TRUE-FALSE") {
     const rows = q.trueFalseRows || q.true_false_rows || [];
+    const trueLabel = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+    const falseLabel = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
+    const trueChar = trueLabel.charAt(0).toUpperCase();
+    const falseChar = falseLabel.charAt(0).toUpperCase();
     const answers = rows.map((r: any) => {
       const isTrue =
         r.answer === true ||
         String(r.answer).toLowerCase().trim() === "true" ||
         String(r.answer).trim() === "1" ||
+        String(r.answer).toLowerCase().trim() === trueLabel.toLowerCase() ||
         String(r.answer).trim() === "Benar" ||
         String(r.answer).trim() === "BENAR";
-      return isTrue ? "B" : "S";
+      return isTrue ? trueChar : falseChar;
     });
     if (answers.length > 0) {
       return answers.join(", ");
@@ -428,14 +433,18 @@ export const generateBookHtml = ({
                     `;
         });
       } else if (q.questionType === "TRUE_FALSE") {
+        const tfTrueLabel = (q.categoryLabels && q.categoryLabels[0]) || "BENAR";
+        const tfFalseLabel = (q.categoryLabels && q.categoryLabels[1]) || "SALAH";
+        const tfTrueChar = tfTrueLabel.charAt(0).toUpperCase();
+        const tfFalseChar = tfFalseLabel.charAt(0).toUpperCase();
         questionsHtmlStr += `
                     <div class="printable-item tf-part" style="margin-top: 8px; margin-left: 36px; margin-bottom: 24px; width: calc(100% - 36px); page-break-inside: auto; break-inside: auto;">
                         <table style="width: 100%; table-layout: fixed; word-wrap: break-word; border-collapse: collapse; border: 1.5px solid #0f172a; font-size: 10pt;">
                             <thead>
                                 <tr style="background-color: #f1f5f9;">
                                     <th style="text-align: left; padding: 6px 10px; font-weight: bold; border-right: 1px solid #0f172a; border-bottom: 1.5px solid #0f172a;">Pernyataan</th>
-                                    <th style="width: 80px; text-align: center; font-weight: bold; border-right: 1px solid #0f172a; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">BENAR</th>
-                                    <th style="width: 80px; text-align: center; font-weight: bold; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">SALAH</th>
+                                    <th style="width: 80px; text-align: center; font-weight: bold; border-right: 1px solid #0f172a; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">${tfTrueLabel.toUpperCase()}</th>
+                                    <th style="width: 80px; text-align: center; font-weight: bold; border-bottom: 1.5px solid #0f172a; white-space: nowrap;">${tfFalseLabel.toUpperCase()}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -449,10 +458,10 @@ export const generateBookHtml = ({
                         <tr style="border-bottom: 1px solid #cbd5e1;">
                             <td class="html-content" style="padding: 6px 10px; text-align: left; border-right: 1px solid #cbd5e1; font-weight: 500;">${rText}</td>
                             <td style="padding: 6px; text-align: center; border-right: 1px solid #cbd5e1;">
-                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">B</div>
+                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">${tfTrueChar}</div>
                             </td>
                             <td style="padding: 6px; text-align: center;">
-                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">S</div>
+                                <div style="width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #94a3b8; background-color: #f8fafc; box-sizing: border-box; padding: 0 0 1px 0; vertical-align: middle;">${tfFalseChar}</div>
                             </td>
                         </tr>
                     `;

@@ -24,7 +24,7 @@ interface UseWysiwygEditorParams {
   value: string;
   onChange: (val: string) => void;
   showTabs: boolean;
-  onChartClick?: () => void;
+  onChartClick?: (chartType?: "cartesian") => void;
   chartData?: any;
 }
 
