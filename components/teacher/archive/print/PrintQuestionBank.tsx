@@ -71,7 +71,9 @@ export const PrintQuestionBank: React.FC<PrintQuestionBankProps> = ({ exam }) =>
                     <tr key={i}>
                       <td className="border border-slate-200 p-2">{row.text}</td>
                       <td className={`border border-slate-200 p-2 text-center font-bold ${row.answer ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50"}`}>
-                        {row.answer ? "Benar" : "Salah"}
+                        {row.answer
+                          ? (q.categoryLabels && q.categoryLabels[0]) || "Benar"
+                          : (q.categoryLabels && q.categoryLabels[1]) || "Salah"}
                       </td>
                     </tr>
                   ))}
