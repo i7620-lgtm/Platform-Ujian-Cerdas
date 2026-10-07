@@ -25,6 +25,7 @@ import {
 import { ArchiveQuestionAnalysis } from "../archive/ArchiveQuestionAnalysis";
 import { ArchiveClassAnalysis } from "../archive/ArchiveClassAnalysis";
 import { ArchiveHeaderActions } from "../archive/ArchiveHeaderActions";
+import { PrintSoalModal } from "../modals/berlangsung/PrintSoalModal";
 import {
   fixArchiveDataSorting,
   getCalculatedStats,
@@ -84,6 +85,8 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
     showEditMetadata,
     setShowEditMetadata,
     handleDownloadQuestionsPDF,
+    isPrintModalOpen,
+    setIsPrintModalOpen,
     handleUploadToCloud,
     handleReclaimArchive,
     expandedStudent,
@@ -448,6 +451,12 @@ export const ArchiveViewer: React.FC<ArchiveViewerProps> = ({
           teacherProfile={teacherProfile}
         />
       )}
+
+      <PrintSoalModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        exam={exam || null}
+      />
     </div>
   );
 };
