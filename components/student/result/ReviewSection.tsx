@@ -130,6 +130,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             try {
               if (q.questionType === "TRUE_FALSE") {
                 const ansObj = JSON.parse(studentAns);
+                const trueLabel = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+                const falseLabel = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
                 isCorrect =
                   q.trueFalseRows?.every(
                     (row, i) => ansObj[i] === row.answer,
@@ -138,14 +140,14 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
                   q.trueFalseRows
                     ?.map(
                       (r, i) =>
-                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${ansObj[i] ? "Benar" : "Salah"}</strong>`,
+                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${ansObj[i] ? trueLabel : falseLabel}</strong>`,
                     )
                     .join("<br/>") || studentAns;
                 displayCorrectAns =
                   q.trueFalseRows
                     ?.map(
                       (r) =>
-                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${r.answer ? "Benar" : "Salah"}</strong>`,
+                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${r.answer ? trueLabel : falseLabel}</strong>`,
                     )
                     .join("<br/>") || correctAns;
               } else {
@@ -168,11 +170,13 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
               }
             } catch {
               if (q.questionType === "TRUE_FALSE") {
+                const trueLabel = (q.categoryLabels && q.categoryLabels[0]) || "Benar";
+                const falseLabel = (q.categoryLabels && q.categoryLabels[1]) || "Salah";
                 displayCorrectAns =
                   q.trueFalseRows
                     ?.map(
                       (r) =>
-                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${r.answer ? "Benar" : "Salah"}</strong>`,
+                        `• ${r.text.replace(/<[^>]*>/g, "")}: <strong>${r.answer ? trueLabel : falseLabel}</strong>`,
                     )
                     .join("<br/>") || correctAns;
               } else if (q.questionType === "MATCHING") {
