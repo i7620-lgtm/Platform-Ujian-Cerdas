@@ -369,8 +369,9 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             padding-bottom: 8px !important;
           }
 
-          /* Prevent individual question cards from breaking awkwardly across pages */
-          .print-question-card {
+          /* Prevent individual question cards and info cards from breaking awkwardly across pages */
+          .print-question-card,
+          .print-info-card {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             -webkit-column-break-inside: avoid !important;
@@ -379,6 +380,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
             display: block !important;
             position: static !important;
             width: 100% !important;
+          }
+
+          .print-info-card {
+            background-color: #f0f7ff !important;
+            border: 1px solid #bfdbfe !important;
+            border-left: 4px solid #2563eb !important;
+            padding: 10px 14px !important;
+            border-radius: 6px !important;
+            margin-top: 8px !important;
+            margin-bottom: 14px !important;
           }
 
           /* KaTeX print protection - prevent square root lines and formulas from stretching across page */
@@ -516,7 +527,16 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
     });
   };
 
+  const isInfoItem = (q: any): boolean => {
+    if (!q) return false;
+    const t = (q.questionType || q.type || "").toString().trim().toUpperCase();
+    return t === "INFO" || t === "KETERANGAN" || t === "INFORMASI";
+  };
+
   const currentYear = new Date().getFullYear();
+  const allQuestions = exam.questions || [];
+  const actualQuestionsCount = allQuestions.filter((q) => !isInfoItem(q)).length;
+  const infoCount = allQuestions.filter((q) => isInfoItem(q)).length;
 
   return createPortal(
     <div className="print-soal-modal-wrapper fixed inset-0 bg-white z-[9999] overflow-y-auto">
@@ -531,7 +551,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
               Pratinjau Cetak Naskah Soal
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {exam.config?.subject || "Ujian"} • {(exam.questions || []).length} Butir Soal • Format Cetak Hemat Kertas
+              {exam.config?.subject || "Ujian"} • {actualQuestionsCount} Butir Soal • Format Cetak Hemat Kertas
             </p>
           </div>
         </div>
@@ -606,7 +626,7 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
               <span className="font-bold">Kelas / Jenjang:</span> {exam.config?.classLevel || "-"}
             </div>
             <div>
-              <span className="font-bold">Jumlah Soal:</span> {(exam.questions || []).length} Butir ({exam.code})
+              <span className="font-bold">Jumlah Soal:</span> {actualQuestionsCount} Butir ({exam.code})
             </div>
           </div>
         </div>
@@ -618,20 +638,25 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
         {/* Questions List */}
         <div className="space-y-4">
-          {(exam.questions || []).map((q, idx) => (
-            <div key={q.id} className="print-question-card break-inside-avoid">
-              <div className="flex gap-2.5 items-start">
-                <span className="font-bold w-6 text-right shrink-0 select-none text-xs sm:text-sm pt-0.5">
-                  {idx + 1}.
-                </span>
-                <div className="flex-1 text-xs sm:text-sm text-black leading-relaxed">
-                  {/* Question Stem / Stimulus */}
+          {allQuestions.map((q, idx) => {
+            const isInfo = isInfoItem(q);
+            const questionNumber = allQuestions
+              .slice(0, idx)
+              .filter((item) => !isInfoItem(item)).length + 1;
+
+            if (isInfo) {
+              return (
+                <div 
+                  key={q.id || idx} 
+                  className="print-info-card break-inside-avoid bg-blue-50/70 border border-blue-200 print:border-blue-700/60 rounded-lg p-3.5 sm:p-4 my-3 border-l-4 border-l-blue-600"
+                >
+                  {/* Stem / Stimulus */}
                   <div 
-                    className="text-black font-normal"
+                    className="text-black font-normal text-xs sm:text-sm leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
                   />
 
-                  {/* Chart Visual Stimulus (Dedicated Print Chart Renderer) */}
+                  {/* Chart Visual Stimulus */}
                   {q.chartData && (
                     <PrintChartRenderer data={q.chartData} />
                   )}
@@ -641,8 +666,8 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
                     <div className="my-2 max-w-sm">
                       <img 
                         src={q.imageUrl} 
-                        alt="Gambar Soal" 
-                        className="max-w-full max-h-48 object-contain rounded border border-slate-200" 
+                        alt="Gambar Keterangan" 
+                        className="max-w-full max-h-48 object-contain rounded border border-slate-200 print:border-black" 
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = "none";
                         }}
@@ -652,157 +677,201 @@ export const PrintSoalModal: React.FC<PrintSoalModalProps> = ({
 
                   {/* Audio Stimulus Note */}
                   {q.audioUrl && (
-                    <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 inline-flex items-center gap-2">
-                      <span className="font-bold">[Audio Soal]:</span>
+                    <div className="my-2 p-1.5 bg-white rounded text-xs text-slate-700 border border-slate-300 inline-flex items-center gap-2">
+                      <span className="font-bold">[Audio]:</span>
                       <span className="text-slate-500 break-all">{q.audioUrl}</span>
                     </div>
                   )}
+                </div>
+              );
+            }
 
-                  {/* Multiple Choice Options */}
-                  {q.questionType === "MULTIPLE_CHOICE" && q.options && (
-                    <div
-                      className={
-                        isTwoColOptions && shouldRenderTwoColumns(q.options)
-                          ? "grid grid-cols-2 gap-x-6 gap-y-1 mt-1.5 pl-6"
-                          : "space-y-1 mt-1.5 pl-6"
-                      }
-                    >
-                      {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
-                          <span className="font-bold shrink-0 text-black">
-                            {String.fromCharCode(65 + oIdx)}.
-                          </span>
-                          <div className="flex-1 text-black font-normal">
-                            <div 
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                            />
-                            {q.optionImages?.[oIdx] && (
-                              <img 
-                                src={q.optionImages[oIdx]!} 
-                                alt={`Opsi ${String.fromCharCode(65 + oIdx)}`} 
-                                className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = "none";
-                                }}
+            return (
+              <div key={q.id || idx} className="print-question-card break-inside-avoid">
+                <div className="flex gap-2.5 items-start">
+                  <span className="font-bold w-6 text-right shrink-0 select-none text-xs sm:text-sm pt-0.5">
+                    {questionNumber}.
+                  </span>
+                  <div className="flex-1 text-xs sm:text-sm text-black leading-relaxed">
+                    {/* Question Stem / Stimulus */}
+                    <div 
+                      className="text-black font-normal"
+                      dangerouslySetInnerHTML={{ __html: renderFormattedHtml(q.questionText) }}
+                    />
+
+                    {/* Chart Visual Stimulus (Dedicated Print Chart Renderer) */}
+                    {q.chartData && (
+                      <PrintChartRenderer data={q.chartData} />
+                    )}
+
+                    {/* Image Stimulus */}
+                    {q.imageUrl && q.imageUrl.trim() !== "" && (
+                      <div className="my-2 max-w-sm">
+                        <img 
+                          src={q.imageUrl} 
+                          alt="Gambar Soal" 
+                          className="max-w-full max-h-48 object-contain rounded border border-slate-200" 
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Audio Stimulus Note */}
+                    {q.audioUrl && (
+                      <div className="my-2 p-2 bg-slate-50 rounded text-xs text-slate-700 border border-slate-300 inline-flex items-center gap-2">
+                        <span className="font-bold">[Audio Soal]:</span>
+                        <span className="text-slate-500 break-all">{q.audioUrl}</span>
+                      </div>
+                    )}
+
+                    {/* Multiple Choice Options */}
+                    {q.questionType === "MULTIPLE_CHOICE" && q.options && (
+                      <div
+                        className={
+                          isTwoColOptions && shouldRenderTwoColumns(q.options)
+                            ? "grid grid-cols-2 gap-x-6 gap-y-1 mt-1.5 pl-6"
+                            : "space-y-1 mt-1.5 pl-6"
+                        }
+                      >
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
+                            <span className="font-bold shrink-0 text-black">
+                              {String.fromCharCode(65 + oIdx)}.
+                            </span>
+                            <div className="flex-1 text-black font-normal">
+                              <div 
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                               />
-                            )}
+                              {q.optionImages?.[oIdx] && (
+                                <img 
+                                  src={q.optionImages[oIdx]!} 
+                                  alt={`Opsi ${String.fromCharCode(65 + oIdx)}`} 
+                                  className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Complex Multiple Choice Options */}
-                  {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
-                    <div className="space-y-1.5 mt-2 pl-6">
-                      <p className="text-[11px] italic text-slate-600 mb-1">
-                        *(Pilihlah semua pernyataan yang benar - Jawaban lebih dari satu)*
-                      </p>
-                      {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
-                          <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
-                          <div className="flex-1 text-black font-normal">
-                            <div 
-                              dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
-                            />
-                            {q.optionImages?.[oIdx] && (
-                              <img 
-                                src={q.optionImages[oIdx]!} 
-                                alt="Opsi" 
-                                className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = "none";
-                                }}
+                    {/* Complex Multiple Choice Options */}
+                    {q.questionType === "COMPLEX_MULTIPLE_CHOICE" && q.options && (
+                      <div className="space-y-1.5 mt-2 pl-6">
+                        <p className="text-[11px] italic text-slate-600 mb-1">
+                          *(Pilihlah semua pernyataan yang benar - Jawaban lebih dari satu)*
+                        </p>
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex gap-2 items-start text-xs sm:text-[13px]">
+                            <div className="w-3.5 h-3.5 border border-black rounded-sm shrink-0 mt-0.5"></div>
+                            <div className="flex-1 text-black font-normal">
+                              <div 
+                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(opt) }}
                               />
-                            )}
+                              {q.optionImages?.[oIdx] && (
+                                <img 
+                                  src={q.optionImages[oIdx]!} 
+                                  alt="Opsi" 
+                                  className="max-w-[100px] max-h-[100px] object-contain mt-1 rounded border border-slate-200" 
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Fill In The Blank */}
-                  {q.questionType === "FILL_IN_THE_BLANK" && (
-                    <div className="mt-2 text-xs italic text-slate-700">
-                      Jawaban: ..........................................................................................................................................
-                    </div>
-                  )}
+                    {/* Fill In The Blank */}
+                    {q.questionType === "FILL_IN_THE_BLANK" && (
+                      <div className="mt-2 text-xs italic text-slate-700">
+                        Jawaban: ..........................................................................................................................................
+                      </div>
+                    )}
 
-                  {/* Essay */}
-                  {q.questionType === "ESSAY" && (
-                    <div className="mt-2 space-y-3">
-                      <div className="border-b border-black border-dashed"></div>
-                      <div className="border-b border-black border-dashed"></div>
-                      <div className="border-b border-black border-dashed"></div>
-                    </div>
-                  )}
+                    {/* Essay */}
+                    {q.questionType === "ESSAY" && (
+                      <div className="mt-2 space-y-3">
+                        <div className="border-b border-black border-dashed"></div>
+                        <div className="border-b border-black border-dashed"></div>
+                        <div className="border-b border-black border-dashed"></div>
+                      </div>
+                    )}
 
-                  {/* True / False Table */}
-                  {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
-                    <div className="mt-2 pl-6">
-                      <table className="w-full border-collapse border border-black text-xs">
-                        <thead>
-                          <tr className="bg-slate-100">
-                            <th className="border border-black px-3 py-1.5 text-left font-bold w-full">Pernyataan</th>
-                            <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
-                              {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
-                            </th>
-                            <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
-                              {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {q.trueFalseRows.map((row, rIdx) => (
-                            <tr key={rIdx}>
-                              <td 
-                                className="border border-black px-3 py-1.5" 
-                                dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
-                              />
-                              <td className="border border-black px-2 py-1.5 text-center">
-                                <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
-                              </td>
-                              <td className="border border-black px-2 py-1.5 text-center">
-                                <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
-                              </td>
+                    {/* True / False Table */}
+                    {q.questionType === "TRUE_FALSE" && q.trueFalseRows && (
+                      <div className="mt-2 pl-6">
+                        <table className="w-full border-collapse border border-black text-xs">
+                          <thead>
+                            <tr className="bg-slate-100">
+                              <th className="border border-black px-3 py-1.5 text-left font-bold w-full">Pernyataan</th>
+                              <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                                {(q.categoryLabels && q.categoryLabels[0]) || "Benar"}
+                              </th>
+                              <th className="border border-black px-2 py-1.5 w-20 text-center font-bold">
+                                {(q.categoryLabels && q.categoryLabels[1]) || "Salah"}
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody>
+                            {q.trueFalseRows.map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                <td 
+                                  className="border border-black px-3 py-1.5" 
+                                  dangerouslySetInnerHTML={{ __html: renderFormattedHtml(row.text) }}
+                                />
+                                <td className="border border-black px-2 py-1.5 text-center">
+                                  <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
+                                </td>
+                                <td className="border border-black px-2 py-1.5 text-center">
+                                  <div className="w-3.5 h-3.5 border border-black rounded-full mx-auto"></div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
 
-                  {/* Matching Pairs */}
-                  {q.questionType === "MATCHING" && q.matchingPairs && (
-                    <div className="mt-2 pl-6">
-                      <table className="w-full border-collapse border border-black text-xs">
-                        <thead>
-                          <tr className="bg-slate-100">
-                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
-                            <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {q.matchingPairs.map((pair, pIdx) => (
-                            <tr key={pIdx}>
-                              <td className="border border-black px-3 py-1.5">
-                                <span className="font-bold mr-1">({pIdx + 1})</span>
-                                <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }} />
-                              </td>
-                              <td className="border border-black px-3 py-1.5">
-                                <span className="font-bold mr-1">({String.fromCharCode(65 + pIdx)})</span>
-                                <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }} />
-                              </td>
+                    {/* Matching Pairs */}
+                    {q.questionType === "MATCHING" && q.matchingPairs && (
+                      <div className="mt-2 pl-6">
+                        <table className="w-full border-collapse border border-black text-xs">
+                          <thead>
+                            <tr className="bg-slate-100">
+                              <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pernyataan / Soal</th>
+                              <th className="border border-black px-3 py-1.5 text-left font-bold w-1/2">Pasangan Jawaban</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody>
+                            {q.matchingPairs.map((pair, pIdx) => (
+                              <tr key={pIdx}>
+                                <td className="border border-black px-3 py-1.5">
+                                  <span className="font-bold mr-1">({pIdx + 1})</span>
+                                  <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.left) }} />
+                                </td>
+                                <td className="border border-black px-3 py-1.5">
+                                  <span className="font-bold mr-1">({String.fromCharCode(65 + pIdx)})</span>
+                                  <span dangerouslySetInnerHTML={{ __html: renderFormattedHtml(pair.right) }} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>,
