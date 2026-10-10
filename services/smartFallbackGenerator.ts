@@ -78,30 +78,37 @@ interface FallbackParams {
 
 function buildSingleFallbackQuestion(params: FallbackParams): Question {
   const { index, subject, blueprint, qType, difficulty, includeImages, failureReason, scoreWeight } = params;
+  const specificTopic = `${subject} ${params.category || ''} ${params.kisiKisi || ''}`.toLowerCase();
   const contextStr = `${subject} ${blueprint} ${params.category || ''} ${params.kisiKisi || ''}`.toLowerCase();
 
-  const isProbability = /peluang|permutasi|kombinasi|pencacahan|kaidah perkalian|ruang sampel|kejadian majemuk|dadu|koin|kartu bridge/i.test(contextStr);
-  const isMatrix = !isProbability && /matriks|determinan|invers matriks|ordo/i.test(contextStr);
-  const isSequence = !isProbability && !isMatrix && /barisan|deret|aritmatika|aritmetika|geometri|bunga majemuk|anuitas/i.test(contextStr);
-  const isTrig = !isProbability && !isMatrix && !isSequence && /trigonometri|sinus|cosinus|tangen|aturan sinus|sudut istimewa/i.test(contextStr);
-  const isAlgebra = !isProbability && !isMatrix && !isSequence && !isTrig && /aljabar|spltv|spls|persamaan linear|pertidaksamaan|sistem persamaan/i.test(contextStr);
+  const isPolynomial = /polinomial|suku banyak|horner|teorema sisa|teorema faktor|akar polinomial|derajat polinomial/i.test(specificTopic) ||
+                       /polinomial|suku banyak|horner|teorema sisa|teorema faktor/i.test(contextStr);
 
-  const isCartesian = !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra &&
+  const isProbability = !isPolynomial && /peluang|permutasi|kombinasi|pencacahan|kaidah perkalian|ruang sampel|kejadian majemuk|dadu|koin|kartu bridge/i.test(contextStr);
+  const isMatrix = !isPolynomial && !isProbability && /matriks|determinan|invers matriks|ordo/i.test(contextStr);
+  const isSequence = !isPolynomial && !isProbability && !isMatrix && /barisan|deret|aritmatika|aritmetika|bunga majemuk|anuitas/i.test(contextStr);
+  const isTrig = !isPolynomial && !isProbability && !isMatrix && !isSequence && /trigonometri|sinus|cosinus|tangen|aturan sinus|sudut istimewa/i.test(contextStr);
+  const isAlgebra = !isPolynomial && !isProbability && !isMatrix && !isSequence && !isTrig && /aljabar|spltv|spls|persamaan linear|pertidaksamaan|sistem persamaan/i.test(contextStr);
+
+  const isCartesian = !isPolynomial && !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra &&
                       (/kartesius|cartesian|koordinat|titik potong|persamaan garis|kuadran|fungsi kuadrat|parabola/i.test(contextStr));
 
-  const isGeometry = !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra && !isCartesian &&
-                     (/geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(contextStr));
+  // isGeometry MUST NOT trigger when specific topic is non-geometry (e.g. polynomial, matrix, algebra)
+  const isGeometry = !isPolynomial && !isProbability && !isMatrix && !isSequence && !isTrig && !isAlgebra && !isCartesian &&
+                     (/geometri|bangun|balok|limas|kubus|tabung|kerucut|prisma|bola|dimensi/i.test(specificTopic.trim().length > 3 ? specificTopic : contextStr));
 
   const isScience = /ipa|sains|biologi|fisika|kimia|alam|ekosistem|organ|tata surya|fotosintesis|rantai makanan|peredaran darah|daur/i.test(contextStr);
   const isIndonesian = /bahasa indonesia|literasi|teks|fabel|cerpen|puisi|bacaan|artikel|paragraf/i.test(contextStr);
 
   const id = `q_fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const levelText = difficulty.includes("HOTS") ? "Level 3 - Penalaran (HOTS)" : difficulty;
-  const category = params.category || (isProbability ? "Peluang & Kaidah Pencacahan" : isMatrix ? "Matriks" : isSequence ? "Barisan dan Deret" : isTrig ? "Trigonometri" : isAlgebra ? "Aljabar & Sistem Persamaan" : isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
+  const category = params.category || (isPolynomial ? "Polinomial (Suku Banyak)" : isProbability ? "Peluang & Kaidah Pencacahan" : isMatrix ? "Matriks" : isSequence ? "Barisan dan Deret" : isTrig ? "Trigonometri" : isAlgebra ? "Aljabar & Sistem Persamaan" : isCartesian ? "Koordinat & Diagram Kartesius" : isGeometry ? "Geometri Bangun Ruang" : isScience ? "Ilmu Pengetahuan Alam" : isIndonesian ? "Literasi Membaca" : subject);
 
   let q: Question;
   // Question context generator based on Subject & Blueprint
-  if (isProbability) {
+  if (isPolynomial) {
+    q = buildPolynomialFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
+  } else if (isProbability) {
     q = buildProbabilityFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
   } else if (isMatrix) {
     q = buildMatrixFallbackQuestion({ id, index, blueprint, kisiKisi: params.kisiKisi, qType, levelText, category, includeImages, failureReason });
@@ -1666,3 +1673,298 @@ function buildAlgebraFallbackQuestion(args: {
     fallbackReason
   } as any;
 }
+
+// 11. Polynomial (Suku Banyak) Fallback Generator
+function buildPolynomialFallbackQuestion(args: {
+  id: string;
+  index: number;
+  blueprint: string;
+  kisiKisi?: string;
+  qType: QuestionType;
+  levelText: string;
+  category: string;
+  includeImages: boolean;
+  failureReason: string;
+}): Question {
+  const { id, index, qType, levelText, category, failureReason } = args;
+  const fallbackReason = failureReason || args.failureReason || "Safe Fallback Active";
+  const seed = (index - 1) % 3;
+
+  if (seed === 0) {
+    // Seed 0: Teorema Sisa & Nilai Koefisien Polinomial
+    const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan suku banyak berderajat empat dengan salah satu koefisien belum diketahui dan sisa pembagiannya, peserta didik dapat menentukan nilai koefisien tersebut menggunakan Teorema Sisa / Horner dengan tepat.");
+    const questionText = `<p>Diketahui suku banyak $P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$. Jika $P(x)$ dibagi oleh $(x - 2)$ bersisa $16$, maka nilai $a$ adalah ....</p>`;
+    const explanation = `**Langkah Penyelesaian Berdasarkan Teorema Sisa:**
+1. Berdasarkan Teorema Sisa, jika suku banyak $P(x)$ dibagi oleh $(x - k)$, maka sisa pembagiannya adalah $S = P(k)$.
+2. Karena pembaginya $(x - 2)$, maka $k = 2$ dan $P(2) = 16$.
+3. Substitusi $x = 2$ ke dalam $P(x)$:
+   $$P(2) = 2(2)^4 - 3(2)^3 + a(2)^2 + 5(2) - 6 = 16$$
+   $$2(16) - 3(8) + 4a + 10 - 6 = 16$$
+   $$32 - 24 + 4a + 4 = 16$$
+   $$12 + 4a = 16$$
+   $$4a = 16 - 12$$
+   $$4a = 4 \\implies \\mathbf{a = 1}$$
+4. Pembuktian dengan Skema Horner ($x = 2$):
+   Koefisien: $[2, -3, a, 5, -6]$. Sisa Horner pada ujung baris bernilai $4a + 12$. Karena sisa $= 16$, maka $4a + 12 = 16 \\implies a = 1$.`;
+
+    if (qType === "TRUE_FALSE") {
+      return {
+        id,
+        questionType: "TRUE_FALSE",
+        questionText: `<p>Diberikan suku banyak $P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$ yang dibagi oleh $(x - 2)$ bersisa $16$. Tentukan nilai kebenaran dari setiap pernyataan berikut!</p>`,
+        options: [],
+        correctAnswer: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah",
+        scoreWeight: 1,
+        categoryLabels: ["Benar", "Salah"],
+        trueFalseRows: [
+          { text: "Nilai koefisien $a$ pada suku banyak tersebut adalah $1$.", answer: true },
+          { text: "Berdasarkan Teorema Sisa, nilai $P(2)$ sama dengan sisa pembagian yaitu $16$.", answer: true },
+          { text: "Derajat dari hasil bagi pembagian $P(x)$ oleh $(x - 2)$ adalah $4$.", answer: false }
+        ],
+        explanation,
+        kisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason
+      } as any;
+    }
+
+    if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+      const options = [
+        "Nilai koefisien $a$ adalah $1$",
+        "Sisa pembagian $P(x)$ oleh $(x - 2)$ memenuhi $P(2) = 16$",
+        "Hasil bagi pembagian $P(x)$ oleh $(x - 2)$ merupakan suku banyak berderajat $3$",
+        "Suku banyak $P(x)$ habis dibagi oleh $(x - 2)$ tanpa sisa"
+      ];
+      const correctAnswers = [options[0], options[1], options[2]];
+      return {
+        id,
+        questionType: "COMPLEX_MULTIPLE_CHOICE",
+        questionText: `<p>Diketahui suku banyak $P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$. Jika $P(x)$ dibagi oleh $(x - 2)$ bersisa $16$, pilihlah semua pernyataan yang benar!</p>`,
+        options,
+        correctAnswer: correctAnswers.join("|||"),
+        scoreWeight: 2,
+        explanation,
+        kisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason
+      } as any;
+    }
+
+    if (qType === "MATCHING") {
+      return {
+        id,
+        questionType: "MATCHING",
+        questionText: `<p>Diberikan suku banyak $P(x) = 2x^4 - 3x^3 + x^2 + 5x - 6$. Pasangkanlah operasi atau pembagi polinomial berikut dengan nilai atau hasil yang sesuai!</p>`,
+        options: [],
+        correctAnswer: "P(2) = 16, P(0) = -6, P(1) = -1",
+        scoreWeight: 1,
+        matchingPairs: [
+          { left: "Nilai Suku Banyak $P(2)$ (Sisa bagi oleh $x - 2$)", right: "$16$" },
+          { left: "Suku Konstan / Nilai $P(0)$", right: "$-6$" },
+          { left: "Jumlah Seluruh Koefisien / Nilai $P(1)$", right: "$-1$" }
+        ],
+        explanation,
+        kisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason
+      } as any;
+    }
+
+    const options = ["$1$", "$2$", "$3$", "$-1$", "$-2$"];
+    return {
+      id,
+      questionType: qType,
+      questionText,
+      options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+      correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "$1$",
+      scoreWeight: 1,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (seed === 1) {
+    // Seed 1: Teorema Sisa Pembagian oleh Polinomial Kuadrat (x - a)(x - b)
+    const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan informasi sisa pembagian suku banyak oleh dua pembagi linear berbeda, peserta didik dapat menentukan rumus sisa pembagian oleh hasil kali kedua pembagi linear tersebut dengan tepat.");
+    const questionText = `<p>Suatu suku banyak $P(x)$ jika dibagi oleh $(x - 1)$ bersisa $5$, dan jika dibagi oleh $(x + 2)$ bersisa $-4$. Sisa pembagian suku banyak $P(x)$ oleh $(x^2 + x - 2)$ adalah ....</p>`;
+    const explanation = `**Langkah Penyelesaian:**
+1. Pembagi berderajat 2: $(x^2 + x - 2) = (x - 1)(x + 2)$.
+2. Sisa pembagian oleh pembagi kuadrat maksimal berderajat 1, sehingga dapat dimisalkan:
+   $$S(x) = ax + b$$
+3. Berdasarkan Teorema Sisa:
+   * $P(1) = 5 \\implies a(1) + b = 5 \\implies a + b = 5$ (Persamaan 1)
+   * $P(-2) = -4 \\implies a(-2) + b = -4 \\implies -2a + b = -4$ (Persamaan 2)
+4. Eliminasi nilai $b$:
+   $$(a + b) - (-2a + b) = 5 - (-4)$$
+   $$3a = 9 \\implies a = 3$$
+5. Substitusi $a = 3$ ke Persamaan 1:
+   $$3 + b = 5 \\implies b = 2$$
+6. Jadi, sisa pembagiannya adalah:
+   $$S(x) = ax + b = \\mathbf{3x + 2}$$`;
+
+    if (qType === "TRUE_FALSE") {
+      return {
+        id,
+        questionType: "TRUE_FALSE",
+        questionText: `<p>Suatu suku banyak $P(x)$ jika dibagi $(x - 1)$ bersisa $5$ dan jika dibagi $(x + 2)$ bersisa $-4$. Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+        options: [],
+        correctAnswer: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah",
+        scoreWeight: 1,
+        categoryLabels: ["Benar", "Salah"],
+        trueFalseRows: [
+          { text: "Bentuk umum sisa pembagian suku banyak oleh pembagi berderajat 2 adalah polinomial linear $S(x) = ax + b$.", answer: true },
+          { text: "Sisa pembagian $P(x)$ oleh $(x^2 + x - 2)$ adalah $3x + 2$.", answer: true },
+          { text: "Nilai $P(-2)$ sama dengan $5$.", answer: false }
+        ],
+        explanation,
+        kisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason
+      } as any;
+    }
+
+    if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+      const options = [
+        "Sisa pembagian $P(x)$ oleh $(x^2 + x - 2)$ adalah $3x + 2$",
+        "Nilai $P(1) = 5$ dan $P(-2) = -4$",
+        "Derajat dari sisa pembagian adalah 1",
+        "Sisa pembagian $P(x)$ oleh $(x^2 + x - 2)$ adalah $2x + 3$"
+      ];
+      const correctAnswers = [options[0], options[1], options[2]];
+      return {
+        id,
+        questionType: "COMPLEX_MULTIPLE_CHOICE",
+        questionText: `<p>Suatu suku banyak $P(x)$ jika dibagi $(x - 1)$ bersisa $5$, dan jika dibagi $(x + 2)$ bersisa $-4$. Pilihlah semua pernyataan yang benar!</p>`,
+        options,
+        correctAnswer: correctAnswers.join("|||"),
+        scoreWeight: 2,
+        explanation,
+        kisiKisi,
+        level: levelText,
+        category,
+        isFallback: true,
+        fallbackReason
+      } as any;
+    }
+
+    const options = ["$3x + 2$", "$3x - 2$", "$2x + 3$", "$2x - 3$", "$x + 4$"];
+    return {
+      id,
+      questionType: qType,
+      questionText,
+      options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+      correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "$3x + 2$",
+      scoreWeight: 1,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  // Seed 2: Teorema Faktor & Penentuan Faktor Linear Lainnya
+  const kisiKisi = args.kisiKisi || (args.blueprint ? args.blueprint : "Disajikan suku banyak berderajat tiga dengan salah satu faktor linear diketahui, peserta didik dapat menentukan faktor-faktor linear lainnya menggunakan skema Horner dan Teorema Faktor secara cermat.");
+  const questionText = `<p>Diketahui $(x - 3)$ merupakan faktor linear dari suku banyak $P(x) = x^3 - 4x^2 + px + 6$. Faktor linear yang lain dari suku banyak tersebut adalah ....</p>`;
+  const explanation = `**Langkah Penyelesaian Teorema Faktor:**
+1. Berdasarkan Teorema Faktor, jika $(x - 3)$ merupakan faktor dari $P(x)$, maka $P(3) = 0$.
+2. Substitusi $x = 3$:
+   $$P(3) = 3^3 - 4(3)^2 + 3p + 6 = 0$$
+   $$27 - 36 + 3p + 6 = 0$$
+   $$-3 + 3p = 0 \\implies 3p = 3 \\implies p = 1$$
+3. Persamaan suku banyak menjadi $P(x) = x^3 - 4x^2 + x + 6$.
+4. Faktorkan $P(x)$ menggunakan skema Horner dengan pembagi $x = 3$:
+   * Koefisien: $1, -4, 1, 6$
+   * Baris Horner:
+     - Turunkan: $1$
+     - Kalikan $3$: $1 \\times 3 = 3 \\implies -4 + 3 = -1$
+     - Kalikan $3$: $-1 \\times 3 = -3 \\implies 1 + (-3) = -2$
+     - Kalikan $3$: $-2 \\times 3 = -6 \\implies 6 + (-6) = 0$ (Sisa = 0, terbukti faktor).
+5. Hasil bagi: $H(x) = x^2 - x - 2$.
+6. Faktorkan hasil bagi kuadrat:
+   $$x^2 - x - 2 = (x - 2)(x + 1)$$
+7. Jadi, faktor linear yang lain adalah $(x - 2)$ dan $(x + 1)$.`;
+
+  if (qType === "TRUE_FALSE") {
+    return {
+      id,
+      questionType: "TRUE_FALSE",
+      questionText: `<p>Diketahui $(x - 3)$ merupakan faktor linear dari suku banyak $P(x) = x^3 - 4x^2 + px + 6$. Tentukan nilai kebenaran setiap pernyataan berikut!</p>`,
+      options: [],
+      correctAnswer: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah",
+      scoreWeight: 1,
+      categoryLabels: ["Benar", "Salah"],
+      trueFalseRows: [
+        { text: "Nilai konstanta $p$ pada suku banyak tersebut adalah $1$.", answer: true },
+        { text: "$(x - 2)$ dan $(x + 1)$ merupakan faktor linear lain dari suku banyak tersebut.", answer: true },
+        { text: "Akar-akar dari persamaan $P(x) = 0$ adalah $x = -3, x = -2,$ dan $x = 1$.", answer: false }
+      ],
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  if (qType === "COMPLEX_MULTIPLE_CHOICE") {
+    const options = [
+      "Nilai $p = 1$",
+      "$(x - 2)$ merupakan faktor linear dari $P(x)$",
+      "$(x + 1)$ merupakan faktor linear dari $P(x)$",
+      "$(x + 3)$ merupakan faktor linear dari $P(x)$"
+    ];
+    const correctAnswers = [options[0], options[1], options[2]];
+    return {
+      id,
+      questionType: "COMPLEX_MULTIPLE_CHOICE",
+      questionText: `<p>Diketahui $(x - 3)$ merupakan faktor linear dari suku banyak $P(x) = x^3 - 4x^2 + px + 6$. Pilihlah semua pernyataan yang benar!</p>`,
+      options,
+      correctAnswer: correctAnswers.join("|||"),
+      scoreWeight: 2,
+      explanation,
+      kisiKisi,
+      level: levelText,
+      category,
+      isFallback: true,
+      fallbackReason
+    } as any;
+  }
+
+  const options = [
+    "$(x - 2)$ dan $(x + 1)$",
+    "$(x + 2)$ dan $(x - 1)$",
+    "$(x - 2)$ dan $(x - 1)$",
+    "$(x + 2)$ dan $(x + 1)$",
+    "$(x - 3)$ dan $(x + 2)$"
+  ];
+  return {
+    id,
+    questionType: qType,
+    questionText,
+    options: qType === "MULTIPLE_CHOICE" ? options : undefined,
+    correctAnswer: qType === "MULTIPLE_CHOICE" ? options[0] : "$(x - 2)$ dan $(x + 1)$",
+    scoreWeight: 1,
+    explanation,
+    kisiKisi,
+    level: levelText,
+    category,
+    isFallback: true,
+    fallbackReason
+  } as any;
+}
+
