@@ -232,16 +232,16 @@ export const QuestionCard = React.memo(
                       </div>
 
                       <div className="mb-4">
-                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                          Kisi-Kisi Materi
-                        </label>
-                        <textarea
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">
+                            Kisi-Kisi Materi
+                          </label>
+                        </div>
+                        <WysiwygEditor
                           value={q.kisiKisi || ""}
-                          onChange={(e) =>
-                            handleKisiKisiChange(q.id, e.target.value)
-                          }
-                          className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[60px] resize-y"
-                          placeholder="Contoh: Peserta didik dapat menentukan hasil operasi hitung campuran bilangan cacah"
+                          onChange={(val) => handleKisiKisiChange(q.id, val)}
+                          placeholder="Tulis kisi-kisi di sini..."
+                          minHeight="70px"
                         />
                       </div>
                     </>
