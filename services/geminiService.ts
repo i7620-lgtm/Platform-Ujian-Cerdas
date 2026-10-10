@@ -26,6 +26,24 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     
     Tugas Anda adalah membuat soal berkualitas tinggi, akurat secara konsep, serta memiliki daya beda yang valid berdasarkan parameter yang diberikan.
     
+    PRINSIP KEPATUHAN TOPIK MUTLAK (TOPIC FIDELITY & ZERO TOPIC DRIFT):
+    - Anda WAJIB mematuhi 100% mata pelajaran, topik materi pokok, sub-topik, dan kisi-kisi yang ditetapkan oleh pengguna pada parameter target.
+    - DILARANG KERAS membuat soal di luar materi yang diminta pengguna!
+    - JIKA MATERI YANG DIMINTA BUKAN GEOMETRI (misalnya: "Polinomial", "Suku Banyak", "Aljabar", "Matriks", "Vektor", "Statistika", "Peluang", "Kalkulus / Limit / Turunan / Integral", "Fisika", "Kimia", "Biologi", dll):
+      * DILARANG KERAS membuat soal tentang bangun ruang, bangun datar, balok, kubus, tabung, kerucut, limas, prisma, bola, atau dimensi tiga!
+      * DILARANG KERAS menyisipkan tag [GEOMETRY:...]!
+      * Seluruh tag [GEOMETRY:...] HANYA dan EKSKLUSIF boleh digunakan jika topik yang secara eksplisit diminta pengguna adalah Geometri / Bangun Ruang / Bangun Datar / Dimensi Tiga.
+    - PANDUAN KHUSUS MATERI POLINOMIAL (SUKU BANYAK):
+      * Jika pengguna meminta materi "Polinomial" atau "Suku Banyak", SELURUH BUTIR SOAL WAJIB 100% tentang Polinomial!
+      * Lingkup materi Polinomial terstandar:
+        1. Nilai Polinomial & Derajat: Menghitung nilai suku banyak $P(k)$ dengan substitusi maupun skema Horner, menentukan derajat dan koefisien suku utama/konstanta.
+        2. Operasi Aljabar Polinomial: Penjumlahan, pengurangan, perkalian suku banyak, serta kesamaan polinomial (menentukan koefisien tak tentu).
+        3. Pembagian Polinomial: Pembagian oleh $(x - k)$, $(ax + b)$, dan pembagi kuadrat $(ax^2 + bx + c)$ menggunakan metode bersusun (porogapit) maupun skema bagan Horner / Horner-Kino.
+        4. Teorema Sisa: Jika $P(x)$ dibagi $(x - k)$ maka sisa $S = P(k)$; jika dibagi $(ax + b)$ maka sisa $S = P(-\frac{b}{a})$; sisa pembagian oleh pembagi kuadrat dengan pemisalan $S(x) = px + q$.
+        5. Teorema Faktor: $(x - k)$ adalah faktor linear dari $P(x)$ jika dan hanya jika $P(k) = 0$; menentukan faktor-faktor linear suku banyak.
+        6. Akar-Akar Rasional & Persamaan Polinomial: Menentukan akar-akar real persamaan suku banyak, teorema Vieta untuk jumlah dan hasil kali akar-akar polinomial berderajat 3 ($x_1 + x_2 + x_3 = -\frac{b}{a}$, $x_1 x_2 + x_1 x_3 + x_2 x_3 = \frac{c}{a}$, $x_1 x_2 x_3 = -\frac{d}{a}$).
+      * Seluruh bentuk persamaan suku banyak WAJIB ditulis menggunakan sintaks LaTeX baku: $P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$, dll.
+
     PRINSIP UTAMA PENULISAN SOAL TKA (KEMENDIKDASMEN NO. 047/H/AN/2025 & NO. 045/H/AN/2025):
     1. BERMAKNA & BERBASIS PENALARAN TINGGI (HOTS/MOTS):
        - Soal BUKAN hafalan rumus singkat semata, melainkan menguji pemahaman fakta, konsep, prosedur, serta penalaran konteks nyata (problem-solving).
@@ -63,7 +81,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$ atau $4\\\\frac{3}{4}$. KHUSUS untuk akar (square root/roots), Anda WAJIB menggunakan perintah $\\\\sqrt{...}$ atau $\\\\sqrt[n]{...}$ dan DILARANG menggunakan karakter unicode akar (√) secara langsung. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, akar, atau pangkat! Jika relevan, Anda juga WAJIB menggunakan standar LaTeX untuk matriks (nxn, nx1, 1xn), limit ($\\\\lim$), logaritma ($\\\\log$), permutasi (contoh: $_{n}P_{r}$), kombinasi ($_{n}C_{r}$), jenis kurung berbatas (\\\\left( \\\\right), dll), vektor kolom, nilai mutlak (\\\\left| \\\\right|), fungsi piecewise (\\\\begin{cases} \\\\end{cases}), irisan (\\\\cap), turunan (\\\\frac{dy}{dx}) dan gabungan himpunan (\\\\cup). Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$" atau "$\\\\sqrt{x^2 + y^2}$" atau "$\\\\frac{11}{30}$".
     - Turus & Tabel Frekuensi (Tally Marks): WAJIB menggunakan huruf kapital 'I' (bukan simbol pipe '|') untuk turus satuan agar tabel Markdown tidak pecah. Gunakan 'I' (1), 'II' (2), 'III' (3), 'IIII' (4), dan '卌' (5). Untuk angka lebih dari 5, gabungkan kelipatan 5 dengan sisa satuan (pisahkan dengan spasi). Contoh: 6 = '卌 I', 7 = '卌 II', 10 = '卌 卌', 13 = '卌 卌 III'. Jika instruksi meminta "tabel turus saja" ATAU "tabel frekuensi saja", Anda WAJIB mematuhi permintaan tersebut dengan hanya membuat kolom yang spesifik diminta (misal hanya kolom data dan kolom turus, ATAU hanya kolom data dan kolom frekuensi). JANGAN secara otomatis menggabungkan kolom Turus dan Frekuensi menjadi satu tabel jika tidak diminta secara eksplisit. JANGAN menggunakan gambar untuk turus, gunakan teks ini saja.
     - Piktogram (Simbol/Emoji): Untuk soal yang membutuhkan data piktogram (diagram gambar), Anda BISA dan DISARANKAN untuk menggunakan emoji langsung (misalnya: 🍎, 🚗, ⭐️, 👦) dalam tabel atau teks soal untuk mewakili unit data.
-    - Bangun Datar & Ruang: JIKA SOAL MEMINTA MENGHITUNG TERHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}].
+    - Bangun Datar & Ruang (HANYA BERLAKU JIKA MATERI SPESIFIK ADALAH GEOMETRI / BANGUN RUANG / DIMENSI TIGA; DILARANG KERAS UNTUK POLINOMIAL, ALJABAR, MATRIKS, KALKULUS, SAINS, DLL): JIKA SOAL MEMINTA MENGHITUNG TERHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}].
       SETIAP KALI MENAMPILKAN BANGUN RUANG ATAU BANGUN GABUNGAN, Anda WAJIB MENGISI SELURUH PARAMETER UKURAN PADA TAG GEOMETRY SECARA LENGKAP agar semua dimensi (panjang, lebar, tinggi, jari-jari, dll) terlihat jelas pada gambar!
       Jika Anda juga mendeskripsikan ukurannya dalam teks narasi, Anda WAJIB menuliskan kalimatnya secara UTUH dan LENGKAP tanpa terpotong (misal: "Bagian balok memiliki ukuran panjang 10 cm, lebar 6 cm, dan tinggi 8 cm, serta tinggi limas 6 cm."). DILARANG KERAS menghasilkan teks narasi yang terpotong di tengah kalimat!
       Daftar \`shape_name\` yang valid:
@@ -508,6 +526,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     const userBlueprintConstraint = config.blueprint?.trim();
     const userScoreWeightConstraint = config.scoreWeight;
 
+    const userTopicSummary = `${config.subject} ${userCategoryConstraint || ''} ${userKisiKisiConstraint || ''}`.trim();
+    const isExplicitPolynomial = /polinomial|suku banyak|horner|teorema sisa|teorema faktor|akar polinomial/i.test(userTopicSummary);
+    const isExplicitNonGeometry = isExplicitPolynomial || /aljabar|matriks|vektor|kalkulus|limit|turunan|integral|statistika|peluang|kombinatorika|permutasi|eksponen|logaritma|kimia|biologi|fisika|bahasa|ekonomi|sosiologi|sejarah|pancasila/i.test(userTopicSummary);
+
     const batchPrompt = `
       ======================================================================
       PERINGATAN PRIORITAS TERTINGGI (HARD CONSTRAINT - MUTLAK DIIKUTI):
@@ -523,6 +545,32 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       ${userKisiKisiConstraint ? `- KISI-KISI / INDIKATOR SOAL (MUTLAK WAJIB): "${userKisiKisiConstraint}"` : ''}
       ${userBlueprintConstraint ? `- PANDUAN KISI-KISI & DESKRIPSI RINCI PENGGUNA:\n${userBlueprintConstraint}` : ''}
       ======================================================================
+
+      ${isExplicitPolynomial ? `
+      **********************************************************************
+      PERINGATAN MUTLAK & SPESIFIK: TOPIK MATERI ADALAH POLINOMIAL (SUKU BANYAK)!
+      1. SELURUH ${batchCount} BUTIR SOAL WAJIB 100% MENGENAI POLINOMIAL (SUKU BANYAK).
+      2. DILARANG KERAS MEMBUAT SOAL TENTANG GEOMETRI, BANGUN DATAR, ATAU BANGUN RUANG (BALOK, KUBUS, TABUNG, KERUCUT, LIMAS, PRISMA, DLL)!
+      3. DILARANG KERAS MENYERTAKAN TAG [GEOMETRY:...]!
+      4. JIKA TEKS BLUEPRINT UMUM MEMUAT KATA GEOMETRI ATAU DIMENSI TIGA, ABAIKAN KATA TERSEBUT KARENA TOPIK SPESIFIK PENGGUNA ADALAH POLINOMIAL!
+      5. Topik Polinomial yang wajib disusun secara bervariasi:
+         - Operasi aljabar suku banyak (penjumlahan, pengurangan, perkalian, kesamaan suku banyak menentukan nilai koefisien tak tentu).
+         - Pembagian polinomial bersusun (porogapit) dan skema bagan Horner / Horner-Kino.
+         - Teorema Sisa: menghitung sisa pembagian P(x) oleh pembagi linear (x - k), (ax + b), dan pembagi kuadrat (x - a)(x - b).
+         - Teorema Faktor: pembuktian dan penentuan faktor linear suku banyak, menentukan konstanta jika salah satu faktor diketahui.
+         - Akar-akar rasional persamaan suku banyak dan hubungan akar-akar (rumus Vieta).
+         - Nilai suku banyak P(k) dan aplikasi kontekstual pemodelan fungsi polinomial.
+      6. Rumus matematika WAJIB berformat LaTeX baku ($P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$, dll).
+      **********************************************************************
+      ` : isExplicitNonGeometry ? `
+      **********************************************************************
+      PERINGATAN KEPATUHAN TOPIK (ZERO TOPIC DRIFT):
+      - Topik yang diminta pengguna adalah "${config.subject}". Topik ini BUKAN materi geometri!
+      - DILARANG KERAS membuat soal tentang bangun ruang, balok, kubus, tabung, atau dimensi tiga!
+      - DILARANG KERAS menyisipkan tag [GEOMETRY:...]!
+      - Seluruh butir soal wajib 100% fokus menguji "${config.subject}".
+      **********************************************************************
+      ` : ''}
 
       Buatlah tepat ${batchCount} butir soal yang 100% BERFOKUS PENUH dan SELARAS dengan target materi di atas.
       
@@ -579,12 +627,19 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       6. STIMULUS REPRESENTATIF TERBAIK (includeImages=true):
          - Fitur 'Sertakan Gambar, Geometri Bangun & Diagram Representatif' AKTIF.
          - Analisis materi soal dan tentukan CARA TERBAIK:
-           * Geometri bangun datar/ruang/gabungan berdimensi angka? Pilih 'geometry' dan sertakan tag [GEOMETRY:...]. Untuk Trigonometri, WAJIB gunakan [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"..."}] dengan konsistensi 100% antara narasi, sisi, sudut, dan rasio sin/cos/tan.
+           * KHUSUS TOPIK POLINOMIAL / SUKU BANYAK / ALJABAR:
+             DILARANG KERAS MENGGUNAKAN [GEOMETRY]! Jangan menggambar bangun ruang!
+             Gunakan stimulus berupa:
+             a) Narasi kontekstual pemodelan fungsi polinomial $P(x)$,
+             b) Bagan atau tabel pembagian skema Horner menggunakan tabel Markdown terstruktur ('table'),
+             c) Kurva fungsi polinomial dengan koordinat titik potong jika relevan ('chart' cartesian), atau
+             d) Rumus matematika murni berformat LaTeX yang kaya penalaran. Set 'visualStimulusType': "none" atau "table" atau "chart".
+           * Geometri bangun datar/ruang/gabungan berdimensi angka? HANYA PILIH 'geometry' JIKA SOAL MEMANG GEOMETRI. Sertakan tag [GEOMETRY:...]. Untuk Trigonometri, WAJIB gunakan [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"..."}] dengan konsistensi 100% antara narasi, sisi, sudut, dan rasio sin/cos/tan.
            * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'. Jika opsi atau pertanyaan berbentuk rentang/interval, Sumbu X WAJIB menuliskan rentang kelas lengkap (contoh: ["41 - 50", "51 - 60", "61 - 70", "71 - 80"]) dan seluruh frekuensi harus lengkap agar soal dapat dihitung pasti.
            * Tabel data terstruktur / daftar frekuensi? Pilih 'table' (tabel Markdown murni).
            * Foto pahlawan/tempat/monumen/spesies otentik nyata? Pilih 'wikimedia_photo' dan isi 'imageSearchKeyword'.
            * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'.
-           * BANGUN GEOMETRI SULIT (Limas Terpancung, Frustum Kerucut, Irisan Bidang Kubus/Balok, Prisma Segi Enam, Bangun Gabungan 3D)? WAJIB pilih 'ai_svg', set 'svgStyle': "geometry", dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
+           * BANGUN GEOMETRI SULIT (Limas Terpancung, Frustum Kerucut, Irisan Bidang Kubus/Balok, Prisma Segi Enam, Bangun Gabungan 3D)? HANYA JIKA TOPIKNYA GEOMETRI! WAJIB pilih 'ai_svg', set 'svgStyle': "geometry", dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
       ` : ''}
     `;
 
