@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
-import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
+import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
@@ -522,8 +522,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     }
 
     const userCategoryConstraint = config.category?.trim();
-    const userKisiKisiConstraint = config.kisiKisi?.trim();
-    const userBlueprintConstraint = config.blueprint?.trim();
+    const userKisiKisiConstraint = config.kisiKisi ? htmlToMarkdown(config.kisiKisi).trim() : '';
+    const userBlueprintConstraint = config.blueprint ? htmlToMarkdown(config.blueprint).trim() : '';
     const userScoreWeightConstraint = config.scoreWeight;
 
     const userTopicSummary = `${config.subject} ${userCategoryConstraint || ''} ${userKisiKisiConstraint || ''}`.trim();
