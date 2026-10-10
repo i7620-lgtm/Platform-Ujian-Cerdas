@@ -14,6 +14,8 @@ export interface EditorState {
   showAksara: boolean;
   showEmoji: boolean;
   showAiImage: boolean;
+  showLink: boolean;
+  selectedTextForLink: string;
 }
 
 const execCmd = (command: string, value: string | undefined = undefined) => {
@@ -53,6 +55,8 @@ export const useWysiwygEditor = ({
     showAksara: false,
     showEmoji: false,
     showAiImage: false,
+    showLink: false,
+    selectedTextForLink: "",
   });
 
   const setEditorSubState = (
@@ -377,6 +381,41 @@ export const useWysiwygEditor = ({
     handleInput();
   };
 
+  const openLinkModal = () => {
+    saveSelection();
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    setEditorSubState({ showLink: true, selectedTextForLink: text });
+  };
+
+  const insertLink = (url: string, linkText?: string) => {
+    restoreSelection();
+    if (editorRef.current) {
+      const sel = window.getSelection();
+      const hasSelection =
+        sel &&
+        sel.rangeCount > 0 &&
+        !sel.isCollapsed &&
+        editorRef.current.contains(sel.anchorNode);
+
+      if (hasSelection) {
+        document.execCommand("createLink", false, url);
+        const links = editorRef.current.querySelectorAll(`a[href="${url}"]`);
+        links.forEach((a) => {
+          a.setAttribute("target", "_blank");
+          a.setAttribute("rel", "noopener noreferrer");
+          (a as HTMLElement).classList.add("text-indigo-600", "underline");
+        });
+      } else {
+        const title = linkText || url;
+        const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">${title}</a>&nbsp;`;
+        document.execCommand("insertHTML", false, linkHtml);
+      }
+      saveSelection();
+      handleInput();
+    }
+  };
+
   return {
     editorRef,
     fileInputRef,
@@ -392,6 +431,8 @@ export const useWysiwygEditor = ({
     deleteCurrentTable,
     insertMath,
     insertAiImage,
+    openLinkModal,
+    insertLink,
     handlePaste,
     handleImageFileChange,
     handleAudioFileChange,
