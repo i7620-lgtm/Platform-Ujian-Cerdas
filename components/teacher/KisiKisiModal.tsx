@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { PrinterIcon, XMarkIcon } from "../Icons";
 import { Question } from "../../types";
+import { renderMathInHtml } from "../../utils/mathRenderer";
 
 export const KisiKisiModal: React.FC<{
   isOpen: boolean;
@@ -97,7 +98,14 @@ export const KisiKisiModal: React.FC<{
                         {q.category || "-"}
                       </td>
                       <td className="p-3 text-slate-800 dark:text-slate-200 leading-relaxed">
-                        {q.kisiKisi || (
+                        {q.kisiKisi ? (
+                          <div
+                            className="prose prose-sm dark:prose-invert max-w-none break-words"
+                            dangerouslySetInnerHTML={{
+                              __html: renderMathInHtml(q.kisiKisi),
+                            }}
+                          />
+                        ) : (
                           <span className="text-slate-400 italic">
                             Tidak ada indikator
                           </span>
@@ -179,7 +187,15 @@ export const KisiKisiModal: React.FC<{
                     {q.category || "-"}
                   </td>
                   <td className="border border-black p-2">
-                    {q.kisiKisi || "-"}
+                    {q.kisiKisi ? (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: renderMathInHtml(q.kisiKisi),
+                        }}
+                      />
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td className="border border-black p-2 text-center">
                     {q.level || "-"}
