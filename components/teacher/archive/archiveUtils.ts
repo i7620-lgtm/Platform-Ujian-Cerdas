@@ -118,6 +118,46 @@ export const formatDuration = (seconds: number | undefined | null): string => {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
+/**
+ * Normalizes student NISN/ID for display and export.
+ * Retains the original format of NISN/ID, but ensures that if the ID (or its trailing absent number)
+ * is detected between 1 and 9 (single digit under 10), it is formatted with a leading zero (01 through 09).
+ *
+ * Example:
+ * - "8CV2SB_SD_Negeri_2_Padangsambian_6A_2" -> "8CV2SB_SD_Negeri_2_Padangsambian_6A_02"
+ * - "8CV2SB_SD_Negeri_2_Padangsambian_6A_01" -> "8CV2SB_SD_Negeri_2_Padangsambian_6A_01" (unchanged)
+ * - "8CV2SB_SD_Negeri_2_Padangsambian_6A_10" -> "8CV2SB_SD_Negeri_2_Padangsambian_6A_10" (unchanged)
+ * - "2" -> "02"
+ */
+export const formatStudentIdForExport = (
+  studentId: string | undefined | null,
+  fallbackAbsent?: string | number | null,
+): string => {
+  const raw =
+    studentId ||
+    (fallbackAbsent !== undefined &&
+    fallbackAbsent !== null &&
+    String(fallbackAbsent).trim() !== ""
+      ? String(fallbackAbsent)
+      : "");
+  if (!raw) return "-";
+  const idStr = String(raw).trim();
+  if (!idStr) return "-";
+
+  // Case 1: Pure single digit between 1 and 9 (e.g. "2" -> "02")
+  if (/^[1-9]$/.test(idStr)) {
+    return `0${idStr}`;
+  }
+
+  // Case 2: ID ending with delimiter (_, -, %, /, :, #, ., or space) followed by single digit 1-9
+  // Example: "8CV2SB_SD_Negeri_2_Padangsambian_6A_2" -> "8CV2SB_SD_Negeri_2_Padangsambian_6A_02"
+  if (/([_\-%/:#\s.])([1-9])$/.test(idStr)) {
+    return idStr.replace(/([_\-%/:#\s.])([1-9])$/, "$10$2");
+  }
+
+  return idStr;
+};
+
 export const normalizeQuestion = (q: any): any => {
   if (!q) {
     return {
