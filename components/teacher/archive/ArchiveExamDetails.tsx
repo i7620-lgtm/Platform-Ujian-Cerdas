@@ -19,37 +19,48 @@ export const ArchiveDetailUjianView: React.FC<ArchiveDetailUjianViewProps> = ({
   return (
     <div className="space-y-4">
       {exam.questions.map((q, index) => {
+        const isInfo = q.questionType === "INFO" || (q as any).type === "INFO";
         const questionNumber =
           exam.questions
             .slice(0, index)
-            .filter((i) => i.questionType !== "INFO").length + 1;
+            .filter((i) => i.questionType !== "INFO" && (i as any).type !== "INFO").length + 1;
         return (
           <div
             key={q.id}
-            className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm"
+            className={`p-6 rounded-2xl border shadow-sm ${
+              isInfo
+                ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40 border-l-4 border-l-blue-500"
+                : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"
+            }`}
           >
             <div className="flex items-start gap-4">
-              <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">
-                {q.questionType === "INFO" ? "i" : questionNumber}
-              </span>
+              {isInfo ? (
+                <span className="flex-shrink-0 mt-1 text-[10px] font-black px-2 py-1 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  INFO
+                </span>
+              ) : (
+                <span className="flex-shrink-0 mt-1 text-sm font-bold w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">
+                  {questionNumber}
+                </span>
+              )}
               <div className="flex-1 space-y-4 min-w-0">
                 {/* Metadata Badge */}
-                {(q.category || q.level || q.scoreWeight) && (
+                {!isInfo && (q.category || q.level || q.scoreWeight) && (
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {q.category && (
-                      <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600 uppercase tracking-wide">
-                        Kategori: {q.category}
+                      {q.category && (
+                        <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600 uppercase tracking-wide">
+                          Kategori: {q.category}
+                        </span>
+                      )}
+                      {q.level && (
+                        <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 uppercase tracking-wide">
+                          Level: {q.level}
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 uppercase tracking-wide">
+                        Bobot: {q.scoreWeight || 1}
                       </span>
-                    )}
-                    {q.level && (
-                      <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 uppercase tracking-wide">
-                        Level: {q.level}
-                      </span>
-                    )}
-                    <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 uppercase tracking-wide">
-                      Bobot: {q.scoreWeight || 1}
-                    </span>
-                  </div>
+                    </div>
                 )}
 
                 <div
