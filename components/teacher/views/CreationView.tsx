@@ -464,10 +464,10 @@ export const CreationView: React.FC<CreationViewProps> = ({
                       setAiConfig({ ...aiConfig, subject: e.target.value })
                     }
                     className="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-sm text-slate-800 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all"
-                    placeholder="Contoh: Matematika SMA (TKA) - Dimensi Tiga & Transformasi Geometri"
+                    placeholder="Contoh: Matematika SMA (TKA) - Polinomial (Suku Banyak) atau Dimensi Tiga"
                   />
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
-                    Ketik materi spesifik Anda di atas, atau pilih dari daftar <strong>Preset Standar TKA</strong> di bagian bawah untuk otomatisasi instan.
+                    Ketik materi spesifik Anda di atas (misal: <strong>Polinomial</strong>, <strong>Matriks</strong>, dll), atau pilih dari daftar <strong>Preset Standar TKA</strong> di bagian bawah untuk otomatisasi instan.
                   </p>
                 </div>
 
