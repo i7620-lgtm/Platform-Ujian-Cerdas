@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCreationView } from "../useCreationView";
 import { TKA_PRESETS, type TKAPreset } from "../../../utils/tkaPresets";
+import { WysiwygEditor } from "../WysiwygEditor";
 
 interface CreationViewProps {
   onQuestionsGenerated: (
@@ -824,18 +825,20 @@ export const CreationView: React.FC<CreationViewProps> = ({
                   })}
                 </div>
 
-                {/* Blueprint Textarea */}
+                {/* Blueprint Editor */}
                 <div className="pt-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Detail Blueprint & Kisi-kisi yang Dikirim ke AI:
-                  </label>
-                  <textarea
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Detail Blueprint & Kisi-kisi yang Dikirim ke AI:
+                    </label>
+                  </div>
+                  <WysiwygEditor
                     value={aiConfig.blueprint}
-                    onChange={(e) =>
-                      setAiConfig({ ...aiConfig, blueprint: e.target.value })
+                    onChange={(val) =>
+                      setAiConfig({ ...aiConfig, blueprint: val })
                     }
-                    className="w-full h-28 p-3 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-xs resize-y text-slate-800 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all font-mono leading-relaxed"
                     placeholder="Pilih salah satu preset di atas atau ketik kisi-kisi custom Anda di sini..."
+                    minHeight="140px"
                   />
                 </div>
 
