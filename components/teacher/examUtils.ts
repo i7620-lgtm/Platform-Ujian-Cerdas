@@ -2069,6 +2069,14 @@ export const htmlToMarkdown = (html: string): string => {
     return `[[audio:${src}]]`;
   });
 
+  // 3b. Links
+  // From: <a href="url">text</a>
+  // To: [text](url)
+  markdown = markdown.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, (match, href, text) => {
+    const cleanText = text.replace(/<[^>]+>/g, "").trim() || href;
+    return `[${cleanText}](${href})`;
+  });
+
   // 4. Basic Formatting
   markdown = markdown
     .replace(/<b>(.*?)<\/b>/g, "**$1**")
