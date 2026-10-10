@@ -15,6 +15,7 @@ import {
   EraserIcon,
   ListBulletIcon,
   ChartBarIcon,
+  LinkIcon,
 } from "../Icons";
 import type { ChartData } from "../../types";
 
@@ -63,6 +64,7 @@ interface ToolbarActionsProps {
   onChartClick?: (chartType?: "cartesian") => void;
   onAksaraClick: () => void;
   onEmojiClick: () => void;
+  onLinkClick?: () => void;
   isInsideTable: boolean;
   onDeleteTable: () => void;
   chartData?: ChartData;
@@ -83,6 +85,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   onChartClick,
   onAksaraClick,
   onEmojiClick,
+  onLinkClick,
   isInsideTable,
   onDeleteTable,
   chartData,
@@ -343,6 +346,19 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
         >
           <span className="text-[14px]">😀</span> Simbol / Emoji
         </button>
+        {onLinkClick && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onLinkClick();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+            title="Sisipkan Tautan / Link"
+          >
+            <LinkIcon className="w-4 h-4" /> Link
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={(e) => {
