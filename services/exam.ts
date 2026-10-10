@@ -563,6 +563,9 @@ export class ExamService {
             if (q.trueFalseRows) {
                 q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
             }
+            if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
+                q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
+            }
             if (q.matchingPairs) {
                 q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));
             }
@@ -764,6 +767,9 @@ export class ExamService {
             }
             if (q.trueFalseRows) {
                 q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
+            }
+            if (q.categoryLabels && Array.isArray(q.categoryLabels)) {
+                q.categoryLabels = q.categoryLabels.map((l: string) => this.sanitizeHtmlString(String(l)));
             }
             if (q.matchingPairs) {
                 q.matchingPairs = q.matchingPairs.map((p: { left: string; right: string }) => ({ left: this.sanitizeHtmlString(p.left), right: this.sanitizeHtmlString(p.right) }));

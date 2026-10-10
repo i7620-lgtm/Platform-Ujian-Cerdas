@@ -15,6 +15,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 import { ChartData } from "../types";
 
@@ -72,7 +73,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return null;
 };
 
-const BAR_CHART_MARGIN = { top: 20, right: 20, left: -20, bottom: 0 };
+const BAR_CHART_MARGIN = { top: 30, right: 25, left: -10, bottom: 5 };
 
 export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   const { type, title, labels, datasets } = data;
@@ -135,8 +136,9 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
   }, [type, labels, datasets]);
 
   const renderPieLabel = React.useCallback((props: any) => {
-    const { name, percent, x, y, textAnchor, fill } = props;
+    const { name, percent, x, y, textAnchor, fill, value } = props;
     if (!percent || percent === 0) return null;
+    const valueText = value !== undefined && value !== null ? `${value} ` : "";
     return (
       <text
         x={x}
@@ -147,7 +149,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
         fontWeight={700}
         style={{ fontSize: "clamp(9px, 2.5vw, 13px)" }}
       >
-        {`${name}: ${(percent * 100).toFixed(0)}%`}
+        {`${name}: ${valueText}(${(percent * 100).toFixed(0)}%)`}
       </text>
     );
   }, []);
@@ -179,13 +181,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
     if (max === 0) return undefined;
 
     let interval = 5;
-    if (max > 50 && max <= 100) interval = 10;
+    if (max <= 10) interval = 2;
+    else if (max <= 25) interval = 5;
+    else if (max <= 50) interval = 10;
+    else if (max <= 100) interval = 20;
     else if (max > 100 && max <= 500) interval = 50;
     else if (max > 500) interval = 100;
 
     const ticks = [];
     const maxTick = Math.ceil(max / interval) * interval;
-    for (let i = 0; i <= maxTick; i += interval) {
+    // Berikan ruang/headroom di atas bar tertinggi agar LabelList di atas bar tidak terpotong
+    const upperLimit = maxTick === max ? maxTick + interval : maxTick;
+    for (let i = 0; i <= upperLimit; i += interval) {
       ticks.push(i);
     }
     return ticks;
@@ -201,8 +208,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={0}
-            minHeight={0}
+            minWidth={100}
+            minHeight={220}
           >
             <BarChart
               data={chartData}
@@ -216,14 +223,14 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 13, fill: "#475569", fontWeight: 600 }}
+                tick={{ fontSize: 12, fill: "#334155", fontWeight: 700 }}
                 axisLine={{ stroke: "#64748b", strokeWidth: 1.5 }}
                 tickLine={{ stroke: "#64748b" }}
                 interval={0}
-                angle={-35}
-                textAnchor="end"
-                height={70}
-                tickMargin={5}
+                angle={chartData.some((d) => String(d.name).length > 5) ? -30 : 0}
+                textAnchor={chartData.some((d) => String(d.name).length > 5) ? "end" : "middle"}
+                height={chartData.some((d) => String(d.name).length > 5) ? 65 : 40}
+                tickMargin={6}
               />
               <YAxis
                 tick={{ fontSize: 13, fill: "#475569", fontWeight: 600 }}
@@ -253,7 +260,16 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   }
                   maxBarSize={80}
                   isAnimationActive={false}
-                />
+                >
+                  <LabelList
+                    dataKey={dataset.label}
+                    position="top"
+                    fill="#1e293b"
+                    fontSize={12}
+                    fontWeight={800}
+                    offset={6}
+                  />
+                </Bar>
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -263,8 +279,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={0}
-            minHeight={0}
+            minWidth={100}
+            minHeight={220}
           >
             <LineChart data={chartData} margin={BAR_CHART_MARGIN}>
               <CartesianGrid
@@ -274,14 +290,14 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
               />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 13, fill: "#475569", fontWeight: 600 }}
+                tick={{ fontSize: 12, fill: "#334155", fontWeight: 700 }}
                 axisLine={{ stroke: "#64748b", strokeWidth: 1.5 }}
                 tickLine={{ stroke: "#64748b" }}
                 interval={0}
-                angle={-35}
-                textAnchor="end"
-                height={70}
-                tickMargin={5}
+                angle={chartData.some((d) => String(d.name).length > 5) ? -30 : 0}
+                textAnchor={chartData.some((d) => String(d.name).length > 5) ? "end" : "middle"}
+                height={chartData.some((d) => String(d.name).length > 5) ? 65 : 40}
+                tickMargin={6}
               />
               <YAxis
                 tick={{ fontSize: 13, fill: "#475569", fontWeight: 600 }}
@@ -313,7 +329,16 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
                   dot={{ r: 6, strokeWidth: 2, fill: "#fff" }}
                   activeDot={{ r: 8, strokeWidth: 0 }}
                   isAnimationActive={false}
-                />
+                >
+                  <LabelList
+                    dataKey={dataset.label}
+                    position="top"
+                    fill="#1e293b"
+                    fontSize={11}
+                    fontWeight={800}
+                    offset={8}
+                  />
+                </Line>
               ))}
             </LineChart>
           </ResponsiveContainer>
@@ -329,8 +354,8 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({ data }) => {
           <ResponsiveContainer
             width="100%"
             height="100%"
-            minWidth={0}
-            minHeight={0}
+            minWidth={100}
+            minHeight={220}
           >
             <PieChart margin={pieChartMargin}>
               <Pie

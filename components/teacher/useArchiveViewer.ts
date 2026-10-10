@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { storageService } from "../../services/storage";
-import { generateQuestionsPDF, compressImage } from "./examUtils";
+import { compressImage } from "./examUtils";
 import {
   fixArchiveDataSorting,
   getCalculatedStats,
@@ -45,6 +45,7 @@ export const useArchiveViewer = ({
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const loadCloudList = async () => {
     try {
@@ -333,9 +334,9 @@ export const useArchiveViewer = ({
     }, 100);
   };
 
-  const handleDownloadQuestionsPDF = async () => {
+  const handleDownloadQuestionsPDF = () => {
     if (!archiveData) return;
-    await generateQuestionsPDF(archiveData.exam);
+    setIsPrintModalOpen(true);
   };
 
   const handleDownloadExcel = async () => {
@@ -526,6 +527,8 @@ export const useArchiveViewer = ({
     resetView,
     handlePrint,
     handleDownloadQuestionsPDF,
+    isPrintModalOpen,
+    setIsPrintModalOpen,
     handleDownloadExcel,
     handleUpdateKey,
     checkIsNoAuthor,

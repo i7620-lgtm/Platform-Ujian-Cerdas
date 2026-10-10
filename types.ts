@@ -12,6 +12,7 @@ export interface QuizConfig {
   includeImages: boolean;
   category?: string;
   kisiKisi?: string;
+  scoreWeight?: number;
 }
 
 export interface CartesianConfig {
@@ -103,6 +104,8 @@ export interface Question {
     answer: boolean; 
     chartData?: ChartData;
   }[];
+
+  categoryLabels?: [string, string] | string[]; // Label pilihan untuk soal kategori (misal: ["Benar", "Salah"], ["Sesuai", "Tidak Sesuai"]), default: ["Benar", "Salah"]
 }
 
 export interface RegisteredStudentConfig {

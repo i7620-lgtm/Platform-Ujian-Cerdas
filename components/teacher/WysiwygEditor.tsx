@@ -7,6 +7,7 @@ import {
   CheckIcon,
   TableCellsIcon,
   FunctionIcon,
+  LinkIcon,
 } from "../Icons";
 import { ChartRenderer } from "../ChartRenderer";
 import EmojiPickerModal from "./EmojiPickerModal";
@@ -17,8 +18,13 @@ import { EquationEditorTab as VisualMathModal } from "./EquationEditorTab";
 import { useWysiwygEditor } from "./useWysiwygEditor";
 import { transliterate } from "../../utils/aksaraBali";
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
-import { cleanOrphanedSvgMarkup, repairGeometrySvgInHtml } from "./examUtils";
-import { hydrateMathInContainer } from "../../utils/mathRenderer";
+import { cleanOrphanedSvgMarkup, repairGeometrySvgInHtml, sanitizeHtml } from "./examUtils";
+import { hydrateMathInContainer, renderMathInHtml } from "../../utils/mathRenderer";
+import {
+  isEditorActive,
+  getCaretCharacterOffsetWithin,
+  setCaretCharacterOffsetWithin,
+} from "./caretUtils";
 
 export const SelectionModal: React.FC<{
   isOpen: boolean;
@@ -247,13 +253,102 @@ export const AksaraBaliModal: React.FC<{
   );
 };
 
+export const LinkModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onInsert: (url: string, text?: string) => void;
+  selectedText?: string;
+}> = ({ isOpen, onClose, onInsert, selectedText = "" }) => {
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState(selectedText);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!url.trim()) return;
+    let formattedUrl = url.trim();
+    if (
+      !/^https?:\/\//i.test(formattedUrl) &&
+      !formattedUrl.startsWith("#") &&
+      !formattedUrl.startsWith("mailto:")
+    ) {
+      formattedUrl = "https://" + formattedUrl;
+    }
+    onInsert(formattedUrl, text.trim() || formattedUrl);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-700 flex flex-col">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
+          <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+            <LinkIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            Sisipkan Tautan (Link)
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div>
+            <label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-1">
+              URL Link / Alamat Web
+            </label>
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://contoh.com atau link materi"
+              className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none text-xs"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 dark:text-slate-400 block mb-1">
+              Teks Ditampilkan (Opsional)
+            </label>
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Judul / Teks yang dapat diklik"
+              className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 outline-none text-xs"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-bold text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={!url.trim()}
+              className="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sisipkan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const WysiwygEditor: React.FC<{
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
   minHeight?: string;
   showTabs?: boolean;
-  onChartClick?: () => void;
+  onChartClick?: (chartType?: "cartesian") => void;
   chartData?: ChartData;
 }> = ({
   value,
@@ -279,10 +374,15 @@ export const WysiwygEditor: React.FC<{
     deleteCurrentTable,
     insertMath,
     insertAiImage,
+    openLinkModal,
+    insertLink,
     handlePaste,
     handleImageFileChange,
     handleAudioFileChange,
     restoreSelection,
+    lastEmittedValueRef,
+    isTypingRef,
+    debounceRef,
   } = useWysiwygEditor({ value, onChange, showTabs, onChartClick, chartData });
 
   const {
@@ -295,6 +395,8 @@ export const WysiwygEditor: React.FC<{
     showAksara,
     showEmoji,
     showAiImage,
+    showLink,
+    selectedTextForLink,
   } = state;
 
   const [chartNode, setChartNode] = useState<HTMLElement | null>(null);
@@ -302,33 +404,93 @@ export const WysiwygEditor: React.FC<{
 
   useEffect(() => {
     if (editorRef.current) {
-      const isFocused = document.activeElement === editorRef.current;
+      const isFocused = isEditorActive(editorRef.current);
       const currentHtml = editorRef.current.innerHTML;
+
+      // 1. If this incoming value was emitted by this editor instance, do NOT touch DOM
+      const isSelfChange =
+        value === lastEmittedValueRef.current ||
+        (lastEmittedValueRef.current !== null &&
+          sanitizeHtml(value) === lastEmittedValueRef.current);
+
+      if (isSelfChange) {
+        lastValueRef.current = value;
+        return;
+      }
+
+      // 2. If the user is actively focused and typing/pending debounce in this editor, do NOT disrupt cursor
+      if (isFocused && (isTypingRef.current || debounceRef.current !== null)) {
+        lastValueRef.current = value;
+        return;
+      }
+
       const propChangedExternally = value !== lastValueRef.current;
       lastValueRef.current = value;
 
       if (value !== currentHtml) {
-        if (propChangedExternally || !isFocused || !currentHtml || currentHtml === "<p><br></p>") {
+        if (
+          propChangedExternally ||
+          !isFocused ||
+          !currentHtml ||
+          currentHtml === "<p><br></p>"
+        ) {
+          // If the editor is currently focused, preserve caret character offset
+          const savedOffset = isFocused
+            ? getCaretCharacterOffsetWithin(editorRef.current)
+            : -1;
+
           let newHtml = value || "";
+
+          // If plain text with newlines and no HTML tags (e.g. preset or raw multiline text)
+          if (
+            newHtml &&
+            !/<[a-z][\s\S]*>/i.test(newHtml) &&
+            newHtml.includes("\n")
+          ) {
+            newHtml = newHtml
+              .split(/\r?\n\r?\n/)
+              .map((para) => `<p>${para.replace(/\r?\n/g, "<br/>")}</p>`)
+              .join("");
+          }
+
+          // Pre-render any LaTeX delimiters ($...$ or $$...$$) into rich math-visual spans
+          newHtml = renderMathInHtml(newHtml);
+
           const CHART_PLACEHOLDER = `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
-          
+
           if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(newHtml)) {
-            newHtml = newHtml.replace(/(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi, CHART_PLACEHOLDER);
+            newHtml = newHtml.replace(
+              /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+              CHART_PLACEHOLDER,
+            );
           } else if (chartData && !newHtml.includes('data-chart="true"')) {
             newHtml += CHART_PLACEHOLDER;
           }
 
           // Resolve any unrendered geometry tag
-          if (/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)) {
-            newHtml = newHtml.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi, (_match, shape, labelsStr) => {
-              try {
-                const labels = parseGeometryLabels(labelsStr || "{}");
-                const svg = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
-                return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
-              } catch {
-                return _match;
-              }
-            });
+          if (
+            /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)
+          ) {
+            newHtml = newHtml.replace(
+              /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi,
+              (_match, shape, labelsStr) => {
+                try {
+                  const labels = parseGeometryLabels(labelsStr || "{}");
+                  const svg = generateGeometrySVG(
+                    shape,
+                    labels,
+                    "#e2e8f0",
+                    "#0f172a",
+                    false,
+                    true,
+                    true,
+                  );
+                  return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+                } catch {
+                  return _match;
+                }
+              },
+            );
           }
 
           // Clean any orphaned SVG code fragments from past errors and repair geometry SVGs
@@ -337,10 +499,15 @@ export const WysiwygEditor: React.FC<{
 
           // Rehydrate any KaTeX math elements or raw LaTeX
           hydrateMathInContainer(editorRef.current);
+
+          // Restore caret position if editor was focused
+          if (isFocused && savedOffset >= 0) {
+            setCaretCharacterOffsetWithin(editorRef.current, savedOffset);
+          }
         }
       }
     }
-  }, [value, chartData, editorRef]);
+  }, [value, chartData, editorRef, lastEmittedValueRef, isTypingRef, debounceRef]);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -399,6 +566,7 @@ export const WysiwygEditor: React.FC<{
             onChartClick={onChartClick}
             onAksaraClick={() => setEditorSubState({ showAksara: true })}
             onEmojiClick={() => setEditorSubState({ showEmoji: true })}
+            onLinkClick={openLinkModal}
             isInsideTable={isInsideTable}
             onDeleteTable={deleteCurrentTable}
             chartData={chartData}
@@ -407,17 +575,48 @@ export const WysiwygEditor: React.FC<{
             handleInput={handleInput}
           />
           {activeTab === "MATH" && (
-            <div className="flex items-center gap-2 w-full">
+            <div className="flex flex-wrap items-center gap-1.5 w-full">
               <button
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   setEditorSubState({ showMath: true });
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"
               >
                 <FunctionIcon className="w-4 h-4" /> Buka Math Pro
               </button>
+              <div className="h-5 w-px bg-gray-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
+              {[
+                { label: "x²", latex: "x^2", title: "Pangkat Kuadrat" },
+                { label: "a/b", latex: "\\frac{a}{b}", title: "Pecahan" },
+                { label: "√x", latex: "\\sqrt{x}", title: "Akar Kuadrat" },
+                { label: "π", latex: "\\pi", title: "Pi" },
+                { label: "±", latex: "\\pm", title: "Plus Minus" },
+                { label: "×", latex: "\\times", title: "Kali" },
+                { label: "÷", latex: "\\div", title: "Bagi" },
+                { label: "≤", latex: "\\leq", title: "Kurang dari sama dengan" },
+                { label: "≥", latex: "\\geq", title: "Lebih dari sama dengan" },
+                { label: "≠", latex: "\\neq", title: "Tidak sama dengan" },
+                { label: "α", latex: "\\alpha", title: "Alpha" },
+                { label: "β", latex: "\\beta", title: "Beta" },
+                { label: "θ", latex: "\\theta", title: "Theta" },
+                { label: "∞", latex: "\\infty", title: "Tak Hingga" },
+                { label: "∑", latex: "\\sum_{i=1}^{n}", title: "Sigma" },
+              ].map((sym) => (
+                <button
+                  key={sym.label}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertMath(sym.latex);
+                  }}
+                  className="px-2 py-1 bg-slate-100 hover:bg-indigo-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-indigo-700 dark:text-slate-200 rounded text-xs font-serif font-bold transition-colors"
+                  title={sym.title}
+                >
+                  {sym.label}
+                </button>
+              ))}
             </div>
           )}
           {isInsideTable && (
@@ -523,6 +722,13 @@ export const WysiwygEditor: React.FC<{
         isOpen={showAiImage}
         onClose={() => setEditorSubState({ showAiImage: false })}
         onInsert={insertAiImage}
+      />
+      <LinkModal
+        key={showLink ? `link-open-${selectedTextForLink}` : "link-closed"}
+        isOpen={showLink}
+        onClose={() => setEditorSubState({ showLink: false })}
+        onInsert={insertLink}
+        selectedText={selectedTextForLink}
       />
     </div>
   );

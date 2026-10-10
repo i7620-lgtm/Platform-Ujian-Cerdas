@@ -1,6 +1,11 @@
 import { useRef, useEffect, useState } from "react";
 import { compressImage, sanitizeHtml } from "./examUtils";
 import { renderLatexToString } from "../../utils/mathRenderer";
+import {
+  isEditorActive,
+  getCaretCharacterOffsetWithin,
+  setCaretCharacterOffsetWithin,
+} from "./caretUtils";
 
 export type WysiwygTab = "FORMAT" | "PARAGRAPH" | "INSERT" | "MATH";
 
@@ -14,6 +19,8 @@ export interface EditorState {
   showAksara: boolean;
   showEmoji: boolean;
   showAiImage: boolean;
+  showLink: boolean;
+  selectedTextForLink: string;
 }
 
 const execCmd = (command: string, value: string | undefined = undefined) => {
@@ -24,7 +31,7 @@ interface UseWysiwygEditorParams {
   value: string;
   onChange: (val: string) => void;
   showTabs: boolean;
-  onChartClick?: () => void;
+  onChartClick?: (chartType?: "cartesian") => void;
   chartData?: any;
 }
 
@@ -39,7 +46,10 @@ export const useWysiwygEditor = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const savedRange = useRef<Range | null>(null);
+  const savedCaretOffset = useRef<number>(-1);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastEmittedValueRef = useRef<string | null>(null);
+  const isTypingRef = useRef<boolean>(false);
 
   const defaultTab: WysiwygTab = showTabs ? "FORMAT" : "INSERT";
 
@@ -53,6 +63,8 @@ export const useWysiwygEditor = ({
     showAksara: false,
     showEmoji: false,
     showAiImage: false,
+    showLink: false,
+    selectedTextForLink: "",
   });
 
   const setEditorSubState = (
@@ -75,17 +87,23 @@ export const useWysiwygEditor = ({
 
   const handleInput = () => {
     if (editorRef.current) {
+      isTypingRef.current = true;
       const clone = editorRef.current.cloneNode(true) as HTMLElement;
       const chartNodes = clone.querySelectorAll('[data-chart="true"]');
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
       });
       const html = clone.innerHTML;
+      const sanitized = sanitizeHtml(html);
+      lastEmittedValueRef.current = sanitized;
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        onChange(sanitizeHtml(html));
-      }, 1000);
+        debounceRef.current = null;
+        isTypingRef.current = false;
+        lastEmittedValueRef.current = sanitized;
+        onChange(sanitized);
+      }, 700);
 
       saveSelection();
       checkActiveFormats();
@@ -96,14 +114,19 @@ export const useWysiwygEditor = ({
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
-      if (editorRef.current) {
-        const clone = editorRef.current.cloneNode(true) as HTMLElement;
-        const chartNodes = clone.querySelectorAll('[data-chart="true"]');
-        chartNodes.forEach((node) => {
-          node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
-        });
-        const html = clone.innerHTML;
-        onChange(sanitizeHtml(html));
+    }
+    isTypingRef.current = false;
+    if (editorRef.current) {
+      const clone = editorRef.current.cloneNode(true) as HTMLElement;
+      const chartNodes = clone.querySelectorAll('[data-chart="true"]');
+      chartNodes.forEach((node) => {
+        node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
+      });
+      const html = clone.innerHTML;
+      const sanitized = sanitizeHtml(html);
+      if (sanitized !== lastEmittedValueRef.current) {
+        lastEmittedValueRef.current = sanitized;
+        onChange(sanitized);
       }
     }
     saveSelection();
@@ -117,15 +140,28 @@ export const useWysiwygEditor = ({
       editorRef.current?.contains(sel.anchorNode)
     ) {
       savedRange.current = sel.getRangeAt(0).cloneRange();
+      savedCaretOffset.current = getCaretCharacterOffsetWithin(editorRef.current);
     }
   };
 
   const restoreSelection = () => {
     if (editorRef.current) editorRef.current.focus();
     const sel = window.getSelection();
-    if (sel && savedRange.current) {
-      sel.removeAllRanges();
-      sel.addRange(savedRange.current);
+    if (
+      sel &&
+      savedRange.current &&
+      editorRef.current?.contains(savedRange.current.startContainer)
+    ) {
+      try {
+        sel.removeAllRanges();
+        sel.addRange(savedRange.current);
+        return;
+      } catch {
+        // Fallback to offset
+      }
+    }
+    if (editorRef.current && savedCaretOffset.current >= 0) {
+      setCaretCharacterOffsetWithin(editorRef.current, savedCaretOffset.current);
     } else if (editorRef.current && sel) {
       const range = document.createRange();
       range.selectNodeContents(editorRef.current);
@@ -377,6 +413,41 @@ export const useWysiwygEditor = ({
     handleInput();
   };
 
+  const openLinkModal = () => {
+    saveSelection();
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    setEditorSubState({ showLink: true, selectedTextForLink: text });
+  };
+
+  const insertLink = (url: string, linkText?: string) => {
+    restoreSelection();
+    if (editorRef.current) {
+      const sel = window.getSelection();
+      const hasSelection =
+        sel &&
+        sel.rangeCount > 0 &&
+        !sel.isCollapsed &&
+        editorRef.current.contains(sel.anchorNode);
+
+      if (hasSelection) {
+        document.execCommand("createLink", false, url);
+        const links = editorRef.current.querySelectorAll(`a[href="${url}"]`);
+        links.forEach((a) => {
+          a.setAttribute("target", "_blank");
+          a.setAttribute("rel", "noopener noreferrer");
+          (a as HTMLElement).classList.add("text-indigo-600", "underline");
+        });
+      } else {
+        const title = linkText || url;
+        const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">${title}</a>&nbsp;`;
+        document.execCommand("insertHTML", false, linkHtml);
+      }
+      saveSelection();
+      handleInput();
+    }
+  };
+
   return {
     editorRef,
     fileInputRef,
@@ -392,9 +463,14 @@ export const useWysiwygEditor = ({
     deleteCurrentTable,
     insertMath,
     insertAiImage,
+    openLinkModal,
+    insertLink,
     handlePaste,
     handleImageFileChange,
     handleAudioFileChange,
     restoreSelection,
+    lastEmittedValueRef,
+    isTypingRef,
+    debounceRef,
   };
 };

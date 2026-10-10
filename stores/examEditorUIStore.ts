@@ -6,6 +6,7 @@ export interface ChartTarget {
     type: 'question' | 'option' | 'tf' | 'matching' | 'correctAnswer';
     index?: number;
     subIndex?: 'left' | 'right';
+    preferredType?: 'bar' | 'line' | 'pie' | 'venn' | 'relation' | 'cartesian';
 }
 
 interface ExamEditorUIState {

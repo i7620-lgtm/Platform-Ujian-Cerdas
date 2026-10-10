@@ -144,6 +144,33 @@ export const TKA_PRESETS: TKAPreset[] = [
 - Karakteristik: Soal penalaran bertingkat (multi-step reasoning), stimulus kontekstual aplikatif, sintaks LaTeX baku ($...$), dan opsi pengecoh logis.`,
   },
   {
+    id: 'tka-sma-matematika-lanjut',
+    name: '+ Preset TKA SMA Matematika Tingkat Lanjut',
+    shortLabel: 'SMA Mat Lanjut',
+    jenjang: 'SMA',
+    category: 'MIPA',
+    regulation: 'BSKAP No. 045/H/AN/2025',
+    subject: 'Matematika Tingkat Lanjut SMA (TKA) - Polinomial',
+    difficulties: [
+      'Level 3 - Penalaran (Reasoning / HOTS)',
+      'Level 2 - Penerapan (Applying / MOTS)',
+    ],
+    types: ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Benar/Salah'],
+    description: 'Polinomial (Suku Banyak), Pembagian Horner, Teorema Sisa/Faktor, Matriks, Vektor & Kalkulus.',
+    blueprint: `Standar TKA Matematika Tingkat Lanjut SMA Kemendikdasmen No. 045/H/AN/2025:
+- Domain Aljabar Polinomial (Suku Banyak):
+  1. Operasi aljabar suku banyak (penjumlahan, pengurangan, perkalian, derajat dan koefisien polinomial, kesamaan suku banyak).
+  2. Nilai suku banyak dengan substitusi langsung dan skema bagan Horner.
+  3. Pembagian polinomial dengan metode bersusun (porogapit) dan skema bagan Horner serta Horner-Kino (pembagi linear x-k, ax+b, dan pembagi kuadrat ax^2+bx+c).
+  4. Teorema Sisa: menghitung sisa pembagian P(x) oleh pembagi linear dan pembagi kuadrat dengan pemisalan S(x) = px + q.
+  5. Teorema Faktor: menentukan faktor linear dari suku banyak, menentukan nilai koefisien tak tentu jika faktor diketahui.
+  6. Akar-akar rasional persamaan suku banyak dan hubungan akar-akar polinomial derajat 3 (Teorema Vieta).
+- Domain Matriks: Operasi matriks, determinan matriks ordo 2x2 dan 3x3, invers matriks ordo 2x2 dan 3x3, penyelesaian SPL dengan matriks/Cramer.
+- Domain Geometri Analitik & Vektor: Vektor 2D/3D, panjang vektor, hasil kali skalar (dot product), proyeksi ortogonal, persamaan lingkaran dan garis singgung.
+- Domain Kalkulus: Limit aljabar dan trigonometri, turunan fungsi aljabar dan trigonometri, nilai stasioner maksimum/minimum, integral substitusi.
+- Karakteristik: Soal penalaran HOTS/MOTS bertingkat, kepatuhan mutlak pada topik polinomial jika dipilih, sintaks LaTeX baku ($...$), dan pembuktian langkah aljabar 100% akurat.`,
+  },
+  {
     id: 'tka-sma-fisika',
     name: '+ Preset TKA SMA Fisika',
     shortLabel: 'SMA Fisika',

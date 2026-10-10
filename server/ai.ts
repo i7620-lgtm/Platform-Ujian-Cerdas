@@ -24,8 +24,15 @@ export function getAI(): GoogleGenAI {
   return aiInstance;
 }
 
+export const FLASH_MODELS_CASCADE = [
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite'
+];
+
 export async function generateAIAnalysisOnServer(prompt: string): Promise<string> {
-    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = [...FLASH_MODELS_CASCADE];
     
     for (const model of modelsToTry) {
         let attempts = 0;
@@ -61,10 +68,23 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
         throw new Error(safety.reason || "Permintaan tidak sesuai dengan standar etika pendidikan sekolah.");
     }
 
-    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash'];
+    const modelsToTry = [...FLASH_MODELS_CASCADE];
     
+    const isGeometryMode = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|dimensi\s*tiga|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga|terpancung|frustum|irisan|bidang\s*iris|rusuk|diagonal|jaring-jaring|segi\s*(enam|delapan|lima)|heksagon|oktagon|poligon|sudut|trigonometri|tembereng|juring|bola|lingkaran|elips|parabola|jajargenjang|belah\s*ketupat|layang|trapezoid|pyramid|prism|cylinder|cone|cube|cuboid|tetrahedron|oktahedron|isometrik|proyeksi|cross\s*section/i.test(prompt);
+
     let styleInstruction = "";
-    if (style === "infographic") {
+    if (isGeometryMode) {
+        styleInstruction = `PERINGATAN KERAS & ATURAN MUTLAK: DILARANG KERAS MEMBUAT PRESENTASI PPT, KARTU INFOGRAFIS '1. KONSEP DASAR', '2. PROSES & FUNGSI', SLIDE MATERI, ATAU KOTAK KESIMPULAN RANGKUMAN!
+Tugas Anda adalah menggambar BENTUK BANGUN GEOMETRI 2D/3D TEKNIS MATEMATIS MURNI:
+- Bangun Geometri Sulit / 3D Ruang (Limas Terpancung, Irisan Bidang, Prisma Segi-6, Frustum Kerucut, Bangun Gabungan 3D, dsb.):
+  * Gambarkan bentuk fisik 3D secara isometrik atau proyeksi miring presisi.
+  * Rusuk depan/terlihat: garis tegas stroke="#0f172a" ketebalan 2.5.
+  * Rusuk belakang/tersembunyi: WAJIB garis putus-putus (stroke-dasharray="5 5") stroke="#64748b" ketebalan 1.8.
+  * Bidang irisan (jika diminta irisan bidang): gunakan arsiran transparan (contoh fill="rgba(239, 68, 68, 0.25)" stroke="#dc2626") yang memotong rusuk-rusuk secara tepat.
+  * Bangun terpancung (limas/kerucut terpancung): gambarkan bidang alas bawah dan bidang atas sejajar dengan ukuran berbeda, dihubungkan rusuk tegak miring, garis tinggi tegak, dan apotema.
+  * Garis dimensi berpanah: cantumkan ukuran panjang rusuk, tinggi, jari-jari, apotema dengan teks angka dan satuan jelas.
+  * Titik sudut: cantumkan huruf kapital tegas (A, B, C, D, E, F, G, H, T, P, Q, R) pada setiap sudut pertemuan rusuk.`;
+    } else if (style === "infographic") {
         styleInstruction = "Fokuskan pada infografis edukasi modern: judul topik yang jelas, 2-3 kartu konsep simetris dengan ikon dan poin-poin materi, serta kotak kesimpulan/rangkuman rapi di bagian bawah.";
     } else if (style === "diagram") {
         styleInstruction = "Fokuskan pada diagram ilmiah berlabel lengkap dengan panah penunjuk, bagian-bagian objek/organ/alam, dan teks label keterangan yang jelas dan mudah dipahami siswa.";
@@ -72,28 +92,25 @@ export async function generateSvgOnServer(prompt: string, style?: string): Promi
         styleInstruction = "Fokuskan pada bagan alur proses bertahap atau diagram siklus (daur air, rantai makanan, metamorfosis) dengan panah penghubung, ikon sederhana, dan penomoran langkah yang rapi.";
     } else if (style === "flat_art") {
         styleInstruction = "Gunakan gaya ilustrasi vektor modern datar (flat design) dengan warna-warna cerah, bentuk ramah edukasi, dan tampilan visual menarik untuk siswa sekolah.";
-    } else if (style === "geometry") {
-        styleInstruction = "Fokuskan pada gambar geometri matematika yang presisi, dimensi ukuran yang jelas (panjang, lebar, tinggi, jari-jari), sudut, atau grafik kartesius yang terstruktur rapi.";
     } else {
-        styleInstruction = "Buat infografis atau diagram materi pendidikan yang jelas, rapi, dengan label keterangan dan warna kontras yang edukatif.";
+        styleInstruction = "Buat diagram materi pendidikan yang jelas, rapi, dengan label keterangan dan bentuk yang edukatif.";
     }
 
     if (safety.educationalSafetyDirective) {
         styleInstruction += `\nDIREKTIF KEPATUTAN KURIKULUM: ${safety.educationalSafetyDirective}`;
     }
 
-    const isGeometryMode = style === "geometry" || /geometri|bangun\s*(datar|ruang|gabungan)?|kubus|balok|prisma|limas|tabung|kerucut|trapesium|lingkaran|segitiga/i.test(prompt);
-
     let layoutInstruction = "";
     if (isGeometryMode) {
-        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI MURNI (BUKAN POSTER):
-   - DILARANG KERAS MEMBUAT KARTU HEADER, BANNER POSTER, ATAU KOTAK JUDUL ATAS! Ini adalah stimulus soal matematika/geometri resmi.
-   - Posisikan bangun geometri di tengah kanvas (center: x sekitar 425, y sekitar 280).
-   - BANGUN GABUNGAN: Jika diminta bangun gabungan (misal balok dan limas, tabung dan kerucut, persegi dan segitiga), kedua bangun HARUS MENYATU RAPI DAN BERHIMPIT TEPAT (koordinat sisi temu sama persis), DILARANG terpisah atau renggang!
-   - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak atau bidang batas pertemuan.
+        layoutInstruction = `4. TATA LETAK DIAGRAM GEOMETRI TEKNIS MURNI (BUKAN SLIDE PPT / BUKAN POSTER):
+   - DILARANG KERAS MEMBUAT KARTU PRESENTASI, SLIDE PPT, KARTU KONSEP 1-2-3, ATAU KOTAK KESIMPULAN!
+   - Posisikan gambar bangun geometri di tengah kanvas (center x=425, y=280).
+   - Di pojok kiri atas (x=45, y=40), hanya berikan teks judul teknis kecil (maks 1 baris, font-size="14-16", font-weight="800", fill="#0f172a").
+   - Bangun gabungan: kedua bangun harus menempel berhimpit presisi tanpa celah.
+   - Berikan garis putus-putus (stroke-dasharray="5 5") untuk rusuk di belakang yang tak tampak.
    - Anotasi Ukuran: Gambarkan garis dimensi berpanah dengan teks ukuran jelas (contoh: '12 cm', '8 cm', 't = 15 cm', 'r = 7 cm').
    - Sudut & Titik Sudut: Berikan label titik sudut (A, B, C, D, ...) dan tanda siku-siku pada sudut 90°.
-   - Stroke utama: stroke="#1e293b" ketebalan 2 sampai 2.5, fill transparan atau pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
+   - Stroke utama: stroke="#0f172a" ketebalan 2 sampai 2.5, fill transparan pastel sangat lembut (contoh: rgba(59, 130, 246, 0.08)).`;
     } else {
         layoutInstruction = `4. TATA LETAK HEADER ATAS (y=25 sampai y=90):
    - Gunakan wadah header elegan di bagian atas: <rect x="40" y="25" width="770" height="65" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
@@ -218,20 +235,20 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
     let response = null;
     let lastError: unknown = null;
   
-    // Cascade of modern valid Gemini models
-    const fallbackCascade = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-    const validModels = (modelsToTry && modelsToTry.length > 0 ? modelsToTry : fallbackCascade)
+    // Cascade of modern valid Flash & Flash Lite models from highest to lowest
+    const inputModels = (modelsToTry && modelsToTry.length > 0 ? modelsToTry : FLASH_MODELS_CASCADE)
         .map(m => (m === 'gemini-3.5-flash' || m === 'gemini-3.7-flash') ? 'gemini-3.8-flash' : m)
-        .filter(m => m !== 'gemini-flash-latest' && m !== 'gemini-2.0-flash' && m !== 'gemini-1.5-flash' && m !== 'gemini-2.5-pro');
+        .filter(m => m !== 'gemini-2.0-flash' && m !== 'gemini-1.5-flash' && m !== 'gemini-2.5-pro');
     
-    for (const m of fallbackCascade) {
-        if (!validModels.includes(m)) {
-            validModels.push(m);
+    const combinedModels = [...inputModels];
+    for (const m of FLASH_MODELS_CASCADE) {
+        if (!combinedModels.includes(m)) {
+            combinedModels.push(m);
         }
     }
 
-    // Deduplicate and prioritize active, non-exhausted models
-    const uniqueModels = Array.from(new Set(validModels));
+    // Deduplicate and prioritize active, non-exhausted models while maintaining highest-to-lowest order
+    const uniqueModels = Array.from(new Set(combinedModels));
     const sortedModels = [
         ...uniqueModels.filter(m => !isModelTemporarilyExhausted(m)),
         ...uniqueModels.filter(m => isModelTemporarilyExhausted(m))
@@ -246,23 +263,103 @@ export async function generateQuestionsOnServer(prompt: string, systemInstructio
             attempts++;
             try {
                 console.log(`Mencoba membuat soal menggunakan model: ${currentModel} (Percobaan ${attempts}/${maxAttempts})`);
-                response = await ai.models.generateContent({
-                  model: currentModel,
-                  contents: prompt,
-                  config: {
-                    systemInstruction: systemInstruction,
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: properties,
-                        required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category", "options"]
-                      },
-                    },
+                const configObj: any = {
+                  systemInstruction: systemInstruction,
+                  temperature: 0.2,
+                  responseMimeType: "application/json"
+                };
+
+                // Gunakan properties lengkap agar diagram statistik (chartData), tabel, dan geometri ter-generate secara utuh
+                const fullProperties = (properties && Object.keys(properties).length > 0) ? properties : {
+                  id: { type: Type.STRING },
+                  questionType: { type: Type.STRING },
+                  questionText: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctAnswer: { type: Type.STRING },
+                  scoreWeight: { type: Type.NUMBER },
+                  kisiKisi: { type: Type.STRING },
+                  level: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                  visualStimulusType: { type: Type.STRING },
+                  svgPrompt: { type: Type.STRING },
+                  svgStyle: { type: Type.STRING },
+                  categoryLabels: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  chartData: {
+                    type: Type.OBJECT,
+                    properties: {
+                      type: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      datasets: {
+                        type: Type.ARRAY,
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            label: { type: Type.STRING },
+                            data: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                            dataValues: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            backgroundColor: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            borderColor: { type: Type.ARRAY, items: { type: Type.STRING } }
+                          },
+                          required: ["label"]
+                        }
+                      }
+                    }
                   },
-                });
+                  trueFalseRows: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        answer: { type: Type.BOOLEAN }
+                      },
+                      required: ["text", "answer"]
+                    }
+                  },
+                  matchingPairs: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        left: { type: Type.STRING },
+                        right: { type: Type.STRING }
+                      },
+                      required: ["left", "right"]
+                    }
+                  }
+                };
+
+                configObj.responseSchema = {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: fullProperties,
+                    required: ["id", "questionType", "questionText", "correctAnswer", "kisiKisi", "level", "category"]
+                  }
+                };
+
+                try {
+                  response = await ai.models.generateContent({
+                    model: currentModel,
+                    contents: prompt,
+                    config: configObj,
+                  });
+                } catch (schemaErr: any) {
+                  const schemaErrMsg = schemaErr?.message?.toLowerCase() || "";
+                  if (schemaErr?.status === 400 || schemaErrMsg.includes("invalid argument") || schemaErrMsg.includes("schema")) {
+                    delete configObj.responseSchema;
+                    response = await ai.models.generateContent({
+                      model: currentModel,
+                      contents: prompt,
+                      config: configObj,
+                    });
+                  } else {
+                    throw schemaErr;
+                  }
+                }
+
                 lastError = null;
                 success = true;
                 break;

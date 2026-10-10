@@ -1,5 +1,14 @@
-import { useEffect, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { ChartData, ChartDataset, CartesianConfig } from "../../types";
+
+export const DEFAULT_CARTESIAN_CONFIG: CartesianConfig = {
+  xMin: -10,
+  xMax: 10,
+  yMin: -10,
+  yMax: 10,
+  xStep: 1,
+  yStep: 1,
+};
 
 interface UseChartConfigModalProps {
   isOpen: boolean;
@@ -9,11 +18,12 @@ interface UseChartConfigModalProps {
 }
 
 export const useChartConfigModal = ({
-  isOpen,
+  isOpen: _isOpen,
   initialData,
   onClose,
   onSave,
 }: UseChartConfigModalProps) => {
+  const [prevInitialData, setPrevInitialData] = useState<ChartData | undefined>(initialData);
   const [type, setType] = useState<
     "bar" | "line" | "pie" | "venn" | "relation" | "cartesian"
   >(initialData?.type || "bar");
@@ -33,7 +43,46 @@ export const useChartConfigModal = ({
   );
   const [showTooltip, setShowTooltip] = useState(initialData?.showTooltip !== false);
   const [showLegend, setShowLegend] = useState(initialData?.showLegend !== false);
-  const [cartesianConfig, setCartesianConfig] = useState<CartesianConfig | undefined>(initialData?.cartesianConfig);
+  const [cartesianConfig, setCartesianConfig] = useState<CartesianConfig>(() => ({
+    ...DEFAULT_CARTESIAN_CONFIG,
+    ...(initialData?.cartesianConfig || {}),
+  }));
+
+  // Synchronize state when initialData changes across opens (React-recommended pattern without cascading effect renders)
+  if (prevInitialData !== initialData) {
+    setPrevInitialData(initialData);
+    if (initialData) {
+      setType(initialData.type || "bar");
+      setTitle(initialData.title || "");
+      setLabels(initialData.labels || ["kategori 1"]);
+      setDatasets(
+        initialData.datasets?.map((d) => ({
+          label: d.label,
+          data: d.data,
+          backgroundColor: d.backgroundColor,
+          borderColor: d.borderColor,
+          showLine: d.showLine,
+          fill: d.fill,
+          isFunction: d.isFunction,
+          functionStr: d.functionStr,
+        })) || [{ label: "Data 1", data: [0] }],
+      );
+      setShowTooltip(initialData.showTooltip !== false);
+      setShowLegend(initialData.showLegend !== false);
+      setCartesianConfig({
+        ...DEFAULT_CARTESIAN_CONFIG,
+        ...(initialData.cartesianConfig || {}),
+      });
+    } else {
+      setType("bar");
+      setTitle("");
+      setLabels(["kategori 1"]);
+      setDatasets([{ label: "Data 1", data: [0] }]);
+      setShowTooltip(true);
+      setShowLegend(true);
+      setCartesianConfig(DEFAULT_CARTESIAN_CONFIG);
+    }
+  }
 
   const resetStore = useCallback(() => {
     setType("bar");
@@ -42,7 +91,7 @@ export const useChartConfigModal = ({
     setDatasets([{ label: "Data 1", data: [0] }]);
     setShowTooltip(true);
     setShowLegend(true);
-    setCartesianConfig(undefined);
+    setCartesianConfig(DEFAULT_CARTESIAN_CONFIG);
   }, []);
 
   const handleTypeChange = useCallback(
@@ -78,6 +127,10 @@ export const useChartConfigModal = ({
             showLine: false,
           },
         ]);
+        setCartesianConfig((prev) => ({
+          ...DEFAULT_CARTESIAN_CONFIG,
+          ...(prev || {}),
+        }));
       }
     },
     [labels.length],
@@ -130,7 +183,14 @@ export const useChartConfigModal = ({
       datasets: datasets,
       showTooltip: showTooltip,
       showLegend: showLegend,
-      ...(type === "cartesian" ? { cartesianConfig } : {}),
+      ...(type === "cartesian"
+        ? {
+            cartesianConfig: {
+              ...DEFAULT_CARTESIAN_CONFIG,
+              ...(cartesianConfig || {}),
+            },
+          }
+        : {}),
     });
     onClose();
     resetStore();

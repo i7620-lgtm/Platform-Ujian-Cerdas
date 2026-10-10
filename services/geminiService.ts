@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuizConfig, QuestionType, ChartData } from "../types";
-import { markdownToHtml, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
+import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch } from "../components/teacher/examUtils";
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
@@ -26,6 +26,24 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     
     Tugas Anda adalah membuat soal berkualitas tinggi, akurat secara konsep, serta memiliki daya beda yang valid berdasarkan parameter yang diberikan.
     
+    PRINSIP KEPATUHAN TOPIK MUTLAK (TOPIC FIDELITY & ZERO TOPIC DRIFT):
+    - Anda WAJIB mematuhi 100% mata pelajaran, topik materi pokok, sub-topik, dan kisi-kisi yang ditetapkan oleh pengguna pada parameter target.
+    - DILARANG KERAS membuat soal di luar materi yang diminta pengguna!
+    - JIKA MATERI YANG DIMINTA BUKAN GEOMETRI (misalnya: "Polinomial", "Suku Banyak", "Aljabar", "Matriks", "Vektor", "Statistika", "Peluang", "Kalkulus / Limit / Turunan / Integral", "Fisika", "Kimia", "Biologi", dll):
+      * DILARANG KERAS membuat soal tentang bangun ruang, bangun datar, balok, kubus, tabung, kerucut, limas, prisma, bola, atau dimensi tiga!
+      * DILARANG KERAS menyisipkan tag [GEOMETRY:...]!
+      * Seluruh tag [GEOMETRY:...] HANYA dan EKSKLUSIF boleh digunakan jika topik yang secara eksplisit diminta pengguna adalah Geometri / Bangun Ruang / Bangun Datar / Dimensi Tiga.
+    - PANDUAN KHUSUS MATERI POLINOMIAL (SUKU BANYAK):
+      * Jika pengguna meminta materi "Polinomial" atau "Suku Banyak", SELURUH BUTIR SOAL WAJIB 100% tentang Polinomial!
+      * Lingkup materi Polinomial terstandar:
+        1. Nilai Polinomial & Derajat: Menghitung nilai suku banyak $P(k)$ dengan substitusi maupun skema Horner, menentukan derajat dan koefisien suku utama/konstanta.
+        2. Operasi Aljabar Polinomial: Penjumlahan, pengurangan, perkalian suku banyak, serta kesamaan polinomial (menentukan koefisien tak tentu).
+        3. Pembagian Polinomial: Pembagian oleh $(x - k)$, $(ax + b)$, dan pembagi kuadrat $(ax^2 + bx + c)$ menggunakan metode bersusun (porogapit) maupun skema bagan Horner / Horner-Kino.
+        4. Teorema Sisa: Jika $P(x)$ dibagi $(x - k)$ maka sisa $S = P(k)$; jika dibagi $(ax + b)$ maka sisa $S = P(-\frac{b}{a})$; sisa pembagian oleh pembagi kuadrat dengan pemisalan $S(x) = px + q$.
+        5. Teorema Faktor: $(x - k)$ adalah faktor linear dari $P(x)$ jika dan hanya jika $P(k) = 0$; menentukan faktor-faktor linear suku banyak.
+        6. Akar-Akar Rasional & Persamaan Polinomial: Menentukan akar-akar real persamaan suku banyak, teorema Vieta untuk jumlah dan hasil kali akar-akar polinomial berderajat 3 ($x_1 + x_2 + x_3 = -\frac{b}{a}$, $x_1 x_2 + x_1 x_3 + x_2 x_3 = \frac{c}{a}$, $x_1 x_2 x_3 = -\frac{d}{a}$).
+      * Seluruh bentuk persamaan suku banyak WAJIB ditulis menggunakan sintaks LaTeX baku: $P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$, dll.
+
     PRINSIP UTAMA PENULISAN SOAL TKA (KEMENDIKDASMEN NO. 047/H/AN/2025 & NO. 045/H/AN/2025):
     1. BERMAKNA & BERBASIS PENALARAN TINGGI (HOTS/MOTS):
        - Soal BUKAN hafalan rumus singkat semata, melainkan menguji pemahaman fakta, konsep, prosedur, serta penalaran konteks nyata (problem-solving).
@@ -63,13 +81,31 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     - Gunakan LaTeX untuk rumus matematika (gunakan $...$ untuk inline dan $$...$$ untuk block equation). PENTING: Karena ini adalah string JSON, Anda WAJIB menggunakan double-backslash ganda untuk escape command LaTeX, contoh: $\\\\frac{1}{2}$ atau $\\\\sqrt{x}$ atau $4\\\\frac{3}{4}$. KHUSUS untuk akar (square root/roots), Anda WAJIB menggunakan perintah $\\\\sqrt{...}$ atau $\\\\sqrt[n]{...}$ dan DILARANG menggunakan karakter unicode akar (√) secara langsung. DILARANG menggunakan karakter pangkat (seperti x^2) atau simbol matematika lainnya tanpa dibungkus LaTeX. Anda WAJIB menggunakan format LaTeX ($...$) secara KONSISTEN pada SELURUH opsi jawaban ('options'), pernyataan, maupun narasi jika memuat persamaan, polinomial, pecahan, akar, atau pangkat! Jika relevan, Anda juga WAJIB menggunakan standar LaTeX untuk matriks (nxn, nx1, 1xn), limit ($\\\\lim$), logaritma ($\\\\log$), permutasi (contoh: $_{n}P_{r}$), kombinasi ($_{n}C_{r}$), jenis kurung berbatas (\\\\left( \\\\right), dll), vektor kolom, nilai mutlak (\\\\left| \\\\right|), fungsi piecewise (\\\\begin{cases} \\\\end{cases}), irisan (\\\\cap), turunan (\\\\frac{dy}{dx}) dan gabungan himpunan (\\\\cup). Contoh opsi jawaban yang benar: "$x^2 + 2x + 1$" atau "$\\\\sqrt{x^2 + y^2}$" atau "$\\\\frac{11}{30}$".
     - Turus & Tabel Frekuensi (Tally Marks): WAJIB menggunakan huruf kapital 'I' (bukan simbol pipe '|') untuk turus satuan agar tabel Markdown tidak pecah. Gunakan 'I' (1), 'II' (2), 'III' (3), 'IIII' (4), dan '卌' (5). Untuk angka lebih dari 5, gabungkan kelipatan 5 dengan sisa satuan (pisahkan dengan spasi). Contoh: 6 = '卌 I', 7 = '卌 II', 10 = '卌 卌', 13 = '卌 卌 III'. Jika instruksi meminta "tabel turus saja" ATAU "tabel frekuensi saja", Anda WAJIB mematuhi permintaan tersebut dengan hanya membuat kolom yang spesifik diminta (misal hanya kolom data dan kolom turus, ATAU hanya kolom data dan kolom frekuensi). JANGAN secara otomatis menggabungkan kolom Turus dan Frekuensi menjadi satu tabel jika tidak diminta secara eksplisit. JANGAN menggunakan gambar untuk turus, gunakan teks ini saja.
     - Piktogram (Simbol/Emoji): Untuk soal yang membutuhkan data piktogram (diagram gambar), Anda BISA dan DISARANKAN untuk menggunakan emoji langsung (misalnya: 🍎, 🚗, ⭐️, 👦) dalam tabel atau teks soal untuk mewakili unit data.
-    - Bangun Datar & Ruang: JIKA SOAL MEMINTA MENGHITUNG TERHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}].
+    - Bangun Datar & Ruang (HANYA BERLAKU JIKA MATERI SPESIFIK ADALAH GEOMETRI / BANGUN RUANG / DIMENSI TIGA; DILARANG KERAS UNTUK POLINOMIAL, ALJABAR, MATRIKS, KALKULUS, SAINS, DLL): JIKA SOAL MEMINTA MENGHITUNG TERHADAP SEBUAH "GAMBAR BANGUN RUANG" ATAU "GAMBAR BANGUN DATAR", Anda WAJIB MENAMPILKAN GAMBAR tersebut menggunakan tag [GEOMETRY:shape_name:{"label_key":"label_value"}].
       SETIAP KALI MENAMPILKAN BANGUN RUANG ATAU BANGUN GABUNGAN, Anda WAJIB MENGISI SELURUH PARAMETER UKURAN PADA TAG GEOMETRY SECARA LENGKAP agar semua dimensi (panjang, lebar, tinggi, jari-jari, dll) terlihat jelas pada gambar!
       Jika Anda juga mendeskripsikan ukurannya dalam teks narasi, Anda WAJIB menuliskan kalimatnya secara UTUH dan LENGKAP tanpa terpotong (misal: "Bagian balok memiliki ukuran panjang 10 cm, lebar 6 cm, dan tinggi 8 cm, serta tinggi limas 6 cm."). DILARANG KERAS menghasilkan teks narasi yang terpotong di tengah kalimat!
       Daftar \`shape_name\` yang valid:
-      * Bangun Datar 2D: "triangle", "square", "rectangle", "parallelogram", "rhombus", "trapezoid", "kite", "circle", "polygon"
+      * Bangun Datar 2D: "triangle", "triangle_right" (segitiga siku-siku trigonometri), "square", "rectangle", "parallelogram", "rhombus", "trapezoid", "kite", "circle", "polygon"
       * Bangun Ruang 3D: "cube" (kubus), "cuboid" (balok), "cylinder" (tabung), "cone" (kerucut), "pyramid" (limas segiempat), "triangular_pyramid" (limas segitiga), "prism" (prisma segitiga), "sphere" (bola), "hemisphere" (setengah bola)
       * Bangun Gabungan: "combined_cuboid_pyramid" (balok+limas), "combined_cuboid_prism" (balok+atap prisma), "combined_cuboid_cube" (balok+kubus), "combined_cylinder_cone" (tabung+kerucut), "combined_cylinder_hemisphere" (tabung+kubah bola), "combined_cone_hemisphere" (kerucut+bola es krim), "combined_rect_triangle" (rumah 2D), "combined_l_shape" (bentuk L), "combined_rect_semicircle" (persegi panjang+setengah lingkaran).
+
+      PANDUAN KHUSUS SOAL TRIGONOMETRI (KONSISTENSI TOTAL 100% ANTARA SOAL DAN GAMBAR):
+      * JIKA SOAL TRIGONOMETRI (sudut elevasi/depresi, perbandingan sin/cos/tan, atau segitiga siku-siku):
+        Gunakan tag [GEOMETRY:triangle_right:{"bottom":"24 m","left":"8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
+      * KONSISTENSI MUTLAK TITIK SUDUT SIKU-SIKU:
+        - Jika narasi soal menyebutkan "segitiga ABC siku-siku di B", maka field 'rightAngleAt' WAJIB diisi "B". Sisi miring (hipotenusa) adalah AC ($AC^2 = AB^2 + BC^2$). DILARANG KERAS narasi menulis siku-siku di B tetapi gambar siku-siku di A!
+      * KONSISTENSI NILAI SUDUT DAN PERBANDINGAN SISI:
+        - Sisi miring ('hypotenuse') WAJIB sisi yang terpanjang.
+        - Sudut elevasi $30^\\circ$: perbandingan depan : samping : miring = $1 : \\sqrt{3} : 2$. Contoh: tinggi depan $8\\sqrt{3}\\text{ m}$, alas samping $24\\text{ m}$, miring $16\\sqrt{3}\\text{ m}$. Nilai $\\tan(30^\\circ) = \\frac{8\\sqrt{3}}{24} = \\frac{1}{3}\\sqrt{3}$ (KONSISTEN 100%).
+        - Sudut elevasi $45^\\circ$: sisi depan = sisi samping ($1 : 1 : \\sqrt{2}$).
+        - Sudut elevasi $60^\\circ$: perbandingan $\\sqrt{3} : 1 : 2$.
+        - DILARANG KERAS gambar menampilkan angka/sudut yang bertentangan dengan teks soal dan opsi jawaban!
+      
+      PANDUAN BANGUN GEOMETRI SULIT (DILARANG MEMBUAT SLIDE PPT):
+      * JIKA SOAL MENGUJI BANGUN GEOMETRI SULIT ATAU 3D DIMENSI TIGA YANG KOMPLEKS (seperti: "Limas Terpancung", "Irisan Bidang pada Kubus/Balok/Prisma", "Frustum Kerucut", "Prisma Segi Enam Beraturan", "Jaring-jaring Kompleks"):
+        Gunakan cara 'ai_svg' atau sisipkan tag [ai_svg: Gambar teknis 3D isometrik ...] dengan 'svgStyle': "geometry".
+        Tuliskan deskripsi teknis geometri presisi: misal "Gambar teknis 3D isometrik limas terpancung ABCD.EFGH dengan alas persegi 10x10 cm, tutup atas 6x6 cm, tinggi t = 8 cm, rusuk belakang putus-putus, label titik sudut dan dimensi berpanah".
+        PERINGATAN KERAS & MUTLAK: DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT! Gambar yang dihasilkan harus murni bentuk fisik geometri 3D matematika presisi.
       
       PENTING - KEBERAGAMAN BENTUK BANGUN RUANG (DILARANG MONOTON):
       * DILARANG KERAS selalu membuat soal volume bangun ruang yang hanya berupa gabungan balok dan limas!
@@ -96,8 +132,25 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         - Balok KLMN.OPQR: [GEOMETRY:cuboid:{"width":"15 cm","depth":"8 cm","height":"10 cm","vertices":"KLMN.OPQR"}]
         - Limas T.ABCD: [GEOMETRY:pyramid:{"side":"10 cm","height":"12 cm","vertices":"T.ABCD"}]
         - Prisma ABC.DEF: [GEOMETRY:prism:{"width":"6 cm","height":"8 cm","depth":"15 cm","vertices":"ABC.DEF"}]
+        - Segitiga Siku-Siku ABC: [GEOMETRY:triangle_right:{"bottom":"24 m","left":"8√3 m","hypotenuse":"16√3 m","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
         - Segitiga ABC: [GEOMETRY:triangle:{"bottom":"12 cm","left":"10 cm","right":"10 cm","vertices":"ABC","angleA":"60°","angleB":"60°"}]
         - Persegi Panjang ABCD: [GEOMETRY:rectangle:{"width":"14 cm","height":"8 cm","vertices":"ABCD"}]
+      * PANDUAN MUTLAK SOAL TRIGONOMETRI & SEGITIGA SIKU-SIKU (KONSISTENSI VISUAL & MATEMATIS 100%):
+        JIKA soal berkaitan dengan Trigonometri (perbandingan sin, cos, tan, csc, sec, cot, sudut elevasi/depresi, aturan sinus/cosinus, tinggi pohon/gedung/tiang, tangga bersandar):
+        1. WAJIB menggunakan tag: [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"30°"}]
+        2. PEMETAAN SISI & SUDUT YANG WAJIB KONSISTEN:
+           - "bottom": sisi mendatar/samping (alas).
+           - "left": sisi tegak/depan (tinggi).
+           - "hypotenuse": sisi miring terpanjang di depan sudut siku-siku.
+           - "rightAngleAt": nama titik sudut siku-siku (misal "B").
+           - "angleC": sudut lancip pada alas kanan (misal sudut elevasi pengamat).
+        3. KONSISTENSI TOTAL DENGAN NARASI DAN OPSI:
+           - DILARANG KERAS gambar bertentangan dengan teks soal (misal teks menulis "siku-siku di B" tetapi gambar siku-siku di A, atau teks menulis sin C = 3/5 tetapi gambar perbandingan sisinya berbeda).
+           - Perbandingan trigonometri: sin = depan/miring, cos = samping/miring, tan = depan/samping.
+           - Soal kontekstual elevasi: Jika pengamat dengan tinggi mata h_mata (misal 1,5 m) melihat puncak gedung dari jarak d dengan sudut elevasi α:
+             * Tinggi segitiga (sisi depan) = d * tan α.
+             * Tinggi gedung total = tinggi segitiga + h_mata.
+             * Pastikan seluruh angka pada narasi, visual, opsi, dan explanation terverifikasi matematis 100%!
       Contoh penggunaan tag GEOMETRY yang BENAR dengan seluruh ukuran lengkap:
       * Balok: [GEOMETRY:cuboid:{"width":"12 cm","height":"6 cm","depth":"8 cm","vertices":"ABCD.EFGH"}]
       * Kubus: [GEOMETRY:cube:{"side":"8 cm"}]
@@ -108,7 +161,28 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       * Bangun Gabungan Balok + Limas: [GEOMETRY:combined_cuboid_pyramid:{"bottom_width":"12 cm","bottom_depth":"8 cm","bottom_height":"10 cm","top_height":"6 cm"}]
       * Bangun Gabungan Tabung + Kerucut: [GEOMETRY:combined_cylinder_cone:{"radius":"7 cm","cylinderHeight":"10 cm","coneHeight":"6 cm"}]
       * Bangun Gabungan Balok + Atap Prisma: [GEOMETRY:combined_cuboid_prism:{"width":"12 cm","depth":"8 cm","bottom_height":"10 cm","roof_height":"6 cm"}]
-    - Diagram (Charts): JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
+    - Diagram (Charts) & STATISTIKA INFORMATIF LENGKAP:
+      JIKA SOAL ATAU OPSI MEMINTA DIAGRAM (diagram batang/garis/lingkaran/venn/relasi/kartesius), Anda WAJIB mengisi field 'chartData'. UNTUK MENEMPATKAN DIAGRAM DI POSISI TERTENTU dalam teks (\`questionText\` atau opsi), Anda WAJIB menggunakan tag [CHART]. Jika Anda tidak menggunakan tag [CHART], diagram akan otomatis dirender di bagian paling bawah teks.
+      * PANDUAN MUTLAK DIAGRAM STATISTIKA (WAJIB JELAS, LENGKAP, DATA LENGKAP DAPAT DIHITUNG, DAN KONSISTEN):
+        1. JUDUL DIAGRAM LENGKAP & SPESIFIK:
+           Field 'chartData.title' WAJIB spesifik memuat topik, subjek, satuan, dan periode/tahun jika ada (Contoh: "Diagram Batang: Distribusi Frekuensi Nilai Ulangan Matematika Siswa Kelas VIII", "Hasil Panen Padi Desa Sukamaju 2020-2024 (Ton)"). DILARANG menuliskan judul kosong atau sekadar "Diagram"!
+        2. ATURAN MUTLAK RENTANG KELAS INTERVAL (HISTOGRAM & DATA BERKELOMPOK):
+           - JIKA SOAL ATAU PILIHAN JAWABAN MENANYAKAN/MEMUAT BENTUK RENTANG NILAI (misal: "Rentang nilai manakah yang...", "Berapa banyak siswa dalam rentang...", atau opsi jawaban berupa interval: ["41 - 50", "51 - 60", "61 - 70", "71 - 80"]):
+             * Sumbu X ('chartData.labels') WAJIB MENULISKAN LABEL RENTANG SECARA EKSPLISIT DAN LENGKAP PADA SETIAP BATANG!
+               Contoh BENAR: ["41 - 50", "51 - 60", "61 - 70", "71 - 80", "81 - 90"] atau ["140 - 149 cm", "150 - 159 cm", "160 - 169 cm"].
+             * DILARANG KERAS hanya menuliskan angka tunggal (seperti ["1", "2", "3", "4", "5"] atau ["45", "55", "65"]) jika pertanyaan atau opsi meminta rentang kelas!
+             * OPSI JAWABAN HARUS PERSIS SAMA DENGAN LABEL RENTANG PADA DIAGRAM (Jika diagram memuat kelas "51 - 60", opsi jawaban harus "51 - 60", bukan rentang lain yang membingungkan siswa).
+        3. KELENGKAPAN DATA 100% (SOAL WAJIB DAPAT DIHITUNG SECARA PASTI / SOLVABLE):
+           - Seluruh nilai frekuensi untuk SETIAP kelas/kategori WAJIB tercantum pasti pada 'datasets[0].data' (dan angka frekuensi tersebut akan otomatis ditampilkan tegas di atas setiap batang diagram).
+           - DILARANG KERAS membuat soal yang menanyakan ukuran pemusatan (mean/rata-rata, median, modus, kuartil, jangkauan, persentase lulus, selisih frekuensi) jika data frekuensi pada diagram tidak lengkap atau ada kelas yang informasinya terpotong!
+           - JUMLAH TOTAL POPULASI KONSISTEN: Jika teks soal menyatakan "Data nilai dari 40 siswa...", maka jumlah nilai seluruh elemen pada 'datasets[0].data' WAJIB TEPAT bernilai 40 (misal: [4, 8, 14, 10, 4] = 40). DILARANG ADA KETIDAKCOCOKAN DATA!
+        4. SUMBU KATEGORI & SATUAN DATA:
+           - Sumbu X ('labels'): Tuliskan kategori/rentang yang jelas (contoh: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] atau ["41 - 50", "51 - 60", "61 - 70", "71 - 80", "81 - 90"]).
+           - Dataset label ('datasets[0].label'): Cantumkan nama besaran dan satuan (contoh: "Frekuensi (Siswa)" atau "Hasil Panen (Ton)").
+        5. DIAGRAM LINGKARAN (PIE CHART):
+           - Nilai data harus bulat dan jelas apakah berupa frekuensi asli atau persentase.
+           - Jika persentase, total seluruh juring WAJIB tepat 100%. Jika derajat, total sudut WAJIB tepat 360°.
+           - Tuliskan total populasi di teks soal (contoh: "Diagram lingkaran di samping menunjukkan kegiatan ekstrakurikuler 120 siswa SMP Nusantara:").
       * Diagram Venn: gunakan 'labels' untuk nama himpunan (["A", "B"] atau ["A", "B", "C"]). 'datasets.data' berisi nilai area (Hanya A, Hanya B, Irisan A&B, Di Luar, Semesta).
       * Relasi/Fungsi: 'datasets'[0] = anggota Domain, 'datasets'[1] = Kodomain, 'datasets'[2] = pasangan "indexDomain-indexKodomain".
       * Diagram Kartesius (Cartesian):
@@ -132,7 +206,10 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         2. Cara 'chart' (Diagram Statistik & Hubungan): Gunakan tag [CHART] dan isi 'chartData' jika butir soal menguji data statistik (batang/garis/lingkaran), relasi/fungsi, diagram venn, atau kurva/titik koordinat kartesius. Set 'visualStimulusType': "chart".
         3. Cara 'table' (Tabel Markdown): Gunakan tabel data terstruktur Markdown untuk daftar frekuensi nilai, jadwal, atau perbandingan tekstual. Set 'visualStimulusType': "table".
         4. Cara 'wikimedia_photo' (Foto Otentik Nyata): Gunakan jika soal membutuhkan foto riil sejarah/tokoh pahlawan (Soekarno, Cut Nyak Dien), candi/monumen nyata (Borobudur, Prambanan, Monas), atau flora/fauna endemik nyata (Komodo, Rafflesia). Tuliskan 1-2 kata kunci bahasa Inggris pada 'imageSearchKeyword'. Set 'visualStimulusType': "wikimedia_photo".
-        5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk seluruh konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), peta/denah konseptual, bagan alur proses (flowchart), infografis materi, atau ilustrasi kontekstual. Tuliskan deskripsi gambar ilmiah yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("infographic", "diagram", "flowchart", "geometry", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
+        5. Cara 'ai_svg' (GENERATOR GAMBAR VEKTOR SVG AI OTOMATIS): TERBAIK dan SANGAT DIREKOMENDASIKAN untuk:
+           a) Konsep IPA/Sains, biologi (organ tubuh, fotosintesis, rantai makanan, metamorfosis, daur hidup), fisika/bumi (siklus air, tata surya, gerhana, magnet, gaya), bagan alur proses (flowchart).
+           b) BANGUN GEOMETRI SULIT / 3D DIMENSI TIGA (Limas Terpancung, Irisan Bidang Kubus/Balok, Frustum Kerucut, Prisma Segi Enam Beraturan, Jaring-jaring Kompleks). WAJIB pilih 'svgStyle': "geometry" dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
+           Tuliskan deskripsi gambar yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("geometry", "diagram", "infographic", "flowchart", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar teknis/ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
     - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3. Untuk rumus matematika multi-baris bertingkat / sistem persamaan, Anda dapat menggunakan pemisah baris (\\n) atau '\\\\\\' dan '&' untuk penyejajaran.
@@ -174,8 +251,16 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
          * 'options': WAJIB berisi 3-5 butir opsi pernyataan LENGKAP dengan nilai/angka dan satuan matematis. DILARANG KERAS membuat opsi gantung yang tidak selesai (contoh SALAH: "Volume tabung tangki tersebut adalah "). Contoh opsi BENAR: "Volume tabung bagian bawah adalah $1.540\\text{ cm}^3$", "Volume kerucut bagian atas adalah $308\\text{ cm}^3$", "Volume total seluruh tangki adalah $1.848\\text{ cm}^3$".
          * 'correctAnswer': WAJIB berisi semua opsi yang benar, dipisahkan dengan tanda "|||" (contoh: "Opsi 1|||Opsi 3").
       3. Benar/Salah (PGK Kategori - WAJIB memuat angka dan satuan lengkap pada setiap baris):
-         * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus gambar bangun ruang berikut! Tentukan nilai kebenaran dari setiap pernyataan berikut.").
+         * 'questionText': Hanya narasi stimulus masalah dan pengantar (contoh: "Perhatikan stimulus berikut! Tentukan nilai kebenaran/kesesuaian dari setiap pernyataan berikut.").
          * DILARANG KERAS menuliskan daftar butir "1. ...", "2. ...", "3. ..." di dalam 'questionText'!
+         * 'categoryLabels': Array 2 string untuk teks opsi kategori [Label Opsi 1 (True), Label Opsi 2 (False)]. DEFAULT: ["Benar", "Salah"].
+           Anda DAPAT menyesuaikan redaksi label kategori ini secara otomatis sesuai konteks stimulus materi:
+           - Literasi / Kesesuaian Teks AKM / Asesmen Nasional: ["Sesuai", "Tidak Sesuai"]
+           - Pertanyaan Konfirmasi / Ya-Tidak: ["Ya", "Tidak"]
+           - Sikap / Pendapat / Survei Karakter: ["Setuju", "Tidak Setuju"]
+           - Penilaian Ketepatan: ["Tepat", "Tidak Tepat"]
+           - Analisis Fakta/Opini: ["Fakta", "Opini"]
+           - Sains / Matematika Fakta Baku: ["Benar", "Salah"] (Default)
          * 'trueFalseRows': WAJIB berisi array 3 baris pernyataan matematis/faktual lengkap dan spesifik dengan klaim angka dan satuan utuh.
            Contoh format yang WAJIB dipatuhi:
            [
@@ -183,9 +268,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
              { "text": "Volume kerucut bagian atas adalah $308\\text{ cm}^3$.", "answer": true },
              { "text": "Volume total seluruh bangun adalah $2.400\\text{ cm}^3$.", "answer": false }
            ]
-         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar atau Salah.
-         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true atau false).
-         * 'correctAnswer': WAJIB berisi ringkasan nilai kebenaran pasti (contoh: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
+         * DILARANG KERAS hanya menuliskan nama besaran atau kalimat gantung seperti "Volume bangun adalah " atau "Tinggi bangun adalah "! Seluruh pernyataan harus berupa kalimat proposisi utuh yang dapat dinilai Benar/Salah atau Sesuai/Tidak Sesuai.
+         * Setiap pernyataan WAJIB memiliki nilai kebenaran pasti (boolean 'answer': true untuk label pertama, false untuk label kedua).
+         * 'correctAnswer': WAJIB berisi ringkasan nilai pasti (contoh jika categoryLabels ["Sesuai", "Tidak Sesuai"]: "Pernyataan 1: Sesuai, Pernyataan 2: Sesuai, Pernyataan 3: Tidak Sesuai"; atau jika ["Benar", "Salah"]: "Pernyataan 1: Benar, Pernyataan 2: Benar, Pernyataan 3: Salah").
       4. Menjodohkan:
          * 'questionText': Hanya stimulus dan kalimat instruksi menjodohkan. DILARANG membuat tabel daftar jodoh di dalam 'questionText'!
          * 'matchingPairs': WAJIB berisi array 3-5 pasangan { "left": "item kiri", "right": "pasangan kanan yang cocok dengan nilai/deskripsi lengkap" }.
@@ -334,6 +419,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       type: Type.STRING, 
       description: "Sub-kategori atau domain materi spesifik untuk soal ini (Contoh: 'Operasi Pecahan', 'Geometri & Pengukuran', 'Ekosistem')" 
     },
+    categoryLabels: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Array 2 teks label kategori untuk soal Benar/Salah (contoh: ['Benar', 'Salah'], ['Sesuai', 'Tidak Sesuai'], ['Ya', 'Tidak'], ['Setuju', 'Tidak Setuju'], ['Fakta', 'Opini']). Default jika kosong: ['Benar', 'Salah']."
+    },
     trueFalseRows: {
       type: Type.ARRAY,
       items: {
@@ -390,10 +480,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
   
   const isLevel6 = combinedText.includes('C6') || combinedText.includes('LEVEL 6');
   
-  let modelsToTry: string[] = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-  if (isLevel6) {
-      modelsToTry = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-  }
+  const modelsToTry: string[] = [
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite'
+  ];
 
   const replaceGeometryPlaceholders = (text: string) => {
       if (!text) return text;
@@ -425,27 +517,60 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       const globalIndex = startIndex + i;
       const assignedType = selectedTypes[globalIndex % selectedTypes.length];
       const assignedDiff = selectedDifficulties[globalIndex % selectedDifficulties.length];
-      slotDistribution.push(`- Soal #${globalIndex + 1}: Bentuk Soal = "${assignedType}", Tingkat Kognitif = "${assignedDiff}"`);
+      const assignedWeight = (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : 1;
+      slotDistribution.push(`- Soal #${globalIndex + 1}: Bentuk Soal = "${assignedType}", Tingkat Kognitif = "${assignedDiff}", Bobot Nilai = ${assignedWeight}${config.category?.trim() ? `, Kategori = "${config.category.trim()}"` : ''}${config.kisiKisi?.trim() ? `, Kisi-Kisi = "${config.kisiKisi.trim()}"` : ''}`);
     }
 
     const userCategoryConstraint = config.category?.trim();
-    const userKisiKisiConstraint = config.kisiKisi?.trim();
-    const userBlueprintConstraint = config.blueprint?.trim();
+    const userKisiKisiConstraint = config.kisiKisi ? htmlToMarkdown(config.kisiKisi).trim() : '';
+    const userBlueprintConstraint = config.blueprint ? htmlToMarkdown(config.blueprint).trim() : '';
+    const userScoreWeightConstraint = config.scoreWeight;
+
+    const userTopicSummary = `${config.subject} ${userCategoryConstraint || ''} ${userKisiKisiConstraint || ''}`.trim();
+    const isExplicitPolynomial = /polinomial|suku banyak|horner|teorema sisa|teorema faktor|akar polinomial/i.test(userTopicSummary);
+    const isExplicitNonGeometry = isExplicitPolynomial || /aljabar|matriks|vektor|kalkulus|limit|turunan|integral|statistika|peluang|kombinatorika|permutasi|eksponen|logaritma|kimia|biologi|fisika|bahasa|ekonomi|sosiologi|sejarah|pancasila/i.test(userTopicSummary);
 
     const batchPrompt = `
       ======================================================================
       PERINGATAN PRIORITAS TERTINGGI (HARD CONSTRAINT - MUTLAK DIIKUTI):
-      Pengguna telah menetapkan mata pelajaran, kategori materi, tingkat kognitif (level), dan kisi-kisi soal secara spesifik.
-      Anda DILARANG KERAS membuat soal di luar data yang telah ditetapkan ini!
+      Pengguna telah menetapkan mata pelajaran, kategori materi, tingkat kognitif (level), bobot nilai, jenis soal, dan kisi-kisi soal secara spesifik.
+      Anda DILARANG KERAS membuat soal di luar parameter yang telah ditetapkan ini!
       DILARANG membuat soal tentang topik/materi/konteks acak lain yang tidak diminta!
       
       TARGET PARAMETER WAJIB DARI PENGGUNA:
       - MATA PELAJARAN / MATERI: "${config.subject}"
-      ${userCategoryConstraint ? `- KATEGORI MATERI (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
-      - TINGKAT KOGNITIF (MUTLAK WAJIB SESUAI DISTRIBUSI): Lihat TABEL DISTRIBUSI di bawah.
+      ${userCategoryConstraint ? `- KATEGORI MATERI / SUB-TOPIK (MUTLAK WAJIB): "${userCategoryConstraint}"` : ''}
+      - TINGKAT KOGNITIF & BENTUK SOAL: Sesuai TABEL DISTRIBUSI di bawah (WAJIB dipatuhi persis).
+      ${userScoreWeightConstraint !== undefined ? `- BOBOT NILAI (SCORE WEIGHT): ${userScoreWeightConstraint}` : ''}
       ${userKisiKisiConstraint ? `- KISI-KISI / INDIKATOR SOAL (MUTLAK WAJIB): "${userKisiKisiConstraint}"` : ''}
       ${userBlueprintConstraint ? `- PANDUAN KISI-KISI & DESKRIPSI RINCI PENGGUNA:\n${userBlueprintConstraint}` : ''}
       ======================================================================
+
+      ${isExplicitPolynomial ? `
+      **********************************************************************
+      PERINGATAN MUTLAK & SPESIFIK: TOPIK MATERI ADALAH POLINOMIAL (SUKU BANYAK)!
+      1. SELURUH ${batchCount} BUTIR SOAL WAJIB 100% MENGENAI POLINOMIAL (SUKU BANYAK).
+      2. DILARANG KERAS MEMBUAT SOAL TENTANG GEOMETRI, BANGUN DATAR, ATAU BANGUN RUANG (BALOK, KUBUS, TABUNG, KERUCUT, LIMAS, PRISMA, DLL)!
+      3. DILARANG KERAS MENYERTAKAN TAG [GEOMETRY:...]!
+      4. JIKA TEKS BLUEPRINT UMUM MEMUAT KATA GEOMETRI ATAU DIMENSI TIGA, ABAIKAN KATA TERSEBUT KARENA TOPIK SPESIFIK PENGGUNA ADALAH POLINOMIAL!
+      5. Topik Polinomial yang wajib disusun secara bervariasi:
+         - Operasi aljabar suku banyak (penjumlahan, pengurangan, perkalian, kesamaan suku banyak menentukan nilai koefisien tak tentu).
+         - Pembagian polinomial bersusun (porogapit) dan skema bagan Horner / Horner-Kino.
+         - Teorema Sisa: menghitung sisa pembagian P(x) oleh pembagi linear (x - k), (ax + b), dan pembagi kuadrat (x - a)(x - b).
+         - Teorema Faktor: pembuktian dan penentuan faktor linear suku banyak, menentukan konstanta jika salah satu faktor diketahui.
+         - Akar-akar rasional persamaan suku banyak dan hubungan akar-akar (rumus Vieta).
+         - Nilai suku banyak P(k) dan aplikasi kontekstual pemodelan fungsi polinomial.
+      6. Rumus matematika WAJIB berformat LaTeX baku ($P(x) = 2x^4 - 3x^3 + ax^2 + 5x - 6$, dll).
+      **********************************************************************
+      ` : isExplicitNonGeometry ? `
+      **********************************************************************
+      PERINGATAN KEPATUHAN TOPIK (ZERO TOPIC DRIFT):
+      - Topik yang diminta pengguna adalah "${config.subject}". Topik ini BUKAN materi geometri!
+      - DILARANG KERAS membuat soal tentang bangun ruang, balok, kubus, tabung, atau dimensi tiga!
+      - DILARANG KERAS menyisipkan tag [GEOMETRY:...]!
+      - Seluruh butir soal wajib 100% fokus menguji "${config.subject}".
+      **********************************************************************
+      ` : ''}
 
       Buatlah tepat ${batchCount} butir soal yang 100% BERFOKUS PENUH dan SELARAS dengan target materi di atas.
       
@@ -502,11 +627,19 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       6. STIMULUS REPRESENTATIF TERBAIK (includeImages=true):
          - Fitur 'Sertakan Gambar, Geometri Bangun & Diagram Representatif' AKTIF.
          - Analisis materi soal dan tentukan CARA TERBAIK:
-           * Geometri bangun datar/ruang/gabungan berdimensi angka? Pilih 'geometry' dan sertakan tag [GEOMETRY:...].
-           * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'.
+           * KHUSUS TOPIK POLINOMIAL / SUKU BANYAK / ALJABAR:
+             DILARANG KERAS MENGGUNAKAN [GEOMETRY]! Jangan menggambar bangun ruang!
+             Gunakan stimulus berupa:
+             a) Narasi kontekstual pemodelan fungsi polinomial $P(x)$,
+             b) Bagan atau tabel pembagian skema Horner menggunakan tabel Markdown terstruktur ('table'),
+             c) Kurva fungsi polinomial dengan koordinat titik potong jika relevan ('chart' cartesian), atau
+             d) Rumus matematika murni berformat LaTeX yang kaya penalaran. Set 'visualStimulusType': "none" atau "table" atau "chart".
+           * Geometri bangun datar/ruang/gabungan berdimensi angka? HANYA PILIH 'geometry' JIKA SOAL MEMANG GEOMETRI. Sertakan tag [GEOMETRY:...]. Untuk Trigonometri, WAJIB gunakan [GEOMETRY:triangle_right:{"bottom":"...","left":"...","hypotenuse":"...","vertices":"BCA","rightAngleAt":"B","angleC":"..."}] dengan konsistensi 100% antara narasi, sisi, sudut, dan rasio sin/cos/tan.
+           * Data statistik / diagram frekuensi / kartesius / venn / relasi? Pilih 'chart' dan sertakan tag [CHART] & 'chartData'. Jika opsi atau pertanyaan berbentuk rentang/interval, Sumbu X WAJIB menuliskan rentang kelas lengkap (contoh: ["41 - 50", "51 - 60", "61 - 70", "71 - 80"]) dan seluruh frekuensi harus lengkap agar soal dapat dihitung pasti.
            * Tabel data terstruktur / daftar frekuensi? Pilih 'table' (tabel Markdown murni).
            * Foto pahlawan/tempat/monumen/spesies otentik nyata? Pilih 'wikimedia_photo' dan isi 'imageSearchKeyword'.
-           * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'. Generator Gambar AI akan langsung menggambar vektor SVG tajam stimulus tersebut secara otomatis!
+           * Konsep sains/IPA, biologi, siklus/daur proses, organ tubuh, rantai makanan, tata surya, infografis materi, atau ilustrasi konsep? Pilih 'ai_svg', isi 'svgPrompt' dan 'svgStyle'.
+           * BANGUN GEOMETRI SULIT (Limas Terpancung, Frustum Kerucut, Irisan Bidang Kubus/Balok, Prisma Segi Enam, Bangun Gabungan 3D)? HANYA JIKA TOPIKNYA GEOMETRI! WAJIB pilih 'ai_svg', set 'svgStyle': "geometry", dan tuliskan deskripsi teknis 3D isometrik dengan garis putus-putus rusuk belakang dan dimensi ukuran berpanah. DILARANG KERAS MEMBUAT KARTU PRESENTASI ATAU SLIDE MATERI PPT!
       ` : ''}
     `;
 
@@ -532,7 +665,11 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => {
+        try {
+          controller.abort(new Error("Batas waktu koneksi AI terlampaui. Mengaktifkan Safe Fallback."));
+        } catch (_) {}
+      }, 60000);
 
       const res = await fetch("/api/generate-questions", {
           method: "POST",
@@ -554,11 +691,15 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       }
       questions = JSON.parse(data.text || "[]");
     } catch (batchErr: any) {
-      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, batchErr?.message);
+      const isAbort = batchErr?.name === "AbortError" || (batchErr?.message && batchErr.message.toLowerCase().includes("aborted"));
+      const cleanReason = isAbort
+        ? "Batas waktu koneksi AI terlampaui (Timeout). Safe Fallback aktif."
+        : (batchErr?.message || "Layanan AI tidak merespons. Safe Fallback Aktif.");
+      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, cleanReason);
       return generateSmartFallbackQuestions({
         ...config,
         count: batchCount,
-      }, batchErr?.message || "Safe Fallback Aktif");
+      }, cleanReason);
     }
 
     // Helper: Cek apakah baris pernyataan Benar/Salah berupa placeholder/dummy
@@ -1262,16 +1403,27 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             optionCharts: q.optionCharts,
             correctAnswer: String(correctAnswer),
             correctAnswerChart: q.correctAnswerChart,
-            scoreWeight: q.scoreWeight || 1,
+            scoreWeight: (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : (q.scoreWeight || 1),
             kisiKisi: config.kisiKisi?.trim() || specificKisiKisi,
             level: expectedDiff || q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)",
             category: config.category?.trim() || q.category?.trim() || config.subject || "Umum",
             chartData: q.chartData,
             imagePrompt: q.imagePrompt,
-            imageSearchKeyword: (q as any).imageSearchKeyword
+            imageSearchKeyword: (q as any).imageSearchKeyword,
+            categoryLabels: (q as any).categoryLabels
         };
         
         if (currentQuestionType === 'TRUE_FALSE') {
+            if ((q as any).categoryLabels && Array.isArray((q as any).categoryLabels) && (q as any).categoryLabels.length >= 2) {
+                const l1 = String((q as any).categoryLabels[0] || '').trim();
+                const l2 = String((q as any).categoryLabels[1] || '').trim();
+                if (l1 && l2) {
+                    mappedQ.categoryLabels = [l1, l2];
+                }
+            }
+            const trueLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[0]) || 'Benar';
+            const falseLabel = (mappedQ.categoryLabels && mappedQ.categoryLabels[1]) || 'Salah';
+
             const rawRows = (q.trueFalseRows && q.trueFalseRows.length > 0)
                 ? q.trueFalseRows
                 : [
@@ -1288,9 +1440,9 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                     boolAnswer = boolSeq[rIdx]!;
                 } else if (typeof r.answer === 'string') {
                     const lower = r.answer.toLowerCase();
-                    if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak' || lower.includes('tidak')) {
+                    if (lower === 'false' || lower === 'salah' || lower === '0' || lower === 'tidak' || lower === falseLabel.toLowerCase() || lower.includes('tidak')) {
                         boolAnswer = false;
-                    } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya' || lower === 'sesuai') {
+                    } else if (lower === 'true' || lower === 'benar' || lower === '1' || lower === 'ya' || lower === 'sesuai' || lower === trueLabel.toLowerCase()) {
                         boolAnswer = true;
                     }
                 }
@@ -1300,7 +1452,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
                 rowText = autoRepairIncompleteContent(rowText, contextShape, `memiliki nilai yang ${boolAnswer ? 'tepat' : 'berbeda'} berdasarkan stimulus.`, boolAnswer);
 
                 if (isDummyStatement(rowText)) {
-                    rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? 'benar' : 'tidak sesuai fakta'}.`;
+                    rowText = `Pernyataan ${rIdx + 1} terkait ${mappedQ.category}: nilai yang diperoleh dari stimulus adalah ${boolAnswer ? trueLabel : falseLabel}.`;
                 }
 
                 return {
@@ -1312,7 +1464,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
 
             // Kunci jawaban pasti untuk Benar/Salah selalu terstruktur ringkas dan pasti
             mappedQ.correctAnswer = mappedQ.trueFalseRows
-                .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? 'Benar' : 'Salah'}`)
+                .map((r, i) => `Pernyataan ${i + 1}: ${r.answer ? trueLabel : falseLabel}`)
                 .join(', ');
         }
 

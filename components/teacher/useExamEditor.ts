@@ -138,7 +138,9 @@ export const useExamEditor = ({
         }
 
         const includeImages = includeImagesConfig ?? true;
-        const aiSubject = [subject, userCategory].filter(Boolean).join(" - ") || "Umum";
+        const aiSubject = userCategory
+          ? (subject ? `${subject} - ${userCategory}` : userCategory)
+          : (subject || "Umum");
 
         const aiConfig: QuizConfig = {
           subject: aiSubject,
@@ -151,12 +153,28 @@ export const useExamEditor = ({
           difficulties: [cognitiveLevel],
           blueprint: blueprintPrompt,
           includeImages,
+          scoreWeight: q.scoreWeight || 1,
         };
 
         const generatedQuestions = await generateQuestions(aiConfig);
         if (generatedQuestions && generatedQuestions.length > 0) {
           const newQ = generatedQuestions[0];
           const currentQuestions = useExamEditorStore.getState().questions;
+          const isTrueFalse = q.questionType === "TRUE_FALSE" || newQ.questionType === "TRUE_FALSE";
+          const resolvedTrueFalseRows = isTrueFalse
+            ? (newQ.trueFalseRows && newQ.trueFalseRows.length > 0
+                ? newQ.trueFalseRows
+                : (q.trueFalseRows && q.trueFalseRows.length > 0
+                    ? q.trueFalseRows
+                    : [
+                        { text: "Pernyataan 1 terkait materi soal", answer: true },
+                        { text: "Pernyataan 2 terkait materi soal", answer: false },
+                        { text: "Pernyataan 3 terkait materi soal", answer: true }
+                      ]
+                  )
+              )
+            : undefined;
+
           setQuestions(
             currentQuestions.map((question) =>
               question.id === q.id
@@ -164,13 +182,15 @@ export const useExamEditor = ({
                     ...question,
                     ...newQ,
                     id: question.id,
+                    questionType: q.questionType,
                     questionText: newQ.questionText,
                     options: newQ.options || (newQ.questionType === "MULTIPLE_CHOICE" || newQ.questionType === "COMPLEX_MULTIPLE_CHOICE" ? [] : undefined),
                     correctAnswer: newQ.correctAnswer,
                     explanation: newQ.explanation || "",
                     chartData: newQ.chartData ?? undefined,
-                    trueFalseRows: newQ.trueFalseRows || undefined,
-                    matchingPairs: newQ.matchingPairs || undefined,
+                    trueFalseRows: resolvedTrueFalseRows,
+                    categoryLabels: newQ.categoryLabels || q.categoryLabels || undefined,
+                    matchingPairs: newQ.matchingPairs || q.matchingPairs || undefined,
                     category: userCategory || newQ.category || q.category,
                     level: q.level?.trim() ? q.level : (newQ.level || q.level),
                     kisiKisi: userKisiKisi || newQ.kisiKisi || q.kisiKisi,

@@ -192,6 +192,7 @@ export const normalizeQuestion = (q: any): any => {
     kisiKisi,
     matchingPairs,
     trueFalseRows,
+    categoryLabels: q.categoryLabels || q.category_labels,
   };
 };
 

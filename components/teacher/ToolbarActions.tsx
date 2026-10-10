@@ -15,6 +15,7 @@ import {
   EraserIcon,
   ListBulletIcon,
   ChartBarIcon,
+  LinkIcon,
 } from "../Icons";
 import type { ChartData } from "../../types";
 
@@ -60,9 +61,10 @@ interface ToolbarActionsProps {
   onAiImageClick?: () => void;
   onTableClick: () => void;
   onGeometryClick: () => void;
-  onChartClick?: () => void;
+  onChartClick?: (chartType?: "cartesian") => void;
   onAksaraClick: () => void;
   onEmojiClick: () => void;
+  onLinkClick?: () => void;
   isInsideTable: boolean;
   onDeleteTable: () => void;
   chartData?: ChartData;
@@ -83,6 +85,7 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   onChartClick,
   onAksaraClick,
   onEmojiClick,
+  onLinkClick,
   isInsideTable,
   onDeleteTable,
   chartData,
@@ -287,6 +290,42 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
             <ChartBarIcon className="w-4 h-4" /> Diagram
           </button>
         )}
+        {onChartClick && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const placeholderHtml = `<span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📈 Diagram Kartesius (Klik untuk mengedit)</span></span><br/>`;
+              if (
+                editorRef.current &&
+                !editorRef.current.innerHTML.includes('data-chart="true"')
+              ) {
+                restoreSelection();
+                document.execCommand("insertHTML", false, placeholderHtml);
+                handleInput();
+              }
+              onChartClick("cartesian");
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 rounded text-xs font-bold hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap"
+            title="Sisipkan Diagram Kartesius (Titik, Garis, Kurva, Poligon, Lingkaran)"
+          >
+            <svg
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+              <path d="M12 3l-3 3 M12 3l3 3 M21 12l-3-3 M21 12l-3 3" />
+              <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+            </svg>{" "}
+            Kartesius
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={(e) => {
@@ -307,6 +346,19 @@ export const ToolbarActions: React.FC<ToolbarActionsProps> = ({
         >
           <span className="text-[14px]">😀</span> Simbol / Emoji
         </button>
+        {onLinkClick && (
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onLinkClick();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+            title="Sisipkan Tautan / Link"
+          >
+            <LinkIcon className="w-4 h-4" /> Link
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={(e) => {
