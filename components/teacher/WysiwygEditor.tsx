@@ -18,8 +18,13 @@ import { EquationEditorTab as VisualMathModal } from "./EquationEditorTab";
 import { useWysiwygEditor } from "./useWysiwygEditor";
 import { transliterate } from "../../utils/aksaraBali";
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
-import { cleanOrphanedSvgMarkup, repairGeometrySvgInHtml } from "./examUtils";
+import { cleanOrphanedSvgMarkup, repairGeometrySvgInHtml, sanitizeHtml } from "./examUtils";
 import { hydrateMathInContainer, renderMathInHtml } from "../../utils/mathRenderer";
+import {
+  isEditorActive,
+  getCaretCharacterOffsetWithin,
+  setCaretCharacterOffsetWithin,
+} from "./caretUtils";
 
 export const SelectionModal: React.FC<{
   isOpen: boolean;
@@ -375,6 +380,9 @@ export const WysiwygEditor: React.FC<{
     handleImageFileChange,
     handleAudioFileChange,
     restoreSelection,
+    lastEmittedValueRef,
+    isTypingRef,
+    debounceRef,
   } = useWysiwygEditor({ value, onChange, showTabs, onChartClick, chartData });
 
   const {
@@ -396,17 +404,49 @@ export const WysiwygEditor: React.FC<{
 
   useEffect(() => {
     if (editorRef.current) {
-      const isFocused = document.activeElement === editorRef.current;
+      const isFocused = isEditorActive(editorRef.current);
       const currentHtml = editorRef.current.innerHTML;
+
+      // 1. If this incoming value was emitted by this editor instance, do NOT touch DOM
+      const isSelfChange =
+        value === lastEmittedValueRef.current ||
+        (lastEmittedValueRef.current !== null &&
+          sanitizeHtml(value) === lastEmittedValueRef.current);
+
+      if (isSelfChange) {
+        lastValueRef.current = value;
+        return;
+      }
+
+      // 2. If the user is actively focused and typing/pending debounce in this editor, do NOT disrupt cursor
+      if (isFocused && (isTypingRef.current || debounceRef.current !== null)) {
+        lastValueRef.current = value;
+        return;
+      }
+
       const propChangedExternally = value !== lastValueRef.current;
       lastValueRef.current = value;
 
       if (value !== currentHtml) {
-        if (propChangedExternally || !isFocused || !currentHtml || currentHtml === "<p><br></p>") {
+        if (
+          propChangedExternally ||
+          !isFocused ||
+          !currentHtml ||
+          currentHtml === "<p><br></p>"
+        ) {
+          // If the editor is currently focused, preserve caret character offset
+          const savedOffset = isFocused
+            ? getCaretCharacterOffsetWithin(editorRef.current)
+            : -1;
+
           let newHtml = value || "";
 
           // If plain text with newlines and no HTML tags (e.g. preset or raw multiline text)
-          if (newHtml && !/<[a-z][\s\S]*>/i.test(newHtml) && newHtml.includes("\n")) {
+          if (
+            newHtml &&
+            !/<[a-z][\s\S]*>/i.test(newHtml) &&
+            newHtml.includes("\n")
+          ) {
             newHtml = newHtml
               .split(/\r?\n\r?\n/)
               .map((para) => `<p>${para.replace(/\r?\n/g, "<br/>")}</p>`)
@@ -417,24 +457,40 @@ export const WysiwygEditor: React.FC<{
           newHtml = renderMathInHtml(newHtml);
 
           const CHART_PLACEHOLDER = `<br/><span class="chart-placeholder" contenteditable="false" data-chart="true" style="display: block; width: 100%; max-width: 600px; min-height: 100px; padding: 10px; background: #f8fafc; border: 2px dashed #cbd5e1; text-align: center; border-radius: 8px; margin: 10px auto; color: #475569; font-weight: bold; cursor: pointer;"><span class="chart-placeholder-text" style="display: block; padding: 40px 0;">📊 Diagram (Klik untuk mengedit)</span></span><br/>`;
-          
+
           if (/\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]/i.test(newHtml)) {
-            newHtml = newHtml.replace(/(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi, CHART_PLACEHOLDER);
+            newHtml = newHtml.replace(
+              /(?:<p>)?\s*\\?\[(CHART|DIAGRAM|GRAFIK).*?\\?\]\s*(?:<\/p>)?/gi,
+              CHART_PLACEHOLDER,
+            );
           } else if (chartData && !newHtml.includes('data-chart="true"')) {
             newHtml += CHART_PLACEHOLDER;
           }
 
           // Resolve any unrendered geometry tag
-          if (/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)) {
-            newHtml = newHtml.replace(/\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi, (_match, shape, labelsStr) => {
-              try {
-                const labels = parseGeometryLabels(labelsStr || "{}");
-                const svg = generateGeometrySVG(shape, labels, "#e2e8f0", "#0f172a", false, true, true);
-                return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
-              } catch {
-                return _match;
-              }
-            });
+          if (
+            /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/i.test(newHtml)
+          ) {
+            newHtml = newHtml.replace(
+              /\[GEOMETRY:([a-zA-Z0-9_-]+)(?:[:|]([\s\S]*?))?\]/gi,
+              (_match, shape, labelsStr) => {
+                try {
+                  const labels = parseGeometryLabels(labelsStr || "{}");
+                  const svg = generateGeometrySVG(
+                    shape,
+                    labels,
+                    "#e2e8f0",
+                    "#0f172a",
+                    false,
+                    true,
+                    true,
+                  );
+                  return `<span class="geometry-shape" contenteditable="false" data-shape="${shape}" data-labels="${encodeURIComponent(JSON.stringify(labels))}" style="display: block; max-width: 250px; margin: 0.35rem auto; text-align: center; line-height: 1;">${svg}</span>`;
+                } catch {
+                  return _match;
+                }
+              },
+            );
           }
 
           // Clean any orphaned SVG code fragments from past errors and repair geometry SVGs
@@ -443,10 +499,15 @@ export const WysiwygEditor: React.FC<{
 
           // Rehydrate any KaTeX math elements or raw LaTeX
           hydrateMathInContainer(editorRef.current);
+
+          // Restore caret position if editor was focused
+          if (isFocused && savedOffset >= 0) {
+            setCaretCharacterOffsetWithin(editorRef.current, savedOffset);
+          }
         }
       }
     }
-  }, [value, chartData, editorRef]);
+  }, [value, chartData, editorRef, lastEmittedValueRef, isTypingRef, debounceRef]);
 
   useEffect(() => {
     if (editorRef.current) {
