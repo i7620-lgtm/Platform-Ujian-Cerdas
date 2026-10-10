@@ -26,8 +26,8 @@ export const downloadStudentDataTemplate = (filename = "Format_Data_Siswa.xlsx")
     ["Nama kelas", "6A"],
     [],
     ["nomor absen", "nama siswa"],
-    [1, "Siswa Contoh 1"],
-    [2, "Siswa Contoh 2"],
+    ["01", "Siswa Contoh 1"],
+    ["02", "Siswa Contoh 2"],
   ];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   const wb = XLSX.utils.book_new();
@@ -85,9 +85,8 @@ export const parseStudentDataExcel = (file: File): Promise<ParsedStudentData> =>
 
           if (startRow !== -1) {
             for (let i = startRow; i < data.length; i++) {
-              const row = data[i];
-              if (!row) continue;
-              const absentNumber = String(row[0] || "").trim();
+              const rawAbsent = String(row[0] || "").trim();
+              const absentNumber = /^[1-9]$/.test(rawAbsent) ? `0${rawAbsent}` : rawAbsent;
               const fullName = String(row[1] || "").trim();
 
               if (fullName) {

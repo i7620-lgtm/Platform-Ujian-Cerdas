@@ -4,6 +4,7 @@ import {
   checkAnswerStatus,
   getCalculatedStats,
   formatDuration,
+  formatStudentIdForExport,
 } from "./archiveUtils";
 import { isAnswerMatch, parseList } from "../examUtils";
 
@@ -96,7 +97,7 @@ export const downloadArchiveExcel = (exam: Exam, results: Result[]) => {
     const row = [
       String(idx + 1),
       r.student.fullName,
-      r.student.studentId,
+      formatStudentIdForExport(r.student.studentId, r.student.absentNumber),
       r.student.class,
       r.student.schoolName || "-",
       String(stats.score),
