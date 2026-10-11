@@ -42,8 +42,9 @@ export const useStudentExamLogic = ({
 
   const [activeExam, setActiveExam] = useState<Exam>(exam);
 
-  // Session Timeout Modal State
-  const [isSessionTimeoutModalOpen, setIsSessionTimeoutModalOpen] = useState(false);
+  // Session Timeout & Grace Period State
+  const [isSessionTimeoutModalOpen] = useState(false);
+  const [isSessionGracePeriodActive, setIsSessionGracePeriodActive] = useState(false);
   const [sessionEndTime, setSessionEndTime] = useState<string>("");
   const [isSavingPause, setIsSavingPause] = useState(false);
   const hasDismissedTimeoutModalRef = useRef(false);
@@ -666,17 +667,20 @@ export const useStudentExamLogic = ({
     if (mode === "PR" || student.class === "PREVIEW") return;
 
     const checkDailySession = () => {
-      if (hasDismissedTimeoutModalRef.current || isSubmittingRef.current) return;
+      if (isSubmittingRef.current) return;
       const access = calculateStudentAccess(activeExam.config, student.class, new Date());
       if (access.status === "OUTSIDE_DAILY_SESSION") {
         if (timeLeftRef.current > 0 && timeLeftRef.current !== Infinity) {
-          setIsSessionTimeoutModalOpen(true);
+          // Logika baru: Langsung memberikan kesempatan bagi siswa untuk melanjutkan pengerjaan sampai durasi pengerjaan habis
+          setIsSessionGracePeriodActive(true);
           const endLabel =
             access.applicableSessions.find((s) => s.endTime)?.endTime ||
             activeExam.config.dailyEndTime ||
             "10:00";
           setSessionEndTime(endLabel);
         }
+      } else {
+        setIsSessionGracePeriodActive(false);
       }
     };
 
@@ -686,8 +690,7 @@ export const useStudentExamLogic = ({
   }, [activeExam.config, student.class]);
 
   const handleContinueSessionNow = () => {
-    setIsSessionTimeoutModalOpen(false);
-    hasDismissedTimeoutModalRef.current = true;
+    setIsSessionGracePeriodActive(false);
   };
 
   const handlePauseAndResumeNextSession = async () => {
@@ -734,6 +737,7 @@ export const useStudentExamLogic = ({
     scrollToQuestion,
     answersRef,
     isSessionTimeoutModalOpen,
+    isSessionGracePeriodActive,
     sessionEndTime,
     isSavingPause,
     handleContinueSessionNow,
