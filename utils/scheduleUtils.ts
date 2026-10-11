@@ -261,13 +261,18 @@ export const calculateStudentAccess = (
     };
   }
 
-  // Periksa waktu saat ini dalam format menit
+  // Periksa waktu saat ini dalam format tanggal dan menit lokal
+  const todayDateStr = now.toLocaleDateString("en-CA"); // YYYY-MM-DD
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const currentSecondsInMinute = now.getSeconds();
 
   // Cari apakah ada sesi aktif saat ini
   let activeSession: DailyExamSession | undefined;
   for (const session of applicableSessions) {
+    // Jika sesi memiliki tanggal spesifik, tanggal harus cocok dengan hari ini
+    if (session.date && session.date !== todayDateStr) {
+      continue;
+    }
+
     const startMin = parseTimeMinutes(session.startTime);
     const endMin = parseTimeMinutes(session.endTime);
 
@@ -287,10 +292,11 @@ export const calculateStudentAccess = (
 
   if (activeSession) {
     // Siswa berhak mengerjakan sekarang di dalam sesi aktif kelasnya
+    const dateLabel = activeSession.date ? ` [${activeSession.date}]` : "";
     return {
       status: "OPEN",
       canAccess: true,
-      message: `Sesi aktif: ${activeSession.name || "Sesi Pengerjaan"} (${activeSession.startTime} - ${activeSession.endTime})`,
+      message: `Sesi aktif: ${activeSession.name || "Sesi Pengerjaan"}${dateLabel} (${activeSession.startTime} - ${activeSession.endTime})`,
       activeSession,
       countdownSeconds: 0,
       applicableSessions,
@@ -302,39 +308,35 @@ export const calculateStudentAccess = (
   // Tidak ada sesi aktif saat ini -> cari sesi terdekat berikutnya untuk kelas siswa
   let nextSession: DailyExamSession | undefined;
   let nextSessionDate: Date | undefined;
-  let minDiffMinutes = Infinity;
+  let minDiffMs = Infinity;
 
-  // Cek sesi hari ini yang belum mulai
   for (const session of applicableSessions) {
     const startMin = parseTimeMinutes(session.startTime);
-    if (startMin > currentMinutes) {
-      const diff = startMin - currentMinutes;
-      if (diff < minDiffMinutes) {
-        minDiffMinutes = diff;
-        nextSession = session;
-        const target = new Date(now);
-        target.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
-        nextSessionDate = target;
-      }
-    }
-  }
+    const startH = Math.floor(startMin / 60);
+    const startM = startMin % 60;
 
-  // Jika tidak ada sesi lagi hari ini, ambil sesi paling awal besok
-  if (!nextSession) {
-    let earliestMin = Infinity;
-    for (const session of applicableSessions) {
-      const startMin = parseTimeMinutes(session.startTime);
-      if (startMin < earliestMin) {
-        earliestMin = startMin;
-        nextSession = session;
+    let candidateDate: Date;
+    if (session.date) {
+      // Sesi terikat tanggal spesifik kalender
+      const [y, m, d] = session.date.split("-").map((v) => parseInt(v, 10));
+      candidateDate = new Date(y, (m || 1) - 1, d || 1, startH, startM, 0, 0);
+    } else {
+      // Sesi tanpa tanggal (berulang harian)
+      if (startMin > currentMinutes) {
+        candidateDate = new Date(now);
+        candidateDate.setHours(startH, startM, 0, 0);
+      } else {
+        candidateDate = new Date(now);
+        candidateDate.setDate(candidateDate.getDate() + 1);
+        candidateDate.setHours(startH, startM, 0, 0);
       }
     }
 
-    if (nextSession) {
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(Math.floor(earliestMin / 60), earliestMin % 60, 0, 0);
-      nextSessionDate = tomorrow;
+    const diffMs = candidateDate.getTime() - nowTs;
+    if (diffMs > 0 && diffMs < minDiffMs) {
+      minDiffMs = diffMs;
+      nextSession = session;
+      nextSessionDate = candidateDate;
     }
   }
 
@@ -345,11 +347,12 @@ export const calculateStudentAccess = (
 
   const sessionName = nextSession?.name ? `"${nextSession.name}"` : "sesi berikutnya";
   const startLabel = nextSession?.startTime || "-";
+  const sessionDateLabel = nextSession?.date ? ` pada tanggal ${nextSession.date}` : "";
 
   return {
     status: "OUTSIDE_DAILY_SESSION",
     canAccess: false,
-    message: `Di luar jam pengerjaan untuk kelas Anda. Sesi ${sessionName} akan dimulai pukul ${startLabel}.`,
+    message: `Di luar jam pengerjaan untuk kelas Anda. Sesi ${sessionName} akan dimulai pukul ${startLabel} WIB${sessionDateLabel}.`,
     nextSession,
     nextSessionDate,
     countdownSeconds,
@@ -360,7 +363,74 @@ export const calculateStudentAccess = (
 };
 
 /**
+ * Validasi batasan jam dan tanggal sesi terhadap rentang jadwal global ujian.
+ */
+export interface SessionValidationIssue {
+  type: "DATE_OUT_OF_BOUNDS" | "START_TIME_TOO_EARLY" | "END_TIME_TOO_LATE" | "INVALID_TIME_RANGE";
+  message: string;
+}
+
+export const validateSessionAgainstGlobal = (
+  session: DailyExamSession,
+  config: ExamConfig
+): SessionValidationIssue[] => {
+  const issues: SessionValidationIssue[] = [];
+  const sStartMin = parseTimeMinutes(session.startTime);
+  const sEndMin = parseTimeMinutes(session.endTime);
+
+  if (sStartMin >= sEndMin) {
+    issues.push({
+      type: "INVALID_TIME_RANGE",
+      message: `Jam mulai (${session.startTime || "--:--"}) harus lebih awal dari jam selesai (${session.endTime || "--:--"}).`,
+    });
+  }
+
+  const globalStart = config.startDate || config.date;
+  const globalEnd = config.endDate || config.date;
+
+  if (session.date) {
+    if (globalStart && session.date < globalStart) {
+      issues.push({
+        type: "DATE_OUT_OF_BOUNDS",
+        message: `Tanggal sesi (${session.date}) mendahului tanggal mulai umum (${globalStart}).`,
+      });
+    }
+    if (globalEnd && session.date > globalEnd) {
+      issues.push({
+        type: "DATE_OUT_OF_BOUNDS",
+        message: `Tanggal sesi (${session.date}) melewati tanggal selesai umum (${globalEnd}).`,
+      });
+    }
+
+    // Jika pada tanggal mulai umum, jam mulai sesi tidak boleh mendahului jam mulai umum
+    if (globalStart && session.date === globalStart && config.startTime) {
+      const gStartMin = parseTimeMinutes(config.startTime);
+      if (sStartMin < gStartMin) {
+        issues.push({
+          type: "START_TIME_TOO_EARLY",
+          message: `Jam mulai sesi (${session.startTime}) tidak boleh lebih awal dari jam mulai umum (${config.startTime}) pada hari pertama.`,
+        });
+      }
+    }
+
+    // Jika pada tanggal selesai umum, jam selesai sesi tidak boleh melewati jam selesai umum
+    if (globalEnd && session.date === globalEnd && config.endTime) {
+      const gEndMin = parseTimeMinutes(config.endTime);
+      if (sEndMin > gEndMin) {
+        issues.push({
+          type: "END_TIME_TOO_LATE",
+          message: `Jam selesai sesi (${session.endTime}) tidak boleh melewati jam selesai umum (${config.endTime}) pada hari terakhir.`,
+        });
+      }
+    }
+  }
+
+  return issues;
+};
+
+/**
  * Utilitas untuk mendeteksi potensi tumpang tindih waktu (conflict) antar sesi pada kelas yang sama.
+ * PENTING: Dua sesi yang memiliki jam sama tetapi TANGGAL BERBEDA TIDAK DIANGGAP BENTROK.
  */
 export const findSessionConflicts = (sessions: DailyExamSession[]): { hasConflict: boolean; conflicts: string[] } => {
   const conflicts: string[] = [];
@@ -372,6 +442,11 @@ export const findSessionConflicts = (sessions: DailyExamSession[]): { hasConflic
     for (let j = i + 1; j < sessions.length; j++) {
       const s1 = sessions[i];
       const s2 = sessions[j];
+
+      // Jika keduanya memiliki tanggal dan tanggalnya berbeda -> TIDAK BENTROK
+      if (s1.date && s2.date && s1.date !== s2.date) {
+        continue;
+      }
 
       // Periksa apakah kelas beririsan
       const s1General = s1.isGeneral || !s1.targetClasses || s1.targetClasses.length === 0;
@@ -393,8 +468,9 @@ export const findSessionConflicts = (sessions: DailyExamSession[]): { hasConflic
 
         // Cek overlap rentang jam (s1Start < s2End && s2Start < s1End)
         if (s1Start < s2End && s2Start < s1End) {
+          const dateLabel = s1.date ? ` (Tgl ${s1.date})` : "";
           conflicts.push(
-            `"${s1.name || `Sesi ${i + 1}`}" (${s1.startTime}-${s1.endTime}) bertabrakan dengan "${s2.name || `Sesi ${j + 1}`}" (${s2.startTime}-${s2.endTime}) pada kelas yang sama.`
+            `"${s1.name || `Sesi ${i + 1}`}" (${s1.startTime}-${s1.endTime}) bertabrakan dengan "${s2.name || `Sesi ${j + 1}`}" (${s2.startTime}-${s2.endTime})${dateLabel} pada kelas yang sama.`
           );
         }
       }
