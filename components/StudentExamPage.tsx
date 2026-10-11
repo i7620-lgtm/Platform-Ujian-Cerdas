@@ -30,6 +30,7 @@ import { useExamAntiCheat } from "../hooks/useExamAntiCheat";
 import { MultipleChoiceView } from "./student/question-types/MultipleChoiceView";
 import { TrueFalseView } from "./student/question-types/TrueFalseView";
 import { MatchingView } from "./student/question-types/MatchingView";
+import { SessionTimeoutModal } from "./student/SessionTimeoutModal";
 
 const renderQuestionTextWithChart = (
   html: string,
@@ -126,7 +127,9 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     hasAttemptedSubmit, showConfigIntro, setShowConfigIntro,
     activeExam, matchingOptionsMap, isMonitoring, monitoringLabel,
     isAnswered, handleSubmit, timeLeft, 
-    handleAnswerChange, scrollToQuestion, answersRef
+    handleAnswerChange, scrollToQuestion, answersRef,
+    isSessionTimeoutModalOpen, sessionEndTime, isSavingPause,
+    handleContinueSessionNow, handlePauseAndResumeNextSession
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
   interface FontStepConfig {
@@ -694,6 +697,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Decision Modal Saat Jam Sesi Berakhir di Tengah Pengerjaan */}
+      <SessionTimeoutModal
+        isOpen={isSessionTimeoutModalOpen}
+        sessionEndTime={sessionEndTime}
+        timeLeftMinutes={Math.max(1, Math.ceil(timeLeft / 60))}
+        onContinueNow={handleContinueSessionNow}
+        onPauseAndResumeNextSession={handlePauseAndResumeNextSession}
+        isSaving={isSavingPause}
+      />
     </div>
   );
 };
