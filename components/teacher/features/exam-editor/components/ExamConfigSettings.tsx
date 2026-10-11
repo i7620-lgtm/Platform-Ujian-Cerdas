@@ -14,6 +14,7 @@ import {
   downloadStudentDataTemplate,
   parseStudentDataExcel,
 } from "../../../studentDataUtils";
+import { DailySessionsSettings } from "./DailySessionsSettings";
 
 interface ExamConfigSettingsProps {
   config: ExamConfig;
@@ -489,6 +490,11 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
               </p>
             </div>
           </>
+        )}
+
+        {/* Rentang Jam Pengerjaan Harian (Multi-Sesi & Isolasi Kelas) */}
+        {(config.examMode || "").trim().toUpperCase() !== "PR" && (
+          <DailySessionsSettings config={config} store={store} />
         )}
 
         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">

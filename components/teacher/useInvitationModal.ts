@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import type { Exam } from "../../types";
+import { calculateStudentAccess } from "../../utils/scheduleUtils";
 import {
   downloadStudentDataTemplate,
   parseStudentDataExcel,
@@ -68,14 +69,26 @@ export const useInvitationModal = ({
         return;
       }
 
-      const dateStr = exam.config.startDate || exam.config.date;
-
-      if (dateStr.includes("T") && dateStr.length > 10) {
-        targetDate = new Date(dateStr).getTime();
+      if (exam.config.enableDailyWindow) {
+        const access = calculateStudentAccess(exam.config, undefined, new Date());
+        if (access.canAccess) {
+          setIsStarted(true);
+          setTimeLeft(null);
+          return;
+        } else if (access.nextSessionDate) {
+          targetDate = access.nextSessionDate.getTime();
+        } else {
+          targetDate = Date.now() + 3600000;
+        }
       } else {
-        targetDate = new Date(
-          `${dateStr}T${exam.config.startTime || "00:00"}`,
-        ).getTime();
+        const dateStr = exam.config.startDate || exam.config.date;
+        if (dateStr.includes("T") && dateStr.length > 10) {
+          targetDate = new Date(dateStr).getTime();
+        } else {
+          targetDate = new Date(
+            `${dateStr}T${exam.config.startTime || "00:00"}`,
+          ).getTime();
+        }
       }
 
       const now = new Date().getTime();

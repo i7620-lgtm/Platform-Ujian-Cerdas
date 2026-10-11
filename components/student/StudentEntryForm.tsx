@@ -10,12 +10,15 @@ import {
   ChevronDownIcon,
   XMarkIcon,
 } from "../Icons";
-import type { Student } from "../../types";
+import type { Student, Exam } from "../../types";
 import { storageService } from "../../services/storage";
 import { useStudentEntryForm, parseClassConfig } from "./useStudentEntryForm";
 import { QrScannerModal } from "./QrScannerModal";
 import { UnlockForm } from "./UnlockForm";
 import { supabase } from "../../lib/supabase";
+import { StudentInvitationCard } from "./StudentInvitationCard";
+import { useStudentScheduleStore } from "../../stores/studentScheduleStore";
+import { calculateStudentAccess } from "../../utils/scheduleUtils";
 
 interface StudentEntryFormProps {
   onLoginSuccess: (examCode: string, student: Student) => void;
@@ -86,6 +89,49 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
     });
     return matches.length > 0 ? matches : nameSuggestions;
   }, [nameSuggestions, fullName]);
+
+  const [invitationData, setInvitationData] = useState<{
+    exam: Exam;
+    student: Student;
+  } | null>(null);
+  const [isEnteringExam, setIsEnteringExam] = useState(false);
+  const liveAccessResult = useStudentScheduleStore((s) => s.accessResult);
+
+  const handleEnterFromInvitation = () => {
+    if (!invitationData) return;
+    const check = calculateStudentAccess(
+      invitationData.exam.config,
+      invitationData.student.class,
+      new Date()
+    );
+    if (!check.canAccess) {
+      alert(check.message);
+      return;
+    }
+    setIsEnteringExam(true);
+    useStudentScheduleStore.getState().stopTimer();
+    onLoginSuccess(invitationData.exam.code, invitationData.student);
+    setInvitationData(null);
+    setIsEnteringExam(false);
+  };
+
+  const handleBackFromInvitation = () => {
+    useStudentScheduleStore.getState().stopTimer();
+    setInvitationData(null);
+  };
+
+  if (invitationData && liveAccessResult) {
+    return (
+      <StudentInvitationCard
+        exam={invitationData.exam}
+        student={invitationData.student}
+        accessResult={liveAccessResult}
+        onEnterExam={handleEnterFromInvitation}
+        onBack={handleBackFromInvitation}
+        isEntering={isEnteringExam}
+      />
+    );
+  }
 
   if (isLocked) {
     return (
@@ -630,6 +676,35 @@ export const StudentEntryForm: React.FC<StudentEntryFormProps> = ({
               <button
                 id="btn-ya-data-benar-modal"
                 onClick={() => {
+                  if (pendingStudentData.config) {
+                    const check = calculateStudentAccess(
+                      pendingStudentData.config,
+                      pendingStudentData.studentData.class,
+                      new Date()
+                    );
+                    if (
+                      check.status === "OUTSIDE_DAILY_SESSION" ||
+                      check.status === "NOT_STARTED_GLOBAL"
+                    ) {
+                      const examPreview: Exam = {
+                        code: pendingStudentData.cleanExamCode,
+                        config: pendingStudentData.config,
+                        questions: [], // Anti-leak: jangan kirim naskah soal
+                        status: "PUBLISHED",
+                        authorSchool: pendingStudentData.studentData.schoolName,
+                      };
+                      useStudentScheduleStore
+                        .getState()
+                        .initScheduleMonitor(examPreview, pendingStudentData.studentData.class);
+                      setInvitationData({
+                        exam: examPreview,
+                        student: pendingStudentData.studentData,
+                      });
+                      setPendingStudentData(null);
+                      return;
+                    }
+                  }
+
                   onLoginSuccess(
                     pendingStudentData.cleanExamCode,
                     pendingStudentData.studentData,

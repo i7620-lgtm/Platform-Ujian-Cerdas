@@ -85,6 +85,8 @@ export const parseStudentDataExcel = (file: File): Promise<ParsedStudentData> =>
 
           if (startRow !== -1) {
             for (let i = startRow; i < data.length; i++) {
+              const row = data[i];
+              if (!row) continue;
               const rawAbsent = String(row[0] || "").trim();
               const absentNumber = /^[1-9]$/.test(rawAbsent) ? `0${rawAbsent}` : rawAbsent;
               const fullName = String(row[1] || "").trim();

@@ -304,7 +304,12 @@ export class ExamService {
             };
         }
 
-        if (!studentId || studentId === 'check_schedule') {
+        // ANTI-LEAK: Jika hanya memeriksa jadwal (misal kartu undangan / pre-login), jangan kirim naskah soal sama sekali
+        if (studentId === 'check_schedule') {
+            return { ...exam, questions: [] };
+        }
+
+        if (!studentId) {
             let questionsToProcess = selectBankSoalQuestions([...exam.questions], exam.config);
             if (exam.config.shuffleQuestions) {
                 questionsToProcess = shuffleArray(questionsToProcess);

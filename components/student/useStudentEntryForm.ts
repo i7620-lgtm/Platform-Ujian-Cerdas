@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from "react";
-import { Student } from "../../types";
+import { Student, ExamConfig } from "../../types";
 import { storageService } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
 
@@ -37,6 +37,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
   const [pendingStudentData, setPendingStudentData] = useState<{
     cleanExamCode: string;
     studentData: Student;
+    config?: ExamConfig;
   } | null>(null);
 
   // UI State
@@ -657,7 +658,7 @@ export const useStudentEntryForm = ({ initialCode, onLoginSuccess }: UseStudentE
       const lockKey = `exam_lock_${cleanExamCode}_${studentId}`;
       localStorage.removeItem(lockKey);
 
-      setPendingStudentData({ cleanExamCode, studentData });
+      setPendingStudentData({ cleanExamCode, studentData, config });
       setIsLoading(false);
     } catch (err) {
       console.error(err);
