@@ -120,10 +120,23 @@ export interface RegisteredStudentConfig {
   schoolName?: string;
 }
 
+export interface DailyExamSession {
+  id: string; // ID unik sesi
+  name?: string; // e.g. "Sesi 1: Kelas 8A"
+  startTime: string; // HH:mm e.g. "08:00"
+  endTime: string; // HH:mm e.g. "10:00"
+  targetClasses?: string[]; // Array kelas yang ditautkan, e.g. ["8A"]
+  isGeneral?: boolean; // True jika berlaku untuk semua kelas (Kelas Umum)
+}
+
 export interface ExamConfig {
   examMode: 'PR' | 'UJIAN'; // NEW: Mode PR atau Ujian
   startDate?: string; // NEW: Tanggal mulai (hanya untuk Ujian)
   endDate?: string; // NEW: Tanggal selesai (untuk PR dan Ujian)
+  enableDailyWindow?: boolean; // NEW: Batas jam pengerjaan harian aktif
+  dailySessions?: DailyExamSession[]; // NEW: Daftar dinamis sesi jam harian
+  dailyStartTime?: string; // Fallback kompatibilitas konfigurasi tunggal "HH:mm"
+  dailyEndTime?: string; // Fallback kompatibilitas konfigurasi tunggal "HH:mm"
   useBankSoal?: boolean; // NEW: Gunakan sistem bank soal
   bankSoalCount?: number; // NEW: Jumlah soal yang ditampilkan dari bank
   bankSoalProportions?: {

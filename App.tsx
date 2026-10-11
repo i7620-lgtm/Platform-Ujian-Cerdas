@@ -15,6 +15,7 @@ import { TutorialPage } from './components/TutorialPage';
 import { CollaboratorView } from './components/CollaboratorView';
 import { supabase } from './lib/supabase';
 import { hydrateMathInContainer } from './utils/mathRenderer';
+import { calculateStudentAccess } from './utils/scheduleUtils';
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -250,25 +251,12 @@ const App: React.FC = () => {
         return; 
       }
 
-      // FIX: Check schedule before allowing entry (Manual Login)
+      // FIX: Check schedule before allowing entry (Manual Login & Class Session Isolation)
       if (!isPreview) {
-          const mode = exam.config.examMode || 'UJIAN';
-          
-          if (mode === 'UJIAN') {
-              const dateStr = exam.config.startDate || exam.config.date;
-              let startTime: Date;
-              if (dateStr.includes('T') && dateStr.length > 10) {
-                  startTime = new Date(dateStr);
-              } else {
-                  startTime = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
-              }
-              
-              const now = new Date();
-
-              if (!isNaN(startTime.getTime()) && now < startTime) {
-                  setInvitationExam(exam);
-                  return;
-              }
+          const access = calculateStudentAccess(exam.config, student.class, new Date());
+          if (!access.canAccess) {
+              setInvitationExam(exam);
+              return;
           }
       }
       
