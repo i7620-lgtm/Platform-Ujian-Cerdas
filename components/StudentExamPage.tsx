@@ -30,7 +30,6 @@ import { useExamAntiCheat } from "../hooks/useExamAntiCheat";
 import { MultipleChoiceView } from "./student/question-types/MultipleChoiceView";
 import { TrueFalseView } from "./student/question-types/TrueFalseView";
 import { MatchingView } from "./student/question-types/MatchingView";
-import { SessionTimeoutModal } from "./student/SessionTimeoutModal";
 
 const renderQuestionTextWithChart = (
   html: string,
@@ -128,8 +127,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     activeExam, matchingOptionsMap, isMonitoring, monitoringLabel,
     isAnswered, handleSubmit, timeLeft, 
     handleAnswerChange, scrollToQuestion, answersRef,
-    isSessionTimeoutModalOpen, sessionEndTime, isSavingPause,
-    handleContinueSessionNow, handlePauseAndResumeNextSession
+    isSessionGracePeriodActive, sessionEndTime,
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
   interface FontStepConfig {
@@ -568,6 +566,28 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           } as React.CSSProperties
         }
       >
+        {/* Banner Grace Period Saat Batas Jam Sesi Habis Namun Durasi Masih Ada */}
+        {isSessionGracePeriodActive && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
+                <ClockIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <strong className="block font-bold text-sm text-amber-900 dark:text-amber-100">
+                  Batas Jam Sesi Telah Berakhir ({sessionEndTime || "Selesai"})
+                </strong>
+                <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                  Anda diberikan kesempatan untuk melanjutkan pengerjaan hingga durasi pengerjaan Anda habis. Jawaban akan otomatis terkirim saat sisa waktu pengerjaan berakhir.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100 shrink-0 self-end sm:self-center">
+              Lanjut Mengerjakan
+            </span>
+          </div>
+        )}
+
         {activeExam.questions.map((q, idx) => {
           const num =
             activeExam.questions
@@ -697,16 +717,6 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Decision Modal Saat Jam Sesi Berakhir di Tengah Pengerjaan */}
-      <SessionTimeoutModal
-        isOpen={isSessionTimeoutModalOpen}
-        sessionEndTime={sessionEndTime}
-        timeLeftMinutes={Math.max(1, Math.ceil(timeLeft / 60))}
-        onContinueNow={handleContinueSessionNow}
-        onPauseAndResumeNextSession={handlePauseAndResumeNextSession}
-        isSaving={isSavingPause}
-      />
     </div>
   );
 };
