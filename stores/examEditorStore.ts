@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { Question, QuestionType, ExamConfig, ChartData, RegisteredStudentConfig } from '../types';
+import type { Question, QuestionType, ExamConfig, ChartData, RegisteredStudentConfig, DailyExamSession } from '../types';
 import { parseList, isAnswerMatch, repairGeometrySvgInHtml } from '../components/teacher/examUtils';
 import { useExamEditorUIStore, type ChartTarget } from './examEditorUIStore';
 
@@ -34,6 +34,10 @@ interface ExamEditorState {
     removeClassTag: (tag: string) => void;
     setRegisteredStudents: (students: RegisteredStudentConfig[]) => void;
     addRegisteredStudents: (newStudents: RegisteredStudentConfig[]) => void;
+    addDailySession: (session?: Partial<DailyExamSession>) => void;
+    updateDailySession: (id: string, updates: Partial<DailyExamSession>) => void;
+    removeDailySession: (id: string) => void;
+    setDailySessions: (sessions: DailyExamSession[]) => void;
     handleConfigChangeManual: (updater: (prev: ExamConfig) => ExamConfig) => void;
     handleSubjectSelect: (subject: string) => void;
     handleSaveChart: (data: ChartData) => void;
@@ -100,6 +104,10 @@ export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     classLevel: 'Lainnya',
     targetClasses: [],
     registeredStudents: [],
+    enableDailyWindow: false,
+    dailySessions: [],
+    dailyStartTime: '08:00',
+    dailyEndTime: '16:00',
     examType: 'Lainnya',
     description: '',
 };
@@ -186,6 +194,42 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 map.set(key, s);
             });
             state.config.registeredStudents = Array.from(map.values());
+        }),
+
+        addDailySession: (session) => set((state) => {
+            if (!state.config.dailySessions) {
+                state.config.dailySessions = [];
+            }
+            const count = state.config.dailySessions.length + 1;
+            const newSession: DailyExamSession = {
+                id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: session?.name || `Sesi ${count}`,
+                startTime: session?.startTime || '08:00',
+                endTime: session?.endTime || '10:00',
+                targetClasses: session?.targetClasses || [],
+                isGeneral: session?.isGeneral ?? (session?.targetClasses && session.targetClasses.length > 0 ? false : true),
+            };
+            state.config.dailySessions.push(newSession);
+        }),
+
+        updateDailySession: (id, updates) => set((state) => {
+            if (!state.config.dailySessions) return;
+            const idx = state.config.dailySessions.findIndex(s => s.id === id);
+            if (idx !== -1) {
+                state.config.dailySessions[idx] = {
+                    ...state.config.dailySessions[idx],
+                    ...updates,
+                };
+            }
+        }),
+
+        removeDailySession: (id) => set((state) => {
+            if (!state.config.dailySessions) return;
+            state.config.dailySessions = state.config.dailySessions.filter(s => s.id !== id);
+        }),
+
+        setDailySessions: (sessions) => set((state) => {
+            state.config.dailySessions = [...sessions];
         }),
 
         handleConfigChangeManual: (updater) => set((state) => {
