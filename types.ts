@@ -123,6 +123,7 @@ export interface RegisteredStudentConfig {
 export interface DailyExamSession {
   id: string; // ID unik sesi
   name?: string; // e.g. "Sesi 1: Kelas 8A"
+  date?: string; // NEW: Tanggal spesifik pelaksanaan (YYYY-MM-DD), dibatasi startDate <= date <= endDate
   startTime: string; // HH:mm e.g. "08:00"
   endTime: string; // HH:mm e.g. "10:00"
   targetClasses?: string[]; // Array kelas yang ditautkan, e.g. ["8A"]
