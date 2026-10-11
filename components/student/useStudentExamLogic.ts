@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { calculateExamScore, sanitizeHtml, parseList } from "../teacher/examUtils";
 import { useExamAntiCheat } from "../../hooks/useExamAntiCheat";
+import { calculateStudentAccess } from "../../utils/scheduleUtils";
 
 interface UseStudentExamLogicProps {
   exam: Exam;
@@ -40,6 +41,12 @@ export const useStudentExamLogic = ({
   const [showConfigIntro, setShowConfigIntro] = useState(true);
 
   const [activeExam, setActiveExam] = useState<Exam>(exam);
+
+  // Session Timeout Modal State
+  const [isSessionTimeoutModalOpen, setIsSessionTimeoutModalOpen] = useState(false);
+  const [sessionEndTime, setSessionEndTime] = useState<string>("");
+  const [isSavingPause, setIsSavingPause] = useState(false);
+  const hasDismissedTimeoutModalRef = useRef(false);
 
   const answersRef = useRef<Record<string, string>>({});
   const logRef = useRef<string[]>(initialData?.activityLog || []);
@@ -652,5 +659,84 @@ export const useStudentExamLogic = ({
     );
   };
 
-  return { formatTime, totalQuestions, answeredCount, progress, optimizeHtml, answers, isSubmitting, userLocation, isNavOpen, setIsNavOpen, hasAttemptedSubmit, showConfigIntro, setShowConfigIntro, activeExam, matchingOptionsMap, isMonitoring, monitoringLabel, isAnswered, handleSubmit, timeLeft, handleAnswerChange, scrollToQuestion, answersRef };
+  // Check if daily session ends during the active exam
+  useEffect(() => {
+    if (!activeExam.config.enableDailyWindow) return;
+    const mode = (activeExam.config.examMode || "UJIAN").trim().toUpperCase();
+    if (mode === "PR" || student.class === "PREVIEW") return;
+
+    const checkDailySession = () => {
+      if (hasDismissedTimeoutModalRef.current || isSubmittingRef.current) return;
+      const access = calculateStudentAccess(activeExam.config, student.class, new Date());
+      if (access.status === "OUTSIDE_DAILY_SESSION") {
+        if (timeLeftRef.current > 0 && timeLeftRef.current !== Infinity) {
+          setIsSessionTimeoutModalOpen(true);
+          const endLabel =
+            access.applicableSessions.find((s) => s.endTime)?.endTime ||
+            activeExam.config.dailyEndTime ||
+            "10:00";
+          setSessionEndTime(endLabel);
+        }
+      }
+    };
+
+    checkDailySession();
+    const interval = setInterval(checkDailySession, 3000);
+    return () => clearInterval(interval);
+  }, [activeExam.config, student.class]);
+
+  const handleContinueSessionNow = () => {
+    setIsSessionTimeoutModalOpen(false);
+    hasDismissedTimeoutModalRef.current = true;
+  };
+
+  const handlePauseAndResumeNextSession = async () => {
+    setIsSavingPause(true);
+    try {
+      await storageService.saveLocalProgress(STORAGE_KEY, {
+        answers: answersRef.current,
+        logs: logRef.current,
+      });
+      if (onUpdate) {
+        onUpdate(answersRef.current, timeLeftRef.current);
+      }
+      window.location.href = "/";
+    } catch (e) {
+      console.error("Gagal menyimpan progres sesi:", e);
+      window.location.href = "/";
+    } finally {
+      setIsSavingPause(false);
+    }
+  };
+
+  return {
+    formatTime,
+    totalQuestions,
+    answeredCount,
+    progress,
+    optimizeHtml,
+    answers,
+    isSubmitting,
+    userLocation,
+    isNavOpen,
+    setIsNavOpen,
+    hasAttemptedSubmit,
+    showConfigIntro,
+    setShowConfigIntro,
+    activeExam,
+    matchingOptionsMap,
+    isMonitoring,
+    monitoringLabel,
+    isAnswered,
+    handleSubmit,
+    timeLeft,
+    handleAnswerChange,
+    scrollToQuestion,
+    answersRef,
+    isSessionTimeoutModalOpen,
+    sessionEndTime,
+    isSavingPause,
+    handleContinueSessionNow,
+    handlePauseAndResumeNextSession,
+  };
 };
