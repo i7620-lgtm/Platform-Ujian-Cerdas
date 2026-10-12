@@ -130,6 +130,8 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     isSessionGracePeriodActive, sessionEndTime,
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
+  const [isSessionBannerDismissed, setIsSessionBannerDismissed] = useState(false);
+
   interface FontStepConfig {
     step: number;
     percentage: number;
@@ -533,23 +535,64 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             })}
           </div>
 
-          {/* Monitoring Explanation in Dropdown (Visible when Nav Open) */}
-          {isMonitoring && (
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center text-center animate-fade-in">
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-full border border-indigo-100 dark:border-indigo-800 flex items-center gap-2 mb-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
-                </span>
-                <span className="text-xs font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300">
-                  {monitoringLabel}
-                </span>
+          {/* Informasi Pengawasan & Batas Jam Sesi Bersebelahan di Laci Soal */}
+          {(isMonitoring || isSessionGracePeriodActive) && (
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
+              <div
+                className={`grid grid-cols-1 ${
+                  isMonitoring && isSessionGracePeriodActive
+                    ? "md:grid-cols-2"
+                    : "max-w-md mx-auto"
+                } gap-3.5 max-w-4xl mx-auto`}
+              >
+                {/* Kolom 1: Peringatan Pengawasan Sistem */}
+                {isMonitoring && (
+                  <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex flex-col items-center text-center justify-between shadow-xs">
+                    <div className="flex flex-col items-center w-full">
+                      <div className="bg-indigo-100/80 dark:bg-indigo-900/50 px-3.5 py-1.5 rounded-full border border-indigo-200/60 dark:border-indigo-800 flex items-center gap-2 mb-2.5">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+                        </span>
+                        <span className="text-xs font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                          {monitoringLabel || "Sistem Pengawasan Aktif"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                        {activeExam.config.continueWithPermission
+                          ? "Peringatan: Ujian sedang diawasi oleh sistem. Jika Anda berpindah tab atau keluar dari halaman, ujian akan terkunci dan membutuhkan token guru untuk melanjutkan."
+                          : "Peringatan: Ujian sedang diawasi oleh sistem. Seluruh aktivitas dan riwayat pengerjaan Anda dipantau serta dicatat secara realtime oleh pengawas."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Kolom 2: Informasi Batas Jam Sesi & Toleransi Waktu */}
+                {isSessionGracePeriodActive && (
+                  <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 flex flex-col items-center text-center justify-between shadow-xs">
+                    <div className="flex flex-col items-center w-full">
+                      <div className="bg-amber-100 dark:bg-amber-900/50 px-3.5 py-1.5 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-2 mb-2.5 text-amber-800 dark:text-amber-200">
+                        <ClockIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          Batas Jam Sesi: {sessionEndTime || "Selesai"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
+                        Batas jam sesi ujian telah berakhir, namun Anda diberikan kesempatan menyelesaikan soal hingga hitung mundur durasi habis.
+                      </p>
+                    </div>
+                    {isSessionBannerDismissed && (
+                      <button
+                        type="button"
+                        onClick={() => setIsSessionBannerDismissed(false)}
+                        className="mt-3 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2 cursor-pointer transition-colors"
+                      >
+                        Tampilkan kembali banner di layar utama
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 max-w-md font-medium leading-relaxed">
-                {activeExam.config.continueWithPermission
-                  ? "Sistem memantau aktivitas Anda. Jika Anda keluar dari aplikasi atau mencoba melakukan kecurangan, ujian akan otomatis terkunci dan memerlukan token guru untuk melanjutkan."
-                  : "Sistem memantau aktivitas Anda selama pengerjaan ujian. Setiap upaya meninggalkan halaman akan tercatat dalam log aktivitas yang dapat dilihat oleh pengawas."}
-              </p>
             </div>
           )}
         </div>
@@ -567,7 +610,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
         }
       >
         {/* Banner Grace Period Saat Batas Jam Sesi Habis Namun Durasi Masih Ada */}
-        {isSessionGracePeriodActive && (
+        {isSessionGracePeriodActive && !isSessionBannerDismissed && (
           <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0">
@@ -582,9 +625,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100 shrink-0 self-end sm:self-center">
-              Lanjut Mengerjakan
-            </span>
+            <button
+              type="button"
+              onClick={() => setIsSessionBannerDismissed(true)}
+              className="text-[11px] font-black uppercase px-4 py-2 rounded-xl bg-amber-200 hover:bg-amber-300 dark:bg-amber-900/80 dark:hover:bg-amber-800 text-amber-950 dark:text-amber-100 shrink-0 self-end sm:self-center transition-all active:scale-95 shadow-xs cursor-pointer flex items-center gap-1.5 focus:outline-hidden"
+              title="Tutup banner peringatan agar pandangan soal lebih leluasa"
+              aria-label="Lanjut Mengerjakan"
+            >
+              <span>Lanjut Mengerjakan</span>
+              <CheckIcon className="w-3.5 h-3.5 text-amber-950 dark:text-amber-100" />
+            </button>
           </div>
         )}
 
