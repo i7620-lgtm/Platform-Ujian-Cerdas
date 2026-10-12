@@ -311,7 +311,7 @@ export const useStudentExamLogic = ({
           // Select extreme for exams
           const { data } = await supabase
             .from("exams")
-            .select("status, config, unlock_token")
+            .select("status, config")
             .eq("code", exam.code)
             .single();
           if (data) {

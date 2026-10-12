@@ -142,52 +142,71 @@ export const StudentInvitationCard: React.FC<StudentInvitationCardProps> = ({
                   </span>
                 </div>
 
-                {/* Real-time Countdown Digits */}
-                <div className="flex items-center justify-center gap-2 sm:gap-3 py-1">
-                  {days > 0 && (
-                    <>
-                      <div className="flex flex-col items-center">
-                        <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
-                          {pad(days)}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Hari</span>
-                      </div>
-                      <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
-                    </>
-                  )}
-                  <div className="flex flex-col items-center">
-                    <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
-                      {pad(hours)}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Jam</span>
+                {/* Real-time Countdown Digits or Informative Status */}
+                {countdownSeconds > 0 ? (
+                  <div className="flex items-center justify-center gap-2 sm:gap-3 py-1">
+                    {days > 0 && (
+                      <>
+                        <div className="flex flex-col items-center">
+                          <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
+                            {pad(days)}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Hari</span>
+                        </div>
+                        <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
+                      </>
+                    )}
+                    <div className="flex flex-col items-center">
+                      <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
+                        {pad(hours)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Jam</span>
+                    </div>
+                    <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
+                    <div className="flex flex-col items-center">
+                      <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
+                        {pad(minutes)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Menit</span>
+                    </div>
+                    <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
+                    <div className="flex flex-col items-center">
+                      <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
+                        {pad(seconds)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Detik</span>
+                    </div>
                   </div>
-                  <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
-                  <div className="flex flex-col items-center">
-                    <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
-                      {pad(minutes)}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Menit</span>
+                ) : (
+                  <div className="py-2 px-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200 text-xs font-semibold">
+                    {accessResult.message || "Belum ada sesi aktif saat ini."}
                   </div>
-                  <span className="text-indigo-300 font-bold text-xl self-center pb-4">:</span>
-                  <div className="flex flex-col items-center">
-                    <span className="w-12 sm:w-14 h-12 sm:h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-mono font-black text-xl sm:text-2xl shadow-xs border border-indigo-100 dark:border-slate-700">
-                      {pad(seconds)}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Detik</span>
-                  </div>
-                </div>
+                )}
 
-                <div className="text-xs text-slate-600 dark:text-slate-300 pt-1">
+                <div className="text-xs text-slate-600 dark:text-slate-300 pt-1 space-y-1.5">
                   {nextSession ? (
                     <>
-                      Jadwal sesi kelas Anda (<strong>{nextSession.name || "Sesi Pengerjaan"}</strong>):{" "}
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                        {nextSession.startTime} - {nextSession.endTime} WIB
-                      </span>
+                      <div>
+                        Jadwal sesi kelas Anda (<strong>{nextSession.name || "Sesi Pengerjaan"}</strong>):{" "}
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                          {nextSession.startTime} - {nextSession.endTime} {accessResult.timezone || "WIB"}
+                        </span>
+                      </div>
                       {formattedDate && <span className="block text-[11px] text-slate-400 mt-0.5">{formattedDate}</span>}
                     </>
-                  ) : (
-                    "Jadwal pelaksanaan belum tiba."
+                  ) : status === "NOT_STARTED_GLOBAL" ? (
+                    <div>
+                      Jadwal pelaksanaan ujian:{" "}
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                        {accessResult.targetTimeLabel || `${exam.config.startTime || "08:00"} - ${exam.config.endTime || "10:00"} ${accessResult.timezone || "WIB"}`}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {accessResult.studentTimezoneNotice && (
+                    <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold bg-indigo-50/80 dark:bg-indigo-900/40 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                      {accessResult.studentTimezoneNotice}
+                    </div>
                   )}
                 </div>
               </div>
@@ -209,14 +228,18 @@ export const StudentInvitationCard: React.FC<StudentInvitationCardProps> = ({
                         <span className="font-semibold text-slate-700 dark:text-slate-200">
                           {s.name || `Sesi ${idx + 1}`}
                         </span>
-                        {s.date && (
+                        {s.dateMode === "SPECIFIC_DATE" || s.date ? (
                           <span className="block text-[10px] text-slate-400 font-medium">
                             Tanggal: {s.date}
+                          </span>
+                        ) : (
+                          <span className="block text-[10px] text-slate-400 font-medium">
+                            Berlaku: Setiap Hari
                           </span>
                         )}
                       </div>
                       <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                        {s.startTime} - {s.endTime}
+                        {s.startTime} - {s.endTime} {accessResult.timezone || "WIB"}
                       </span>
                     </div>
                   ))}
