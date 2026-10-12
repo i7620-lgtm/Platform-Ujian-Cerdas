@@ -844,6 +844,34 @@ export const useOngoingExamModal = ({
     [displayExam],
   );
 
+  const [proctorToken, setProctorToken] = useState<string>("");
+
+  useEffect(() => {
+    if (!displayExam?.code) return;
+    const collabs = displayExam.config?.collaborators || [];
+    const viewer = collabs.find((c) => c.role === "viewer");
+    if (viewer?.token) {
+      setProctorToken(viewer.token);
+    } else {
+      storageService
+        .addCollaborator(displayExam.code, "Pengawas (Live Monitor)", "viewer")
+        .then((token) => {
+          if (token) setProctorToken(token);
+        })
+        .catch(() => {});
+    }
+  }, [displayExam?.code, displayExam?.config?.collaborators]);
+
+  const proctorUrl = useMemo(() => {
+    if (typeof window !== "undefined" && displayExam?.code) {
+      if (proctorToken) {
+        return `${window.location.origin}/?collab_code=${displayExam.code}&collab_token=${proctorToken}`;
+      }
+      return `${window.location.origin}/?live=${displayExam.code}`;
+    }
+    return "";
+  }, [displayExam?.code, proctorToken]);
+
   const liveUrl = useMemo(() => {
     if (typeof window !== "undefined" && displayExam?.code) {
       return `${window.location.origin}/?live=${displayExam.code}`;
@@ -924,6 +952,7 @@ export const useOngoingExamModal = ({
     calculateScore,
 
     // Cached / Computed
+    proctorUrl,
     liveUrl,
     joinUrl,
     isLargeScale,
