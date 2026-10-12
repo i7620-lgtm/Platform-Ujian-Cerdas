@@ -1,4 +1,11 @@
-import type { ExamConfig, DailyExamSession } from "../types";
+import type { ExamConfig, DailyExamSession, IndonesianTimezone } from "../types";
+import {
+  detectUserIndonesianTimezone,
+  getTimezoneOffsetHours,
+  normalizeDateString,
+  toAbsoluteUtcTimestamp,
+  getStudentTimezoneNotice,
+} from "./timezoneUtils";
 
 /**
  * Konversi string waktu "HH:mm" menjadi menit dari tengah malam (0 - 1439).
@@ -48,9 +55,6 @@ export const isClassMatch = (targetClass: string, studentClass?: string): boolea
 
 /**
  * Memeriksa apakah suatu sesi berlaku bagi kelas siswa.
- * Aturan:
- * 1. Jika sesi bertanda isGeneral = true ATAU targetClasses kosong -> berlaku untuk semua kelas (Umum).
- * 2. Jika sesi memiliki targetClasses spesifik -> hanya berlaku jika kelas siswa ada di dalamnya.
  */
 export const isSessionApplicableForStudent = (
   session: DailyExamSession,
@@ -75,7 +79,6 @@ export const getApplicableSessionsForStudent = (
 
 /**
  * Mengambil daftar sesi harian yang dinormalisasi dari config ujian.
- * Menyediakan fallback jika config versi sebelumnya hanya memiliki dailyStartTime/dailyEndTime.
  */
 export const getNormalizedDailySessions = (config: ExamConfig): DailyExamSession[] => {
   if (config.dailySessions && Array.isArray(config.dailySessions) && config.dailySessions.length > 0) {
@@ -90,6 +93,7 @@ export const getNormalizedDailySessions = (config: ExamConfig): DailyExamSession
         name: "Sesi Harian Utama",
         startTime: config.dailyStartTime || "08:00",
         endTime: config.dailyEndTime || "16:00",
+        dateMode: "ALL_DAYS",
         isGeneral: true,
         targetClasses: [],
       },
@@ -100,34 +104,28 @@ export const getNormalizedDailySessions = (config: ExamConfig): DailyExamSession
 };
 
 /**
- * Mendapatkan rentang tanggal dan jam global ujian (startDate & startTime s/d endDate & endTime)
+ * Mendapatkan rentang tanggal dan jam global ujian berbasis UTC absolut sesuai zona waktu guru.
  */
-export const getGlobalExamTimeRange = (config: ExamConfig): { start: Date; end: Date; isValid: boolean } => {
+export const getGlobalExamTimeRange = (
+  config: ExamConfig
+): { start: Date; end: Date; isValid: boolean; timezone: IndonesianTimezone } => {
   const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
-  const defaultToday = new Date().toLocaleDateString("en-CA");
+  const examTz: IndonesianTimezone = config.timezone || "WIB";
+  const defaultToday = normalizeDateString();
 
-  // Start Date
-  const rawStartDate = config.startDate || config.date || defaultToday;
+  const rawStartDate = normalizeDateString(config.startDate || config.date || defaultToday);
   const startTimeStr = isPR ? "00:00" : (config.startTime || "00:00");
-  let start: Date;
-  if (rawStartDate.includes("T") && rawStartDate.length > 10) {
-    start = new Date(rawStartDate);
-  } else {
-    start = new Date(`${rawStartDate}T${startTimeStr}:00`);
-  }
+  const startUtcMs = toAbsoluteUtcTimestamp(rawStartDate, startTimeStr, examTz, false);
 
-  // End Date
-  const rawEndDate = config.endDate || config.date || defaultToday;
+  const rawEndDate = normalizeDateString(config.endDate || config.date || defaultToday);
   const endTimeStr = config.endTime || (isPR ? "23:59" : "23:59");
-  let end: Date;
-  if (rawEndDate.includes("T") && rawEndDate.length > 10) {
-    end = new Date(rawEndDate);
-  } else {
-    end = new Date(`${rawEndDate}T${endTimeStr}:59`);
-  }
+  const endUtcMs = toAbsoluteUtcTimestamp(rawEndDate, endTimeStr, examTz, true);
 
-  const isValid = !isNaN(start.getTime()) && !isNaN(end.getTime());
-  return { start, end, isValid };
+  const start = new Date(startUtcMs);
+  const end = new Date(endUtcMs);
+  const isValid = !isNaN(startUtcMs) && !isNaN(endUtcMs);
+
+  return { start, end, isValid, timezone: examTz };
 };
 
 export type ExamAccessStatus =
@@ -147,11 +145,14 @@ export interface StudentAccessCheckResult {
   applicableSessions: DailyExamSession[];
   allSessions: DailyExamSession[];
   isDailyWindowEnabled: boolean;
+  timezone: IndonesianTimezone;
+  studentTimezone: IndonesianTimezone;
+  studentTimezoneNotice?: string | null;
+  targetTimeLabel?: string;
 }
 
 /**
- * Menghitung status akses siswa secara real-time dan terisolasi.
- * Menjamin isolasi penuh antar-kelas (contoh: siswa 8B tidak bisa masuk di jam sesi 8A).
+ * Menghitung status akses siswa secara real-time dan terisolasi dengan dukungan zona waktu penuh.
  */
 export const calculateStudentAccess = (
   config: ExamConfig,
@@ -160,6 +161,8 @@ export const calculateStudentAccess = (
 ): StudentAccessCheckResult => {
   const isPR = (config.examMode || "").trim().toUpperCase() === "PR";
   const nowTs = now.getTime();
+  const examTz: IndonesianTimezone = config.timezone || "WIB";
+  const studentTz: IndonesianTimezone = detectUserIndonesianTimezone();
 
   // Mode PR tidak terikat batas jam harian
   if (isPR) {
@@ -173,6 +176,8 @@ export const calculateStudentAccess = (
         applicableSessions: [],
         allSessions: [],
         isDailyWindowEnabled: false,
+        timezone: examTz,
+        studentTimezone: studentTz,
       };
     }
 
@@ -184,14 +189,17 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions: [],
       isDailyWindowEnabled: false,
+      timezone: examTz,
+      studentTimezone: studentTz,
     };
   }
 
-  // 1. Evaluasi Batas Global (Global Start & End Time)
+  // 1. Evaluasi Batas Global (Global Start & End Time) dalam UTC
   const { start: globalStart, end: globalEnd } = getGlobalExamTimeRange(config);
 
   if (!isNaN(globalStart.getTime()) && nowTs < globalStart.getTime()) {
     const diffSec = Math.max(0, Math.floor((globalStart.getTime() - nowTs) / 1000));
+    const tzNotice = getStudentTimezoneNotice(config.startTime || "00:00", config.endTime || "23:59", examTz, studentTz);
     return {
       status: "NOT_STARTED_GLOBAL",
       canAccess: false,
@@ -201,6 +209,10 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions: [],
       isDailyWindowEnabled: !!config.enableDailyWindow,
+      timezone: examTz,
+      studentTimezone: studentTz,
+      studentTimezoneNotice: tzNotice,
+      targetTimeLabel: `${config.startTime || "00:00"} - ${config.endTime || "23:59"} ${examTz}`,
     };
   }
 
@@ -213,6 +225,8 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions: [],
       isDailyWindowEnabled: !!config.enableDailyWindow,
+      timezone: examTz,
+      studentTimezone: studentTz,
     };
   }
 
@@ -228,6 +242,8 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions: [],
       isDailyWindowEnabled: false,
+      timezone: examTz,
+      studentTimezone: studentTz,
     };
   }
 
@@ -241,6 +257,8 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions: [],
       isDailyWindowEnabled: true,
+      timezone: examTz,
+      studentTimezone: studentTz,
     };
   }
 
@@ -258,32 +276,43 @@ export const calculateStudentAccess = (
       applicableSessions: [],
       allSessions,
       isDailyWindowEnabled: true,
+      timezone: examTz,
+      studentTimezone: studentTz,
     };
   }
 
-  // Periksa waktu saat ini dalam format tanggal dan menit lokal
-  const todayDateStr = now.toLocaleDateString("en-CA"); // YYYY-MM-DD
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // Hitung tanggal dan menit saat ini menurut zona waktu guru
+  const offsetExamMs = getTimezoneOffsetHours(examTz) * 3600000;
+  const examNow = new Date(nowTs + offsetExamMs);
+  const examYear = examNow.getUTCFullYear();
+  const examMonth = (examNow.getUTCMonth() + 1).toString().padStart(2, "0");
+  const examDay = examNow.getUTCDate().toString().padStart(2, "0");
+  const examTodayDateStr = `${examYear}-${examMonth}-${examDay}`;
+  const examCurrentMinutes = examNow.getUTCHours() * 60 + examNow.getUTCMinutes();
 
   // Cari apakah ada sesi aktif saat ini
   let activeSession: DailyExamSession | undefined;
   for (const session of applicableSessions) {
-    // Jika sesi memiliki tanggal spesifik, tanggal harus cocok dengan hari ini
-    if (session.date && session.date !== todayDateStr) {
-      continue;
+    const isSpecificDate = session.dateMode === "SPECIFIC_DATE";
+
+    if (isSpecificDate && session.date) {
+      const cleanSessionDate = normalizeDateString(session.date);
+      if (cleanSessionDate !== examTodayDateStr) {
+        continue;
+      }
     }
 
     const startMin = parseTimeMinutes(session.startTime);
     const endMin = parseTimeMinutes(session.endTime);
 
     if (startMin <= endMin) {
-      if (currentMinutes >= startMin && currentMinutes < endMin) {
+      if (examCurrentMinutes >= startMin && examCurrentMinutes < endMin) {
         activeSession = session;
         break;
       }
     } else {
       // Sesi melewati tengah malam
-      if (currentMinutes >= startMin || currentMinutes < endMin) {
+      if (examCurrentMinutes >= startMin || examCurrentMinutes < endMin) {
         activeSession = session;
         break;
       }
@@ -291,74 +320,90 @@ export const calculateStudentAccess = (
   }
 
   if (activeSession) {
-    // Siswa berhak mengerjakan sekarang di dalam sesi aktif kelasnya
-    const dateLabel = activeSession.date ? ` [${activeSession.date}]` : "";
+    const dateLabel = activeSession.dateMode === "SPECIFIC_DATE" && activeSession.date ? ` [${activeSession.date}]` : "";
+    const tzNotice = getStudentTimezoneNotice(activeSession.startTime, activeSession.endTime, examTz, studentTz);
     return {
       status: "OPEN",
       canAccess: true,
-      message: `Sesi aktif: ${activeSession.name || "Sesi Pengerjaan"}${dateLabel} (${activeSession.startTime} - ${activeSession.endTime})`,
+      message: `Sesi aktif: ${activeSession.name || "Sesi Pengerjaan"}${dateLabel} (${activeSession.startTime} - ${activeSession.endTime} ${examTz})`,
       activeSession,
       countdownSeconds: 0,
       applicableSessions,
       allSessions,
       isDailyWindowEnabled: true,
+      timezone: examTz,
+      studentTimezone: studentTz,
+      studentTimezoneNotice: tzNotice,
+      targetTimeLabel: `${activeSession.startTime} - ${activeSession.endTime} ${examTz}`,
     };
   }
 
-  // Tidak ada sesi aktif saat ini -> cari sesi terdekat berikutnya untuk kelas siswa
+  // Tidak ada sesi aktif saat ini -> cari sesi terdekat berikutnya dalam UTC
   let nextSession: DailyExamSession | undefined;
   let nextSessionDate: Date | undefined;
   let minDiffMs = Infinity;
 
   for (const session of applicableSessions) {
+    const isSpecificDate = session.dateMode === "SPECIFIC_DATE";
     const startMin = parseTimeMinutes(session.startTime);
-    const startH = Math.floor(startMin / 60);
-    const startM = startMin % 60;
 
-    let candidateDate: Date;
-    if (session.date) {
-      // Sesi terikat tanggal spesifik kalender
-      const [y, m, d] = session.date.split("-").map((v) => parseInt(v, 10));
-      candidateDate = new Date(y, (m || 1) - 1, d || 1, startH, startM, 0, 0);
+    let candidateUtcMs: number;
+    if (isSpecificDate && session.date) {
+      const cleanDate = normalizeDateString(session.date);
+      candidateUtcMs = toAbsoluteUtcTimestamp(cleanDate, session.startTime, examTz, false);
     } else {
-      // Sesi tanpa tanggal (berulang harian)
-      if (startMin > currentMinutes) {
-        candidateDate = new Date(now);
-        candidateDate.setHours(startH, startM, 0, 0);
+      // Berlaku setiap hari
+      if (startMin > examCurrentMinutes) {
+        candidateUtcMs = toAbsoluteUtcTimestamp(examTodayDateStr, session.startTime, examTz, false);
       } else {
-        candidateDate = new Date(now);
-        candidateDate.setDate(candidateDate.getDate() + 1);
-        candidateDate.setHours(startH, startM, 0, 0);
+        // Hari berikutnya di zona waktu guru
+        const nextDayDate = new Date(Date.UTC(examNow.getUTCFullYear(), examNow.getUTCMonth(), examNow.getUTCDate() + 1));
+        const tomY = nextDayDate.getUTCFullYear();
+        const tomM = (nextDayDate.getUTCMonth() + 1).toString().padStart(2, "0");
+        const tomD = nextDayDate.getUTCDate().toString().padStart(2, "0");
+        const tomorrowDateStr = `${tomY}-${tomM}-${tomD}`;
+        candidateUtcMs = toAbsoluteUtcTimestamp(tomorrowDateStr, session.startTime, examTz, false);
       }
     }
 
-    const diffMs = candidateDate.getTime() - nowTs;
+    const diffMs = candidateUtcMs - nowTs;
     if (diffMs > 0 && diffMs < minDiffMs) {
       minDiffMs = diffMs;
       nextSession = session;
-      nextSessionDate = candidateDate;
+      nextSessionDate = new Date(candidateUtcMs);
     }
   }
 
   let countdownSeconds = 0;
-  if (nextSessionDate) {
+  if (nextSessionDate && minDiffMs < Infinity) {
     countdownSeconds = Math.max(0, Math.floor((nextSessionDate.getTime() - nowTs) / 1000));
   }
 
   const sessionName = nextSession?.name ? `"${nextSession.name}"` : "sesi berikutnya";
-  const startLabel = nextSession?.startTime || "-";
+  const startLabel = nextSession?.startTime ? `${nextSession.startTime} ${examTz}` : "-";
   const sessionDateLabel = nextSession?.date ? ` pada tanggal ${nextSession.date}` : "";
+  const tzNotice = nextSession
+    ? getStudentTimezoneNotice(nextSession.startTime, nextSession.endTime, examTz, studentTz)
+    : null;
+
+  const fallbackMessage = nextSession
+    ? `Di luar jam pengerjaan untuk kelas Anda. Sesi ${sessionName} akan dimulai pukul ${startLabel}${sessionDateLabel}.`
+    : `Sesi pengerjaan untuk hari ini telah selesai atau belum ada jadwal sesi berikutnya untuk kelas Anda.`;
 
   return {
     status: "OUTSIDE_DAILY_SESSION",
     canAccess: false,
-    message: `Di luar jam pengerjaan untuk kelas Anda. Sesi ${sessionName} akan dimulai pukul ${startLabel} WIB${sessionDateLabel}.`,
+    message: fallbackMessage,
     nextSession,
     nextSessionDate,
     countdownSeconds,
     applicableSessions,
     allSessions,
     isDailyWindowEnabled: true,
+    timezone: examTz,
+    studentTimezone: studentTz,
+    studentTimezoneNotice: tzNotice,
+    targetTimeLabel: nextSession ? `${nextSession.startTime} - ${nextSession.endTime} ${examTz}` : undefined,
   };
 };
 
@@ -385,25 +430,25 @@ export const validateSessionAgainstGlobal = (
     });
   }
 
-  const globalStart = config.startDate || config.date;
-  const globalEnd = config.endDate || config.date;
+  const globalStart = normalizeDateString(config.startDate || config.date);
+  const globalEnd = normalizeDateString(config.endDate || config.date);
 
-  if (session.date) {
-    if (globalStart && session.date < globalStart) {
+  if (session.dateMode === "SPECIFIC_DATE" && session.date) {
+    const cleanSessionDate = normalizeDateString(session.date);
+    if (globalStart && cleanSessionDate < globalStart) {
       issues.push({
         type: "DATE_OUT_OF_BOUNDS",
         message: `Tanggal sesi (${session.date}) mendahului tanggal mulai umum (${globalStart}).`,
       });
     }
-    if (globalEnd && session.date > globalEnd) {
+    if (globalEnd && cleanSessionDate > globalEnd) {
       issues.push({
         type: "DATE_OUT_OF_BOUNDS",
         message: `Tanggal sesi (${session.date}) melewati tanggal selesai umum (${globalEnd}).`,
       });
     }
 
-    // Jika pada tanggal mulai umum, jam mulai sesi tidak boleh mendahului jam mulai umum
-    if (globalStart && session.date === globalStart && config.startTime) {
+    if (globalStart && cleanSessionDate === globalStart && config.startTime) {
       const gStartMin = parseTimeMinutes(config.startTime);
       if (sStartMin < gStartMin) {
         issues.push({
@@ -413,8 +458,7 @@ export const validateSessionAgainstGlobal = (
       }
     }
 
-    // Jika pada tanggal selesai umum, jam selesai sesi tidak boleh melewati jam selesai umum
-    if (globalEnd && session.date === globalEnd && config.endTime) {
+    if (globalEnd && cleanSessionDate === globalEnd && config.endTime) {
       const gEndMin = parseTimeMinutes(config.endTime);
       if (sEndMin > gEndMin) {
         issues.push({
@@ -432,7 +476,9 @@ export const validateSessionAgainstGlobal = (
  * Utilitas untuk mendeteksi potensi tumpang tindih waktu (conflict) antar sesi pada kelas yang sama.
  * PENTING: Dua sesi yang memiliki jam sama tetapi TANGGAL BERBEDA TIDAK DIANGGAP BENTROK.
  */
-export const findSessionConflicts = (sessions: DailyExamSession[]): { hasConflict: boolean; conflicts: string[] } => {
+export const findSessionConflicts = (
+  sessions: DailyExamSession[]
+): { hasConflict: boolean; conflicts: string[] } => {
   const conflicts: string[] = [];
   if (!sessions || sessions.length < 2) {
     return { hasConflict: false, conflicts };
@@ -443,8 +489,10 @@ export const findSessionConflicts = (sessions: DailyExamSession[]): { hasConflic
       const s1 = sessions[i];
       const s2 = sessions[j];
 
-      // Jika keduanya memiliki tanggal dan tanggalnya berbeda -> TIDAK BENTROK
-      if (s1.date && s2.date && s1.date !== s2.date) {
+      // Jika keduanya sesi tanggal spesifik dan tanggalnya berbeda -> TIDAK BENTROK
+      const s1Specific = s1.dateMode === "SPECIFIC_DATE" || !!s1.date;
+      const s2Specific = s2.dateMode === "SPECIFIC_DATE" || !!s2.date;
+      if (s1Specific && s2Specific && s1.date && s2.date && s1.date !== s2.date) {
         continue;
       }
 

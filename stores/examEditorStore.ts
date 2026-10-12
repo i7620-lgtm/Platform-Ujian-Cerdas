@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { Question, QuestionType, ExamConfig, ChartData, RegisteredStudentConfig, DailyExamSession } from '../types';
 import { parseList, isAnswerMatch, repairGeometrySvgInHtml } from '../components/teacher/examUtils';
 import { useExamEditorUIStore, type ChartTarget } from './examEditorUIStore';
+import { detectUserIndonesianTimezone } from '../utils/timezoneUtils';
 
 const createNewQuestion = (type: QuestionType): Question => {
     const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1 };
@@ -78,6 +79,7 @@ const checkAndCascade = (state: any) => {
 
 export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     examMode: 'UJIAN',
+    timezone: detectUserIndonesianTimezone(),
     startDate: new Date().toLocaleDateString('en-CA'),
     endDate: new Date(Date.now() + 86400000).toLocaleDateString('en-CA'),
     useBankSoal: false,
@@ -139,6 +141,9 @@ export const useExamEditorStore = create<ExamEditorState>()(
 
         setConfig: (config) => set((state) => {
             state.config = { ...DEFAULT_EXAM_CONFIG, ...config };
+            if (!state.config.timezone) {
+                state.config.timezone = detectUserIndonesianTimezone();
+            }
             if (state.config.examMode === 'PR') {
                 state.config.detectBehavior = false;
                 state.config.continueWithPermission = false;
@@ -204,6 +209,8 @@ export const useExamEditorStore = create<ExamEditorState>()(
             const newSession: DailyExamSession = {
                 id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 name: session?.name || `Sesi ${count}`,
+                dateMode: session?.dateMode || 'ALL_DAYS',
+                date: session?.date,
                 startTime: session?.startTime || '08:00',
                 endTime: session?.endTime || '10:00',
                 targetClasses: session?.targetClasses || [],

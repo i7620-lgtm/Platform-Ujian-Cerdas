@@ -366,9 +366,9 @@ const App: React.FC = () => {
         }
     }
     
-    // COLLABORATOR CHECK
-    const collabCode = params.get('collab_code');
-    const collabToken = params.get('collab_token');
+    // COLLABORATOR / PROCTOR CHECK
+    const collabCode = params.get('collab_code') || params.get('proctor');
+    const collabToken = params.get('collab_token') || params.get('token');
     
     if (collabCode && collabToken) {
         setIsSyncing(true);
@@ -416,24 +416,12 @@ const App: React.FC = () => {
                     const mode = exam.config.examMode || 'UJIAN';
                     
                     if (mode === 'UJIAN') {
-                        const dateStr = exam.config.startDate || exam.config.date;
-                        
-                        let startTime: Date;
-                        if (dateStr.includes('T') && dateStr.length > 10) {
-                            startTime = new Date(dateStr);
-                        } else {
-                            startTime = new Date(`${dateStr}T${exam.config.startTime || '00:00'}`);
-                        }
-                        
-                        const now = new Date();
-
-                        // Strict check: if exam has not started yet, show invitation card directly (replaces waiting room)
-                        if (!isNaN(startTime.getTime()) && now < startTime) {
+                        const access = calculateStudentAccess(exam.config, undefined, new Date());
+                        if (access.status === 'NOT_STARTED_GLOBAL') {
                             setInvitationExam(exam);
                             setPrefillCode(code);
                             setView('STUDENT_LOGIN');
                         } else {
-                            // On time (Direct Login)
                             setPrefillCode(code);
                             setView('STUDENT_LOGIN');
                         }

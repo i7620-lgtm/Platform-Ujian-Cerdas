@@ -34,11 +34,15 @@ interface OngoingExamModalProps {
   teacherProfile?: TeacherProfile;
   onClose: () => void;
   isReadOnly?: boolean;
+  isProctor?: boolean;
   isPremium?: boolean;
 }
 
 export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
-  const { exam, onClose, teacherProfile, isReadOnly, isPremium } = props;
+  const { exam, onClose, teacherProfile, isReadOnly, isProctor: isProctorProp, isPremium } = props;
+  const isProctor = !!isProctorProp || teacherProfile?.accountType === "collaborator";
+  const isOwner = !isReadOnly && !isProctor;
+  const canShowActionColumn = isOwner || isProctor;
 
   const {
     displayExam,
@@ -82,6 +86,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     handleAddTimeSubmit,
     getRelativeTime,
     calculateScore,
+    proctorUrl,
     liveUrl,
     joinUrl,
     isLargeScale,
@@ -322,7 +327,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 ))}
               </select>
 
-              {displayExam.config.examMode !== "PR" && (
+              {isOwner && displayExam.config.examMode !== "PR" && (
                 <button
                   onClick={handleFinishAllExams}
                   className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
@@ -332,7 +337,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 </button>
               )}
 
-              {displayExam.config.examMode !== "PR" && (
+              {isOwner && displayExam.config.examMode !== "PR" && (
                 <button
                   onClick={() => setIsAddTimeOpen(true)}
                   className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
@@ -351,15 +356,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                 <span>AKSES SISWA</span>
               </button>
 
-              {displayExam.config.enablePublicStream && (
+              {isOwner && (
                 <button
-                  id="ongoing-parent-access-btn"
+                  id="ongoing-share-stream-btn"
                   onClick={() => setIsShareModalOpen(true)}
                   className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
-                  title="Akses Pantauan Orang Tua"
+                  title="Bagikan Pantauan Pengawas & Orang Tua"
                 >
                   <ShareIcon className="w-3.5 h-3.5 text-teal-500" />
-                  <span>AKSES ORANG TUA</span>
+                  <span>BAGIKAN STREAM</span>
                 </button>
               )}
 
@@ -430,7 +435,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
                         WAKTU
                       </th>
-                      {!isReadOnly && (
+                      {canShowActionColumn && (
                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">
                           AKSI
                         </th>
@@ -493,7 +498,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                   -
                                 </span>
                               </td>
-                              {!isReadOnly && (
+                              {canShowActionColumn && (
                                 <td className="px-6 py-4 text-right whitespace-nowrap">
                                   <div className="flex items-center justify-end pr-3 text-slate-300 dark:text-slate-600 text-xs font-bold">
                                     -
@@ -598,9 +603,10 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                               )}
                             </td>
 
-                            {!isReadOnly && (
+                            {canShowActionColumn && (
                               <td className="px-6 py-4 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                  {/* Edit Data Siswa: Pemilik & Pengawas */}
                                   <button
                                     onClick={() =>
                                       setEditingStudent({
@@ -617,19 +623,24 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                   >
                                     <PencilIcon className="w-4 h-4" />
                                   </button>
-                                  <button
-                                    onClick={() =>
-                                      handleDeleteStudent(
-                                        r.student.studentId,
-                                        r.student.fullName,
-                                      )
-                                    }
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
-                                    title="Hapus Data Siswa"
-                                  >
-                                    <TrashIcon className="w-4 h-4" />
-                                  </button>
 
+                                  {/* Hapus Data Siswa: Hanya Pemilik */}
+                                  {isOwner && (
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteStudent(
+                                          r.student.studentId,
+                                          r.student.fullName,
+                                        )
+                                      }
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                                      title="Hapus Data Siswa"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  )}
+
+                                  {/* Buka Kunci & Buat Token: Pemilik & Pengawas */}
                                   {r.status !== "completed" &&
                                     displayExam.config.examMode !== "PR" && (
                                       <div className="flex items-center gap-1 border-l pl-2 border-slate-100 dark:border-slate-700 ml-1">
@@ -647,29 +658,36 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
                                             <span>Buka Kunci</span>
                                           </button>
                                         ) : (
+                                          (displayExam.config.detectBehavior !== false &&
+                                            displayExam.config.continueWithPermission !== false) && (
+                                            <button
+                                              onClick={() =>
+                                                handleGenerateToken(
+                                                  r.student.studentId,
+                                                  r.student.fullName,
+                                                )
+                                              }
+                                              className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95"
+                                            >
+                                              Buat Token
+                                            </button>
+                                          )
+                                        )}
+
+                                        {/* Hentikan Ujian: Hanya Pemilik */}
+                                        {isOwner && (
                                           <button
                                             onClick={() =>
-                                              handleGenerateToken(
+                                              handleFinishStudentExam(
                                                 r.student.studentId,
                                                 r.student.fullName,
                                               )
                                             }
-                                            className="px-3 py-1.5 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 transition-all border border-indigo-200 dark:border-indigo-800 shadow-sm active:scale-95"
+                                            className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95"
                                           >
-                                            Buat Token
+                                            Hentikan
                                           </button>
                                         )}
-                                        <button
-                                          onClick={() =>
-                                            handleFinishStudentExam(
-                                              r.student.studentId,
-                                              r.student.fullName,
-                                            )
-                                          }
-                                          className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all border border-rose-200 dark:border-rose-800 shadow-sm active:scale-95"
-                                        >
-                                          Hentikan
-                                        </button>
                                       </div>
                                     )}
                                 </div>
@@ -746,6 +764,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         liveUrl={liveUrl}
+        proctorUrl={proctorUrl}
         examCode={displayExam.code}
       />
 

@@ -3,6 +3,12 @@ import { supabase } from "../../lib/supabase";
 import type { Exam } from "../../types";
 import { calculateStudentAccess } from "../../utils/scheduleUtils";
 import {
+  toAbsoluteUtcTimestamp,
+  normalizeDateString,
+  detectUserIndonesianTimezone,
+  getStudentTimezoneNotice,
+} from "../../utils/timezoneUtils";
+import {
   downloadStudentDataTemplate,
   parseStudentDataExcel,
   type StudentExcelRecord as Student,
@@ -81,14 +87,9 @@ export const useInvitationModal = ({
           targetDate = Date.now() + 3600000;
         }
       } else {
-        const dateStr = exam.config.startDate || exam.config.date;
-        if (dateStr.includes("T") && dateStr.length > 10) {
-          targetDate = new Date(dateStr).getTime();
-        } else {
-          targetDate = new Date(
-            `${dateStr}T${exam.config.startTime || "00:00"}`,
-          ).getTime();
-        }
+        const dateStr = normalizeDateString(exam.config.startDate || exam.config.date);
+        const startTimeStr = exam.config.startTime || "00:00";
+        targetDate = toAbsoluteUtcTimestamp(dateStr, startTimeStr, exam.config.timezone || "WIB", false);
       }
 
       const now = new Date().getTime();
@@ -123,53 +124,29 @@ export const useInvitationModal = ({
     }
 
     try {
-      let date: Date;
-      const dateStr = exam.config.startDate || exam.config.date;
-      if (dateStr.includes("T") && dateStr.length > 10) {
-        date = new Date(dateStr);
-      } else {
-        date = new Date(`${dateStr}T${exam.config.startTime || "00:00"}`);
-      }
+      const examTz = exam.config.timezone || "WIB";
+      const studentTz = detectUserIndonesianTimezone();
+      const rawDate = normalizeDateString(exam.config.startDate || exam.config.date);
+      const startTime = exam.config.startTime || "00:00";
+      const endTime = exam.config.endTime ? ` - ${exam.config.endTime}` : "";
 
-      if (isNaN(date.getTime()))
-        return `${dateStr} ${exam.config.startTime || "00:00"}`;
+      const [y, m, d] = rawDate.split("-").map((v) => parseInt(v, 10));
+      const fakeLocalDate = new Date(y, (m || 1) - 1, d || 1);
 
-      const datePart = date.toLocaleDateString("id-ID", {
+      const datePart = fakeLocalDate.toLocaleDateString("id-ID", {
         weekday: "long",
         day: "numeric",
         month: "long",
         year: "numeric",
       });
-      const timePart = date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
 
-      let timeZoneName = "";
-      try {
-        const match = date
-          .toLocaleTimeString("id-ID", { timeZoneName: "short" })
-          .split(" ");
-        if (match && match.length > 0) {
-          const lastPart = match[match.length - 1];
-          if (lastPart.length >= 3) {
-            timeZoneName = lastPart;
-          }
-        }
-      } catch {
-        /* ignore */
+      const primaryText = `${datePart} pukul ${startTime}${endTime} ${examTz}`;
+      const tzNotice = getStudentTimezoneNotice(startTime, exam.config.endTime || startTime, examTz, studentTz);
+
+      if (tzNotice) {
+        return `${primaryText} (${tzNotice})`;
       }
-
-      if (!timeZoneName || timeZoneName.includes("GMT")) {
-        const offset = -date.getTimezoneOffset() / 60;
-        if (offset === 7) timeZoneName = "WIB";
-        else if (offset === 8) timeZoneName = "WITA";
-        else if (offset === 9) timeZoneName = "WIT";
-        else timeZoneName = `GMT${offset >= 0 ? "+" : ""}${offset}`;
-      }
-
-      return `${datePart} pukul ${timePart} ${timeZoneName}`;
+      return primaryText;
     } catch {
       const dateStr = exam.config.startDate || exam.config.date;
       return `${dateStr} ${exam.config.startTime || "00:00"}`;
