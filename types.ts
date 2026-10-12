@@ -120,10 +120,13 @@ export interface RegisteredStudentConfig {
   schoolName?: string;
 }
 
+export type IndonesianTimezone = 'WIB' | 'WITA' | 'WIT';
+
 export interface DailyExamSession {
   id: string; // ID unik sesi
   name?: string; // e.g. "Sesi 1: Kelas 8A"
-  date?: string; // NEW: Tanggal spesifik pelaksanaan (YYYY-MM-DD), dibatasi startDate <= date <= endDate
+  dateMode?: 'ALL_DAYS' | 'SPECIFIC_DATE'; // Mode tanggal: setiap hari atau tanggal kalender tertentu
+  date?: string; // Tanggal spesifik pelaksanaan (YYYY-MM-DD), jika dateMode === 'SPECIFIC_DATE'
   startTime: string; // HH:mm e.g. "08:00"
   endTime: string; // HH:mm e.g. "10:00"
   targetClasses?: string[]; // Array kelas yang ditautkan, e.g. ["8A"]
@@ -132,6 +135,7 @@ export interface DailyExamSession {
 
 export interface ExamConfig {
   examMode: 'PR' | 'UJIAN'; // NEW: Mode PR atau Ujian
+  timezone?: IndonesianTimezone; // NEW: Zona waktu acuan pembuat ujian ('WIB' | 'WITA' | 'WIT')
   startDate?: string; // NEW: Tanggal mulai (hanya untuk Ujian)
   endDate?: string; // NEW: Tanggal selesai (untuk PR dan Ujian)
   enableDailyWindow?: boolean; // NEW: Batas jam pengerjaan harian aktif
