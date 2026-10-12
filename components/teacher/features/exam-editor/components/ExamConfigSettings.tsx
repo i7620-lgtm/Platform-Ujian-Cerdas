@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   ArrowPathIcon,
   XMarkIcon,
@@ -6,8 +6,9 @@ import {
   SparklesIcon,
   DocumentArrowUpIcon,
   CheckCircleIcon,
+  ClockIcon,
 } from "../../../../Icons";
-import type { ExamConfig, RegisteredStudentConfig } from "../../../../../types";
+import type { ExamConfig, RegisteredStudentConfig, IndonesianTimezone } from "../../../../../types";
 import { useExamEditorStore } from "../../../../../stores/examEditorStore";
 import { supabase } from "../../../../../lib/supabase";
 import {
@@ -15,6 +16,10 @@ import {
   parseStudentDataExcel,
 } from "../../../studentDataUtils";
 import { DailySessionsSettings } from "./DailySessionsSettings";
+import {
+  detectUserIndonesianTimezone,
+  getTimezoneLabel,
+} from "../../../../../utils/timezoneUtils";
 
 interface ExamConfigSettingsProps {
   config: ExamConfig;
@@ -38,6 +43,19 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+
+  // Otomatis deteksi zona waktu perangkat guru jika belum terset
+  useEffect(() => {
+    if (!config.timezone) {
+      const detected = detectUserIndonesianTimezone();
+      if (typeof store.handleConfigChangeManual === "function") {
+        store.handleConfigChangeManual((prev: ExamConfig) => ({
+          ...prev,
+          timezone: prev.timezone || detected,
+        }));
+      }
+    }
+  }, [config.timezone, store]);
 
   const handleDownloadExcelFormat = () => {
     downloadStudentDataTemplate("Format_Data_Siswa.xlsx");
@@ -409,6 +427,25 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 Default 23:59 waktu setempat. Siswa dapat mengumpulkan tugas hingga jam ini.
               </p>
             </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Zona Waktu
+              </label>
+              <select
+                id="input-pr-timezone"
+                name="timezone"
+                value={config.timezone || detectUserIndonesianTimezone()}
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="WIB">WIB (UTC+7)</option>
+                <option value="WITA">WITA (UTC+8)</option>
+                <option value="WIT">WIT (UTC+9)</option>
+              </select>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
+                {getTimezoneLabel(config.timezone || detectUserIndonesianTimezone())}
+              </p>
+            </div>
           </>
         ) : (
           <>
@@ -431,7 +468,10 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                Jam Mulai
+                Jam Mulai{" "}
+                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                  ({config.timezone || detectUserIndonesianTimezone()})
+                </span>
               </label>
               <input
                 id="input-exam-start-time"
@@ -461,7 +501,10 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                Jam Selesai
+                Jam Selesai{" "}
+                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                  ({config.timezone || detectUserIndonesianTimezone()})
+                </span>
               </label>
               <input
                 id="input-exam-end-time"
@@ -471,6 +514,25 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
                 onChange={handleConfigChange}
                 className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
+                Zona Waktu Acuan
+              </label>
+              <select
+                id="input-exam-timezone"
+                name="timezone"
+                value={config.timezone || detectUserIndonesianTimezone()}
+                onChange={handleConfigChange}
+                className="w-full p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary text-sm font-medium shadow-sm text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="WIB">WIB (Waktu Indonesia Barat - UTC+7)</option>
+                <option value="WITA">WITA (Waktu Indonesia Tengah - UTC+8)</option>
+                <option value="WIT">WIT (Waktu Indonesia Timur - UTC+9)</option>
+              </select>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
+                Acuan: {getTimezoneLabel(config.timezone || detectUserIndonesianTimezone())}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">

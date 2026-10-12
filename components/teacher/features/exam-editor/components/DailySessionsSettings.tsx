@@ -12,6 +12,11 @@ import {
   findSessionConflicts,
   validateSessionAgainstGlobal,
 } from "../../../../../utils/scheduleUtils";
+import {
+  normalizeDateString,
+  getTimezoneLabel,
+  detectUserIndonesianTimezone,
+} from "../../../../../utils/timezoneUtils";
 
 interface DailySessionsSettingsProps {
   config: ExamConfig;
@@ -29,6 +34,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
 }) => {
   const isEnabled = !!config.enableDailyWindow;
   const sessions = useMemo(() => config.dailySessions || [], [config.dailySessions]);
+  const examTz = config.timezone || detectUserIndonesianTimezone();
 
   // Ambil daftar kelas target yang didaftarkan guru
   const availableTargetClasses = useMemo(() => {
@@ -48,7 +54,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     return findSessionConflicts(sessions);
   }, [isEnabled, sessions]);
 
-  const defaultExamDate = config.startDate || config.date || new Date().toLocaleDateString("en-CA");
+  const defaultExamDate = normalizeDateString(config.startDate || config.date);
 
   const handleToggleEnable = () => {
     const nextVal = !isEnabled;
@@ -56,12 +62,11 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
       const next = { ...prev, enableDailyWindow: nextVal };
       // Jika baru diaktifkan dan belum ada sesi, inisialisasi sesi pertama
       if (nextVal && (!next.dailySessions || next.dailySessions.length === 0)) {
-        const initialDate = prev.startDate || prev.date || new Date().toLocaleDateString("en-CA");
         next.dailySessions = [
           {
             id: `session-${Date.now()}-1`,
             name: "Sesi 1",
-            date: initialDate,
+            dateMode: "ALL_DAYS",
             startTime: prev.dailyStartTime || prev.startTime || "08:00",
             endTime: prev.dailyEndTime || prev.endTime || "10:00",
             isGeneral: true,
@@ -78,11 +83,9 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     // Tentukan jam mulai default berdasarkan sesi terakhir (misal jeda 30 menit)
     let nextStart = "10:30";
     let nextEnd = "12:30";
-    let nextDate = defaultExamDate;
 
     if (sessions.length > 0) {
       const last = sessions[sessions.length - 1];
-      if (last.date) nextDate = last.date;
       const lastEndParts = (last.endTime || "10:00").split(":");
       const endH = parseInt(lastEndParts[0] || "10", 10);
       const endM = parseInt(lastEndParts[1] || "00", 10);
@@ -95,7 +98,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     if (typeof store.addDailySession === "function") {
       store.addDailySession({
         name: `Sesi ${count}`,
-        date: nextDate,
+        dateMode: "ALL_DAYS",
         startTime: nextStart,
         endTime: nextEnd,
         isGeneral: true,
@@ -107,7 +110,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
         nextList.push({
           id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           name: `Sesi ${count}`,
-          date: nextDate,
+          dateMode: "ALL_DAYS",
           startTime: nextStart,
           endTime: nextEnd,
           isGeneral: true,
@@ -270,43 +273,95 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
                     </button>
                   </div>
 
+                  {/* Mode Jadwal Tanggal: Berlaku Setiap Hari vs Tanggal Kalender Tertentu */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Keberlakuan Hari / Tanggal Sesi:
+                    </span>
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateSession(session.id, {
+                            dateMode: "ALL_DAYS",
+                            date: undefined,
+                          })
+                        }
+                        className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          session.dateMode !== "SPECIFIC_DATE"
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        Berlaku Setiap Hari
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateSession(session.id, {
+                            dateMode: "SPECIFIC_DATE",
+                            date: session.date ? normalizeDateString(session.date) : defaultExamDate,
+                          })
+                        }
+                        className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          session.dateMode === "SPECIFIC_DATE"
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        Pilih Tanggal Tertentu
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Input Tanggal & Jam Sesi */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Tanggal Pelaksanaan Kalender */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
-                          Tanggal Pelaksanaan
-                        </label>
-                        {session.date && (
+                    {/* Tanggal Pelaksanaan Kalender jika mode SPECIFIC_DATE */}
+                    {session.dateMode === "SPECIFIC_DATE" ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
+                            Tanggal Pelaksanaan
+                          </label>
                           <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
                             Kalender
                           </span>
-                        )}
+                        </div>
+                        <input
+                          type="date"
+                          min={normalizeDateString(config.startDate) || undefined}
+                          max={normalizeDateString(config.endDate) || undefined}
+                          value={session.date ? normalizeDateString(session.date) : defaultExamDate}
+                          onChange={(e) =>
+                            handleUpdateSession(session.id, {
+                              dateMode: "SPECIFIC_DATE",
+                              date: e.target.value,
+                            })
+                          }
+                          className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {config.startDate && config.endDate
+                            ? `Batas: ${normalizeDateString(config.startDate)} s/d ${normalizeDateString(config.endDate)}`
+                            : "Tanggal spesifik sesi"}
+                        </p>
                       </div>
-                      <input
-                        type="date"
-                        min={config.startDate || undefined}
-                        max={config.endDate || undefined}
-                        value={session.date || ""}
-                        onChange={(e) =>
-                          handleUpdateSession(session.id, {
-                            date: e.target.value,
-                          })
-                        }
-                        className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        {config.startDate && config.endDate
-                          ? `Batas: ${config.startDate} s/d ${config.endDate}`
-                          : "Kosongkan jika berlaku harian"}
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col justify-center p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <CalendarDaysIcon className="w-4 h-4 text-indigo-500" />
+                          <span>Berulang Setiap Hari</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Sesi ini aktif setiap hari selama rentang ujian.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Jam Mulai */}
                     <div>
                       <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                        Jam Mulai
+                        Jam Mulai ({examTz})
                       </label>
                       <input
                         type="time"
@@ -319,16 +374,14 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
                         className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
                       />
                       <p className="text-[10px] text-slate-400 mt-1">
-                        {config.startDate && session.date === config.startDate && config.startTime
-                          ? `Min: ${config.startTime} (hari pertama)`
-                          : "Waktu awal sesi"}
+                        Waktu mulai ({examTz})
                       </p>
                     </div>
 
                     {/* Jam Selesai */}
                     <div>
                       <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                        Jam Selesai
+                        Jam Selesai ({examTz})
                       </label>
                       <input
                         type="time"
@@ -341,9 +394,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
                         className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
                       />
                       <p className="text-[10px] text-slate-400 mt-1">
-                        {config.endDate && session.date === config.endDate && config.endTime
-                          ? `Maks: ${config.endTime} (hari terakhir)`
-                          : "Waktu akhir sesi"}
+                        Waktu selesai ({examTz})
                       </p>
                     </div>
                   </div>
