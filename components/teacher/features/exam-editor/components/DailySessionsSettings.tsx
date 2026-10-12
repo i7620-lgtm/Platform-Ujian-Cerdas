@@ -6,8 +6,12 @@ import {
   PlusCircleIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
+  CalendarDaysIcon,
 } from "../../../../Icons";
-import { findSessionConflicts } from "../../../../../utils/scheduleUtils";
+import {
+  findSessionConflicts,
+  validateSessionAgainstGlobal,
+} from "../../../../../utils/scheduleUtils";
 
 interface DailySessionsSettingsProps {
   config: ExamConfig;
@@ -38,11 +42,13 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
       .filter(Boolean);
   }, [config.targetClasses]);
 
-  // Cek potensi tumpang tindih waktu antar sesi
+  // Cek potensi tumpang tindih waktu antar sesi (memperhitungkan tanggal)
   const conflictInfo = useMemo(() => {
     if (!isEnabled) return { hasConflict: false, conflicts: [] };
     return findSessionConflicts(sessions);
   }, [isEnabled, sessions]);
+
+  const defaultExamDate = config.startDate || config.date || new Date().toLocaleDateString("en-CA");
 
   const handleToggleEnable = () => {
     const nextVal = !isEnabled;
@@ -50,12 +56,14 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
       const next = { ...prev, enableDailyWindow: nextVal };
       // Jika baru diaktifkan dan belum ada sesi, inisialisasi sesi pertama
       if (nextVal && (!next.dailySessions || next.dailySessions.length === 0)) {
+        const initialDate = prev.startDate || prev.date || new Date().toLocaleDateString("en-CA");
         next.dailySessions = [
           {
             id: `session-${Date.now()}-1`,
             name: "Sesi 1",
-            startTime: prev.dailyStartTime || "08:00",
-            endTime: prev.dailyEndTime || "10:00",
+            date: initialDate,
+            startTime: prev.dailyStartTime || prev.startTime || "08:00",
+            endTime: prev.dailyEndTime || prev.endTime || "10:00",
             isGeneral: true,
             targetClasses: [],
           },
@@ -70,8 +78,11 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     // Tentukan jam mulai default berdasarkan sesi terakhir (misal jeda 30 menit)
     let nextStart = "10:30";
     let nextEnd = "12:30";
+    let nextDate = defaultExamDate;
+
     if (sessions.length > 0) {
       const last = sessions[sessions.length - 1];
+      if (last.date) nextDate = last.date;
       const lastEndParts = (last.endTime || "10:00").split(":");
       const endH = parseInt(lastEndParts[0] || "10", 10);
       const endM = parseInt(lastEndParts[1] || "00", 10);
@@ -84,6 +95,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
     if (typeof store.addDailySession === "function") {
       store.addDailySession({
         name: `Sesi ${count}`,
+        date: nextDate,
         startTime: nextStart,
         endTime: nextEnd,
         isGeneral: true,
@@ -95,6 +107,7 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
         nextList.push({
           id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           name: `Sesi ${count}`,
+          date: nextDate,
           startTime: nextStart,
           endTime: nextEnd,
           isGeneral: true,
@@ -223,6 +236,8 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
                 !session.targetClasses ||
                 session.targetClasses.length === 0;
 
+              const sessionIssues = validateSessionAgainstGlobal(session, config);
+
               return (
                 <div
                   key={session.id || `session-${index}`}
@@ -255,86 +270,142 @@ export const DailySessionsSettings: React.FC<DailySessionsSettingsProps> = ({
                     </button>
                   </div>
 
-                  {/* Grid Input Jam & Penautan Kelas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Waktu Mulai & Selesai */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                          Jam Mulai
+                  {/* Input Tanggal & Jam Sesi */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Tanggal Pelaksanaan Kalender */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">
+                          Tanggal Pelaksanaan
                         </label>
-                        <input
-                          type="time"
-                          value={session.startTime || "08:00"}
-                          onChange={(e) =>
-                            handleUpdateSession(session.id, {
-                              startTime: e.target.value,
-                            })
-                          }
-                          className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
-                        />
+                        {session.date && (
+                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                            Kalender
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                          Jam Selesai
-                        </label>
-                        <input
-                          type="time"
-                          value={session.endTime || "10:00"}
-                          onChange={(e) =>
-                            handleUpdateSession(session.id, {
-                              endTime: e.target.value,
-                            })
-                          }
-                          className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        min={config.startDate || undefined}
+                        max={config.endDate || undefined}
+                        value={session.date || ""}
+                        onChange={(e) =>
+                          handleUpdateSession(session.id, {
+                            date: e.target.value,
+                          })
+                        }
+                        className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {config.startDate && config.endDate
+                          ? `Batas: ${config.startDate} s/d ${config.endDate}`
+                          : "Kosongkan jika berlaku harian"}
+                      </p>
                     </div>
 
-                    {/* Penautan Kelas (Umum vs Tertentu) */}
+                    {/* Jam Mulai */}
                     <div>
                       <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                        Target Penautan Kelas
+                        Jam Mulai
                       </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateSession(session.id, {
-                              isGeneral: true,
-                              targetClasses: [],
-                            })
-                          }
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            isSessionGeneral
-                              ? "bg-indigo-600 text-white shadow-sm"
-                              : "bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                          }`}
-                        >
-                          Kelas Umum (Semua Siswa)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Default pilih kelas pertama jika ada
-                            const defaultClass =
-                              availableTargetClasses.length > 0
-                                ? [availableTargetClasses[0]]
-                                : [];
-                            handleUpdateSession(session.id, {
-                              isGeneral: false,
-                              targetClasses: defaultClass,
-                            });
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            !isSessionGeneral
-                              ? "bg-indigo-600 text-white shadow-sm"
-                              : "bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                          }`}
-                        >
-                          Kelas Tertentu
-                        </button>
+                      <input
+                        type="time"
+                        value={session.startTime || "08:00"}
+                        onChange={(e) =>
+                          handleUpdateSession(session.id, {
+                            startTime: e.target.value,
+                          })
+                        }
+                        className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {config.startDate && session.date === config.startDate && config.startTime
+                          ? `Min: ${config.startTime} (hari pertama)`
+                          : "Waktu awal sesi"}
+                      </p>
+                    </div>
+
+                    {/* Jam Selesai */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                        Jam Selesai
+                      </label>
+                      <input
+                        type="time"
+                        value={session.endTime || "10:00"}
+                        onChange={(e) =>
+                          handleUpdateSession(session.id, {
+                            endTime: e.target.value,
+                          })
+                        }
+                        className="w-full p-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {config.endDate && session.date === config.endDate && config.endTime
+                          ? `Maks: ${config.endTime} (hari terakhir)`
+                          : "Waktu akhir sesi"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Warning Validasi Batasan Jadwal Global & Waktu Sesi */}
+                  {sessionIssues.length > 0 && (
+                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                      <ExclamationTriangleIcon className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <strong className="block font-bold">Perhatian Batasan Jadwal Sesi:</strong>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {sessionIssues.map((issue, idx) => (
+                            <li key={idx}>{issue.message}</li>
+                          ))}
+                        </ul>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Penautan Kelas (Umum vs Tertentu) */}
+                  <div className="pt-1">
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      Target Penautan Kelas
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateSession(session.id, {
+                            isGeneral: true,
+                            targetClasses: [],
+                          })
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isSessionGeneral
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        Kelas Umum (Semua Siswa)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Default pilih kelas pertama jika ada
+                          const defaultClass =
+                            availableTargetClasses.length > 0
+                              ? [availableTargetClasses[0]]
+                              : [];
+                          handleUpdateSession(session.id, {
+                            isGeneral: false,
+                            targetClasses: defaultClass,
+                          });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          !isSessionGeneral
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        Kelas Tertentu
+                      </button>
                     </div>
                   </div>
 

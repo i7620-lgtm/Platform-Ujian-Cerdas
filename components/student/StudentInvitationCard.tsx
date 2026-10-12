@@ -205,9 +205,16 @@ export const StudentInvitationCard: React.FC<StudentInvitationCardProps> = ({
                       key={s.id || idx}
                       className="p-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs"
                     >
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">
-                        {s.name || `Sesi ${idx + 1}`}
-                      </span>
+                      <div>
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {s.name || `Sesi ${idx + 1}`}
+                        </span>
+                        {s.date && (
+                          <span className="block text-[10px] text-slate-400 font-medium">
+                            Tanggal: {s.date}
+                          </span>
+                        )}
+                      </div>
                       <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
                         {s.startTime} - {s.endTime}
                       </span>
