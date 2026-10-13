@@ -252,6 +252,84 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     };
   }, [isNavOpen, setIsNavOpen]);
 
+  // Mobile Protection: Trap history back / edge-swipe, prevent pull-to-refresh, and confirm beforeunload
+  useEffect(() => {
+    // 1. Trap history back button / swipe back gesture
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    // 2. Prevent accidental browser reload / close without confirmation
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isSubmitting) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // 3. Prevent iOS Safari & Android pull-to-refresh when dragging down from top
+    let startY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        startY = e.touches[0].clientY;
+      }
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const currentY = e.touches[0].clientY;
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        if (scrollTop <= 0 && currentY > startY) {
+          if (e.cancelable) {
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [isSubmitting]);
+
+  // Auto-scroll to last viewed question or first unanswered question after load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const lastQId = localStorage.getItem(`exam_last_q_${activeExam.code}_${student.studentId}`);
+        if (lastQId) {
+          const el = document.getElementById(lastQId);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
+        }
+        // Fallback: scroll to first unanswered question if answers already exist
+        const firstUnanswered = activeExam.questions.find(
+          (q) => q.questionType !== "INFO" && !isAnswered(q, answersRef.current)
+        );
+        if (firstUnanswered && answersRef.current && Object.keys(answersRef.current).length > 0) {
+          const el = document.getElementById(firstUnanswered.id);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [activeExam.code, activeExam.questions, answersRef, isAnswered, student.studentId]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
       {/* Modal Informasi Aturan Ujian */}
