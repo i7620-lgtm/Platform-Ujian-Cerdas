@@ -169,6 +169,11 @@ export const useStudentExamLogic = ({
         }
 
         await storageService.clearLocalProgress(STORAGE_KEY);
+        try {
+          localStorage.removeItem(`exam_last_q_${activeExam.code}_${student.studentId}`);
+        } catch {
+          // ignore
+        }
       } catch (error) {
         console.error("Submit error:", error);
         alert("Gagal mengirim jawaban. Silakan coba lagi.");
@@ -593,6 +598,11 @@ export const useStudentExamLogic = ({
             logs: logRef.current,
             lastUpdated: Date.now(),
           });
+          try {
+            localStorage.setItem(`exam_last_q_${activeExam.code}_${student.studentId}`, qId);
+          } catch {
+            // ignore
+          }
         }
         return next;
       });
@@ -606,14 +616,21 @@ export const useStudentExamLogic = ({
     },
     [
       STORAGE_KEY,
+      activeExam.code,
       activeExam.config.disableRealtime,
       broadcastProgress,
       student.class,
+      student.studentId,
     ],
   );
 
   const scrollToQuestion = (id: string) => {
     setIsNavOpen(false);
+    try {
+      localStorage.setItem(`exam_last_q_${activeExam.code}_${student.studentId}`, id);
+    } catch {
+      // ignore
+    }
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
