@@ -134,6 +134,8 @@ export const useExamAntiCheat = ({
         const isPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
         if (student.class === 'PREVIEW' || !exam.config.detectBehavior || isPR) return;
 
+        let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
         const handleViolation = (type: 'soft' | 'hard', reason: string) => {
             const currentIsPR = (exam.config.examMode || '').trim().toUpperCase() === 'PR';
             if (isSubmittingRef.current || currentIsPR) return;
@@ -145,35 +147,66 @@ export const useExamAntiCheat = ({
                 logs: logRef.current,
             });
 
-            if (exam.config.continueWithPermission) {
-                alert("PELANGGARAN TERDETEKSI: Sesi dikunci.");
+            // Hanya kunci sesi jika merupakan pelanggaran 'hard' (terbukti meninggalkan aplikasi/tab)
+            if (type === 'hard' && exam.config.continueWithPermission) {
                 onForceSubmit(true, 'force_closed');
-                return;
-            }
-
-            if (type === 'hard') {
-                // Warning visual activity is documented in logRef
             }
         };
 
         const handleVisibilityChange = () => {
             if (document.hidden && !isSubmittingRef.current) {
-                handleViolation('hard', 'Meninggalkan halaman');
+                // Konfirmasi pasti bahwa aplikasi ditinggalkan / diminimalkan
+                handleViolation('hard', 'Meninggalkan halaman / beralih aplikasi');
             }
         };
 
         const handleBlur = () => {
-            if (!isSubmittingRef.current) {
-                handleViolation('soft', 'Kehilangan fokus (membuka aplikasi lain/tab baru)');
+            if (isSubmittingRef.current) return;
+
+            // 1. Deteksi apakah kehilangan fokus dipicu oleh elemen input / keyboard virtual mobile
+            const activeEl = document.activeElement;
+            const isTypingField =
+                activeEl &&
+                (activeEl.tagName === 'INPUT' ||
+                 activeEl.tagName === 'TEXTAREA' ||
+                 activeEl.tagName === 'SELECT' ||
+                 (activeEl as HTMLElement).isContentEditable);
+
+            if (isTypingField) {
+                // Aktivitas pengetikan normal siswa di ponsel/iPhone, abaikan
+                return;
+            }
+
+            // 2. Berikan toleransi waktu 1500ms untuk transisi gestur / notifikasi sebelum memutuskan
+            if (blurTimeout) clearTimeout(blurTimeout);
+            blurTimeout = setTimeout(() => {
+                // Jika setelah 1500ms layar masih tersembunyi, catat sebagai pelanggaran
+                if (document.hidden && !isSubmittingRef.current) {
+                    handleViolation('hard', 'Meninggalkan halaman ujian');
+                } else if (!document.hasFocus() && !isSubmittingRef.current) {
+                    // Hanya catat log soft tanpa mengunci sesi
+                    handleViolation('soft', 'Kehilangan fokus sementara');
+                }
+            }, 1500);
+        };
+
+        const handleFocus = () => {
+            // Batalkan timer blur jika pengguna kembali fokus seketika
+            if (blurTimeout) {
+                clearTimeout(blurTimeout);
+                blurTimeout = null;
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('blur', handleBlur);
+        window.addEventListener('focus', handleFocus);
 
         return () => {
+            if (blurTimeout) clearTimeout(blurTimeout);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
         };
     }, [exam.config, student.class, onForceSubmit, storageKey, answersRef, logRef]);
 
