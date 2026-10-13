@@ -16,7 +16,13 @@ let isRefreshing = false;
 
 function isExamSessionActive(): boolean {
   try {
-    return typeof sessionStorage !== 'undefined' && sessionStorage.getItem('is_exam_in_progress') === 'true';
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('is_exam_in_progress') === 'true') {
+      return true;
+    }
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('ujiancerdas_active_exam_session')) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
