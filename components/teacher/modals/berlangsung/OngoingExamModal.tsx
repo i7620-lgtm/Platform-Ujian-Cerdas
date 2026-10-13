@@ -16,6 +16,7 @@ import {
   LockOpenIcon,
   DocumentDuplicateIcon,
   BookOpenIcon,
+  TableCellsIcon,
 } from "../../../Icons";
 import { RemainingTime } from "../../DashboardViews";
 
@@ -27,6 +28,7 @@ import { ManualEditStudentModal } from "./ManualEditStudentModal";
 import { GeneratedTokenPopup } from "./GeneratedTokenPopup";
 import { AddTimeModal } from "./AddTimeModal";
 import { PrintSoalModal } from "./PrintSoalModal";
+import { PrintKisiKisiModal } from "./PrintKisiKisiModal";
 import { useOngoingExamModal } from "./useOngoingExamModal";
 
 interface OngoingExamModalProps {
@@ -60,6 +62,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     isJoinQrModalOpen,
     isGuideModalOpen,
     isPrintModalOpen,
+    isKisiKisiModalOpen,
     confirmDialog,
     alertDialog,
     generatedTokenData,
@@ -74,6 +77,7 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
     setIsJoinQrModalOpen,
     setIsGuideModalOpen,
     setIsPrintModalOpen,
+    setIsKisiKisiModalOpen,
     setConfirmDialog,
     setAlertDialog,
     setEditingStudent,
@@ -374,6 +378,15 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
               >
                 <DocumentDuplicateIcon className="w-3.5 h-3.5 text-slate-400" />
                 <span>SOAL PDF</span>
+              </button>
+
+              <button
+                onClick={() => setIsKisiKisiModalOpen(true)}
+                className="px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[10px] font-black uppercase tracking-wider transition-all shadow-xs shrink-0"
+                title="Pratinjau & Cetak Kisi-Kisi Naskah Soal"
+              >
+                <TableCellsIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span>KISI-KISI</span>
               </button>
 
               <button
@@ -805,6 +818,12 @@ export const OngoingExamModal: React.FC<OngoingExamModalProps> = (props) => {
       <PrintSoalModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
+        exam={displayExam}
+      />
+
+      <PrintKisiKisiModal
+        isOpen={isKisiKisiModalOpen}
+        onClose={() => setIsKisiKisiModalOpen(false)}
         exam={displayExam}
       />
 
