@@ -13,6 +13,8 @@ import {
   MapPinIcon,
   ArrowsRightLeftIcon,
   LockClosedIcon,
+  ListBulletIcon,
+  ExclamationTriangleIcon,
 } from "./Icons";
 import { storageService } from "../services/storage";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -673,6 +675,26 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
               </div>
             </div>
           )}
+
+          {/* Tombol Selesai di Bagian Bawah Laci Soal */}
+          <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-bold text-slate-700 dark:text-slate-200">{answeredCount} dari {totalQuestions}</span>
+              <span>soal terjawab ({progress}%)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsNavOpen(false);
+                handleSubmit(false);
+              }}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-70 cursor-pointer"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              <span>{isSubmitting ? "Mengirim..." : "Selesai & Kumpulkan Ujian"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -818,32 +840,127 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             </div>
           );
         })}
+
+        {/* Kartu Penutup Setelah Soal Terakhir (Exam Completion Card) */}
+        <div className="mt-10 mb-28 p-6 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
+          <div className="max-w-2xl mx-auto flex flex-col items-center text-center">
+            {answeredCount === totalQuestions ? (
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center mb-4 shadow-xs">
+                <CheckCircleIcon className="w-8 h-8" />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80 flex items-center justify-center mb-4 shadow-xs">
+                <ExclamationTriangleIcon className="w-8 h-8" />
+              </div>
+            )}
+
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+              {answeredCount === totalQuestions
+                ? "Semua Soal Telah Dijawab!"
+                : "Lembar Akhir Pengerjaan Ujian"}
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-lg mb-5">
+              {answeredCount === totalQuestions
+                ? "Hebat! Anda telah menjawab seluruh soal ujian. Silakan periksa kembali jawaban Anda jika masih memiliki sisa waktu, atau kumpulkan ujian sekarang."
+                : `Anda telah menjawab ${answeredCount} dari total ${totalQuestions} soal (${progress}%). Masih ada ${totalQuestions - answeredCount} soal yang belum dijawab.`}
+            </p>
+
+            {/* Nomor Soal yang Belum Terjawab (Dapat diklik langsung untuk menuju soal) */}
+            {answeredCount < totalQuestions && (
+              <div className="w-full mb-6 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 text-left">
+                <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block mb-2.5">
+                  Nomor soal yang belum dijawab (ketuk untuk memeriksa):
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {activeExam.questions
+                    .filter((q) => q.questionType !== "INFO" && !isAnswered(q, answers))
+                    .map((q) => {
+                      const num =
+                        activeExam.questions
+                          .slice(0, activeExam.questions.indexOf(q))
+                          .filter((i) => i.questionType !== "INFO").length + 1;
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          onClick={() => scrollToQuestion(q.id)}
+                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer shadow-xs active:scale-95"
+                          title={`Loncat ke soal nomor ${num}`}
+                        >
+                          Soal #{num}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => handleSubmit(false)}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto min-w-[260px] px-8 py-4 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-2xl font-black text-sm sm:text-base transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+            >
+              <CheckCircleIcon className="w-5 h-5 shrink-0" />
+              <span>{isSubmitting ? "Mengirim Jawaban..." : "Selesai & Kumpulkan Jawaban"}</span>
+            </button>
+          </div>
+        </div>
       </main>
 
-      <div className="fixed bottom-8 inset-x-0 flex justify-center z-50 px-4 pointer-events-none">
-        <div className="bg-white dark:bg-slate-900 p-2 rounded-[1.2rem] shadow-2xl border border-white dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800 pointer-events-auto flex items-center gap-4 transition-transform hover:scale-105">
-          <div className="pl-4 flex flex-col justify-center">
-            <span className="hidden sm:inline text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+      {/* Floating Progress Widget di Sudut Kanan Bawah (Ringkas & Bebas Salah Tekan) */}
+      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setIsNavOpen(!isNavOpen)}
+          className="group flex items-center gap-2.5 px-3.5 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl hover:shadow-2xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-800/60 transition-all duration-200 active:scale-95 cursor-pointer text-left"
+          title="Ketuk untuk membuka daftar nomor soal"
+          aria-label="Lihat nomor soal dan progres"
+        >
+          {/* Mini Circular Progress */}
+          <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+            <svg className="w-7 h-7 -rotate-90" viewBox="0 0 36 36">
+              <path
+                className="text-slate-100 dark:text-slate-800"
+                strokeWidth="3.5"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                className="text-indigo-600 dark:text-indigo-400 transition-all duration-500 ease-out"
+                strokeDasharray={`${progress}, 100`}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+            </svg>
+            <span className="absolute text-[8px] font-black text-slate-700 dark:text-slate-200 font-mono">
+              {progress}%
+            </span>
+          </div>
+
+          <div className="flex flex-col pr-0.5">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
               Progres
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-lg font-black text-slate-800 dark:text-white">
+            <div className="flex items-baseline gap-0.5 leading-tight">
+              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tabular-nums">
                 {answeredCount}
               </span>
-              <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
-                / {totalQuestions}
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                /{totalQuestions}
               </span>
             </div>
           </div>
-          <button
-            onClick={() => handleSubmit(false)}
-            disabled={isSubmitting}
-            className="bg-slate-900 dark:bg-indigo-600 text-white pl-6 pr-6 py-3 rounded-xl font-bold text-xs hover:bg-indigo-600 dark:hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-70"
-          >
-            <span>{isSubmitting ? "Mengirim..." : "Selesai"}</span>
-            <CheckCircleIcon className="w-4 h-4" />
-          </button>
-        </div>
+
+          <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/60 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors ml-0.5">
+            <ListBulletIcon className="w-3.5 h-3.5" />
+          </div>
+        </button>
       </div>
     </div>
   );
