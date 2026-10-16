@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { Question, QuizConfig } from "../../types";
 import { parsePdfAndAutoCrop, convertPdfToImages } from "./examUtils";
-import { generateQuestions } from "../../services/geminiService";
+import { generateQuestions, PartialGenerationError } from "../../services/geminiService";
 
 interface UseCreationViewParams {
   onQuestionsGenerated: (
@@ -11,6 +11,19 @@ interface UseCreationViewParams {
 }
 
 export type InputMethod = "ai" | "upload";
+
+export interface FailSafeModalState {
+  isOpen: boolean;
+  errorMessage: string;
+  partialQuestions: Question[] | null;
+  remainingCount: number;
+}
+
+export interface GenerationProgress {
+  completed: number;
+  total: number;
+  stageMessage: string;
+}
 
 const DEFAULT_AI_CONFIG: QuizConfig = {
   count: 5,
@@ -32,6 +45,17 @@ export const useCreationView = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [aiConfig, setAiConfig] = useState<QuizConfig>(DEFAULT_AI_CONFIG);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({
+    completed: 0,
+    total: 5,
+    stageMessage: "",
+  });
+  const [failSafeState, setFailSafeState] = useState<FailSafeModalState>({
+    isOpen: false,
+    errorMessage: "",
+    partialQuestions: null,
+    remainingCount: 0,
+  });
 
   const resetCreationView = useCallback(() => {
     setInputMethod("upload");
@@ -40,6 +64,17 @@ export const useCreationView = ({
     setIsLoading(false);
     setError("");
     setAiConfig(DEFAULT_AI_CONFIG);
+    setGenerationProgress({
+      completed: 0,
+      total: 5,
+      stageMessage: "",
+    });
+    setFailSafeState({
+      isOpen: false,
+      errorMessage: "",
+      partialQuestions: null,
+      remainingCount: 0,
+    });
   }, []);
 
   const aiSectionRef = useRef<HTMLDivElement>(null);
@@ -70,21 +105,44 @@ export const useCreationView = ({
   const handleStartAnalysis = useCallback(async () => {
     setIsLoading(true);
     setError("");
+    const targetCount = Math.max(1, Math.min(10, aiConfig.count || 5));
+    const effectiveAiConfig = { ...aiConfig, count: targetCount };
+
+    if (inputMethod === "ai") {
+      setGenerationProgress({
+        completed: 0,
+        total: targetCount,
+        stageMessage: "Menghubungi AI dan menyiapkan butir soal...",
+      });
+      setTimeout(() => {
+        aiSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+
     try {
       if (inputMethod === "ai") {
-        if (!aiConfig.subject.trim()) {
+        if (!effectiveAiConfig.subject.trim()) {
           throw new Error("Silakan isi mata pelajaran/materi terlebih dahulu.");
         }
-        if (!aiConfig.types || aiConfig.types.length === 0) {
+        if (!effectiveAiConfig.types || effectiveAiConfig.types.length === 0) {
           throw new Error("Silakan pilih minimal 1 (satu) jenis soal.");
         }
-        if (!aiConfig.difficulties || aiConfig.difficulties.length === 0) {
+        if (!effectiveAiConfig.difficulties || effectiveAiConfig.difficulties.length === 0) {
           throw new Error("Silakan pilih minimal 1 (satu) tingkat kognitif.");
         }
-        if (!aiConfig.count || aiConfig.count < 1) {
+        if (!effectiveAiConfig.count || effectiveAiConfig.count < 1) {
           throw new Error("Jumlah soal minimal adalah 1 butir.");
         }
-        const generatedQuestions = await generateQuestions(aiConfig);
+        const generatedQuestions = await generateQuestions(
+          effectiveAiConfig,
+          (completed, total, message) => {
+            setGenerationProgress({
+              completed,
+              total,
+              stageMessage: message,
+            });
+          }
+        );
         if (generatedQuestions.length === 0) {
           throw new Error("Gagal menghasilkan soal dari AI.");
         }
@@ -104,29 +162,46 @@ export const useCreationView = ({
         throw new Error("Silakan pilih file untuk diunggah.");
       }
     } catch (err: unknown) {
+      if (err instanceof PartialGenerationError) {
+        setFailSafeState({
+          isOpen: true,
+          errorMessage: err.message,
+          partialQuestions: err.partialQuestions,
+          remainingCount: Math.max(0, targetCount - err.partialQuestions.length),
+        });
+        return;
+      }
+
       const errorMessage =
         err instanceof Error ? err.message : "Gagal memproses permintaan.";
+
+      let cleanError = errorMessage;
       if (errorMessage === "QUOTA_EXCEEDED_MINUTE") {
-        setError(
-          "⚠️ Peringatan Tipe 1: Batas 15 penggunaan (request) per menit telah tercapai pada akun gratis Gemini Flash (atau 10 API request/menit untuk model terpisah). Silakan tunggu 1 menit lalu coba lagi.",
-        );
+        cleanError =
+          "Batas penggunaan per menit telah tercapai pada akun AI. Silakan tunggu 1 menit lalu coba lagi.";
       } else if (errorMessage === "QUOTA_EXCEEDED_DAY") {
-        setError(
-          "⛔ Peringatan Tipe 2: Batas penggunaan harian gratis (1500 request/hari) dari Gemini Flash telah habis. Silakan coba kembali besok hari atau gunakan model dengan akun berbayar (Jika dikonfigurasi).",
-        );
+        cleanError =
+          "Batas penggunaan harian AI telah habis. Silakan coba kembali besok hari.";
       } else if (errorMessage === "QUOTA_EXCEEDED_TOKENS") {
-        setError(
-          "⚠️ Peringatan Tipe 3: Teks/Konteks materi yang dimasukkan terlalu panjang dan melebihi batas (Maksimum 1 juta token/menit). Kurangi panjang kisi-kisi atau tunggu 1 menit sebelum mencoba lagi.",
-        );
+        cleanError =
+          "Teks atau konteks materi yang dimasukkan terlalu panjang. Silakan ringkas kisi-kisi Anda dan coba lagi.";
       } else if (
         errorMessage === "QUOTA_EXCEEDED_GENERAL" ||
         errorMessage === "QUOTA_EXCEEDED"
       ) {
-        setError(
-          "⛔ Peringatan: Batas kuota gratis pemakaian AI / Gemini API telah tercapai (15 req/menit atau 1500 req/hari). Silakan tunggu beberapa saat atau coba lagi besok hari.",
-        );
+        cleanError =
+          "Batas kuota gratis pemakaian AI telah tercapai. Harap tunggu beberapa saat lalu coba kembali.";
+      }
+
+      if (inputMethod === "ai") {
+        setFailSafeState({
+          isOpen: true,
+          errorMessage: cleanError,
+          partialQuestions: null,
+          remainingCount: targetCount,
+        });
       } else {
-        setError(errorMessage);
+        setError(cleanError);
       }
     } finally {
       setIsLoading(false);
@@ -139,6 +214,71 @@ export const useCreationView = ({
     setIsLoading,
     setError,
   ]);
+
+  const handleAcceptPartialQuestions = useCallback(() => {
+    if (failSafeState.partialQuestions && failSafeState.partialQuestions.length > 0) {
+      onQuestionsGenerated(failSafeState.partialQuestions, "auto");
+      setFailSafeState({ isOpen: false, errorMessage: "", partialQuestions: null, remainingCount: 0 });
+    }
+  }, [failSafeState.partialQuestions, onQuestionsGenerated]);
+
+  const handleRetryGeneration = useCallback(async (onlyRemaining: boolean = false) => {
+    setFailSafeState((prev) => ({ ...prev, isOpen: false }));
+
+    if (onlyRemaining && failSafeState.remainingCount > 0 && failSafeState.partialQuestions) {
+      setIsLoading(true);
+      setError("");
+      try {
+        const remainingCount = Math.min(10, failSafeState.remainingCount);
+        setGenerationProgress({
+          completed: 0,
+          total: remainingCount,
+          stageMessage: `Menyiapkan pembuatan sisa ${remainingCount} butir soal...`,
+        });
+        const remainingQuestions = await generateQuestions(
+          {
+            ...aiConfig,
+            count: remainingCount,
+          },
+          (completed, total, message) => {
+            setGenerationProgress({
+              completed,
+              total,
+              stageMessage: message,
+            });
+          }
+        );
+        const combined = [...failSafeState.partialQuestions, ...remainingQuestions];
+        onQuestionsGenerated(combined, "auto");
+      } catch (retryErr: any) {
+        if (retryErr instanceof PartialGenerationError) {
+          const combined = [...failSafeState.partialQuestions, ...retryErr.partialQuestions];
+          setFailSafeState({
+            isOpen: true,
+            errorMessage: retryErr.message,
+            partialQuestions: combined,
+            remainingCount: Math.max(0, (aiConfig.count || 5) - combined.length),
+          });
+        } else {
+          setFailSafeState({
+            isOpen: true,
+            errorMessage: retryErr?.message || "Percobaan ulang masih mengalami kendala.",
+            partialQuestions: failSafeState.partialQuestions,
+            remainingCount: failSafeState.remainingCount,
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Retry dari awal
+      handleStartAnalysis();
+    }
+  }, [failSafeState, aiConfig, onQuestionsGenerated, handleStartAnalysis]);
+
+  const handleDismissFailSafe = useCallback(() => {
+    setFailSafeState({ isOpen: false, errorMessage: "", partialQuestions: null, remainingCount: 0 });
+  }, []);
 
   const handleManualCreateClick = useCallback(() => {
     setUploadedFile(null);
@@ -186,8 +326,13 @@ export const useCreationView = ({
     setError,
     aiConfig,
     setAiConfig,
+    generationProgress,
     aiSectionRef,
+    failSafeState,
     handleStartAnalysis,
+    handleRetryGeneration,
+    handleAcceptPartialQuestions,
+    handleDismissFailSafe,
     handleManualCreateClick,
     handleAiClick,
     handleFileChange,

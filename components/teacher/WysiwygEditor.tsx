@@ -6,7 +6,6 @@ import {
   XMarkIcon,
   CheckIcon,
   TableCellsIcon,
-  FunctionIcon,
   LinkIcon,
 } from "../Icons";
 import { ChartRenderer } from "../ChartRenderer";
@@ -14,7 +13,8 @@ import EmojiPickerModal from "./EmojiPickerModal";
 import { GeometryModal } from "./GeometryModal";
 import { AiImageModal } from "./AiImageModal";
 import { ToolbarActions } from "./ToolbarActions";
-import { EquationEditorTab as VisualMathModal } from "./EquationEditorTab";
+import { InlineEquationToolbar } from "./InlineEquationToolbar";
+import { InlineLatexCursorChip } from "./InlineLatexCursorChip";
 import { useWysiwygEditor } from "./useWysiwygEditor";
 import { transliterate } from "../../utils/aksaraBali";
 import { generateGeometrySVG, parseGeometryLabels } from "./geometryUtils";
@@ -373,6 +373,15 @@ export const WysiwygEditor: React.FC<{
     insertTable,
     deleteCurrentTable,
     insertMath,
+    inlineMathNode,
+    inlineMathInitialLatex,
+    externalLatexAppend,
+    setExternalLatexAppend,
+    startInlineMathAtCursor,
+    commitInlineMath,
+    cancelInlineMath,
+    activeInlineLatex,
+    setActiveInlineLatex,
     insertAiImage,
     openLinkModal,
     insertLink,
@@ -575,48 +584,13 @@ export const WysiwygEditor: React.FC<{
             handleInput={handleInput}
           />
           {activeTab === "MATH" && (
-            <div className="flex flex-wrap items-center gap-1.5 w-full">
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setEditorSubState({ showMath: true });
-                }}
-                className="flex items-center justify-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow text-xs font-bold hover:from-indigo-600 hover:to-purple-700 transition-all whitespace-nowrap"
-              >
-                <FunctionIcon className="w-4 h-4" /> Buka Math Pro
-              </button>
-              <div className="h-5 w-px bg-gray-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
-              {[
-                { label: "x²", latex: "x^2", title: "Pangkat Kuadrat" },
-                { label: "a/b", latex: "\\frac{a}{b}", title: "Pecahan" },
-                { label: "√x", latex: "\\sqrt{x}", title: "Akar Kuadrat" },
-                { label: "π", latex: "\\pi", title: "Pi" },
-                { label: "±", latex: "\\pm", title: "Plus Minus" },
-                { label: "×", latex: "\\times", title: "Kali" },
-                { label: "÷", latex: "\\div", title: "Bagi" },
-                { label: "≤", latex: "\\leq", title: "Kurang dari sama dengan" },
-                { label: "≥", latex: "\\geq", title: "Lebih dari sama dengan" },
-                { label: "≠", latex: "\\neq", title: "Tidak sama dengan" },
-                { label: "α", latex: "\\alpha", title: "Alpha" },
-                { label: "β", latex: "\\beta", title: "Beta" },
-                { label: "θ", latex: "\\theta", title: "Theta" },
-                { label: "∞", latex: "\\infty", title: "Tak Hingga" },
-                { label: "∑", latex: "\\sum_{i=1}^{n}", title: "Sigma" },
-              ].map((sym) => (
-                <button
-                  key={sym.label}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    insertMath(sym.latex);
-                  }}
-                  className="px-2 py-1 bg-slate-100 hover:bg-indigo-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-indigo-700 dark:text-slate-200 rounded text-xs font-serif font-bold transition-colors"
-                  title={sym.title}
-                >
-                  {sym.label}
-                </button>
-              ))}
+            <div className="w-full">
+              <InlineEquationToolbar
+                onInsert={insertMath}
+                onStartInlineLatex={() => startInlineMathAtCursor()}
+                isInlineEditingActive={!!inlineMathNode}
+                activeLatex={activeInlineLatex}
+              />
             </div>
           )}
           {isInsideTable && (
@@ -659,6 +633,18 @@ export const WysiwygEditor: React.FC<{
             </div>,
             chartNode,
           )}
+        {inlineMathNode &&
+          createPortal(
+            <InlineLatexCursorChip
+              initialLatex={inlineMathInitialLatex}
+              onCommit={commitInlineMath}
+              onCancel={cancelInlineMath}
+              onChange={setActiveInlineLatex}
+              externalAppend={externalLatexAppend}
+              onClearExternalAppend={() => setExternalLatexAppend(null)}
+            />,
+            inlineMathNode,
+          )}
       </div>
       <input
         type="file"
@@ -689,12 +675,6 @@ export const WysiwygEditor: React.FC<{
           runCmd("insertHTML", svgHtml);
           handleInput();
         }}
-      />
-      <VisualMathModal
-        key={showMath ? "math-open" : "math-closed"}
-        isOpen={showMath}
-        onClose={() => setEditorSubState({ showMath: false })}
-        onInsert={insertMath}
       />
       <AksaraBaliModal
         key={showAksara ? "aksara-open" : "aksara-closed"}
