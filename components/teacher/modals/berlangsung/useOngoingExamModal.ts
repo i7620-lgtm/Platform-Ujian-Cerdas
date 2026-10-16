@@ -41,6 +41,7 @@ export const useOngoingExamModal = ({
   const [isJoinQrModalOpen, setIsJoinQrModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isKisiKisiModalOpen, setIsKisiKisiModalOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean; message: string; onConfirm: () => void}>({ isOpen: false, message: '', onConfirm: () => {} });
   const [alertDialog, setAlertDialog] = useState<{isOpen: boolean; message: string}>({ isOpen: false, message: '' });
 
@@ -936,6 +937,8 @@ export const useOngoingExamModal = ({
 
     isPrintModalOpen,
     setIsPrintModalOpen,
+    isKisiKisiModalOpen,
+    setIsKisiKisiModalOpen,
     confirmDialog,
     setConfirmDialog,
     alertDialog,

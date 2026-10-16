@@ -251,20 +251,28 @@ export const hydrateMathInContainer = (container: Element | Document = document)
   if (typeof window === "undefined" || !container) return;
 
   // 1. Hydrate all .math-visual[data-latex] where KaTeX HTML is not yet present
-  const mathVisuals = container.querySelectorAll(".math-visual[data-latex]");
+  const mathVisuals = container.querySelectorAll(".math-visual[data-latex]:not([data-math-hydrated='true'])");
   mathVisuals.forEach((el) => {
     const latex = el.getAttribute("data-latex");
     if (latex && (!el.querySelector(".katex") || el.innerHTML.trim() === "")) {
       const displayMode = (el as HTMLElement).style.display === "block";
       el.innerHTML = renderLatexToString(latex, displayMode);
     }
+    el.setAttribute("data-math-hydrated", "true");
   });
 
   // 2. Scan options and question content for unrendered math delimiters
   const textContainers = container.querySelectorAll(
-    ".option-content, .student-question-text, .wysiwyg-content, .prose",
+    ".option-content:not([data-math-hydrated='true']), .student-question-text:not([data-math-hydrated='true']), .wysiwyg-content:not([data-math-hydrated='true']), .prose:not([data-math-hydrated='true'])",
   );
   textContainers.forEach((tc) => {
+    // Avoid re-hydrating or interfering with active inputs, editable areas, or inside KaTeX
+    if (
+      tc.closest("[contenteditable='true']") ||
+      tc.closest("input, textarea, .katex, .katex-html")
+    ) {
+      return;
+    }
     if (tc.innerHTML.includes("$") || tc.innerHTML.includes("\\(") || tc.innerHTML.includes("\\[")) {
       // If it contains raw dollar or latex delimiters outside of .math-visual, re-render
       const hasUnrenderedMath = /(?:\$[^$\n]+\$|\$\$[\s\S]+?\$\$|\\\([\s\S]+?\\\)|\\[[\s\S]+?\\])/.test(
@@ -274,5 +282,7 @@ export const hydrateMathInContainer = (container: Element | Document = document)
         tc.innerHTML = renderMathInHtml(tc.innerHTML);
       }
     }
+    tc.setAttribute("data-math-hydrated", "true");
   });
 };
+

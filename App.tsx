@@ -113,26 +113,45 @@ const App: React.FC = () => {
     }
   }, [view]);
 
-  // Global Math Hydration Effect
+  // Global Math Hydration Effect (Optimized for iPhone WebKit & Mobile to prevent DOM loops)
   useEffect(() => {
     // Initial hydration
     hydrateMathInContainer(document.body);
 
-    // Observe changes for dynamic rendering
+    // Observe changes for dynamic rendering with intelligent node filtering
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const observer = new MutationObserver((mutations) => {
       let shouldRender = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
-          shouldRender = true;
-          break;
+          for (let i = 0; i < m.addedNodes.length; i++) {
+            const node = m.addedNodes[i];
+            if (node instanceof HTMLElement) {
+              // Ignore internal KaTeX nodes or nodes already marked as hydrated
+              if (
+                node.classList.contains('katex') ||
+                node.classList.contains('katex-html') ||
+                node.hasAttribute('data-math-hydrated') ||
+                node.querySelector?.('.katex')
+              ) {
+                continue;
+              }
+              // Ignore inputs and form controls
+              if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT') {
+                continue;
+              }
+              shouldRender = true;
+              break;
+            }
+          }
+          if (shouldRender) break;
         }
       }
       if (shouldRender) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           hydrateMathInContainer(document.body);
-        }, 50);
+        }, 120);
       }
     });
 
@@ -151,25 +170,7 @@ const App: React.FC = () => {
            profile.fullName !== 'Pengguna' && profile.school !== '-' && profile.regency !== '-');
   };
 
-  useEffect(() => {
-    const checkSession = async () => {
-        try {
-            const profile = await storageService.getCurrentUser();
-            if (profile) {
-                setTeacherProfile(profile);
-                if (!isProfileComplete(profile)) {
-                    setShowProfileCompletion(true);
-                }
-                setView('TEACHER_DASHBOARD');
-            }
-        } catch (e) {
-            console.error("Session check failed", e);
-        } finally {
-            setIsLoadingSession(false);
-        }
-    };
-    checkSession();
-  }, []);
+
 
   useEffect(() => {
     // HARD BLOCK: Ensure Realtime is ONLY enabled if disableRealtime is explicitly false.
@@ -313,6 +314,21 @@ const App: React.FC = () => {
       setCurrentExam(exam);
       setCurrentStudent(studentWithId);
       setView('STUDENT_EXAM');
+
+      try {
+        localStorage.setItem(
+          'ujiancerdas_active_exam_session',
+          JSON.stringify({
+            examCode,
+            student: studentWithId,
+            isPreview,
+            savedAt: Date.now(),
+          })
+        );
+        sessionStorage.setItem('is_exam_in_progress', 'true');
+      } catch {
+        // ignore storage errors
+      }
     } catch (err: unknown) {
         const error = err as Error;
         if (error.message === 'EXAM_IS_DRAFT') {
@@ -323,6 +339,67 @@ const App: React.FC = () => {
         }
     } finally { setIsSyncing(false); }
   }, []);
+
+  // Session check & automatic recovery on reload (iPhone/mobile crash protection)
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const pathname = window.location.pathname;
+        const search = window.location.search;
+        const hasDirectRoute =
+          pathname.startsWith('/result/') ||
+          search.includes('collab_') ||
+          search.includes('proctor=') ||
+          search.includes('preview=') ||
+          search.includes('join=') ||
+          search.includes('invite=') ||
+          search.includes('live=');
+
+        const profile = await storageService.getCurrentUser();
+        if (profile) {
+          setTeacherProfile(profile);
+          if (!isProfileComplete(profile)) {
+            setShowProfileCompletion(true);
+          }
+          setView('TEACHER_DASHBOARD');
+          return;
+        }
+
+        // Auto-restore student session if page was reloaded or crashed on mobile/iPhone
+        if (!hasDirectRoute) {
+          try {
+            const savedSessionRaw = localStorage.getItem('ujiancerdas_active_exam_session');
+            if (savedSessionRaw) {
+              const savedSession = JSON.parse(savedSessionRaw);
+              const isRecent =
+                savedSession?.savedAt &&
+                Date.now() - savedSession.savedAt < 24 * 3600 * 1000;
+
+              if (savedSession && savedSession.examCode && savedSession.student && isRecent) {
+                await handleStudentLoginSuccess(
+                  savedSession.examCode,
+                  savedSession.student,
+                  !!savedSession.isPreview
+                );
+                return;
+              } else {
+                localStorage.removeItem('ujiancerdas_active_exam_session');
+                sessionStorage.removeItem('is_exam_in_progress');
+              }
+            }
+          } catch (restoreErr) {
+            console.error("Auto restore student session error:", restoreErr);
+          }
+        }
+      } catch (e) {
+        console.error("Session check failed", e);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    checkSession();
+  }, [handleStudentLoginSuccess]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -532,6 +609,16 @@ const App: React.FC = () => {
     });
     
     if (status === 'completed' || status === 'force_closed') {
+        // Clear active session storage upon completion
+        if (status === 'completed') {
+          try {
+            localStorage.removeItem('ujiancerdas_active_exam_session');
+            sessionStorage.removeItem('is_exam_in_progress');
+          } catch {
+            // ignore
+          }
+        }
+
         // RE-FETCH EXAM: Ensure we have the full exam with answers if showResultToStudent is true
         // This is necessary because the initial fetch at login might have stripped answers
         const updatedExam = await storageService.getExamForStudent(currentExam.code, currentStudent.studentId, false);
@@ -553,6 +640,12 @@ const App: React.FC = () => {
   };
 
   const resetToHome = () => { 
+    try {
+      localStorage.removeItem('ujiancerdas_active_exam_session');
+      sessionStorage.removeItem('is_exam_in_progress');
+    } catch {
+      // ignore
+    }
     setView('SELECTOR'); 
     setCurrentExam(null); 
     setInvitationExam(null);

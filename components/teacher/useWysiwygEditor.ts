@@ -53,6 +53,12 @@ export const useWysiwygEditor = ({
 
   const defaultTab: WysiwygTab = showTabs ? "FORMAT" : "INSERT";
 
+  const [inlineMathNode, setInlineMathNode] = useState<HTMLElement | null>(null);
+  const [inlineMathInitialLatex, setInlineMathInitialLatex] = useState<string>("");
+  const [activeInlineLatex, setActiveInlineLatex] = useState<string>("");
+  const [externalLatexAppend, setExternalLatexAppend] = useState<string | null>(null);
+  const editingOriginalMathRef = useRef<HTMLElement | null>(null);
+
   const [state, setState] = useState<EditorState>({
     activeTab: defaultTab,
     activeCmds: [],
@@ -89,6 +95,17 @@ export const useWysiwygEditor = ({
     if (editorRef.current) {
       isTypingRef.current = true;
       const clone = editorRef.current.cloneNode(true) as HTMLElement;
+
+      // Strip temporary inline math editing hosts
+      const hosts = clone.querySelectorAll('[data-inline-math-host="true"]');
+      hosts.forEach((h) => h.remove());
+      const hiddenOriginals = clone.querySelectorAll<HTMLElement>(
+        '.math-visual[style*="display: none"]',
+      );
+      hiddenOriginals.forEach((el) => {
+        el.style.display = "inline-block";
+      });
+
       const chartNodes = clone.querySelectorAll('[data-chart="true"]');
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
@@ -118,6 +135,17 @@ export const useWysiwygEditor = ({
     isTypingRef.current = false;
     if (editorRef.current) {
       const clone = editorRef.current.cloneNode(true) as HTMLElement;
+
+      // Strip temporary inline math editing hosts
+      const hosts = clone.querySelectorAll('[data-inline-math-host="true"]');
+      hosts.forEach((h) => h.remove());
+      const hiddenOriginals = clone.querySelectorAll<HTMLElement>(
+        '.math-visual[style*="display: none"]',
+      );
+      hiddenOriginals.forEach((el) => {
+        el.style.display = "inline-block";
+      });
+
       const chartNodes = clone.querySelectorAll('[data-chart="true"]');
       chartNodes.forEach((node) => {
         node.innerHTML = `<span class="chart-placeholder-text">📊 Diagram (Klik untuk mengedit)</span>`;
@@ -222,6 +250,16 @@ export const useWysiwygEditor = ({
     if (target.closest(".chart-placeholder") && onChartClick) {
       onChartClick();
     }
+
+    // Do not intercept if click is inside the active inline math chip
+    if (target.closest(".math-inline-edit-host")) {
+      return;
+    }
+
+    const mathEl = target.closest(".math-visual") as HTMLElement | null;
+    if (mathEl && editorRef.current?.contains(mathEl)) {
+      startInlineMathAtElement(mathEl);
+    }
   };
 
   const runCmd = (cmd: string, val?: string) => {
@@ -273,8 +311,10 @@ export const useWysiwygEditor = ({
     }
   };
 
-  const insertMath = (latex: string) => {
-    const html = renderLatexToString(latex, false);
+  const startInlineMathAtCursor = (initialLatex = "") => {
+    if (inlineMathNode) {
+      commitInlineMath(inlineMathInitialLatex);
+    }
 
     if (document.activeElement !== editorRef.current) {
       restoreSelection();
@@ -282,43 +322,141 @@ export const useWysiwygEditor = ({
     if (editorRef.current) editorRef.current.focus();
 
     const sel = window.getSelection();
+    let range: Range | null = null;
     if (
       sel &&
       sel.rangeCount > 0 &&
       editorRef.current &&
       editorRef.current.contains(sel.anchorNode)
     ) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
+      range = sel.getRangeAt(0);
+    }
 
+    const host = document.createElement("span");
+    host.className = "math-inline-edit-host";
+    host.contentEditable = "false";
+    host.style.display = "inline-block";
+    host.style.verticalAlign = "middle";
+    host.style.margin = "2px 4px";
+    host.setAttribute("data-inline-math-host", "true");
+
+    if (range) {
+      range.deleteContents();
+      const zws1 = document.createTextNode("\u200B");
+      const zws2 = document.createTextNode("\u200B");
+      const frag = document.createDocumentFragment();
+      frag.appendChild(zws1);
+      frag.appendChild(host);
+      frag.appendChild(zws2);
+      range.insertNode(frag);
+    } else if (editorRef.current) {
+      const zws1 = document.createTextNode("\u200B");
+      const zws2 = document.createTextNode("\u200B");
+      editorRef.current.appendChild(zws1);
+      editorRef.current.appendChild(host);
+      editorRef.current.appendChild(zws2);
+    }
+
+    editingOriginalMathRef.current = null;
+    setInlineMathNode(host);
+    setInlineMathInitialLatex(initialLatex);
+    setActiveInlineLatex(initialLatex || "");
+    setEditorSubState({ activeTab: "MATH" });
+  };
+
+  const startInlineMathAtElement = (mathEl: HTMLElement) => {
+    if (!editorRef.current?.contains(mathEl)) return;
+    if (inlineMathNode) {
+      commitInlineMath(inlineMathInitialLatex);
+    }
+
+    const latex = mathEl.getAttribute("data-latex") || "";
+    const host = document.createElement("span");
+    host.className = "math-inline-edit-host";
+    host.contentEditable = "false";
+    host.style.display = "inline-block";
+    host.style.verticalAlign = "middle";
+    host.style.margin = "2px 4px";
+    host.setAttribute("data-inline-math-host", "true");
+
+    mathEl.parentNode?.insertBefore(host, mathEl);
+    mathEl.style.display = "none";
+    editingOriginalMathRef.current = mathEl;
+
+    setInlineMathNode(host);
+    setInlineMathInitialLatex(latex);
+    setActiveInlineLatex(latex || "");
+    setEditorSubState({ activeTab: "MATH" });
+  };
+
+  const commitInlineMath = (latex: string) => {
+    if (!inlineMathNode) return;
+    const trimmed = latex.trim();
+    if (trimmed) {
+      const html = renderLatexToString(trimmed, false);
       const span = document.createElement("span");
       span.className = "math-visual";
       span.style.display = "inline-block";
       span.style.verticalAlign = "middle";
       span.contentEditable = "false";
-      span.setAttribute("data-latex", latex);
+      span.setAttribute("data-latex", trimmed);
       span.innerHTML = html;
 
-      const zws1 = document.createTextNode("\u200B");
-      const zws2 = document.createTextNode("\u200B");
+      inlineMathNode.parentNode?.replaceChild(span, inlineMathNode);
+      if (editingOriginalMathRef.current) {
+        editingOriginalMathRef.current.remove();
+        editingOriginalMathRef.current = null;
+      }
 
-      const frag = document.createDocumentFragment();
-      frag.appendChild(zws1);
-      frag.appendChild(span);
-      frag.appendChild(zws2);
-
-      range.insertNode(frag);
-      range.setStartAfter(zws2);
-      range.setEndAfter(zws2);
-      sel.removeAllRanges();
-      sel.addRange(range);
-
-      checkActiveFormats();
+      const sel = window.getSelection();
+      if (sel) {
+        const nextRange = document.createRange();
+        if (span.nextSibling) {
+          nextRange.setStart(span.nextSibling, 0);
+          nextRange.setEnd(span.nextSibling, 0);
+        } else {
+          nextRange.setStartAfter(span);
+          nextRange.setEndAfter(span);
+        }
+        sel.removeAllRanges();
+        sel.addRange(nextRange);
+      }
     } else {
-      const wrapper = `&#8203;<span class="math-visual" style="display: inline-block; vertical-align: middle;" contenteditable="false" data-latex="${latex.replace(/"/g, "&quot;")}">${html}</span>&#8203;`;
-      runCmd("insertHTML", wrapper);
+      if (editingOriginalMathRef.current) {
+        editingOriginalMathRef.current.remove();
+        editingOriginalMathRef.current = null;
+      }
+      inlineMathNode.remove();
     }
+
+    setInlineMathNode(null);
+    setInlineMathInitialLatex("");
+    setActiveInlineLatex("");
+    setExternalLatexAppend(null);
     handleInput();
+  };
+
+  const cancelInlineMath = () => {
+    if (editingOriginalMathRef.current) {
+      editingOriginalMathRef.current.style.display = "inline-block";
+      editingOriginalMathRef.current = null;
+    }
+    if (inlineMathNode) {
+      inlineMathNode.remove();
+    }
+    setInlineMathNode(null);
+    setInlineMathInitialLatex("");
+    setActiveInlineLatex("");
+    setExternalLatexAppend(null);
+    handleInput();
+  };
+
+  const insertMath = (latex: string) => {
+    if (inlineMathNode) {
+      setExternalLatexAppend(latex);
+    } else {
+      startInlineMathAtCursor(latex);
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -462,6 +600,15 @@ export const useWysiwygEditor = ({
     insertTable,
     deleteCurrentTable,
     insertMath,
+    inlineMathNode,
+    inlineMathInitialLatex,
+    externalLatexAppend,
+    setExternalLatexAppend,
+    startInlineMathAtCursor,
+    commitInlineMath,
+    cancelInlineMath,
+    activeInlineLatex,
+    setActiveInlineLatex,
     insertAiImage,
     openLinkModal,
     insertLink,

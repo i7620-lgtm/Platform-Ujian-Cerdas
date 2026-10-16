@@ -6,8 +6,10 @@
 @tailwind utilities;
 
 @layer base {
-  body {
+  html, body {
     -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
   }
 }
 
