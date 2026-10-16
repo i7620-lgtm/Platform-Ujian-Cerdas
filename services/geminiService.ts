@@ -4,17 +4,107 @@ import { markdownToHtml, htmlToMarkdown, normalize, parseList, isAnswerMatch } f
 import { generateGeometrySVG, extractNum, parseGeometryLabels } from "../components/teacher/geometryUtils";
 import { generateEducationalSvg, svgToDataUrl } from "./svgGeneratorService";
 import { generateContextualEducationalSvg } from "./smartSvgTemplates";
-import { generateSmartFallbackQuestions } from "./smartFallbackGenerator";
 import { repairQuestionCharts, normalizeChartPlaceholdersInHtml } from "./chartRepairService";
 
-export async function generateQuestions(config: QuizConfig): Promise<Question[]> {
+export class PartialGenerationError extends Error {
+  public partialQuestions: Question[];
+  constructor(message: string, partialQuestions: Question[]) {
+    super(message);
+    this.name = "PartialGenerationError";
+    this.partialQuestions = partialQuestions;
+  }
+}
+
+/**
+ * Membersihkan dan menormalisasi format penulisan formula matematika, derajat suhu, mata uang, dan satuan
+ * khusus pada pembuat soal berbantuan AI:
+ * 1. Derajat suhu: Menggunakan simbol "°" langsung (misal: 35°C, 100°C, 32°F, 0°C), menormalisasi kode LaTeX seperti $35^\circ\text{C}$ atau 35circC.
+ * 2. Satuan murni tanpa pangkat (cm, m, km, kg, gram, ton, detik, menit, jam, liter, ml, dll): Menggunakan teks biasa wajar tanpa tanda $ (misal: 8 cm, bukan $8\text{cm}$ atau $8extcm$).
+ * 3. Mata uang: Menggunakan teks biasa (misal: Rp 2.500.000 atau Rp 50.000, bukan $\text{Rp } 2.500.000$).
+ * 4. Pembersihan artefak escape backslash JSON: Memperbaiki string rusak akibat \t tab escape seperti 'extcm', 'extkm', 'extkg' menjadi 'cm', 'km', 'kg'.
+ * 5. Menjaga formula matematika kompleks sejati (pecahan, akar, aljabar, dan satuan berpangkat seperti cm^3) tetap aman.
+ */
+export function cleanGeneratedMathUnits(text: string): string {
+  if (!text || typeof text !== 'string') return text;
+
+  let cleaned = text;
+
+  // 1. Suhu: LaTeX degree Celsius/Fahrenheit/Reamur to Unicode degree symbol (e.g., $35^\circ\text{C}$ -> 35°C)
+  cleaned = cleaned.replace(
+    /\$\s*(\d+(?:[,.]\d+)?)\s*(?:\\circ|\^\{?\\circ\}?|\^o)\s*(?:\\?t?ext\{?)?([CFRK]|Celsius|Fahrenheit|Reamur)\}?\s*\$/gi,
+    (_m, num, unit) => `${num}°${unit.toUpperCase()}`
+  );
+  cleaned = cleaned.replace(
+    /\$\s*(\d+(?:[,.]\d+)?)\s*\^\{?\\circ\}?\s*\$/g,
+    (_m, num) => `${num}°`
+  );
+  cleaned = cleaned.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:\\circ|\^\{?\\circ\}?|\^o|circ)\s*([CFR])\b/g,
+    (_m, num, unit) => `${num}°${unit}`
+  );
+  cleaned = cleaned.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*ext\s*([CFR])\b/g,
+    (_m, num, unit) => `${num}°${unit}`
+  );
+  cleaned = cleaned.replace(
+    /(\d+(?:[,.]\d+)?)\s*°\s*([CFR])\b/g,
+    (_m, num, unit) => `${num}°${unit}`
+  );
+
+  // 2. Nilai Mata Uang (Rupiah)
+  cleaned = cleaned.replace(
+    /\$\s*(?:\\?t?ext\{)?\s*Rp\.?\s*([\d.,]+)\s*\}?\s*\$/gi,
+    (_m, amount) => `Rp ${amount.trim()}`
+  );
+  cleaned = cleaned.replace(
+    /\$\s*\\?t?ext\{\s*Rp\s*\}\s*([\d.,]+)\s*\$/gi,
+    (_m, amount) => `Rp ${amount.trim()}`
+  );
+
+  // 3. Artefak rusak escape JSON \text{...} yang menjadi "ext..." (seperti "8extcm", "$8extcm$", "15extkm")
+  cleaned = cleaned.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*ext\s*(cm|mm|dm|m|km|kg|gram|g|ton|detik|menit|jam|hari|tahun|liter|ml|buah|butir|orang|siswa|ekor)\b/gi,
+    (_m, num, unit) => `${num} ${unit}`
+  );
+
+  // 4. Satuan murni sederhana di dalam blok math $ ... $ tanpa pangkat (contoh: $8\text{cm}$ atau $8\text{ cm}$ -> 8 cm)
+  cleaned = cleaned.replace(
+    /\$\s*(\d+(?:[,.]\d+)?)\s*(?:\\?t?ext\{)?\s*(cm|mm|dm|m|km|kg|gram|g|ton|detik|sekon|menit|jam|hari|tahun|liter|ml|buah|butir|orang|siswa|ekor)\s*\}?\s*\$/gi,
+    (_m, num, unit) => `${num} ${unit}`
+  );
+
+  // 5. Satuan murni langsung dalam math tanpa \text (contoh: $8 cm$ atau $15 km$ -> 8 cm, 15 km)
+  cleaned = cleaned.replace(
+    /\$\s*(\d+(?:[,.]\d+)?)\s*(cm|mm|dm|m|km|kg|gram|g|ton|liter|ml)\s*\$/gi,
+    (_m, num, unit) => `${num} ${unit}`
+  );
+
+  // 6. Standalone \text{satuan} dalam math tanpa angka (contoh: $\text{cm}$ -> cm)
+  cleaned = cleaned.replace(
+    /\$\s*\\?t?ext\{\s*(cm|mm|dm|m|km|kg|gram|g|ton|detik|sekon|menit|jam|liter|ml)\s*\}\s*\$/gi,
+    (_m, unit) => unit
+  );
+
+  // 7. Normalisasi spasi angka dan satuan baku jika menempel langsung (contoh: "8cm" -> "8 cm", "15km" -> "15 km", "5kg" -> "5 kg")
+  cleaned = cleaned.replace(
+    /\b(\d+(?:[,.]\d+)?)(cm|mm|dm|km|kg|gram|ons|ton|liter|ml)\b/gi,
+    (_m, num, unit) => `${num} ${unit}`
+  );
+
+  return cleaned;
+}
+
+export async function generateQuestions(
+  config: QuizConfig,
+  onProgress?: (completed: number, total: number, message: string) => void
+): Promise<Question[]> {
     const selectedTypes: string[] = (config.types && config.types.length > 0)
         ? config.types
         : [config.type || "Pilihan Ganda"];
     
     const selectedDifficulties: string[] = (config.difficulties && config.difficulties.length > 0)
         ? config.difficulties
-        : [config.difficulty || "Level 3 - Penalaran (Reasoning / HOTS)"];
+        : [config.difficulty || "Level 3 - Penalaran"];
 
     const isTKA = config.subject.toUpperCase().includes('TKA') || 
                   config.blueprint.toUpperCase().includes('TKA') || 
@@ -68,11 +158,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     3. KONTEKSTUALITAS INDONESIA:
        - Gunakan nama-nama tokoh lokal yang santun dan wajar di Indonesia (contoh: Pak Bondan, Bu Anita, Danu, Antok, Caca, Mae, Doni, Dina, Mira, Tika, dsb.).
        - Gunakan konteks kehidupan nyata (literasi membaca teks fiksi fabel/puisi/cerita, teks informasi sains/lingkungan/kesehatan gizi, denah taman kota, resep/pasar, pembagian sembako, perbandingan harga, waktu perjalanan).
-    4. STANDAR TIPOGRAFI & NOTASI INDONESIA:
+    4. STANDAR TIPOGRAFI, SATUAN & NOTASI INDONESIA:
        - Tanda Desimal: Menggunakan koma, contoh: 0,75 atau 2,5 atau 3,14 (bukan 0.75).
-       - Pemisah Ribuan / Mata Uang: Menggunakan titik dan format rupiah baku, contoh: Rp24.000,00 atau Rp157.500,00 atau 4.425 gram.
-       - Satuan Baku: Tuliskan sesuai standar metrik (mm, cm, dm, m, dam, hm, km; mg, cg, dg, g, dag, hg, kg; ml, cl, dl, l, dal, hl, kl; detik, menit, jam, hari).
-       - Format Pecahan: Gunakan sintaks LaTeX rapi $\\frac{a}{b}$ atau pecahan campuran $4\\frac{3}{4}$.
+       - Pemisah Ribuan / Mata Uang: Menggunakan titik dan format rupiah baku TEKS BIASA, contoh: Rp 24.000 atau Rp 157.500 atau 4.425 gram. DILARANG KERAS membungkus mata uang ke dalam LaTeX $...$ atau \\text{...}!
+       - Satuan Baku Murni Tanpa Pangkat: Tuliskan sebagai TEKS BIASA sesuai standar metrik (contoh: 8 cm, 15 km, 250 gram, 5 liter, 10 detik, 30 menit). DILARANG KERAS membungkus satuan murni ke dalam $...$ atau \\text{...} (DILARANG: '$8\\text{cm}$' atau '$8extcm$').
+       - Satuan Derajat Suhu: WAJIB menggunakan simbol derajat "°" langsung sebagai TEKS BIASA (contoh: 35°C, 100°C, 32°F, 0°C, 273 K). DILARANG KERAS menggunakan kode LaTeX seperti '$35^\\circ\\text{C}$' atau '$35^\\circ C$'.
+       - Format Rumus Sejati: Gunakan sintaks LaTeX rapi $\\frac{a}{b}$ untuk pecahan, $\\sqrt{x}$ untuk akar, atau $x^2$ untuk pangkat.
 
     ATURAN FORMAT UMUM:
     - Gunakan format Markdown secara maksimal pada teks pertanyaan.
@@ -212,7 +303,12 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
            Tuliskan deskripsi gambar yang detail pada 'svgPrompt' dan pilih 'svgStyle' ("geometry", "diagram", "infographic", "flowchart", atau "flat_art"). Anda juga dapat menyisipkan tag [ai_svg: Deskripsi gambar teknis/ilmiah] di dalam 'questionText' pada letak stimulus yang diinginkan. Sistem akan OTOMATIS memanggil Generator Gambar AI untuk menggambar vektor SVG tajam langsung pada soal ini! Set 'visualStimulusType': "ai_svg".` : `* Jika diminta gambar/ilustrasi/foto: FITUR GAMBAR SEDANG DINONAKTIFKAN. ABAIKAN permintaan gambar/foto dan JANGAN menyisipkan placeholder gambar, instruksi gambar, maupun \`imageSearchKeyword\`. Sesuaikan narasinya agar tidak memerlukan gambar (misal dengan mendeskripsikan secara tekstual atau menggunakan tabel).`}
     - LARANGAN KERAS: DILARANG KERAS menyisipkan tag HTML, tag <img>, atau tag semacam <span class="chart-placeholder"> untuk tabel, gambar raster, atau ilustrasi umum. Gunakan tabel Markdown murni untuk tabel.
     - PENTING (AKSARA BALI): Jika materi atau konteks soal berkaitan dengan mata pelajaran "Bahasa Bali", Anda WAJIB berinisiatif dan memutuskan secara mandiri untuk menggunakan teks Aksara Bali pada narasi soal dan/atau opsi jawaban jika dirasa relevan. Bungkus teks tersebut dengan tag HTML <span class="aksara-bali" style="font-family: 'Noto Sans Balinese', sans-serif;">teks aksara bali</span>.
-    - PENTING (SINTAKS MATEMATIKA & LATEX): Jika Anda menyisipkan sintaks LaTeX atau matematika, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3. Untuk rumus matematika multi-baris bertingkat / sistem persamaan, Anda dapat menggunakan pemisah baris (\\n) atau '\\\\\\' dan '&' untuk penyejajaran.
+    - PENTING (ATURAN SATUAN MURNI, SUHU & NILAI UANG - WAJIB TEKS BIASA):
+      * DILARANG KERAS membungkus satuan panjang/massa/waktu/volume MURNI TANPA PANGKAT (cm, m, km, kg, gram, ton, detik, menit, jam, liter, ml, buah, butir, orang) ke dalam tanda rumus $...$ atau \\text{...}! Tuliskan angka dan satuan sebagai teks biasa (Contoh BENAR: '8 cm', '15 km', '250 gram', '5 liter'. Contoh SALAH: '$8\\text{cm}$', '$8extcm$', '$15\\text{ km}$').
+      * SATUAN SUHU (DERAJAT CELSIUS, FAHRENHEIT, REAMUR): Wajib dituliskan langsung menggunakan simbol derajat "°" sebagai teks biasa (Contoh BENAR: '35°C', '100°C', '32°F', '0°C', '273 K'). DILARANG KERAS menggunakan kode LaTeX seperti '$35^\\circ\\text{C}$', '$35^\\circ C$', atau '$35^{\\circ}C$'.
+      * SATUAN NILAI UANG (RUPIAH): Wajib dituliskan sebagai teks biasa langsung (Contoh BENAR: 'Rp 2.500.000', 'Rp 50.000'. Contoh SALAH: '$\\text{Rp } 2.500.000$', '$Rp 50.000$').
+      * Tanda pembatas LaTeX ($...$) HANYA digunakan untuk rumus matematika sejati: pecahan (\\frac{a}{b}), bentuk akar (\\sqrt{x}), pangkat/eksponen (x^2, cm^3, m/s^2), matriks, dan aljabar.
+      * JIKA Anda menyisipkan sintaks LaTeX atau matematika untuk rumus sejati di atas, Anda WAJIB MENG-ESCAPE KODE BACKSLASH TERSEBUT KARENA INI ADALAH FORMAT JSON! Contoh: Tuliskan \\\\frac{3}{4} BUKAN \\frac{3}{4}. Tuliskan \\\\text{cm}^3 BUKAN \\text{cm}^3. Untuk rumus matematika multi-baris bertingkat / sistem persamaan, Anda dapat menggunakan pemisah baris (\\n) atau '\\\\\\\\' dan '&' untuk penyejajaran.
     - Hindari konten dewasa, kekerasan, atau hal-hal yang tidak pantas untuk lingkungan pendidikan.
     - DILARANG KERAS memberikan penjelasan, cara penyelesaian, atau kunci jawaban di dalam teks pertanyaan (questionText). Teks pertanyaan hanya boleh berisi stimulus dan soal yang harus dijawab oleh siswa.
     - PENTING (KUNCI JAWABAN WAJIB & PRESISI TINGGI):
@@ -663,43 +759,71 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       imageSearchKeyword?: string;
     }[] = [];
 
-    try {
+    // Eksekusi pemanggilan AI dengan auto-failover ke model cadangan jika model utama gagal/timeout
+    const primaryModels = ["gemini-3.8-flash"];
+    const backupModels = ["gemini-flash-latest", "gemini-3.1-flash-lite"];
+
+    const executeAiCall = async (models: string[], timeoutMs: number): Promise<any[]> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         try {
-          controller.abort(new Error("Batas waktu koneksi AI terlampaui. Mengaktifkan Safe Fallback."));
+          controller.abort(new Error("Batas waktu koneksi AI terlampaui (Timeout)."));
         } catch (_) {}
-      }, 60000);
+      }, timeoutMs);
 
-      const res = await fetch("/api/generate-questions", {
+      try {
+        const res = await fetch("/api/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry, properties }),
-          signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+          body: JSON.stringify({ prompt: batchPrompt, systemInstruction, modelsToTry: models, properties }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      const contentType = res.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
           const rawHtml = await res.text();
           console.error("Non-JSON response from server:", rawHtml.slice(0, 300));
-          throw new Error("Server mengembalikan respons non-JSON. Safe Fallback diaktifkan.");
+          throw new Error("Server mengembalikan respons non-JSON.");
+        }
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error || "Gagal menghasilkan soal dari AI.");
+        }
+        const parsed = JSON.parse(data.text || "[]");
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          throw new Error("Format butir soal dari AI kosong atau tidak sesuai.");
+        }
+        return parsed;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
       }
-      const data = await res.json();
-      if (!data.success) {
-          throw new Error(data.error || "Failed to generate questions");
+    };
+
+    try {
+      // Percobaan 1: Menggunakan model utama (gemini-3.8-flash)
+      questions = await executeAiCall(primaryModels, 40000);
+    } catch (primaryErr: any) {
+      console.warn(`[Auto-Failover] Model utama mengalami kendala (${primaryErr?.message}). Otomatis mencoba model cadangan...`);
+      try {
+        // Percobaan 2: Auto-Retry Otomatis dengan Model Cadangan (gemini-flash-latest / gemini-3.1-flash-lite)
+        questions = await executeAiCall(backupModels, 35000);
+      } catch (backupErr: any) {
+        const isAbort =
+          backupErr?.name === "AbortError" ||
+          primaryErr?.name === "AbortError" ||
+          backupErr?.message?.toLowerCase().includes("timeout") ||
+          primaryErr?.message?.toLowerCase().includes("timeout") ||
+          backupErr?.message?.toLowerCase().includes("aborted");
+
+        const cleanReason = isAbort
+          ? "Koneksi AI mengalami batas waktu (timeout). Antrean server sedang padat."
+          : (backupErr?.message || primaryErr?.message || "Layanan AI tidak dapat diakses saat ini.");
+
+        console.error(`[AI Generation Gagal] Batch offset ${startIndex} gagal setelah failover model cadangan:`, cleanReason);
+        throw new Error(cleanReason);
       }
-      questions = JSON.parse(data.text || "[]");
-    } catch (batchErr: any) {
-      const isAbort = batchErr?.name === "AbortError" || (batchErr?.message && batchErr.message.toLowerCase().includes("aborted"));
-      const cleanReason = isAbort
-        ? "Batas waktu koneksi AI terlampaui (Timeout). Safe Fallback aktif."
-        : (batchErr?.message || "Layanan AI tidak merespons. Safe Fallback Aktif.");
-      console.warn(`[Safe Fallback] Batch offset ${startIndex} dialihkan ke Fallback Cerdas kurikulum:`, cleanReason);
-      return generateSmartFallbackQuestions({
-        ...config,
-        count: batchCount,
-      }, cleanReason);
     }
 
     // Helper: Cek apakah baris pernyataan Benar/Salah berupa placeholder/dummy
@@ -792,7 +916,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
           }
           if (lowerStem.includes('tinggi')) {
             const val = answerBool === false ? h2 + 4 : h2;
-            return `${cleanStem || 'Tinggi atap limas'} adalah $${val}\\text{ cm}$.`;
+            return `${cleanStem || 'Tinggi atap limas'} adalah ${val} cm.`;
           }
 
           // Default fallback dengan geometri
@@ -1132,7 +1256,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         }
       }
 
-      return result.slice(0, targetCount);
+      return result.slice(0, targetCount).map(cleanGeneratedMathUnits);
     };
 
     const batchQuestions: Question[] = questions.map((q, index) => {
@@ -1210,6 +1334,7 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
             q.options = q.options.map((opt, optIdx) => {
                 let cleanOpt = (opt || '').replace(/^\s*(?:[A-Ea-e][.)]|\([A-Ea-e]\))\s+/, '').trim();
                 cleanOpt = autoRepairIncompleteContent(cleanOpt, contextShape, `sesuai hasil analisis konsep.`);
+                cleanOpt = cleanGeneratedMathUnits(cleanOpt);
                 return cleanOpt;
             });
         }
@@ -1223,7 +1348,8 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
         };
 
         const formatContent = (text: string, hasChart?: boolean) => {
-            return replaceGeometryPlaceholders(replaceChartPlaceholders(markdownToHtml(text || ''), hasChart));
+            const cleaned = cleanGeneratedMathUnits(text || '');
+            return replaceGeometryPlaceholders(replaceChartPlaceholders(markdownToHtml(cleaned), hasChart));
         };
 
         const hasMainChart = !!q.chartData;
@@ -1493,26 +1619,50 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
     return batchQuestions;
   }
 
-  // Execution: Split into concurrent batches of max 5 questions each to avoid 504 Deadline Exceeded
+  // Execution: Capped to max 10 questions, split into batches of max 5 questions each
   try {
-    const totalCount = config.count || 1;
+    const totalCount = Math.max(1, Math.min(10, config.count || 1));
     const CHUNK_SIZE = 5;
     const results: Question[][] = [];
 
+    onProgress?.(0, totalCount, "Menghubungi AI dan menyiapkan butir soal...");
+
     for (let offset = 0; offset < totalCount; offset += CHUNK_SIZE) {
       const batchCount = Math.min(CHUNK_SIZE, totalCount - offset);
+      const currentCompleted = results.flat().length;
+      onProgress?.(
+        currentCompleted,
+        totalCount,
+        `Sedang merumuskan butir soal ke-${offset + 1} s.d. ${offset + batchCount}...`
+      );
       try {
         const batchResults = await generateSingleBatch(offset, batchCount);
         results.push(batchResults);
+        const updatedCompleted = results.flat().length;
+        onProgress?.(
+          updatedCompleted,
+          totalCount,
+          `Berhasil menyelesaikan ${updatedCompleted} dari ${totalCount} soal...`
+        );
       } catch (err: any) {
-        console.warn("[Safe Fallback] Batch error at offset", offset, ":", err?.message);
-        results.push(generateSmartFallbackQuestions({ ...config, count: batchCount }, err?.message));
+        console.warn(`[Batch Error] Batch pada offset ${offset} gagal:`, err?.message);
+        const savedSoFar = results.flat();
+        if (savedSoFar.length > 0) {
+          // Ada sebagian soal yang berhasil dibuat: selamatkan hasil tersebut!
+          throw new PartialGenerationError(
+            `Sebagian soal (${savedSoFar.length} dari ${totalCount} butir) berhasil dibuat, namun sisa butir berikutnya mengalami kendala koneksi: ${err?.message || "Koneksi terputus"}.`,
+            savedSoFar
+          );
+        } else {
+          // Tidak ada soal yang berhasil dibuat: lemparkan error asli yang transparan
+          throw new Error(err?.message || "Koneksi AI mengalami batas waktu (timeout). Silakan periksa koneksi dan coba lagi.");
+        }
       }
     }
 
-    let finalQuestions: Question[] = results.flat();
+    const finalQuestions: Question[] = results.flat();
     if (finalQuestions.length === 0) {
-      finalQuestions = generateSmartFallbackQuestions(config, "Inisialisasi Safe Fallback");
+      throw new Error("Gagal menghasilkan soal dari AI. Silakan coba kembali.");
     }
 
     // Process AI Educational Images, Geometry, Charts & Automatic SVG Generator
@@ -1655,10 +1805,25 @@ export async function generateQuestions(config: QuizConfig): Promise<Question[]>
       }
     }
 
+    for (const q of finalQuestions) {
+      if (q.correctAnswer && typeof q.correctAnswer === 'string') {
+        q.correctAnswer = cleanGeneratedMathUnits(q.correctAnswer);
+      }
+      if (q.explanation && typeof q.explanation === 'string') {
+        q.explanation = cleanGeneratedMathUnits(q.explanation);
+      }
+      if (q.kisiKisi && typeof q.kisiKisi === 'string') {
+        q.kisiKisi = cleanGeneratedMathUnits(q.kisiKisi);
+      }
+    }
+
+    onProgress?.(finalQuestions.length, totalCount, "Memfinalisasi dan merapikan butir soal...");
     return repairQuestionCharts(finalQuestions);
   } catch (error) {
-    console.warn("[Safe Fallback] Mengaktifkan kurikulum fallback darurat:", error);
-    const fallbackQuestions = generateSmartFallbackQuestions(config, (error as Error)?.message || "Safe Fallback Aktif");
-    return repairQuestionCharts(fallbackQuestions);
+    if (error instanceof PartialGenerationError) {
+      throw error;
+    }
+    console.error("[generateQuestions Error]:", error);
+    throw error;
   }
 }
