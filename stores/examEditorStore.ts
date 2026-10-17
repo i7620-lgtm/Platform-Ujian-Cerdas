@@ -6,7 +6,7 @@ import { useExamEditorUIStore, type ChartTarget } from './examEditorUIStore';
 import { detectUserIndonesianTimezone } from '../utils/timezoneUtils';
 
 const createNewQuestion = (type: QuestionType): Question => {
-    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1 };
+    const base = { id: `q-${Date.now()}-${Math.random()}`, questionText: '', questionType: type, imageUrl: undefined, optionImages: undefined, category: '', level: '', kisiKisi: '', scoreWeight: 1, hint: '', solutionSteps: '' };
     switch (type) {
         case 'INFO': return { ...base }; 
         case 'MULTIPLE_CHOICE': return { ...base, options: ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'], correctAnswer: 'Opsi A' }; 
@@ -46,6 +46,8 @@ interface ExamEditorState {
     handleCategoryChange: (id: string, category: string) => void;
     handleLevelChange: (id: string, level: string) => void;
     handleKisiKisiChange: (id: string, kisiKisi: string) => void;
+    handleHintChange: (id: string, hint: string) => void;
+    handleSolutionStepsChange: (id: string, solutionSteps: string) => void;
     handleScoreWeightChange: (id: string, weight: number) => void;
     handleTypeChange: (qId: string, newType: QuestionType) => void;
     handleOptionTextChange: (qId: string, optIndex: number, text: string) => void;
@@ -98,6 +100,8 @@ export const DEFAULT_EXAM_CONFIG: ExamConfig = {
     continueWithPermission: false,
     showResultToStudent: true,
     showCorrectAnswer: false,
+    showHints: false,
+    showSolutionSteps: false,
     enableCertificate: false,
     enablePublicStream: false,
     disableRealtime: true,
@@ -130,6 +134,12 @@ export const useExamEditorStore = create<ExamEditorState>()(
                 }
                 if (updated.explanation) {
                     updated.explanation = repairGeometrySvgInHtml(updated.explanation);
+                }
+                if (updated.hint) {
+                    updated.hint = repairGeometrySvgInHtml(updated.hint);
+                }
+                if (updated.solutionSteps) {
+                    updated.solutionSteps = repairGeometrySvgInHtml(updated.solutionSteps);
                 }
                 if (updated.questionType === 'COMPLEX_MULTIPLE_CHOICE' && updated.correctAnswer) {
                     const parsed = parseList(updated.correctAnswer, updated.options);
@@ -317,6 +327,20 @@ export const useExamEditorStore = create<ExamEditorState>()(
             const index = state.questions.findIndex(q => q.id === id);
             if (index !== -1) {
                 state.questions[index].kisiKisi = kisiKisi;
+            }
+        }),
+
+        handleHintChange: (id, hint) => set((state) => {
+            const index = state.questions.findIndex(q => q.id === id);
+            if (index !== -1) {
+                state.questions[index].hint = hint;
+            }
+        }),
+
+        handleSolutionStepsChange: (id, solutionSteps) => set((state) => {
+            const index = state.questions.findIndex(q => q.id === id);
+            if (index !== -1) {
+                state.questions[index].solutionSteps = solutionSteps;
             }
         }),
 
