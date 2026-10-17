@@ -1,10 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Question, QuestionType } from "../../types";
 import {
   TrashIcon,
   ArrowPathIcon,
   SparklesIcon,
   PlusCircleIcon,
+  LightBulbIcon,
+  AcademicCapIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "../Icons";
 import { WysiwygEditor } from "./WysiwygEditor";
 import { useExamEditorStore } from "../../stores/examEditorStore";
@@ -37,83 +41,152 @@ export const QuestionCard = React.memo(
     const handleLevelChange = useExamEditorStore((s) => s.handleLevelChange);
     const handleScoreWeightChange = useExamEditorStore((s) => s.handleScoreWeightChange);
     const handleKisiKisiChange = useExamEditorStore((s) => s.handleKisiKisiChange);
+    const handleHintChange = useExamEditorStore((s) => s.handleHintChange);
+    const handleSolutionStepsChange = useExamEditorStore((s) => s.handleSolutionStepsChange);
     const handleQuestionTextChange = useExamEditorStore((s) => s.handleQuestionTextChange);
 
     const setEditingChartTarget = useExamEditorUIStore((s) => s.setEditingChartTarget);
     const setInsertIndex = useExamEditorUIStore((s) => s.setInsertIndex);
     const setTypeSelectionModalOpen = useExamEditorUIStore((s) => s.setTypeSelectionModalOpen);
 
+    const [isHintOpen, setIsHintOpen] = useState(false);
+    const [isStepsOpen, setIsStepsOpen] = useState(false);
+    const stripHtml = (html?: string) => (html ? html.replace(/<[^>]*>/g, "").trim() : "");
+    const hasHint = Boolean(stripHtml(q.hint));
+    const hasSteps = Boolean(stripHtml(q.solutionSteps));
+
+    const toggleHint = () => {
+      const isDesktopOrTablet = typeof window !== "undefined" && window.innerWidth >= 768;
+      if (isDesktopOrTablet) {
+        const nextState = !(isHintOpen || isStepsOpen);
+        setIsHintOpen(nextState);
+        setIsStepsOpen(nextState);
+      } else {
+        setIsHintOpen(!isHintOpen);
+      }
+    };
+
+    const toggleSteps = () => {
+      const isDesktopOrTablet = typeof window !== "undefined" && window.innerWidth >= 768;
+      if (isDesktopOrTablet) {
+        const nextState = !(isHintOpen || isStepsOpen);
+        setIsHintOpen(nextState);
+        setIsStepsOpen(nextState);
+      } else {
+        setIsStepsOpen(!isStepsOpen);
+      }
+    };
+
+    const openHint = () => {
+      const isDesktopOrTablet = typeof window !== "undefined" && window.innerWidth >= 768;
+      setIsHintOpen(true);
+      if (isDesktopOrTablet) {
+        setIsStepsOpen(true);
+      }
+    };
+
+    const openSteps = () => {
+      const isDesktopOrTablet = typeof window !== "undefined" && window.innerWidth >= 768;
+      setIsStepsOpen(true);
+      if (isDesktopOrTablet) {
+        setIsHintOpen(true);
+      }
+    };
+
     return (
       <React.Fragment key={q.id}>
         <div
           id={q.id}
-          className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-visible"
+          className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 group transition-all duration-300 hover:shadow-md relative overflow-hidden"
         >
-          <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity z-20">
-            {q.questionType !== "INFO" && (
+          {/* Header Bar Terintegrasi (Bebas dari Overlap pada Tablet & Mobile) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/60">
+            <div className="flex items-center gap-2.5">
+              {q.questionType === "INFO" ? (
+                <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-xs">
+                  i
+                </div>
+              ) : (
+                <span className="w-7 h-7 rounded-lg bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center font-black text-xs tracking-tight">
+                  {String(questionNumber).padStart(2, "0")}
+                </span>
+              )}
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {q.questionType === "INFO"
+                  ? "Informasi / Teks Bacaan"
+                  : `Soal #${questionNumber}`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {q.questionType !== "INFO" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGenerate(q);
+                  }}
+                  disabled={isGenerating}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors shadow-2xs disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800"
+                  title="Buat dengan AI"
+                >
+                  {isGenerating ? (
+                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <SparklesIcon className="w-3.5 h-3.5" />
+                  )}
+                  <span className="text-[10px] font-black uppercase tracking-wider">
+                    AI
+                  </span>
+                </button>
+              )}
+
+              <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-2xs">
+                <select
+                  value={q.questionType}
+                  onChange={(e) =>
+                    handleTypeChange(q.id, e.target.value as QuestionType)
+                  }
+                  className="appearance-none bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:border-gray-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                >
+                  <option value="MULTIPLE_CHOICE">Pilihan Ganda</option>
+                  <option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option>
+                  <option value="TRUE_FALSE">Benar / Salah</option>
+                  <option value="MATCHING">Menjodohkan</option>
+                  <option value="ESSAY">Esai / Uraian</option>
+                  <option value="FILL_IN_THE_BLANK">Isian Singkat</option>
+                  <option value="INFO">Info / Teks</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 dark:text-slate-400">
+                  <svg
+                    className="fill-current h-3 w-3"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  </svg>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onGenerate(q);
+                  if (
+                    window.confirm("Apakah Anda yakin ingin menghapus soal ini?")
+                  ) {
+                    handleDeleteQuestion(q.id);
+                  }
                 }}
-                disabled={isGenerating}
-                className={`flex items-center gap-1 p-1.5 rounded-lg border transition-colors shadow-sm disabled:opacity-50 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800`}
-                title={"Buat dengan AI"}
+                className="p-1.5 bg-white dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 border border-gray-200 dark:border-slate-700 transition-colors shadow-2xs"
+                title="Hapus Soal"
               >
-                {isGenerating ? (
-                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                ) : (
-                  <SparklesIcon className="w-4 h-4" />
-                )}
-                <span className="text-[10px] font-bold uppercase tracking-wider">
-                  AI
-                </span>
+                <TrashIcon className="w-3.5 h-3.5" />
               </button>
-            )}
-            <div className="relative inline-block bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-              <select
-                value={q.questionType}
-                onChange={(e) =>
-                  handleTypeChange(q.id, e.target.value as QuestionType)
-                }
-                className="appearance-none bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 py-1.5 pl-3 pr-7 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white dark:hover:bg-slate-600 hover:border-gray-300 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-              >
-                <option value="MULTIPLE_CHOICE">Pilihan Ganda</option>
-                <option value="COMPLEX_MULTIPLE_CHOICE">PG Kompleks</option>
-                <option value="TRUE_FALSE">Benar / Salah</option>
-                <option value="MATCHING">Menjodohkan</option>
-                <option value="ESSAY">Esai / Uraian</option>
-                <option value="FILL_IN_THE_BLANK">Isian Singkat</option>
-                <option value="INFO">Info / Teks</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 dark:text-slate-400">
-                <svg
-                  className="fill-current h-3 w-3"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                </svg>
-              </div>
             </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (
-                  window.confirm("Apakah Anda yakin ingin menghapus soal ini?")
-                ) {
-                  handleDeleteQuestion(q.id);
-                }
-              }}
-              className="p-1.5 bg-white dark:bg-slate-700 text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 border border-gray-200 dark:border-slate-600 transition-colors shadow-sm"
-              title="Hapus Soal"
-            >
-              <TrashIcon className="w-4 h-4" />
-            </button>
           </div>
-          <div className="p-6 md:p-8 relative">
+
+          <div className="p-5 md:p-6 relative">
             {isGenerating ? (
               <div className="space-y-6 animate-pulse p-2">
                 <div className="flex items-center gap-3">
@@ -157,31 +230,9 @@ export const QuestionCard = React.memo(
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-4 md:gap-6">
-                <div className="flex-shrink-0 mt-1 hidden md:block select-none">
-                  {q.questionType === "INFO" ? (
-                    <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">
-                      i
-                    </div>
-                  ) : (
-                    <span className="text-slate-300 dark:text-slate-600 font-bold text-xl">
-                      {String.fromCharCode(
-                        48 + Math.floor(questionNumber / 10),
-                      ) + String.fromCharCode(48 + (questionNumber % 10))}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="md:hidden mb-2">
-                    {q.questionType !== "INFO" && (
-                      <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-                        {questionNumber}. Soal
-                      </span>
-                    )}
-                  </div>
-
-                  {q.questionType !== "INFO" && (
-                    <>
+              <div className="w-full min-w-0">
+                {q.questionType !== "INFO" && (
+                  <>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
@@ -286,8 +337,186 @@ export const QuestionCard = React.memo(
                     q.questionType === "ESSAY") && (
                     <ShortAnswerEditor q={q} />
                   )}
+
+                  {/* Petunjuk Pengerjaan & Langkah Pengerjaan (Collapsible - Tertutup Default, Hijau Saat Terisi) */}
+                  {q.questionType !== "INFO" && (
+                    <div className="mt-5 pt-4 border-t border-dashed border-gray-200 dark:border-slate-700">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-start">
+                        {/* 1. Petunjuk Pengerjaan */}
+                        <div
+                          className={`flex flex-col rounded-xl border transition-all duration-200 shadow-2xs overflow-hidden ${
+                            hasHint
+                              ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700/80"
+                              : "bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={toggleHint}
+                            className="w-full p-3 flex items-center justify-between text-left cursor-pointer hover:bg-black/2 dark:hover:bg-white/2 transition-colors select-none"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <LightBulbIcon
+                                className={`w-4 h-4 shrink-0 ${
+                                  hasHint
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-slate-400 dark:text-slate-500"
+                                }`}
+                              />
+                              <label
+                                className={`text-[11px] font-black uppercase tracking-wider truncate cursor-pointer ${
+                                  hasHint
+                                    ? "text-emerald-900 dark:text-emerald-300"
+                                    : "text-slate-700 dark:text-slate-300"
+                                }`}
+                              >
+                                Petunjuk Pengerjaan
+                              </label>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  hasHint
+                                    ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                    : "bg-slate-200/70 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                }`}
+                              >
+                                {hasHint ? "✓ Terisi" : "Opsional"}
+                              </span>
+                              {isHintOpen ? (
+                                <ChevronUpIcon
+                                  className={`w-3.5 h-3.5 ${
+                                    hasHint
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                />
+                              ) : (
+                                <ChevronDownIcon
+                                  className={`w-3.5 h-3.5 ${
+                                    hasHint
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                />
+                              )}
+                            </div>
+                          </button>
+
+                          {!isHintOpen && hasHint && (
+                            <div
+                              onClick={openHint}
+                              className="px-3 pb-2.5 text-[11px] text-emerald-800 dark:text-emerald-300 truncate cursor-pointer hover:underline opacity-90"
+                              title="Klik untuk membuka editor"
+                            >
+                              {stripHtml(q.hint)}
+                            </div>
+                          )}
+
+                          {isHintOpen && (
+                            <div className="p-3 pt-2 border-t border-dashed border-gray-200 dark:border-slate-700/80">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+                                Bimbingan scaffolding konsep / rumus awal tanpa membocorkan kunci/jawaban akhir.
+                              </p>
+                              <WysiwygEditor
+                                value={q.hint || ""}
+                                onChange={(val) => handleHintChange(q.id, val)}
+                                placeholder="Tulis petunjuk pengerjaan (petunjuk saja bukan jawaban)..."
+                                minHeight="75px"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Langkah Pengerjaan */}
+                        <div
+                          className={`flex flex-col rounded-xl border transition-all duration-200 shadow-2xs overflow-hidden ${
+                            hasSteps
+                              ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700/80"
+                              : "bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={toggleSteps}
+                            className="w-full p-3 flex items-center justify-between text-left cursor-pointer hover:bg-black/2 dark:hover:bg-white/2 transition-colors select-none"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <AcademicCapIcon
+                                className={`w-4 h-4 shrink-0 ${
+                                  hasSteps
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-slate-400 dark:text-slate-500"
+                                }`}
+                              />
+                              <label
+                                className={`text-[11px] font-black uppercase tracking-wider truncate cursor-pointer ${
+                                  hasSteps
+                                    ? "text-emerald-900 dark:text-emerald-300"
+                                    : "text-slate-700 dark:text-slate-300"
+                                }`}
+                              >
+                                Langkah Pengerjaan
+                              </label>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  hasSteps
+                                    ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                    : "bg-slate-200/70 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                }`}
+                              >
+                                {hasSteps ? "✓ Terisi" : "Opsional"}
+                              </span>
+                              {isStepsOpen ? (
+                                <ChevronUpIcon
+                                  className={`w-3.5 h-3.5 ${
+                                    hasSteps
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                />
+                              ) : (
+                                <ChevronDownIcon
+                                  className={`w-3.5 h-3.5 ${
+                                    hasSteps
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                />
+                              )}
+                            </div>
+                          </button>
+
+                          {!isStepsOpen && hasSteps && (
+                            <div
+                              onClick={openSteps}
+                              className="px-3 pb-2.5 text-[11px] text-emerald-800 dark:text-emerald-300 truncate cursor-pointer hover:underline opacity-90"
+                              title="Klik untuk membuka editor"
+                            >
+                              {stripHtml(q.solutionSteps)}
+                            </div>
+                          )}
+
+                          {isStepsOpen && (
+                            <div className="p-3 pt-2 border-t border-dashed border-gray-200 dark:border-slate-700/80">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+                                Cara menjawab dari awal sampai ketemu jawaban (dapat dibuka siswa pada ulasan nilai).
+                              </p>
+                              <WysiwygEditor
+                                value={q.solutionSteps || ""}
+                                onChange={(val) => handleSolutionStepsChange(q.id, val)}
+                                placeholder="Tulis cara menjawab dari awal sampai selesai di sini..."
+                                minHeight="75px"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
             )}
           </div>
         </div>
