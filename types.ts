@@ -106,6 +106,10 @@ export interface Question {
   }[];
 
   categoryLabels?: [string, string] | string[]; // Label pilihan untuk soal kategori (misal: ["Benar", "Salah"], ["Sesuai", "Tidak Sesuai"]), default: ["Benar", "Salah"]
+
+  // Petunjuk Pengerjaan & Langkah Pengerjaan
+  hint?: string;          // Petunjuk pengerjaan (clue non-jawaban, scaffolding konsep/rumus)
+  solutionSteps?: string; // Langkah pengerjaan (penjabaran cara menjawab dari awal sampai ketemu jawaban)
 }
 
 export interface RegisteredStudentConfig {
@@ -162,6 +166,8 @@ export interface ExamConfig {
   continueWithPermission: boolean;
   showResultToStudent: boolean;
   showCorrectAnswer: boolean;
+  showHints?: boolean; // NEW: Checkbox tampilkan petunjuk pengerjaan (saat ujian & ulasan)
+  showSolutionSteps?: boolean; // NEW: Checkbox tampilkan langkah pengerjaan (halaman hasil/ulasan)
   enableCertificate?: boolean;
   enablePublicStream: boolean;
   disableRealtime: boolean; // NEW: Untuk mode skala besar >200 siswa
