@@ -818,6 +818,30 @@ export const ExamConfigSettings: React.FC<ExamConfigSettingsProps> = ({
             <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
               <input
                 type="checkbox"
+                name="showHints"
+                checked={config.showHints || false}
+                onChange={handleConfigChange}
+                className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
+              />
+              <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                Tampilkan Petunjuk Pengerjaan
+              </span>
+            </label>
+            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
+              <input
+                type="checkbox"
+                name="showSolutionSteps"
+                checked={config.showSolutionSteps || false}
+                onChange={handleConfigChange}
+                className="h-5 w-5 rounded text-primary focus:ring-primary border-gray-300"
+              />
+              <span className="ml-3 text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                Tampilkan Langkah Pengerjaan
+              </span>
+            </label>
+            <label className="flex items-center p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer group shadow-sm">
+              <input
+                type="checkbox"
                 name="enableCertificate"
                 checked={config.enableCertificate || false}
                 onChange={handleConfigChange}
