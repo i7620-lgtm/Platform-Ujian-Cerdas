@@ -15,6 +15,7 @@ import {
   LockClosedIcon,
   ListBulletIcon,
   ExclamationTriangleIcon,
+  LightBulbIcon,
 } from "./Icons";
 import { storageService } from "../services/storage";
 import { useStudentExamLogic } from "./student/useStudentExamLogic";
@@ -133,6 +134,11 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
   } = useStudentExamLogic({ exam, student, initialData, onSubmit, onUpdate });
 
   const [isSessionBannerDismissed, setIsSessionBannerDismissed] = useState(false);
+  const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
+
+  const toggleHint = useCallback((questionId: string) => {
+    setExpandedHints((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
+  }, []);
 
   interface FontStepConfig {
     step: number;
@@ -834,6 +840,40 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {/* Petunjuk Pengerjaan (Hanya muncul jika diizinkan oleh guru via showHints dan soal memiliki petunjuk) */}
+                    {activeExam.config?.showHints && q.hint && q.hint.trim() !== "" && (
+                      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => toggleHint(q.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/40 border border-amber-200/80 dark:border-amber-800/60 transition-colors shadow-2xs"
+                        >
+                          <LightBulbIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>{expandedHints[q.id] ? "Tutup Petunjuk Pengerjaan" : "Buka Petunjuk Pengerjaan"}</span>
+                          {expandedHints[q.id] ? (
+                            <ChevronUpIcon className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          ) : (
+                            <ChevronDownIcon className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          )}
+                        </button>
+
+                        {expandedHints[q.id] && (
+                          <div className="mt-2.5 p-3.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 rounded-xl text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                            <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-400 mb-1.5">
+                              <LightBulbIcon className="w-3 h-3 text-amber-500" />
+                              <span>Petunjuk Pengerjaan</span>
+                            </div>
+                            <div
+                              className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 [&_p]:my-1"
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeHtml(optimizeHtml(q.hint)),
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

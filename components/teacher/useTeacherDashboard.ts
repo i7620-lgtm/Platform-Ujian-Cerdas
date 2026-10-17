@@ -36,6 +36,8 @@ const DEFAULT_CONFIG: ExamConfig = {
   continueWithPermission: false,
   showResultToStudent: true,
   showCorrectAnswer: false,
+  showHints: false,
+  showSolutionSteps: false,
   enableCertificate: false,
   enablePublicStream: false,
   disableRealtime: true,

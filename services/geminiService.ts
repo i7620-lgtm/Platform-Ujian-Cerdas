@@ -165,6 +165,10 @@ export async function generateQuestions(
        - Satuan Derajat Suhu: WAJIB menggunakan simbol derajat "°" langsung sebagai TEKS BIASA (contoh: 35°C, 100°C, 32°F, 0°C, 273 K). DILARANG KERAS menggunakan kode LaTeX seperti '$35^\\circ\\text{C}$' atau '$35^\\circ C$'.
        - Format Rumus Sejati: Gunakan sintaks LaTeX rapi $\\frac{a}{b}$ untuk pecahan, $\\sqrt{x}$ untuk akar, atau $x^2$ untuk pangkat.
 
+    5. PETUNJUK PENGERJAAN & LANGKAH PENGERJAAN PEDAGOGIS:
+       - Field 'hint' (Petunjuk Pengerjaan): Bimbingan scaffolding, arahan rumus dasar, atau strategi berpikir konseptual tanpa membocorkan kunci jawaban atau opsi yang benar. WAJIB diisi untuk setiap butir soal.
+       - Field 'solutionSteps' (Langkah Pengerjaan): Uraian lengkap langkah demi langkah dari awal membaca masalah, mengidentifikasi besaran/konsep, langkah penurunan/perhitungan matematis, hingga didapat jawaban akhir yang tuntas. WAJIB diisi untuk setiap butir soal.
+
     ATURAN FORMAT UMUM:
     - Gunakan format Markdown secara maksimal pada teks pertanyaan.
     - Gunakan tabel Markdown jika diperlukan untuk menyajikan data. WAJIB tambahkan baris kosong (\\n\\n) sebelum dan sesudah tabel.
@@ -497,6 +501,8 @@ export async function generateQuestions(
       description: "Data diagram untuk setiap opsi jawaban (opsional, urutan harus sesuai dengan options)"
     },
     explanation: { type: Type.STRING, description: "Penjelasan matematis langkah demi langkah atau penalaran logis untuk memastikan jawaban akurat. WAJIB diisi untuk soal hitungan, geometri, fisika, kimia, matematika, dll agar hasil perhitungan benar." },
+    hint: { type: Type.STRING, description: "Petunjuk pengerjaan (bimbingan clue atau arahan rumus/konsep dasar yang memandu siswa berpikir TANPA membocorkan kunci atau pilihan jawaban). WAJIB diisi untuk setiap butir soal." },
+    solutionSteps: { type: Type.STRING, description: "Langkah pengerjaan lengkap tahap demi tahap dari awal penalaran/rumus sampai ketemu jawaban akhir yang tuntas dan jelas. WAJIB diisi untuk setiap butir soal." },
     correctAnswer: { type: Type.STRING, description: "Kunci jawaban pasti yang 100% akurat. Untuk PG: sama persis dengan salah satu opsi. Untuk PGK: opsi-opsi benar dipisah tanda '|||'. Untuk Benar/Salah: ringkasan nilai kebenaran. Untuk Isian/Esai: jawaban pasti." },
     correctAnswerChart: {
       ...chartDataSchema,
@@ -1521,6 +1527,9 @@ export async function generateQuestions(
             specificKisiKisi = `Disajikan stimulus terkait ${topic} (${kognitif}), peserta didik dapat menganalisis dan menyelesaikan masalah dengan tepat.`;
         }
 
+        const formattedHint = q.hint ? formatContent(q.hint) : undefined;
+        const formattedSolutionSteps = q.solutionSteps ? formatContent(q.solutionSteps) : (q.explanation ? formatContent(q.explanation) : undefined);
+
         const mappedQ: Question = {
             id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             questionText: questionText,
@@ -1529,6 +1538,8 @@ export async function generateQuestions(
             optionCharts: q.optionCharts,
             correctAnswer: String(correctAnswer),
             correctAnswerChart: q.correctAnswerChart,
+            hint: formattedHint,
+            solutionSteps: formattedSolutionSteps,
             scoreWeight: (config.scoreWeight && config.scoreWeight > 0) ? config.scoreWeight : (q.scoreWeight || 1),
             kisiKisi: config.kisiKisi?.trim() || specificKisiKisi,
             level: expectedDiff || q.level?.trim() || "Level 3 - Penalaran (Reasoning / HOTS)",

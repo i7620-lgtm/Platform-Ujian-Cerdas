@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Question } from "../../../types";
 import { TrashIcon, CheckIcon, PlusCircleIcon } from "../../Icons";
 import { WysiwygEditor } from "../WysiwygEditor";
@@ -16,6 +16,8 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
   const handleDeleteOption = useExamEditorStore((s) => s.handleDeleteOption);
   const handleAddOption = useExamEditorStore((s) => s.handleAddOption);
   const setEditingChartTarget = useExamEditorUIStore((s) => s.setEditingChartTarget);
+
+  const [optToDelete, setOptToDelete] = useState<{ index: number; letter: string } | null>(null);
 
   if (!q.options) return null;
 
@@ -40,14 +42,15 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
           return (
             <div
               key={`cmc-${q.id}-${optIndex}`}
-              className="flex gap-2 items-start"
+              className="flex gap-2.5 items-stretch"
             >
-              <div className="flex-shrink-0 mt-6 pt-1">
-                <label className="relative flex items-center cursor-pointer">
+              {/* Kolom Kiri: Checkbox Opsi di Atas & Tombol Hapus Kotak Merah Lembut di Bawah */}
+              <div className="flex flex-col items-center justify-between shrink-0 self-stretch py-0.5 w-8">
+                <label className="relative flex items-center justify-center cursor-pointer w-8 h-8 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shrink-0">
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    onChange={(e) =>
+                    onChange={() =>
                       handleComplexCorrectAnswerChange(q.id, opt, !isSelected)
                     }
                     className="w-6 h-6 border-2 border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 checked:bg-primary checked:border-primary focus:ring-primary focus:ring-offset-1 transition-all cursor-pointer appearance-none"
@@ -58,12 +61,25 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
                     }`}
                   />
                 </label>
+
+                {q.options!.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setOptToDelete({ index: optIndex, letter })}
+                    className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-300 shadow-2xs flex items-center justify-center shrink-0 transition-all cursor-pointer"
+                    title={`Hapus Pernyataan ${letter}`}
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <div className="flex-1">
+
+              {/* Kolom Kanan: Editor Opsi Lebar Penuh */}
+              <div className="flex-1 min-w-0">
                 <WysiwygEditor
                   value={opt}
                   onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
-                  placeholder={`Pernyataan ${String.fromCharCode(65 + optIndex)}`}
+                  placeholder={`Pernyataan ${letter}`}
                   minHeight="50px"
                   onChartClick={() =>
                     setEditingChartTarget({
@@ -75,20 +91,11 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
                   chartData={q.optionCharts?.[optIndex]}
                 />
               </div>
-              {q.options!.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteOption(q.id, optIndex)}
-                  className="mt-6 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                  title="Hapus opsi"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              )}
             </div>
           );
         })}
       </div>
+
       {q.options.length < 6 && (
         <button
           type="button"
@@ -98,6 +105,42 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
           <PlusCircleIcon className="w-4 h-4" /> Tambah Opsi{" "}
           {String.fromCharCode(65 + q.options.length)}
         </button>
+      )}
+
+      {/* Modal Dialog Konfirmasi Hapus Opsi (Aman dari Sentuhan Tidak Sengaja di HP) */}
+      {optToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-2xs">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 max-w-xs w-full shadow-2xl border border-slate-100 dark:border-slate-700 text-center">
+            <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
+              <TrashIcon className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+              Hapus Pernyataan {optToDelete.letter}?
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+              Apakah Anda yakin ingin menghapus pernyataan ini? Pernyataan yang tersisa akan otomatis diurutkan kembali.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOptToDelete(null)}
+                className="flex-1 py-2 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDeleteOption(q.id, optToDelete.index);
+                  setOptToDelete(null);
+                }}
+                className="flex-1 py-2 px-3 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-sm cursor-pointer"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
