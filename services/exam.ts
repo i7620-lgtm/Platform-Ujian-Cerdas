@@ -565,6 +565,12 @@ export class ExamService {
                     q.options[i] = await processHtmlString(q.options[i], `${q.id}_opt_${i}`);
                 }
             }
+            if (q.hint) {
+                q.hint = await processHtmlString(this.sanitizeHtmlString(q.hint), `${q.id}_hint`);
+            }
+            if (q.solutionSteps) {
+                q.solutionSteps = await processHtmlString(this.sanitizeHtmlString(q.solutionSteps), `${q.id}_steps`);
+            }
             if (q.trueFalseRows) {
                 q.trueFalseRows = q.trueFalseRows.map((r: { text: string; answer?: boolean }) => ({ ...r, text: this.sanitizeHtmlString(r.text) }));
             }
@@ -899,6 +905,12 @@ export class ExamService {
                 for (let i = 0; i < q.options.length; i++) {
                     q.options[i] = await revertHtmlImages(q.options[i]);
                 }
+            }
+            if (q.hint) {
+                q.hint = await revertHtmlImages(q.hint);
+            }
+            if (q.solutionSteps) {
+                q.solutionSteps = await revertHtmlImages(q.solutionSteps);
             }
         }
         return examData;
