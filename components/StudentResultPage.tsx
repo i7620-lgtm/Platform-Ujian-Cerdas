@@ -509,7 +509,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({
                   </button>
                 )}
 
-                {config.showCorrectAnswer && (
+                {(config.showCorrectAnswer || config.showHints || config.showSolutionSteps) && (
                   <button
                     onClick={() => setExpandedReview(!expandedReview)}
                     className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-white hover:bg-indigo-600 dark:hover:bg-indigo-500 px-6 py-3 rounded-2xl transition-all inline-flex items-center gap-2 border-2 border-indigo-100 dark:border-indigo-900/30"
