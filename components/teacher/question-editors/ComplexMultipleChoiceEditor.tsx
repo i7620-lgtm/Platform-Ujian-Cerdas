@@ -42,10 +42,45 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
           return (
             <div
               key={`cmc-${q.id}-${optIndex}`}
-              className="flex gap-2.5 items-stretch"
+              className="flex flex-col sm:flex-row sm:gap-2.5 sm:items-stretch"
             >
-              {/* Kolom Kiri: Checkbox Opsi di Atas & Tombol Hapus Kotak Merah Lembut di Bawah */}
-              <div className="flex flex-col items-center justify-between shrink-0 self-stretch py-0.5 w-8">
+              {/* KHUSUS HP (Baris Atas): Checkbox Opsi di Kiri, Tombol Hapus di Kanan */}
+              <div className="flex sm:hidden items-center justify-between w-full mb-1.5 px-0.5">
+                <div className="flex items-center gap-2">
+                  <label className="relative flex items-center justify-center cursor-pointer w-8 h-8 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() =>
+                        handleComplexCorrectAnswerChange(q.id, opt, !isSelected)
+                      }
+                      className="w-6 h-6 border-2 border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 checked:bg-primary checked:border-primary focus:ring-primary focus:ring-offset-1 transition-all cursor-pointer appearance-none"
+                    />
+                    <CheckIcon
+                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-white pointer-events-none transition-opacity ${
+                        isSelected ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                  </label>
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                    Pernyataan {letter} {isSelected && <span className="text-primary text-[10px] ml-1 font-extrabold">(Kunci Benar)</span>}
+                  </span>
+                </div>
+
+                {q.options!.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setOptToDelete({ index: optIndex, letter })}
+                    className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-300 shadow-2xs flex items-center justify-center shrink-0 transition-all cursor-pointer"
+                    title={`Hapus Pernyataan ${letter}`}
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* TABLET & DESKTOP (Kolom Kiri Vertikal): Checkbox di Atas, Hapus di Bawah */}
+              <div className="hidden sm:flex flex-col items-center justify-between shrink-0 self-stretch py-0.5 w-8">
                 <label className="relative flex items-center justify-center cursor-pointer w-8 h-8 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shrink-0">
                   <input
                     type="checkbox"
@@ -74,8 +109,8 @@ export const ComplexMultipleChoiceEditor: React.FC<ComplexMultipleChoiceEditorPr
                 )}
               </div>
 
-              {/* Kolom Kanan: Editor Opsi Lebar Penuh */}
-              <div className="flex-1 min-w-0">
+              {/* Editor Opsi: Di HP Menempati Baris Bawah Penuh, Di Tablet/Desktop Di Kolom Kanan */}
+              <div className="w-full sm:flex-1 min-w-0">
                 <WysiwygEditor
                   value={opt}
                   onChange={(val) => handleOptionTextChange(q.id, optIndex, val)}
