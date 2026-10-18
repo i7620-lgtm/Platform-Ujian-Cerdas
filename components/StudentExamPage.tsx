@@ -426,13 +426,16 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
                 )}
             </div>
 
-            <button
-              onClick={() => setShowConfigIntro(false)}
-              className="w-full mt-4 sm:mt-5 py-3 sm:py-3.5 px-6 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-lg hover:shadow-indigo-500/20 transition-all active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              <span>Mulai Mengerjakan</span>
-              <CheckCircleIcon className="w-4.5 h-4.5 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
-            </button>
+            {/* Garis Pemisah Horizontal & Tombol Mulai Mengerjakan */}
+            <div className="mt-3.5 sm:mt-4 pt-3.5 sm:pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowConfigIntro(false)}
+                className="w-full py-2.5 sm:py-3 px-5 bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-md hover:shadow-indigo-500/20 transition-all active:scale-[0.99] flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                <span>Mulai Mengerjakan</span>
+                <CheckCircleIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 group-hover:scale-110 transition-transform" />
+              </button>
+            </div>
           </div>
         </div>
       )}
