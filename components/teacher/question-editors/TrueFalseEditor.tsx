@@ -158,7 +158,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
 
       <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex justify-between items-center mb-1">
         <span>Daftar Pernyataan</span>
-        <div className="flex gap-4 pr-[84px] text-xs font-bold text-slate-500 dark:text-slate-400">
+        <div className="hidden md:flex gap-4 pr-[84px] text-xs font-bold text-slate-500 dark:text-slate-400">
           <span className="w-16 text-center truncate text-emerald-600 dark:text-emerald-400" title={trueLabel}>
             {trueLabel}
           </span>
@@ -172,9 +172,10 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
         {activeRows.map((row, rIndex) => (
           <div
             key={`tf-${q.id}-${rIndex}`}
-            className="flex gap-2 items-start"
+            className="flex flex-col md:flex-row gap-2 items-stretch md:items-start bg-slate-50/60 dark:bg-slate-800/40 p-2.5 md:p-0 rounded-2xl md:rounded-none md:bg-transparent border md:border-0 border-slate-100 dark:border-slate-700/60"
           >
-            <div className="flex-1">
+            {/* Editor Pernyataan (Lebar Penuh) */}
+            <div className="flex-1 min-w-0">
               <WysiwygEditor
                 value={row.text}
                 onChange={(val) => handleTrueFalseRowTextChange(q.id, rIndex, val)}
@@ -190,7 +191,57 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
                 chartData={row.chartData}
               />
             </div>
-            <div className="flex-shrink-0 flex gap-4 mt-8 px-4">
+
+            {/* KHUSUS HP (Di Bawah Pernyataan): Benar, Salah, Hapus Berdampingan */}
+            <div className="flex md:hidden items-center gap-2 mt-1.5 w-full">
+              <button
+                type="button"
+                onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, true)}
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
+                  row.answer === true
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20 shadow-2xs"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-300"
+                }`}
+              >
+                <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === true ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"}`}>
+                  {row.answer === true && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                </span>
+                <span className="truncate">{trueLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTrueFalseRowAnswerChange(q.id, rIndex, false)}
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
+                  row.answer === false
+                    ? "border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/20 shadow-2xs"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-rose-300"
+                }`}
+              >
+                <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${row.answer === false ? "border-rose-500 bg-rose-500" : "border-slate-300 dark:border-slate-600"}`}>
+                  {row.answer === false && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                </span>
+                <span className="truncate">{falseLabel}</span>
+              </button>
+
+              {activeRows.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Hapus pernyataan ini?")) {
+                      handleDeleteTrueFalseRow(q.id, rIndex);
+                    }
+                  }}
+                  className="w-9 h-9 rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center shrink-0 shadow-2xs transition-all cursor-pointer"
+                  title="Hapus pernyataan"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* TABLET & DESKTOP (Di Sisi Kanan Pernyataan): Radio Benar, Radio Salah, dan Hapus */}
+            <div className="hidden md:flex flex-shrink-0 gap-4 mt-8 px-4">
               <label 
                 className="relative flex items-center justify-center cursor-pointer w-16"
                 title={`Pilih jika pernyataan bernilai ${trueLabel}`}
@@ -230,7 +281,7 @@ export const TrueFalseEditor: React.FC<TrueFalseEditorProps> = ({ q }) => {
               <button
                 type="button"
                 onClick={() => handleDeleteTrueFalseRow(q.id, rIndex)}
-                className="mt-6 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                className="hidden md:flex mt-6 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors cursor-pointer"
                 title="Hapus pernyataan"
               >
                 <TrashIcon className="w-4 h-4" />
