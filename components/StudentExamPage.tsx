@@ -289,7 +289,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
       if (e.touches.length === 1) {
         const currentY = e.touches[0].clientY;
         const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        if (scrollTop <= 0 && currentY > startY) {
+        if (scrollTop <= 0 && currentY > startY + 12) {
           if (e.cancelable) {
             e.preventDefault();
           }
@@ -308,35 +308,10 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
     };
   }, [isSubmitting]);
 
-  // Auto-scroll to last viewed question or first unanswered question after load
+  // Selalu mulai dari posisi paling atas halaman ujian saat pertama kali dimuat
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const lastQId = localStorage.getItem(`exam_last_q_${activeExam.code}_${student.studentId}`);
-        if (lastQId) {
-          const el = document.getElementById(lastQId);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-        }
-        // Fallback: scroll to first unanswered question if answers already exist
-        const firstUnanswered = activeExam.questions.find(
-          (q) => q.questionType !== "INFO" && !isAnswered(q, answersRef.current)
-        );
-        if (firstUnanswered && answersRef.current && Object.keys(answersRef.current).length > 0) {
-          const el = document.getElementById(firstUnanswered.id);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [activeExam.code, activeExam.questions, answersRef, isAnswered, student.studentId]);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-40 transition-colors duration-300">
@@ -757,7 +732,7 @@ export const StudentExamPage: React.FC<StudentExamPageProps> = ({
             <div
               key={q.id}
               id={q.id}
-              className={`scroll-mt-32 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-[1.5rem]" : ""}`}
+              className={`scroll-mt-24 sm:scroll-mt-28 animate-fade-in transition-all duration-500 ${isMissing ? "ring-2 ring-rose-400 rounded-[1.5rem]" : ""}`}
             >
               <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8">
                 <div className="flex gap-4 sm:gap-5 items-start">
